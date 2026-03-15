@@ -88,6 +88,8 @@ def compute_skill_hash(skill_dir: Path) -> str:
     return hasher.hexdigest()
 ```
 
+**Note on hash collisions**: SHA-256 collisions are astronomically unlikely (~2^128 effort). If a collision occurred, a modified skill would be incorrectly detected as unchanged. This is an acceptable theoretical risk for this use case.
+
 **Files included**:
 - `SKILL.md` (required)
 - `references/*.md` (if present)
@@ -275,6 +277,18 @@ TOOLS = [
 MAX_ITERATIONS = 20
 EXTRACTION_TIMEOUT = 120  # seconds per API call
 COMPLETION_TOOL = "extract_skill"  # LLM must call this to finish
+MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6-20250514")
+
+def tool_result(tool_id: str, content: str) -> dict:
+    """Create a tool result message for the conversation."""
+    return {
+        "role": "user",
+        "content": [{
+            "type": "tool_result",
+            "tool_use_id": tool_id,
+            "content": content
+        }]
+    }
 
 def tool_use_loop(skill_dir: Path) -> ExtractedSkill:
     """
@@ -512,8 +526,10 @@ ag:payload_abc123
 2. Write to skills.ttl.tmp
 3. Rename skills.ttl.tmp → skills.ttl (atomic)
 4. On failure: restore from backup
-5. Cleanup: keep only last 5 backups
+5. Cleanup: After successful write, delete oldest backups keeping only 5
 ```
+
+**Cleanup timing**: Backup cleanup runs immediately after successful atomic rename, in the same operation.
 
 ---
 
@@ -532,8 +548,6 @@ Compile skills into ontology.
 - `--dry-run`: Preview without saving
 - `--skip-security`: Skip security checks (not recommended)
 - `-y, --yes`: Skip confirmation prompt
-- `-v, --verbose`: Enable debug logging
-- `-q, --quiet`: Suppress progress output
 - `-v, --verbose`: Enable debug logging
 - `-q, --quiet`: Suppress progress output
 
@@ -582,6 +596,35 @@ def execute_sparql(ontology_path: Path, query: str, format: str) -> str:
         raise SPARQLError(f"Invalid query: {e}")
 
     return format_results(results, format)
+
+def format_results(results, format: str) -> str:
+    """Format SPARQL results for output."""
+    if format == "json":
+        import json
+        rows = [dict(row) for row in results]
+        return json.dumps(rows, indent=2, default=str)
+
+    elif format == "turtle":
+        lines = []
+        for row in results:
+            lines.extend(str(v) for v in row)
+        return "\n".join(lines)
+
+    else:  # table
+        from rich.console import Console
+        from rich.table import Table
+
+        table = Table(title="Query Results")
+        for var in results.vars:
+            table.add_column(str(var))
+
+        for row in results:
+            table.add_row(*[str(v) for v in row])
+
+        console = Console()
+        with console.capture() as capture:
+            console.print(table)
+        return capture.get()
 ```
 
 **Result serialization by format**:
