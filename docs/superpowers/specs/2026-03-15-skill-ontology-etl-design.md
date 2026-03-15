@@ -25,6 +25,81 @@ Skill Ontology ETL is a CLI tool that compiles unstructured Markdown agent skill
 
 ---
 
+## Deterministic Algorithms
+
+### ID Generation Algorithm
+
+Skill IDs are derived from the skill directory name:
+
+```python
+def generate_skill_id(directory_name: str) -> str:
+    """
+    Generate deterministic slug from directory name.
+
+    Algorithm:
+    1. Lowercase the directory name
+    2. Replace spaces and underscores with hyphens
+    3. Remove all characters except alphanumeric and hyphens
+    4. Collapse consecutive hyphens
+    5. Truncate to 64 characters max
+    """
+    slug = directory_name.lower()
+    slug = re.sub(r'[\s_]+', '-', slug)
+    slug = re.sub(r'[^a-z0-9-]', '', slug)
+    slug = re.sub(r'-+', '-', slug)
+    slug = slug.strip('-')
+    return slug[:64]
+```
+
+**Examples**:
+- `DOCX-Engineering` → `docx-engineering`
+- `My_Awesome Skill!!!` → `my-awesome-skill`
+- `skill` → `skill`
+
+### Hash Computation Algorithm
+
+Hash is computed over ALL files in the skill directory:
+
+```python
+def compute_skill_hash(skill_dir: Path) -> str:
+    """
+    Compute SHA-256 hash of all files in skill directory.
+
+    Algorithm:
+    1. Recursively find all non-hidden files
+    2. Sort files by relative path (alphabetically)
+    3. For each file: hash(filename) + hash(content)
+    4. Concatenate all hashes
+    5. Final SHA-256 of concatenated hash
+    """
+    hasher = hashlib.sha256()
+
+    files = sorted(
+        f for f in skill_dir.rglob('*')
+        if f.is_file() and not f.name.startswith('.')
+    )
+
+    for file_path in files:
+        # Include relative path in hash
+        rel_path = file_path.relative_to(skill_dir)
+        hasher.update(str(rel_path).encode('utf-8'))
+        hasher.update(file_path.read_bytes())
+
+    return hasher.hexdigest()
+```
+
+**Files included**:
+- `SKILL.md` (required)
+- `references/*.md` (if present)
+- `*.py`, `*.js`, etc. (code files)
+- Any other non-hidden files
+
+**Files excluded**:
+- Hidden files (starting with `.`)
+- `.DS_Store`, `__pycache__/`, etc.
+
+---
+
 ## Architecture
 
 ### High-Level Flow
@@ -126,6 +201,127 @@ Instead of concatenating all files into one prompt, the tool uses Claude's nativ
 2. `read_file` - Read specific files (SKILL.md, references, code)
 3. `extract_skill` - Submit final structured extraction
 
+### Tool JSON Schemas
+
+```python
+TOOLS = [
+    {
+        "name": "list_files",
+        "description": "List all files in the skill directory recursively.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
+        "name": "read_file",
+        "description": "Read a file from the skill directory.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Relative path from skill directory root"
+                }
+            },
+            "required": ["path"]
+        }
+    },
+    {
+        "name": "extract_skill",
+        "description": "Submit the extracted skill data in structured format.",
+        "input_schema": ExtractedSkill.model_json_schema()
+    }
+]
+```
+
+### Tool Response Formats
+
+**list_files response**:
+```json
+{
+    "files": ["SKILL.md", "references/guide.md", "examples/demo.py"]
+}
+```
+
+**read_file response**:
+```json
+{
+    "content": "# Skill Title\n\nContent here...",
+    "path": "SKILL.md"
+}
+```
+
+**read_file error**:
+```json
+{
+    "error": "File not found: nonexistent.md"
+}
+```
+
+**extract_skill response** (from tool handler):
+```json
+{
+    "status": "success",
+    "message": "Skill extracted successfully"
+}
+```
+
+### Tool-Use Loop Specification
+
+```python
+# Configuration
+MAX_ITERATIONS = 20
+EXTRACTION_TIMEOUT = 120  # seconds per API call
+COMPLETION_TOOL = "extract_skill"  # LLM must call this to finish
+
+def tool_use_loop(skill_dir: Path) -> ExtractedSkill:
+    """
+    Orchestrates the tool-use conversation with Claude.
+
+    Flow:
+    1. Send initial message asking to analyze skill
+    2. LLM responds with tool calls
+    3. Execute tool calls, return results
+    4. Repeat until LLM calls extract_skill or max iterations
+    5. Validate extraction with Pydantic
+    """
+    messages = [{"role": "user", "content": "Analyze skill..."}]
+
+    for iteration in range(MAX_ITERATIONS):
+        response = client.messages.create(
+            model=MODEL,
+            max_tokens=8192,
+            tools=TOOLS,
+            messages=messages,
+            timeout=EXTRACTION_TIMEOUT
+        )
+
+        # Process tool calls
+        for block in response.content:
+            if block.type == "tool_use":
+                if block.name == "extract_skill":
+                    # Validate and return
+                    return ExtractedSkill.model_validate(block.input)
+                else:
+                    # Execute tool, add result to messages
+                    result = execute_tool(block.name, block.input, skill_dir)
+                    messages.append(tool_result(block.id, result))
+
+        # Check for end_turn without extraction
+        if response.stop_reason == "end_turn":
+            raise ExtractionError("LLM finished without calling extract_skill")
+
+    raise ExtractionError(f"Max iterations ({MAX_ITERATIONS}) exceeded")
+```
+
+**Error Handling**:
+- Timeout → raise `ExtractionError`, don't save
+- Max iterations → raise `ExtractionError`, don't save
+- Invalid tool call → return error JSON, let LLM retry
+- Pydantic validation failure → raise `ExtractionError`
+
 **Benefits**:
 - No token limits from concatenation
 - LLM reads only what's needed
@@ -206,38 +402,94 @@ Content is normalized before pattern matching to prevent bypass:
 
 ### Predicate Mapping
 
-| Pydantic Field | RDF Predicate | Namespace |
-|----------------|---------------|-----------|
-| `id` | `dcterms:identifier` | Dublin Core |
-| `nature` | `ag:nature` | Custom |
-| `genus` | `skos:broader` | SKOS |
-| `differentia` | `ag:differentia` | Custom |
-| `intents` | `ag:resolvesIntent` | Custom |
-| `depends_on` | `dcterms:requires` | Dublin Core |
-| `extends` | `dcterms:isVersionOf` | Dublin Core |
-| `contradicts` | `ag:contradicts` | Custom |
-| `execution_payload` | `ag:hasPayload` | Custom |
-| `provenance` | `prov:wasDerivedFrom` | PROV |
+| Pydantic Field | RDF Predicate | Namespace | Notes |
+|----------------|---------------|-----------|-------|
+| `id` | `dcterms:identifier` | Dublin Core | Literal |
+| `nature` | `ag:nature` | Custom | Literal |
+| `genus` | `skos:broader` | SKOS | Literal |
+| `differentia` | `ag:differentia` | Custom | Literal |
+| `intents` | `ag:resolvesIntent` | Custom | Multiple literals |
+| `depends_on` | `dcterms:requires` | Dublin Core | Literal (skill ID) |
+| `extends` | `dcterms:isVersionOf` | Dublin Core | Literal (skill ID) |
+| `contradicts` | `ag:contradicts` | Custom | Literal (concept ID) |
+| `constraints` | `ag:hasConstraint` | Custom | Multiple literals |
+| `execution_payload` | `ag:hasPayload` | Custom | Blank node |
+| `provenance` | `prov:wasDerivedFrom` | PROV | Literal (file path) |
+
+### Requirement Mapping (Nested Structure)
+
+Requirements are mapped as blank nodes with typed classes:
+
+```turtle
+ag:skill_abc123 ag:hasRequirement ag:req_x7z9k2 .
+
+ag:req_x7z9k2 a ag:RequirementEnvVar ;
+    ag:requirementValue "API_KEY" ;
+    ag:isOptional false .
+```
+
+**Requirement type → RDF class mapping**:
+| Requirement Type | RDF Class |
+|------------------|-----------|
+| `EnvVar` | `ag:RequirementEnvVar` |
+| `Tool` | `ag:RequirementTool` |
+| `Hardware` | `ag:RequirementHardware` |
+| `API` | `ag:RequirementAPI` |
+| `Knowledge` | `ag:RequirementKnowledge` |
+
+**Requirement URI generation**:
+```python
+req_uri = f"ag:req_{sha256(f'{type}:{value}')[:8]}"
+```
+
+### Execution Payload Mapping
+
+Payloads are mapped as blank nodes:
+
+```turtle
+ag:skill_abc123 ag:hasPayload ag:payload_abc123 .
+
+ag:payload_abc123
+    ag:executor "shell" ;
+    ag:code "echo hello" ;
+    ag:timeout 30 .
+```
+
+**Payload fields**:
+| Field | Predicate | Type |
+|-------|-----------|------|
+| `executor` | `ag:executor` | Literal |
+| `code` | `ag:code` | Literal |
+| `timeout` | `ag:timeout` | Literal (integer) |
 
 ### Example Output
 
 ```turtle
 @prefix ag: <http://agentic.web/ontology#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
 
 ag:skill_abc123def456 a ag:AgenticSkill ;
     dcterms:identifier "docx-engineering" ;
-    ag:contentHash "abc123def456..." ;
+    ag:contentHash "abc123def456789..." ;
     ag:nature "Document generation tool that creates DOCX files from templates" ;
     skos:broader "Document Processing Tool" ;
     ag:differentia "that uses python-docx library" ;
-    ag:resolvesIntent "create_docx", "extract_tables" ;
-    dcterms:requires "python-docx" ;
-    ag:hasPayload [
-        ag:executor "python" ;
-        ag:code "from docx import Document..."
-    ] ;
+    ag:resolvesIntent "create_docx" , "extract_tables" ;
+    ag:hasRequirement ag:req_k8m2p5 ;
+    ag:hasConstraint "Always validate file paths before writing" ;
+    ag:hasPayload ag:payload_abc123 ;
     prov:wasDerivedFrom "/skills/docx-engineering/SKILL.md" .
+
+ag:req_k8m2p5 a ag:RequirementTool ;
+    ag:requirementValue "python-docx" ;
+    ag:isOptional false .
+
+ag:payload_abc123
+    ag:executor "python" ;
+    ag:code "from docx import Document\ndoc = Document()" ;
+    ag:timeout 60 .
 ```
 
 ---
@@ -280,6 +532,10 @@ Compile skills into ontology.
 - `--dry-run`: Preview without saving
 - `--skip-security`: Skip security checks (not recommended)
 - `-y, --yes`: Skip confirmation prompt
+- `-v, --verbose`: Enable debug logging
+- `-q, --quiet`: Suppress progress output
+- `-v, --verbose`: Enable debug logging
+- `-q, --quiet`: Suppress progress output
 
 **Flow for single skill**:
 1. Security check (regex → LLM if flagged)
@@ -301,6 +557,46 @@ Execute SPARQL query against ontology.
 skill-etl query "SELECT ?s ?n WHERE { ?s ag:nature ?n }" -f json
 ```
 
+### SPARQL Implementation
+
+Uses `rdflib` for SPARQL execution:
+
+```python
+from rdflib import Graph
+
+def execute_sparql(ontology_path: Path, query: str, format: str) -> str:
+    """
+    Execute SPARQL query and format results.
+
+    Implementation:
+    1. Load ontology with rdflib
+    2. Execute query with graph.query()
+    3. Format results based on output format
+    """
+    graph = Graph()
+    graph.parse(ontology_path, format="turtle")
+
+    try:
+        results = graph.query(query)
+    except Exception as e:
+        raise SPARQLError(f"Invalid query: {e}")
+
+    return format_results(results, format)
+```
+
+**Result serialization by format**:
+
+| Format | Implementation |
+|--------|----------------|
+| `table` | Use `rich.Table`, columns from `results.vars`, rows from result bindings |
+| `json` | `[dict(row) for row in results]`, serialize with `json.dumps()` |
+| `turtle` | For CONSTRUCT queries, serialize graph; for SELECT, print bindings |
+
+**Query validation**:
+- No mutations (INSERT/DELETE not supported)
+- Must be valid SPARQL syntax
+- Namespaces must be declared or use full URIs
+
 ### `skill-etl list-skills`
 
 List all skills in the ontology.
@@ -308,6 +604,62 @@ List all skills in the ontology.
 ### `skill-etl security-audit`
 
 Re-validate all skills in ontology against current security patterns.
+
+### `skill-etl --version`
+
+Display tool version.
+
+### CLI Exit Codes
+
+| Code | Meaning | When Used |
+|------|---------|-----------|
+| `0` | Success | Command completed successfully |
+| `1` | General error | Unhandled exception, generic failure |
+| `2` | Invalid arguments | CLI argument parsing failed |
+| `3` | Security threat | Content blocked by security pipeline |
+| `4` | Extraction failed | LLM extraction did not complete |
+| `5` | Ontology error | Load/parse/write ontology failed |
+| `6` | SPARQL error | Invalid query or execution failed |
+| `7` | Not found | Skill or file not found |
+| `130` | Interrupted | User cancelled (Ctrl+C) |
+
+### Logging Strategy
+
+```python
+# Configuration
+LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+LOG_DATE_FORMAT = "%H:%M:%S"
+
+def setup_logging(verbose: bool, quiet: bool):
+    """
+    Configure logging based on verbosity flags.
+
+    -v, --verbose: DEBUG level, show all messages
+    (default): INFO level, show progress and warnings
+    -q, --quiet: WARNING level, suppress progress messages
+    """
+    if quiet:
+        level = logging.WARNING
+    elif verbose:
+        level = logging.DEBUG
+    else:
+        level = logging.INFO
+
+    logging.basicConfig(
+        level=level,
+        format=LOG_FORMAT,
+        datefmt=LOG_DATE_FORMAT
+    )
+```
+
+**Log levels usage**:
+- `DEBUG`: Tool call details, file contents, hash computations
+- `INFO`: Progress updates, skill counts, file operations
+- `WARNING`: Skipped files, security flags, recoverable errors
+- `ERROR`: Failures that halt processing
+- `CRITICAL`: Security breaches, data corruption
+
+**Log file**: No persistent log file by default. All output to stderr.
 
 ---
 
@@ -319,6 +671,29 @@ Re-validate all skills in ontology against current security patterns.
 | `ANTHROPIC_BASE_URL` | No | - | Custom API endpoint |
 | `ANTHROPIC_MODEL` | No | `claude-sonnet-4-6-20250514` | Extraction model |
 | `SECURITY_MODEL` | No | `claude-3-5-haiku-20241022` | Security review model |
+
+### Timeout Configuration
+
+| Operation | Timeout | Configurable |
+|-----------|---------|--------------|
+| LLM extraction API call | 120s | No (hardcoded) |
+| Security review API call | 30s | No (hardcoded) |
+| Tool-use max iterations | 20 | No (hardcoded) |
+
+**Retry behavior**: No automatic retries. On timeout, raise error and exit.
+
+### Empty Skills Directory Behavior
+
+When `./skills/` is empty or contains no `SKILL.md` files:
+1. Print: "No SKILL.md files found in input directory"
+2. Exit with code 0 (success, nothing to do)
+
+### Skill Name Validation
+
+For `skill-etl compile <SKILL_NAME>`:
+- Valid: alphanumeric, hyphens, underscores
+- Invalid: paths with `/`, `.`, `..`, hidden dirs (starting with `.`)
+- On invalid: print error, list available skills, exit code 7
 
 ---
 
@@ -426,11 +801,29 @@ pytest --cov=. --cov-report=html --cov-fail-under=100
 ### Error Types
 
 ```python
-class OntologyLoadError(Exception):
-    """Raised when ontology loading/parsing fails."""
+class SkillETLError(Exception):
+    """Base exception for skill-etl errors."""
+    exit_code: int = 1
 
-class SecurityError(Exception):
+class OntologyLoadError(SkillETLError):
+    """Raised when ontology loading/parsing fails."""
+    exit_code = 5
+
+class SecurityError(SkillETLError):
     """Raised when security check fails."""
+    exit_code = 3
+
+class ExtractionError(SkillETLError):
+    """Raised when LLM extraction fails."""
+    exit_code = 4
+
+class SPARQLError(SkillETLError):
+    """Raised when SPARQL query fails."""
+    exit_code = 6
+
+class SkillNotFoundError(SkillETLError):
+    """Raised when skill directory or file not found."""
+    exit_code = 7
 ```
 
 ---
