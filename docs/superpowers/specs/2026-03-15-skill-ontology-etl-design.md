@@ -8,7 +8,7 @@
 
 ## Overview
 
-Skill Ontology ETL is a CLI tool that compiles unstructured Markdown agent skills into a W3C-standard RDF/Turtle ontology. The tool enables "Semantic Routing" by allowing small LLMs to query SPARQL instead of reading long markdown files, avoiding context rot and hallucinations.
+Skill Ontology ETL is a CLI tool that compiles unstructured Markdown agent skills into a W3C-standard **OWL 2** RDF/Turtle ontology. The tool enables "Semantic Routing" by allowing small LLMs to query SPARQL instead of reading long markdown files, avoiding context rot and hallucinations.
 
 ## Goals
 
@@ -16,6 +16,7 @@ Skill Ontology ETL is a CLI tool that compiles unstructured Markdown agent skill
 2. **Enable semantic routing**: Allow agents to find skills via SPARQL queries
 3. **Ensure data integrity**: Deterministic IDs, intelligent merging, atomic writes
 4. **Security first**: Defense-in-depth against prompt injection and malicious content
+5. **OWL 2 ready**: Ontology uses OWL 2 constructs with property characteristics for future reasoning
 
 ## Non-Goals
 
@@ -132,7 +133,7 @@ skills/                    ontology/
 | **Extractor** | `extractor.py` | Scan `SKILL.md` files, compute SHA-256 hashes |
 | **Transformer** | `transformer.py` | Tool-use loop with Claude, structured extraction |
 | **Security** | `security.py` | Regex patterns + LLM-as-judge (defense in depth) |
-| **Loader** | `loader.py` | RDF/Turtle serialization, intelligent merge, atomic writes |
+| **Loader** | `loader.py` | OWL 2 RDF/Turtle serialization, intelligent merge, atomic writes |
 | **Schemas** | `schemas.py` | Pydantic models for extraction |
 
 ---
@@ -409,26 +410,65 @@ Content is normalized before pattern matching to prevent bypass:
 
 ```turtle
 @prefix ag: <http://agentic.web/ontology#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix skos: <http://www.w3.org/2004/02/skos/> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 ```
 
+### OWL 2 Property Definitions
+
+Properties are defined with OWL 2 characteristics for reasoning-ready semantics:
+
+```python
+# Property definitions with OWL characteristics
+OWL_PROPERTIES = {
+    "dependsOn": {
+        "inverse": "enables",
+        "asymmetric": True,  # If A depends on B, B cannot depend on A
+    },
+    "extends": {
+        "inverse": "isExtendedBy",
+        "transitive": True,  # If A extends B and B extends C, A extends C
+    },
+    "contradicts": {
+        "symmetric": True,  # If A contradicts B, B contradicts A
+    },
+    "implements": {
+        "inverse": "isImplementedBy",
+    },
+    "exemplifies": {
+        "inverse": "isExemplifiedBy",
+    },
+}
+```
+
+**Reasoning extensibility**: These characteristics enable automatic entailment when `owlrl` is added:
+
+```python
+# Future: Enable reasoning (not implemented yet)
+import owlrl
+owlrl.DeductiveClosure(owlrl.OWLRL_Semantics).expand(graph)
+# Now: A extends B, B extends C → automatically infers A extends C
+```
+
 ### Predicate Mapping
 
-| Pydantic Field | RDF Predicate | Namespace | Notes |
-|----------------|---------------|-----------|-------|
-| `id` | `dcterms:identifier` | Dublin Core | Literal |
-| `nature` | `ag:nature` | Custom | Literal |
-| `genus` | `skos:broader` | SKOS | Literal |
-| `differentia` | `ag:differentia` | Custom | Literal |
-| `intents` | `ag:resolvesIntent` | Custom | Multiple literals |
-| `depends_on` | `dcterms:requires` | Dublin Core | Literal (skill ID) |
-| `extends` | `dcterms:isVersionOf` | Dublin Core | Literal (skill ID) |
-| `contradicts` | `ag:contradicts` | Custom | Literal (concept ID) |
-| `constraints` | `ag:hasConstraint` | Custom | Multiple literals |
-| `execution_payload` | `ag:hasPayload` | Custom | Blank node |
-| `provenance` | `prov:wasDerivedFrom` | PROV | Literal (file path) |
+| Pydantic Field | RDF Predicate | OWL Type | Namespace | Notes |
+|----------------|---------------|----------|-----------|-------|
+| `id` | `dcterms:identifier` | `owl:DatatypeProperty` | Dublin Core | Literal |
+| `nature` | `ag:nature` | `owl:DatatypeProperty` | Custom | Literal |
+| `genus` | `skos:broader` | `owl:ObjectProperty` | SKOS | Literal |
+| `differentia` | `ag:differentia` | `owl:DatatypeProperty` | Custom | Literal |
+| `intents` | `ag:resolvesIntent` | `owl:DatatypeProperty` | Custom | Multiple literals |
+| `depends_on` | `ag:dependsOn` | `owl:ObjectProperty, owl:AsymmetricProperty` | Custom | Skill ID, inverse: `ag:enables` |
+| `extends` | `ag:extends` | `owl:ObjectProperty, owl:TransitiveProperty` | Custom | Skill ID, inverse: `ag:isExtendedBy` |
+| `contradicts` | `ag:contradicts` | `owl:ObjectProperty, owl:SymmetricProperty` | Custom | Concept ID |
+| `implements` | `ag:implements` | `owl:ObjectProperty` | Custom | Skill ID, inverse: `ag:isImplementedBy` |
+| `exemplifies` | `ag:exemplifies` | `owl:ObjectProperty` | Custom | Pattern ID, inverse: `ag:isExemplifiedBy` |
+| `constraints` | `ag:hasConstraint` | `owl:DatatypeProperty` | Custom | Multiple literals |
+| `execution_payload` | `ag:hasPayload` | `owl:ObjectProperty` | Custom | Blank node |
+| `provenance` | `prov:wasDerivedFrom` | `owl:ObjectProperty` | PROV | Literal (file path) |
 
 ### Requirement Mapping (Nested Structure)
 
@@ -476,15 +516,59 @@ ag:payload_abc123
 | `code` | `ag:code` | Literal |
 | `timeout` | `ag:timeout` | Literal (integer) |
 
-### Example Output
+### Ontology Header
+
+Every ontology file starts with OWL 2 declarations:
 
 ```turtle
 @prefix ag: <http://agentic.web/ontology#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix skos: <http://www.w3.org/2004/02/skos/> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 
-ag:skill_abc123def456 a ag:AgenticSkill ;
+<http://agentic.web/ontology> a owl:Ontology ;
+    dcterms:title "Agentic Skills Ontology" ;
+    dcterms:description "Knowledge graph of agent skills extracted from markdown" .
+
+# Classes
+ag:Skill a owl:Class .
+ag:Tool a owl:Class ; rdfs:subClassOf ag:Skill .
+ag:Concept a owl:Class ; rdfs:subClassOf ag:Skill .
+ag:Work a owl:Class ; rdfs:subClassOf ag:Skill .
+
+# Object Properties with OWL characteristics
+ag:dependsOn a owl:ObjectProperty, owl:AsymmetricProperty ;
+    rdfs:domain ag:Skill ;
+    rdfs:range ag:Skill ;
+    owl:inverseOf ag:enables .
+
+ag:extends a owl:ObjectProperty, owl:TransitiveProperty ;
+    rdfs:domain ag:Skill ;
+    rdfs:range ag:Skill ;
+    owl:inverseOf ag:isExtendedBy .
+
+ag:contradicts a owl:ObjectProperty, owl:SymmetricProperty ;
+    rdfs:domain ag:Skill ;
+    rdfs:range ag:Skill .
+
+ag:implements a owl:ObjectProperty ;
+    rdfs:domain ag:Skill ;
+    rdfs:range ag:Skill ;
+    owl:inverseOf ag:isImplementedBy .
+
+ag:exemplifies a owl:ObjectProperty ;
+    rdfs:domain ag:Skill ;
+    rdfs:range ag:Skill ;
+    owl:inverseOf ag:isExemplifiedBy .
+```
+
+### Example Skill Instance
+
+```turtle
+ag:skill_abc123def456 a ag:Tool ;
     dcterms:identifier "docx-engineering" ;
     ag:contentHash "abc123def456789..." ;
     ag:nature "Document generation tool that creates DOCX files from templates" ;
@@ -873,19 +957,20 @@ class SkillNotFoundError(SkillETLError):
 
 ## Success Criteria
 
-1. ✅ CLI compiles skills to valid RDF/Turtle
+1. ✅ CLI compiles skills to valid OWL 2 RDF/Turtle
 2. ✅ SPARQL queries return correct results
 3. ✅ Merge preserves unmodified skills
 4. ✅ Security blocks malicious content
 5. ✅ 100% test coverage
 6. ✅ Atomic writes with backup/restore
 7. ✅ Tool-use handles arbitrarily large skills
+8. ✅ OWL property characteristics (inverse, transitive, symmetric) defined
 
 ---
 
 ## Future Considerations
 
-- [ ] OWL ontology for richer semantics
+- [ ] **OWL Reasoning**: Add `owlrl` for automatic entailment (inverse/transitive inference)
 - [ ] Web UI for ontology browsing
 - [ ] Skill versioning and history
 - [ ] Multi-language support
