@@ -1,6 +1,33 @@
 """Tests for SHACL validation module."""
 
-from rdflib import Graph
+import pytest
+from rdflib import Graph, Namespace, Literal, RDF
+
+
+def test_validate_skill_graph_empty_graph():
+    """Test validation of empty graph (should pass - no skill instances to validate)."""
+    from compiler.validator import validate_skill_graph
+
+    g = Graph()
+    result = validate_skill_graph(g)
+    assert result.conforms is True  # Empty graph has no skill instances to validate
+
+
+def test_validate_and_raise_raises_for_invalid():
+    """Test that validate_and_raise raises OntologyValidationError for invalid graph."""
+    from compiler.validator import validate_and_raise
+    from compiler.exceptions import OntologyValidationError
+
+    oc = Namespace("http://ontoclaw.marea.software/ontology#")
+    g = Graph()
+
+    # Add a skill without required properties (invalid)
+    skill_uri = oc["skill_test"]
+    g.add((skill_uri, RDF.type, oc.Skill))
+    # Missing resolvesIntent and generatedBy - should fail
+
+    with pytest.raises(OntologyValidationError):
+        validate_and_raise(g)
 
 
 def test_validation_result_namedtuple():
