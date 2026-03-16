@@ -1,5 +1,6 @@
-from pydantic import BaseModel, field_validator
-from typing import Literal
+import json
+from pydantic import BaseModel, field_validator, model_validator
+from typing import Literal, Any
 
 
 class Requirement(BaseModel):
@@ -51,5 +52,26 @@ class ExtractedSkill(BaseModel):
     contradicts: list[str] = []
     state_transitions: StateTransition | None = None
     generated_by: str = "unknown"
-    execution_payload: ExecutionPayload | None
-    provenance: str | None
+    execution_payload: ExecutionPayload | None = None
+    provenance: str | None = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def parse_nested_json(cls, data: Any) -> Any:
+        """Parse JSON strings for nested models if LLM returns them as strings."""
+        if isinstance(data, dict):
+            # Parse state_transitions if it's a string
+            if 'state_transitions' in data and isinstance(data['state_transitions'], str):
+                try:
+                    data['state_transitions'] = json.loads(data['state_transitions'])
+                except json.JSONDecodeError:
+                    pass
+
+            # Parse execution_payload if it's a string
+            if 'execution_payload' in data and isinstance(data['execution_payload'], str):
+                try:
+                    data['execution_payload'] = json.loads(data['execution_payload'])
+                except json.JSONDecodeError:
+                    pass
+
+        return data

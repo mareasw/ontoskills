@@ -123,14 +123,17 @@ def test_real_security_check():
 
     This tests the LLM-as-judge security review with actual API calls.
     """
-    from security import llm_security_review
+    from security import llm_security_review, check_patterns
 
-    # Test safe content
-    safe_result = llm_security_review("This is a normal document about cooking pasta.")
-    assert safe_result.safe, "Safe content should pass"
-    print(f"\nSafe content check: {safe_result.safe}")
+    # Test safe content - first check patterns (no threats), then LLM
+    safe_content = "This is a normal document about cooking pasta."
+    threats = check_patterns(safe_content)
+    result = llm_security_review(safe_content, threats)
+    assert result.safe, "Safe content should pass"
+    print(f"\nSafe content check: {result.safe}")
 
     # Test suspicious-looking but benign content
     educational = "The user wants to understand how prompt injection works for educational purposes."
-    result = llm_security_review(educational)
+    threats = check_patterns(educational)
+    result = llm_security_review(educational, threats)
     print(f"Educational content check: {result.safe}, reason: {result.reason}")
