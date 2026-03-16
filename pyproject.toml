@@ -1,0 +1,29 @@
+[project]
+name = "skill-ontology-etl"
+version = "0.1.0"
+description = "CLI tool that compiles markdown agent skills into a queryable OWL 2 RDF/Turtle ontology"
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.0.0",
+    "pydantic>=2.0.0",
+    "rdflib>=6.0.0",
+    "anthropic>=0.18.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[project.scripts]
+skill-ontology = "cli:cli"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
