@@ -1,14 +1,14 @@
 import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-from transformer import (
+from compiler.transformer import (
     tool_result,
     execute_tool,
     tool_use_loop,
     TOOLS,
 )
-from config import MAX_ITERATIONS
-from schemas import ExtractedSkill, Requirement, ExecutionPayload
+from compiler.config import MAX_ITERATIONS
+from compiler.schemas import ExtractedSkill, Requirement, ExecutionPayload
 
 
 def test_tools_defined():
@@ -84,7 +84,7 @@ def test_execute_tool_extract_skill(tmp_path):
     assert data["status"] == "success"
 
 
-@patch("transformer.client")
+@patch("compiler.transformer.client")
 def test_tool_use_loop_success(mock_client, tmp_path):
     """Test successful tool-use loop."""
     skill_dir = tmp_path / "test-skill"
@@ -138,7 +138,7 @@ def test_system_prompt_includes_state_extraction():
     assert "URIs" in SYSTEM_PROMPT
 
 
-@patch("transformer.client")
+@patch("compiler.transformer.client")
 def test_tool_use_loop_sets_generated_by(mock_client, tmp_path):
     """Test that tool_use_loop sets generated_by field."""
     from config import ANTHROPIC_MODEL

@@ -22,11 +22,17 @@ dev = [
 ]
 
 [project.scripts]
-ontoclaw = "cli:main"
+ontoclaw = "compiler.cli:main"
 
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["compiler"]
+
+[tool.setuptools.package-dir]
+compiler = "."
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

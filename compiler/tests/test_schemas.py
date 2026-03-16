@@ -1,6 +1,6 @@
 import pytest
 from pydantic import ValidationError
-from schemas import Requirement, ExecutionPayload, ExtractedSkill, StateTransition
+from compiler.schemas import Requirement, ExecutionPayload, ExtractedSkill, StateTransition
 
 
 def test_state_transition_model():

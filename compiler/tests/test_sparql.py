@@ -1,8 +1,8 @@
 import pytest
 from pathlib import Path
 from rdflib import Graph, RDF, Literal
-from loader import create_core_ontology, get_oc_namespace
-from sparql import execute_sparql, format_results
+from compiler.loader import create_core_ontology, get_oc_namespace
+from compiler.sparql import execute_sparql, format_results
 
 
 @pytest.fixture
@@ -68,7 +68,7 @@ def test_execute_sparql_filter(sample_ontology):
 
 def test_execute_sparql_invalid_query(sample_ontology):
     """Test that invalid query raises error."""
-    from exceptions import SPARQLError
+    from compiler.exceptions import SPARQLError
     with pytest.raises(SPARQLError):
         execute_sparql(sample_ontology, "THIS IS NOT VALID SPARQL")
 

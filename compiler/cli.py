@@ -13,23 +13,23 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 
-from extractor import generate_skill_id, compute_skill_hash
-from transformer import tool_use_loop
-from security import security_check, SecurityError
-from loader import (
+from compiler.extractor import generate_skill_id, compute_skill_hash
+from compiler.transformer import tool_use_loop
+from compiler.security import security_check, SecurityError
+from compiler.loader import (
     create_core_ontology,
     serialize_skill_to_module,
     generate_index_manifest,
     get_oc_namespace,
 )
-from sparql import execute_sparql, format_results
-from exceptions import (
+from compiler.sparql import execute_sparql, format_results
+from compiler.exceptions import (
     SkillETLError,
     ExtractionError,
     SPARQLError,
     SkillNotFoundError,
 )
-from config import SKILLS_DIR, OUTPUT_DIR
+from compiler.config import SKILLS_DIR, OUTPUT_DIR
 
 # Configure logging
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"

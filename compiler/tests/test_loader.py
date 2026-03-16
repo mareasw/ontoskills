@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 from rdflib import Graph, RDF, RDFS, OWL, Namespace
-from loader import (
+from compiler.loader import (
     get_oc_namespace,
     create_core_ontology,
     serialize_skill,
@@ -15,8 +15,8 @@ from loader import (
     get_output_path,
     create_output_directory,
 )
-from schemas import ExtractedSkill, Requirement, ExecutionPayload
-from config import BASE_URI, CORE_STATES, FAILURE_STATES, OUTPUT_DIR
+from compiler.schemas import ExtractedSkill, Requirement, ExecutionPayload
+from compiler.config import BASE_URI, CORE_STATES, FAILURE_STATES, OUTPUT_DIR
 
 
 def test_get_oc_namespace():

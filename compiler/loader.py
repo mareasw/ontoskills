@@ -17,9 +17,9 @@ import rdflib
 from rdflib import Graph, Namespace, RDF, RDFS, OWL, Literal, URIRef
 from rdflib.namespace import DCTERMS, SKOS, PROV
 
-from schemas import ExtractedSkill, Requirement, ExecutionPayload
-from exceptions import OntologyLoadError
-from config import BASE_URI, CORE_STATES, FAILURE_STATES, SKILLS_DIR, OUTPUT_DIR
+from compiler.schemas import ExtractedSkill, Requirement, ExecutionPayload
+from compiler.exceptions import OntologyLoadError
+from compiler.config import BASE_URI, CORE_STATES, FAILURE_STATES, SKILLS_DIR, OUTPUT_DIR
 
 logger = logging.getLogger(__name__)
 

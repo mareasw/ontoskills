@@ -15,7 +15,7 @@ from rich.table import Table
 
 from rdflib import Graph
 
-from exceptions import SPARQLError
+from compiler.exceptions import SPARQLError
 
 logger = logging.getLogger(__name__)
 
