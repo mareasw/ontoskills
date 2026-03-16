@@ -2,39 +2,118 @@ import pytest
 from pathlib import Path
 from rdflib import Graph, RDF, RDFS, OWL, Namespace
 from loader import (
-    create_ontology_graph,
+    get_oc_namespace,
+    create_core_ontology,
     serialize_skill,
     load_ontology,
     merge_skill,
     save_ontology_atomic,
     apply_reasoning,
-    AG,
 )
 from schemas import ExtractedSkill, Requirement, ExecutionPayload
+from config import BASE_URI, CORE_STATES, FAILURE_STATES
 
 
-def test_create_ontology_graph():
-    graph = create_ontology_graph()
-    assert isinstance(graph, Graph)
-    # Check that basic prefixes are bound
-    prefixes = dict(graph.namespaces())
-    assert "ag" in prefixes
-    assert "owl" in prefixes
+def test_get_oc_namespace():
+    """Test that get_oc_namespace returns namespace with BASE_URI."""
+    oc = get_oc_namespace()
+    assert isinstance(oc, Namespace)
+    assert str(oc) == BASE_URI
 
 
-def test_create_ontology_graph_has_owl_properties():
-    """Test that OWL 2 property characteristics are defined."""
-    graph = create_ontology_graph()
+def test_create_core_ontology_structure(tmp_path):
+    """Test core ontology creates required classes."""
+    output_path = tmp_path / "ontoclaw-core.ttl"
+    graph = create_core_ontology(output_path)
 
-    # Check for transitive property on extends
-    extends_uri = AG.extends
-    assert (extends_uri, RDF.type, OWL.TransitiveProperty) in graph or \
-           (extends_uri, RDF.type, OWL.ObjectProperty) in graph
+    # Verify file was created
+    assert output_path.exists()
 
-    # Check for symmetric property on contradicts
-    contradicts_uri = AG.contradicts
-    assert (contradicts_uri, RDF.type, OWL.SymmetricProperty) in graph or \
-           (contradicts_uri, RDF.type, OWL.ObjectProperty) in graph
+    # Check that core classes exist
+    oc = get_oc_namespace()
+
+    # Check oc:Skill class
+    assert (oc.Skill, RDF.type, OWL.Class) in graph
+    assert (oc.Skill, RDFS.label, None) in graph
+
+    # Check oc:State class
+    assert (oc.State, RDF.type, OWL.Class) in graph
+
+    # Check oc:Attempt class
+    assert (oc.Attempt, RDF.type, OWL.Class) in graph
+
+    # Check oc:ExecutionPayload class
+    assert (oc.ExecutionPayload, RDF.type, OWL.Class) in graph
+
+
+def test_create_core_ontology_state_properties(tmp_path):
+    """Test core ontology creates state transition properties."""
+    output_path = tmp_path / "ontoclaw-core.ttl"
+    graph = create_core_ontology(output_path)
+    oc = get_oc_namespace()
+
+    # Check oc:requiresState (Skill → State)
+    assert (oc.requiresState, RDF.type, OWL.ObjectProperty) in graph
+    assert (oc.requiresState, RDFS.domain, oc.Skill) in graph
+    assert (oc.requiresState, RDFS.range, oc.State) in graph
+
+    # Check oc:yieldsState (Skill → State)
+    assert (oc.yieldsState, RDF.type, OWL.ObjectProperty) in graph
+    assert (oc.yieldsState, RDFS.domain, oc.Skill) in graph
+    assert (oc.yieldsState, RDFS.range, oc.State) in graph
+
+    # Check oc:handlesFailure (Skill → State)
+    assert (oc.handlesFailure, RDF.type, OWL.ObjectProperty) in graph
+    assert (oc.handlesFailure, RDFS.domain, oc.Skill) in graph
+    assert (oc.handlesFailure, RDFS.range, oc.State) in graph
+
+    # Check oc:hasStatus (Attempt → State)
+    assert (oc.hasStatus, RDF.type, OWL.ObjectProperty) in graph
+    assert (oc.hasStatus, RDFS.domain, oc.Attempt) in graph
+    assert (oc.hasStatus, RDFS.range, oc.State) in graph
+
+
+def test_create_core_ontology_execution_payload(tmp_path):
+    """Test core ontology creates execution payload class and properties."""
+    output_path = tmp_path / "ontoclaw-core.ttl"
+    graph = create_core_ontology(output_path)
+    oc = get_oc_namespace()
+
+    # Check oc:hasPayload (Skill → ExecutionPayload)
+    assert (oc.hasPayload, RDF.type, OWL.ObjectProperty) in graph
+    assert (oc.hasPayload, RDFS.domain, oc.Skill) in graph
+    assert (oc.hasPayload, RDFS.range, oc.ExecutionPayload) in graph
+
+    # Check oc:executor (DatatypeProperty)
+    assert (oc.executor, RDF.type, OWL.DatatypeProperty) in graph
+    assert (oc.executor, RDFS.domain, oc.ExecutionPayload) in graph
+
+    # Check oc:code (DatatypeProperty)
+    assert (oc.code, RDF.type, OWL.DatatypeProperty) in graph
+    assert (oc.code, RDFS.domain, oc.ExecutionPayload) in graph
+
+    # Check oc:timeout (DatatypeProperty)
+    assert (oc.timeout, RDF.type, OWL.DatatypeProperty) in graph
+    assert (oc.timeout, RDFS.domain, oc.ExecutionPayload) in graph
+
+
+def test_create_core_ontology_predefined_states(tmp_path):
+    """Test core ontology includes predefined core and failure states."""
+    output_path = tmp_path / "ontoclaw-core.ttl"
+    graph = create_core_ontology(output_path)
+    oc = get_oc_namespace()
+
+    # Check core states exist
+    for state_name, state_fragment in CORE_STATES.items():
+        state_uri = oc[state_fragment.lstrip('#')]
+        assert (state_uri, RDF.type, OWL.Class) in graph
+        assert (state_uri, RDFS.subClassOf, oc.State) in graph
+
+    # Check failure states exist
+    for state_name, state_fragment in FAILURE_STATES.items():
+        state_uri = oc[state_fragment.lstrip('#')]
+        assert (state_uri, RDF.type, OWL.Class) in graph
+        assert (state_uri, RDFS.subClassOf, oc.State) in graph
 
 
 def test_serialize_skill():
@@ -47,7 +126,7 @@ def test_serialize_skill():
         differentia="for testing",
         intents=["test", "verify"],
         requirements=[Requirement(type="Tool", value="pytest")],
-        constraints=["must be fast"],
+        contradicts=["bad-skill"],
         execution_payload=ExecutionPayload(executor="shell", code="echo test"),
         provenance="/skills/test/SKILL.md",
     )
@@ -56,28 +135,32 @@ def test_serialize_skill():
     serialize_skill(graph, skill)
 
     # Check skill was added
-    skill_uri = AG["skill_" + skill.hash[:16]]
-    assert (skill_uri, RDF.type, AG.Skill) in graph
+    oc = get_oc_namespace()
+    skill_uri = oc["skill_" + skill.hash[:16]]
+    assert (skill_uri, RDF.type, oc.Skill) in graph
 
 
 def test_load_ontology(tmp_path):
     """Test loading an existing ontology."""
-    # Create a simple ontology
-    ontology_path = tmp_path / "skills.ttl"
-    graph = create_ontology_graph()
-    graph.serialize(ontology_path, format="turtle")
+    # Create a core ontology
+    output_path = tmp_path / "ontoclaw-core.ttl"
+    core_graph = create_core_ontology(output_path)
 
     # Load it back
-    loaded = load_ontology(ontology_path)
+    loaded = load_ontology(output_path)
     assert isinstance(loaded, Graph)
     prefixes = dict(loaded.namespaces())
-    assert "ag" in prefixes
+    assert "oc" in prefixes
 
 
 def test_merge_skill_new(tmp_path):
     """Test merging a new skill into ontology."""
+    # Create core ontology first
+    core_path = tmp_path / "ontoclaw-core.ttl"
+    create_core_ontology(core_path)
+
     ontology_path = tmp_path / "skills.ttl"
-    graph = create_ontology_graph()
+    graph = load_ontology(ontology_path)
     graph.serialize(ontology_path, format="turtle")
 
     skill = ExtractedSkill(
@@ -97,14 +180,19 @@ def test_merge_skill_new(tmp_path):
     assert isinstance(merged, Graph)
 
     # Check skill was added
-    skill_uri = AG["skill_" + skill.hash[:16]]
-    assert (skill_uri, RDF.type, AG.Skill) in merged
+    oc = get_oc_namespace()
+    skill_uri = oc["skill_" + skill.hash[:16]]
+    assert (skill_uri, RDF.type, oc.Skill) in merged
 
 
 def test_merge_skill_update(tmp_path):
     """Test updating an existing skill (same ID, different hash)."""
+    # Create core ontology first
+    core_path = tmp_path / "ontoclaw-core.ttl"
+    create_core_ontology(core_path)
+
     ontology_path = tmp_path / "skills.ttl"
-    graph = create_ontology_graph()
+    graph = load_ontology(ontology_path)
     graph.serialize(ontology_path, format="turtle")
 
     # Add initial skill
@@ -116,7 +204,7 @@ def test_merge_skill_update(tmp_path):
         differentia="original",
         intents=["test"],
         requirements=[],
-        constraints=[],
+        contradicts=[],
         execution_payload=None,
         provenance=None,
     )
@@ -132,15 +220,16 @@ def test_merge_skill_update(tmp_path):
         differentia="updated",
         intents=["test"],
         requirements=[],
-        constraints=[],
+        contradicts=[],
         execution_payload=None,
         provenance=None,
     )
 
     merged = merge_skill(ontology_path, skill2)
     # New skill should be present
-    skill_uri = AG["skill_" + skill2.hash[:16]]
-    assert (skill_uri, RDF.type, AG.Skill) in merged
+    oc = get_oc_namespace()
+    skill_uri = oc["skill_" + skill2.hash[:16]]
+    assert (skill_uri, RDF.type, oc.Skill) in merged
 
 
 def test_save_ontology_atomic(tmp_path):
@@ -149,14 +238,19 @@ def test_save_ontology_atomic(tmp_path):
     backup_dir = tmp_path / "backups"
     backup_dir.mkdir()
 
-    graph = create_ontology_graph()
+    # Create core ontology first
+    core_path = tmp_path / "ontoclaw-core.ttl"
+    create_core_ontology(core_path)
+
+    graph = load_ontology(ontology_path)
 
     # First save
     save_ontology_atomic(ontology_path, graph, backup_dir=backup_dir)
     assert ontology_path.exists()
 
     # Second save (should create backup)
-    graph.add((AG.TestSkill, RDF.type, AG.Skill))
+    oc = get_oc_namespace()
+    graph.add((oc.TestSkill, RDF.type, oc.Skill))
     save_ontology_atomic(ontology_path, graph, backup_dir=backup_dir)
 
     # Check backup was created
@@ -164,26 +258,30 @@ def test_save_ontology_atomic(tmp_path):
     assert len(backups) >= 1
 
 
-def test_apply_reasoning():
+def test_apply_reasoning(tmp_path):
     """Test OWL reasoning applies inferences."""
-    graph = create_ontology_graph()
+    # Create core ontology first
+    core_path = tmp_path / "ontoclaw-core.ttl"
+    create_core_ontology(core_path)
+
+    graph = load_ontology(tmp_path / "skills.ttl")
 
     # Add some test relationships
-    skill_a = AG["skill_a"]
-    skill_b = AG["skill_b"]
-    skill_c = AG["skill_c"]
+    oc = get_oc_namespace()
+    skill_a = oc["skill_a"]
+    skill_b = oc["skill_b"]
+    skill_c = oc["skill_c"]
 
-    graph.add((skill_a, RDF.type, AG.Skill))
-    graph.add((skill_b, RDF.type, AG.Skill))
-    graph.add((skill_c, RDF.type, AG.Skill))
+    graph.add((skill_a, RDF.type, oc.Skill))
+    graph.add((skill_b, RDF.type, oc.Skill))
+    graph.add((skill_c, RDF.type, oc.Skill))
 
-    # A extends B, B extends C
-    graph.add((skill_a, AG.extends, skill_b))
-    graph.add((skill_b, AG.extends, skill_c))
+    # Add some relationships (extends, etc.)
+    graph.add((skill_a, oc.extends, skill_b))
+    graph.add((skill_b, oc.extends, skill_c))
 
     # Apply reasoning
     reasoned = apply_reasoning(graph)
 
-    # Should infer that A extends C (transitive)
-    # Note: This requires owlrl to be working correctly
+    # Should have inferences
     assert isinstance(reasoned, Graph)

@@ -19,24 +19,38 @@ from rdflib.namespace import DCTERMS, SKOS, PROV
 
 from schemas import ExtractedSkill, Requirement, ExecutionPayload
 from exceptions import OntologyLoadError
+from config import BASE_URI, CORE_STATES, FAILURE_STATES
 
 logger = logging.getLogger(__name__)
 
-# Namespace for our ontology
-AG = Namespace("http://agentic.web/ontology#")
+
+def get_oc_namespace() -> Namespace:
+    """Get the OntoClaw namespace using configured BASE_URI."""
+    return Namespace(BASE_URI)
 
 
-def create_ontology_graph() -> Graph:
+def create_core_ontology(output_path: Path) -> Graph:
     """
-    Create a new ontology graph with OWL 2 declarations.
+    Create the core OntoClaw ontology (TBox) with state transition system.
+
+    Generates ontoclaw-core.ttl containing:
+    - Core classes (Skill, State, Attempt, ExecutionPayload)
+    - State transition properties (requiresState, yieldsState, handlesFailure, hasStatus)
+    - Execution payload properties (hasPayload, executor, code, timeout)
+    - LLM attestation (generatedBy)
+    - Predefined core and failure states
+
+    Args:
+        output_path: Path where ontoclaw-core.ttl will be saved
 
     Returns:
-        Graph with ontology header, classes, and property definitions
+        Graph with core ontology definitions
     """
+    oc = get_oc_namespace()
     g = Graph()
 
     # Bind namespaces
-    g.bind("ag", AG)
+    g.bind("oc", oc)
     g.bind("owl", OWL)
     g.bind("rdf", RDF)
     g.bind("rdfs", RDFS)
@@ -45,90 +59,267 @@ def create_ontology_graph() -> Graph:
     g.bind("prov", PROV)
 
     # Ontology header
-    ontology_uri = URIRef("http://agentic.web/ontology")
-    g.add((ontology_uri, RDF.type, OWL.Ontology))
-    g.add((ontology_uri, DCTERMS.title, Literal("Agentic Skills Ontology")))
-    g.add((ontology_uri, DCTERMS.description, Literal(
-        "Knowledge graph of agent skills extracted from markdown"
+    base_uri = URIRef(BASE_URI.rstrip('#'))
+    g.add((base_uri, RDF.type, OWL.Ontology))
+    g.add((base_uri, DCTERMS.title, Literal("OntoClaw Core Ontology")))
+    g.add((base_uri, DCTERMS.description, Literal(
+        "Core TBox ontology for skill state transitions and execution"
+    )))
+    g.add((base_uri, DCTERMS.created, Literal(datetime.now().isoformat())))
+
+    # ========== Core Classes ==========
+
+    # oc:Skill - Base class for all skills
+    g.add((oc.Skill, RDF.type, OWL.Class))
+    g.add((oc.Skill, RDFS.label, Literal("Skill")))
+    g.add((oc.Skill, RDFS.comment, Literal(
+        "Base class for all executable skills in the ontology"
     )))
 
-    # Classes
-    g.add((AG.Skill, RDF.type, OWL.Class))
-    g.add((AG.Tool, RDF.type, OWL.Class))
-    g.add((AG.Tool, RDFS.subClassOf, AG.Skill))
-    g.add((AG.Concept, RDF.type, OWL.Class))
-    g.add((AG.Concept, RDFS.subClassOf, AG.Skill))
-    g.add((AG.Work, RDF.type, OWL.Class))
-    g.add((AG.Work, RDFS.subClassOf, AG.Skill))
+    # oc:State - Abstract state class
+    g.add((oc.State, RDF.type, OWL.Class))
+    g.add((oc.State, RDFS.label, Literal("State")))
+    g.add((oc.State, RDFS.comment, Literal(
+        "Abstract class representing a system state (precondition, outcome, or failure)"
+    )))
 
-    # Object Properties with OWL characteristics
-    # dependsOn - asymmetric (if A depends on B, B cannot depend on A)
-    g.add((AG.dependsOn, RDF.type, OWL.ObjectProperty))
-    g.add((AG.dependsOn, RDF.type, OWL.AsymmetricProperty))
-    g.add((AG.dependsOn, RDFS.domain, AG.Skill))
-    g.add((AG.dependsOn, RDFS.range, AG.Skill))
-    g.add((AG.dependsOn, OWL.inverseOf, AG.enables))
+    # oc:Attempt - Execution attempt record
+    g.add((oc.Attempt, RDF.type, OWL.Class))
+    g.add((oc.Attempt, RDFS.label, Literal("Attempt")))
+    g.add((oc.Attempt, RDFS.comment, Literal(
+        "Record of a skill execution attempt, used for negative memory"
+    )))
 
-    # enables - inverse of dependsOn
-    g.add((AG.enables, RDF.type, OWL.ObjectProperty))
-    g.add((AG.enables, RDFS.domain, AG.Skill))
-    g.add((AG.enables, RDFS.range, AG.Skill))
+    # oc:ExecutionPayload - Container for executable code
+    g.add((oc.ExecutionPayload, RDF.type, OWL.Class))
+    g.add((oc.ExecutionPayload, RDFS.label, Literal("Execution Payload")))
+    g.add((oc.ExecutionPayload, RDFS.comment, Literal(
+        "Container for executable code and execution metadata"
+    )))
 
-    # extends - transitive (if A extends B and B extends C, A extends C)
-    g.add((AG.extends, RDF.type, OWL.ObjectProperty))
-    g.add((AG.extends, RDF.type, OWL.TransitiveProperty))
-    g.add((AG.extends, RDFS.domain, AG.Skill))
-    g.add((AG.extends, RDFS.range, AG.Skill))
-    g.add((AG.extends, OWL.inverseOf, AG.isExtendedBy))
+    # ========== State Transition Properties ==========
 
-    # isExtendedBy - inverse of extends
-    g.add((AG.isExtendedBy, RDF.type, OWL.ObjectProperty))
-    g.add((AG.isExtendedBy, RDFS.domain, AG.Skill))
-    g.add((AG.isExtendedBy, RDFS.range, AG.Skill))
+    # oc:requiresState (Skill → State) - Pre-conditions
+    g.add((oc.requiresState, RDF.type, OWL.ObjectProperty))
+    g.add((oc.requiresState, RDFS.domain, oc.Skill))
+    g.add((oc.requiresState, RDFS.range, oc.State))
+    g.add((oc.requiresState, RDFS.label, Literal("requires state")))
+    g.add((oc.requiresState, RDFS.comment, Literal(
+        "Pre-condition state that must be satisfied before skill execution"
+    )))
 
-    # contradicts - symmetric (if A contradicts B, B contradicts A)
-    g.add((AG.contradicts, RDF.type, OWL.ObjectProperty))
-    g.add((AG.contradicts, RDF.type, OWL.SymmetricProperty))
-    g.add((AG.contradicts, RDFS.domain, AG.Skill))
-    g.add((AG.contradicts, RDFS.range, AG.Skill))
+    # oc:yieldsState (Skill → State) - Success outcomes
+    g.add((oc.yieldsState, RDF.type, OWL.ObjectProperty))
+    g.add((oc.yieldsState, RDFS.domain, oc.Skill))
+    g.add((oc.yieldsState, RDFS.range, oc.State))
+    g.add((oc.yieldsState, RDFS.label, Literal("yields state")))
+    g.add((oc.yieldsState, RDFS.comment, Literal(
+        "State that results from successful skill execution"
+    )))
 
-    # implements
-    g.add((AG.implements, RDF.type, OWL.ObjectProperty))
-    g.add((AG.implements, RDFS.domain, AG.Skill))
-    g.add((AG.implements, RDFS.range, AG.Skill))
-    g.add((AG.implements, OWL.inverseOf, AG.isImplementedBy))
+    # oc:handlesFailure (Skill → State) - Failure states
+    g.add((oc.handlesFailure, RDF.type, OWL.ObjectProperty))
+    g.add((oc.handlesFailure, RDFS.domain, oc.Skill))
+    g.add((oc.handlesFailure, RDFS.range, oc.State))
+    g.add((oc.handlesFailure, RDFS.label, Literal("handles failure")))
+    g.add((oc.handlesFailure, RDFS.comment, Literal(
+        "Failure state that this skill can handle or recover from"
+    )))
 
-    # isImplementedBy - inverse of implements
-    g.add((AG.isImplementedBy, RDF.type, OWL.ObjectProperty))
-    g.add((AG.isImplementedBy, RDFS.domain, AG.Skill))
-    g.add((AG.isImplementedBy, RDFS.range, AG.Skill))
+    # oc:hasStatus (Attempt → State) - Execution status
+    g.add((oc.hasStatus, RDF.type, OWL.ObjectProperty))
+    g.add((oc.hasStatus, RDFS.domain, oc.Attempt))
+    g.add((oc.hasStatus, RDFS.range, oc.State))
+    g.add((oc.hasStatus, RDFS.label, Literal("has status")))
+    g.add((oc.hasStatus, RDFS.comment, Literal(
+        "Current status state of an execution attempt"
+    )))
 
-    # exemplifies
-    g.add((AG.exemplifies, RDF.type, OWL.ObjectProperty))
-    g.add((AG.exemplifies, RDFS.domain, AG.Skill))
-    g.add((AG.exemplifies, RDFS.range, AG.Skill))
-    g.add((AG.exemplifies, OWL.inverseOf, AG.isExemplifiedBy))
+    # ========== Execution Payload Properties ==========
 
-    # isExemplifiedBy - inverse of exemplifies
-    g.add((AG.isExemplifiedBy, RDF.type, OWL.ObjectProperty))
-    g.add((AG.isExemplifiedBy, RDFS.domain, AG.Skill))
-    g.add((AG.isExemplifiedBy, RDFS.range, AG.Skill))
+    # oc:hasPayload (Skill → ExecutionPayload)
+    g.add((oc.hasPayload, RDF.type, OWL.ObjectProperty))
+    g.add((oc.hasPayload, RDFS.domain, oc.Skill))
+    g.add((oc.hasPayload, RDFS.range, oc.ExecutionPayload))
+    g.add((oc.hasPayload, RDFS.label, Literal("has payload")))
+    g.add((oc.hasPayload, RDFS.comment, Literal(
+        "Links a skill to its execution payload"
+    )))
 
-    # Datatype Properties
-    g.add((AG.contentHash, RDF.type, OWL.DatatypeProperty))
-    g.add((AG.nature, RDF.type, OWL.DatatypeProperty))
-    g.add((AG.differentia, RDF.type, OWL.DatatypeProperty))
-    g.add((AG.resolvesIntent, RDF.type, OWL.DatatypeProperty))
-    g.add((AG.hasConstraint, RDF.type, OWL.DatatypeProperty))
-    g.add((AG.executor, RDF.type, OWL.DatatypeProperty))
-    g.add((AG.code, RDF.type, OWL.DatatypeProperty))
-    g.add((AG.timeout, RDF.type, OWL.DatatypeProperty))
-    g.add((AG.requirementValue, RDF.type, OWL.DatatypeProperty))
-    g.add((AG.isOptional, RDF.type, OWL.DatatypeProperty))
+    # oc:executor (DatatypeProperty)
+    g.add((oc.executor, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.executor, RDFS.domain, oc.ExecutionPayload))
+    g.add((oc.executor, RDFS.label, Literal("executor")))
+    g.add((oc.executor, RDFS.comment, Literal(
+        "Executor type (e.g., 'shell', 'python', 'javascript')"
+    )))
 
-    # Object Properties for relations
-    g.add((AG.hasRequirement, RDF.type, OWL.ObjectProperty))
-    g.add((AG.hasPayload, RDF.type, OWL.ObjectProperty))
+    # oc:code (DatatypeProperty)
+    g.add((oc.code, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.code, RDFS.domain, oc.ExecutionPayload))
+    g.add((oc.code, RDFS.label, Literal("code")))
+    g.add((oc.code, RDFS.comment, Literal(
+        "Executable code as a string"
+    )))
+
+    # oc:timeout (DatatypeProperty)
+    g.add((oc.timeout, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.timeout, RDFS.domain, oc.ExecutionPayload))
+    g.add((oc.timeout, RDFS.label, Literal("timeout")))
+    g.add((oc.timeout, RDFS.comment, Literal(
+        "Execution timeout in seconds"
+    )))
+
+    # ========== LLM Attestation ==========
+
+    # oc:generatedBy (DatatypeProperty)
+    g.add((oc.generatedBy, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.generatedBy, RDFS.domain, oc.Skill))
+    g.add((oc.generatedBy, RDFS.label, Literal("generated by")))
+    g.add((oc.generatedBy, RDFS.comment, Literal(
+        "LLM model identifier that generated this skill (e.g., 'claude-sonnet-4-6-20250514')"
+    )))
+
+    # ========== Additional Skill Properties ==========
+
+    # oc:contentHash (DatatypeProperty)
+    g.add((oc.contentHash, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.contentHash, RDFS.domain, oc.Skill))
+    g.add((oc.contentHash, RDFS.label, Literal("content hash")))
+    g.add((oc.contentHash, RDFS.comment, Literal(
+        "SHA-256 hash of skill content for deduplication"
+    )))
+
+    # oc:nature (DatatypeProperty)
+    g.add((oc.nature, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.nature, RDFS.domain, oc.Skill))
+    g.add((oc.nature, RDFS.label, Literal("nature")))
+    g.add((oc.nature, RDFS.comment, Literal(
+        "Definition/differentia of the skill (what makes it unique)"
+    )))
+
+    # oc:differentia (DatatypeProperty)
+    g.add((oc.differentia, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.differentia, RDFS.domain, oc.Skill))
+    g.add((oc.differentia, RDFS.label, Literal("differentia")))
+    g.add((oc.differentia, RDFS.comment, Literal(
+        "Specific characteristics that differentiate this skill"
+    )))
+
+    # oc:resolvesIntent (DatatypeProperty)
+    g.add((oc.resolvesIntent, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.resolvesIntent, RDFS.domain, oc.Skill))
+    g.add((oc.resolvesIntent, RDFS.label, Literal("resolves intent")))
+    g.add((oc.resolvesIntent, RDFS.comment, Literal(
+        "User intent that this skill can resolve"
+    )))
+
+    # oc:hasConstraint (DatatypeProperty)
+    g.add((oc.hasConstraint, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.hasConstraint, RDFS.domain, oc.Skill))
+    g.add((oc.hasConstraint, RDFS.label, Literal("has constraint")))
+    g.add((oc.hasConstraint, RDFS.comment, Literal(
+        "Constraints or limitations on skill execution"
+    )))
+
+    # ========== Requirement Properties ==========
+
+    # oc:hasRequirement (ObjectProperty)
+    g.add((oc.hasRequirement, RDF.type, OWL.ObjectProperty))
+    g.add((oc.hasRequirement, RDFS.domain, oc.Skill))
+    g.add((oc.hasRequirement, RDFS.label, Literal("has requirement")))
+    g.add((oc.hasRequirement, RDFS.comment, Literal(
+        "Links a skill to its requirements"
+    )))
+
+    # oc:requirementValue (DatatypeProperty)
+    g.add((oc.requirementValue, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.requirementValue, RDFS.label, Literal("requirement value")))
+    g.add((oc.requirementValue, RDFS.comment, Literal(
+        "Value of a requirement (e.g., tool name, version)"
+    )))
+
+    # oc:isOptional (DatatypeProperty)
+    g.add((oc.isOptional, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.isOptional, RDFS.label, Literal("is optional")))
+    g.add((oc.isOptional, RDFS.comment, Literal(
+        "Whether a requirement is optional or required"
+    )))
+
+    # ========== Skill Relationship Properties ==========
+
+    # oc:dependsOn (ObjectProperty) - asymmetric
+    g.add((oc.dependsOn, RDF.type, OWL.ObjectProperty))
+    g.add((oc.dependsOn, RDF.type, OWL.AsymmetricProperty))
+    g.add((oc.dependsOn, RDFS.domain, oc.Skill))
+    g.add((oc.dependsOn, RDFS.range, oc.Skill))
+    g.add((oc.dependsOn, RDFS.label, Literal("depends on")))
+    g.add((oc.dependsOn, RDFS.comment, Literal(
+        "Skill depends on another skill (prerequisite)"
+    )))
+    g.add((oc.dependsOn, OWL.inverseOf, oc.enables))
+
+    # oc:enables (ObjectProperty) - inverse of dependsOn
+    g.add((oc.enables, RDF.type, OWL.ObjectProperty))
+    g.add((oc.enables, RDFS.domain, oc.Skill))
+    g.add((oc.enables, RDFS.range, oc.Skill))
+    g.add((oc.enables, RDFS.label, Literal("enables")))
+    g.add((oc.enables, RDFS.comment, Literal(
+        "Skill enables another skill (inverse of dependsOn)"
+    )))
+
+    # oc:extends (ObjectProperty) - transitive
+    g.add((oc.extends, RDF.type, OWL.ObjectProperty))
+    g.add((oc.extends, RDF.type, OWL.TransitiveProperty))
+    g.add((oc.extends, RDFS.domain, oc.Skill))
+    g.add((oc.extends, RDFS.range, oc.Skill))
+    g.add((oc.extends, RDFS.label, Literal("extends")))
+    g.add((oc.extends, RDFS.comment, Literal(
+        "Skill extends another skill (inheritance)"
+    )))
+    g.add((oc.extends, OWL.inverseOf, oc.isExtendedBy))
+
+    # oc:isExtendedBy (ObjectProperty) - inverse of extends
+    g.add((oc.isExtendedBy, RDF.type, OWL.ObjectProperty))
+    g.add((oc.isExtendedBy, RDFS.domain, oc.Skill))
+    g.add((oc.isExtendedBy, RDFS.range, oc.Skill))
+    g.add((oc.isExtendedBy, RDFS.label, Literal("is extended by")))
+    g.add((oc.isExtendedBy, RDFS.comment, Literal(
+        "Inverse of extends"
+    )))
+
+    # oc:contradicts (ObjectProperty) - symmetric
+    g.add((oc.contradicts, RDF.type, OWL.ObjectProperty))
+    g.add((oc.contradicts, RDF.type, OWL.SymmetricProperty))
+    g.add((oc.contradicts, RDFS.domain, oc.Skill))
+    g.add((oc.contradicts, RDFS.range, oc.Skill))
+    g.add((oc.contradicts, RDFS.label, Literal("contradicts")))
+    g.add((oc.contradicts, RDFS.comment, Literal(
+        "Skill contradicts another skill (mutually exclusive)"
+    )))
+
+    # ========== Predefined Core States ==========
+
+    for state_name, state_fragment in CORE_STATES.items():
+        state_uri = oc[state_fragment.lstrip('#')]
+        g.add((state_uri, RDF.type, OWL.Class))
+        g.add((state_uri, RDFS.subClassOf, oc.State))
+        g.add((state_uri, RDFS.label, Literal(state_name)))
+        g.add((state_uri, SKOS.prefLabel, Literal(state_name)))
+
+    # ========== Predefined Failure States ==========
+
+    for state_name, state_fragment in FAILURE_STATES.items():
+        state_uri = oc[state_fragment.lstrip('#')]
+        g.add((state_uri, RDF.type, OWL.Class))
+        g.add((state_uri, RDFS.subClassOf, oc.State))
+        g.add((state_uri, RDFS.label, Literal(state_name)))
+        g.add((state_uri, SKOS.prefLabel, Literal(state_name)))
+
+    # Save to file
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    g.serialize(output_path, format="turtle")
+    logger.info(f"Created core ontology at {output_path} with {len(g)} triples")
 
     return g
 
@@ -141,55 +332,76 @@ def serialize_skill(graph: Graph, skill: ExtractedSkill) -> None:
         graph: RDF graph to add triples to
         skill: ExtractedSkill to serialize
     """
+    oc = get_oc_namespace()
+
     # Create skill URI from hash
-    skill_uri = AG[f"skill_{skill.hash[:16]}"]
+    skill_uri = oc[f"skill_{skill.hash[:16]}"]
 
     # Basic properties
-    graph.add((skill_uri, RDF.type, AG.Skill))
+    graph.add((skill_uri, RDF.type, oc.Skill))
     graph.add((skill_uri, DCTERMS.identifier, Literal(skill.id)))
-    graph.add((skill_uri, AG.contentHash, Literal(skill.hash)))
-    graph.add((skill_uri, AG.nature, Literal(skill.nature)))
+    graph.add((skill_uri, oc.contentHash, Literal(skill.hash)))
+    graph.add((skill_uri, oc.nature, Literal(skill.nature)))
     graph.add((skill_uri, SKOS.broader, Literal(skill.genus)))
-    graph.add((skill_uri, AG.differentia, Literal(skill.differentia)))
+    graph.add((skill_uri, oc.differentia, Literal(skill.differentia)))
 
     # Intents
     for intent in skill.intents:
-        graph.add((skill_uri, AG.resolvesIntent, Literal(intent)))
+        graph.add((skill_uri, oc.resolvesIntent, Literal(intent)))
 
     # Requirements (as blank nodes)
     for req in skill.requirements:
         req_hash = hashlib.sha256(f"{req.type}:{req.value}".encode()).hexdigest()[:8]
-        req_uri = AG[f"req_{req_hash}"]
+        req_uri = oc[f"req_{req_hash}"]
 
         # Requirement class based on type
-        req_class = AG[f"Requirement{req.type}"]
+        req_class = oc[f"Requirement{req.type}"]
         graph.add((req_uri, RDF.type, req_class))
-        graph.add((req_uri, AG.requirementValue, Literal(req.value)))
-        graph.add((req_uri, AG.isOptional, Literal(req.optional)))
-        graph.add((skill_uri, AG.hasRequirement, req_uri))
+        graph.add((req_uri, oc.requirementValue, Literal(req.value)))
+        graph.add((req_uri, oc.isOptional, Literal(req.optional)))
+        graph.add((skill_uri, oc.hasRequirement, req_uri))
 
     # Relations
     for dep in skill.depends_on:
-        graph.add((skill_uri, AG.dependsOn, AG[f"skill_{dep}"]))
+        graph.add((skill_uri, oc.dependsOn, oc[f"skill_{dep}"]))
 
     for ext in skill.extends:
-        graph.add((skill_uri, AG.extends, AG[f"skill_{ext}"]))
+        graph.add((skill_uri, oc.extends, oc[f"skill_{ext}"]))
 
     for cont in skill.contradicts:
-        graph.add((skill_uri, AG.contradicts, AG[f"skill_{cont}"]))
+        graph.add((skill_uri, oc.contradicts, oc[f"skill_{cont}"]))
 
-    # Constraints
-    for constraint in skill.constraints:
-        graph.add((skill_uri, AG.hasConstraint, Literal(constraint)))
+    # State transitions (new schema feature)
+    if skill.state_transitions:
+        for state_uri in skill.state_transitions.requires_state:
+            # Parse oc:StateName format and create full URI
+            state_name = state_uri.replace('oc:', '')
+            state_ref = oc[state_name]
+            graph.add((skill_uri, oc.requiresState, state_ref))
+
+        for state_uri in skill.state_transitions.yields_state:
+            state_name = state_uri.replace('oc:', '')
+            state_ref = oc[state_name]
+            graph.add((skill_uri, oc.yieldsState, state_ref))
+
+        for state_uri in skill.state_transitions.handles_failure:
+            state_name = state_uri.replace('oc:', '')
+            state_ref = oc[state_name]
+            graph.add((skill_uri, oc.handlesFailure, state_ref))
+
+    # LLM attestation
+    if skill.generated_by and skill.generated_by != "unknown":
+        graph.add((skill_uri, oc.generatedBy, Literal(skill.generated_by)))
 
     # Execution payload
     if skill.execution_payload:
-        payload_uri = AG[f"payload_{skill.hash[:16]}"]
-        graph.add((payload_uri, AG.executor, Literal(skill.execution_payload.executor)))
-        graph.add((payload_uri, AG.code, Literal(skill.execution_payload.code)))
+        payload_uri = oc[f"payload_{skill.hash[:16]}"]
+        graph.add((payload_uri, RDF.type, oc.ExecutionPayload))
+        graph.add((payload_uri, oc.executor, Literal(skill.execution_payload.executor)))
+        graph.add((payload_uri, oc.code, Literal(skill.execution_payload.code)))
         if skill.execution_payload.timeout:
-            graph.add((payload_uri, AG.timeout, Literal(skill.execution_payload.timeout)))
-        graph.add((skill_uri, AG.hasPayload, payload_uri))
+            graph.add((payload_uri, oc.timeout, Literal(skill.execution_payload.timeout)))
+        graph.add((skill_uri, oc.hasPayload, payload_uri))
 
     # Provenance
     if skill.provenance:
@@ -211,7 +423,17 @@ def load_ontology(ontology_path: Path) -> Graph:
     """
     if not ontology_path.exists():
         logger.info(f"Creating new ontology at {ontology_path}")
-        return create_ontology_graph()
+        # Create a minimal graph with namespace bindings
+        g = Graph()
+        oc = get_oc_namespace()
+        g.bind("oc", oc)
+        g.bind("owl", OWL)
+        g.bind("rdf", RDF)
+        g.bind("rdfs", RDFS)
+        g.bind("dcterms", DCTERMS)
+        g.bind("skos", SKOS)
+        g.bind("prov", PROV)
+        return g
 
     try:
         graph = Graph()
@@ -232,9 +454,10 @@ def get_hash_mapping(graph: Graph) -> dict[str, URIRef]:
     Returns:
         Dictionary mapping hashes to skill URIs
     """
+    oc = get_oc_namespace()
     mapping = {}
-    for skill_uri in graph.subjects(RDF.type, AG.Skill):
-        hash_literal = graph.value(skill_uri, AG.contentHash)
+    for skill_uri in graph.subjects(RDF.type, oc.Skill):
+        hash_literal = graph.value(skill_uri, oc.contentHash)
         if hash_literal:
             mapping[str(hash_literal)] = skill_uri
     return mapping
@@ -250,8 +473,9 @@ def get_id_mapping(graph: Graph) -> dict[str, URIRef]:
     Returns:
         Dictionary mapping IDs to skill URIs
     """
+    oc = get_oc_namespace()
     mapping = {}
-    for skill_uri in graph.subjects(RDF.type, AG.Skill):
+    for skill_uri in graph.subjects(RDF.type, oc.Skill):
         id_literal = graph.value(skill_uri, DCTERMS.identifier)
         if id_literal:
             mapping[str(id_literal)] = skill_uri
@@ -266,18 +490,20 @@ def remove_skill(graph: Graph, skill_uri: URIRef) -> None:
         graph: RDF graph to modify
         skill_uri: URI of skill to remove
     """
+    oc = get_oc_namespace()
+
     # Remove all triples where skill is subject
     for predicate in set(graph.predicates(subject=skill_uri)):
         for obj in graph.objects(skill_uri, predicate):
             graph.remove((skill_uri, predicate, obj))
 
     # Remove requirement blank nodes
-    for req_uri in graph.objects(skill_uri, AG.hasRequirement):
+    for req_uri in graph.objects(skill_uri, oc.hasRequirement):
         for p, o in list(graph.predicate_objects(req_uri)):
             graph.remove((req_uri, p, o))
 
     # Remove payload blank node
-    payload_uri = graph.value(skill_uri, AG.hasPayload)
+    payload_uri = graph.value(skill_uri, oc.hasPayload)
     if payload_uri:
         for p, o in list(graph.predicate_objects(payload_uri)):
             graph.remove((payload_uri, p, o))
