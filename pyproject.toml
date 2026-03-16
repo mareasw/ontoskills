@@ -16,6 +16,7 @@ dependencies = [
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.0.0",
+    "pytest-timeout>=2.2.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
 ]
@@ -31,3 +32,7 @@ build-backend = "setuptools.build_meta"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
+addopts = "-m 'not integration'"
