@@ -155,6 +155,22 @@ def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
         "Base class for all executable skills in the ontology"
     )))
 
+    # oc:ExecutableSkill - Skills with execution payloads
+    g.add((oc.ExecutableSkill, RDF.type, OWL.Class))
+    g.add((oc.ExecutableSkill, RDFS.subClassOf, oc.Skill))
+    g.add((oc.ExecutableSkill, RDFS.label, Literal("Executable Skill")))
+    g.add((oc.ExecutableSkill, RDFS.comment, Literal(
+        "A skill with an executable code payload"
+    )))
+
+    # oc:DeclarativeSkill - Skills without execution (knowledge only)
+    g.add((oc.DeclarativeSkill, RDF.type, OWL.Class))
+    g.add((oc.DeclarativeSkill, RDFS.subClassOf, oc.Skill))
+    g.add((oc.DeclarativeSkill, RDFS.label, Literal("Declarative Skill")))
+    g.add((oc.DeclarativeSkill, RDFS.comment, Literal(
+        "A skill without executable code (declarative knowledge)"
+    )))
+
     # oc:State - Abstract state class
     g.add((oc.State, RDF.type, OWL.Class))
     g.add((oc.State, RDFS.label, Literal("State")))
