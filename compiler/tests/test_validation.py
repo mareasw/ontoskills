@@ -66,3 +66,134 @@ def test_load_core_ontology_returns_none_if_missing():
         assert True  # Expected if file doesn't exist
     else:
         assert isinstance(result, Graph)
+
+
+# ============================================================================
+# COMPREHENSIVE VALIDATION TEST CASES
+# ============================================================================
+
+
+def test_valid_executable_skill_passes():
+    """A skill with all required fields and valid payload should pass."""
+    from compiler.schemas import ExtractedSkill, ExecutionPayload, Requirement
+    from compiler.loader import serialize_skill
+    from compiler.validator import validate_skill_graph
+
+    skill = ExtractedSkill(
+        id="test-skill",
+        hash="abc123",
+        nature="Test skill",
+        genus="Test",
+        differentia="for testing",
+        intents=["test"],
+        requirements=[Requirement(type="Tool", value="pytest")],
+        generated_by="claude-opus-4-6",
+        execution_payload=ExecutionPayload(executor="python", code="print('hello')")
+    )
+    graph = Graph()
+    serialize_skill(graph, skill)
+    result = validate_skill_graph(graph)
+    assert result.conforms is True
+
+
+def test_skill_missing_intent_fails():
+    """A skill without resolvesIntent should fail validation."""
+    from compiler.schemas import ExtractedSkill, Requirement
+    from compiler.loader import serialize_skill
+    from compiler.validator import validate_skill_graph
+
+    skill = ExtractedSkill(
+        id="bad-skill",
+        hash="def456",
+        nature="Bad skill",
+        genus="Test",
+        differentia="incomplete",
+        intents=[],  # Missing required intent
+        requirements=[Requirement(type="Tool", value="pytest")],
+        generated_by="claude-opus-4-6"
+    )
+    graph = Graph()
+    serialize_skill(graph, skill)
+    result = validate_skill_graph(graph)
+    assert result.conforms is False
+    assert "resolvesIntent" in result.results_text
+
+
+def test_skill_without_payload_is_declarative():
+    """A skill without execution_payload becomes DeclarativeSkill and passes."""
+    from compiler.schemas import ExtractedSkill, Requirement
+    from compiler.loader import serialize_skill
+    from compiler.validator import validate_skill_graph
+
+    skill = ExtractedSkill(
+        id="knowledge-skill",
+        hash="ghi789",
+        nature="Knowledge skill",
+        genus="Test",
+        differentia="declarative knowledge",
+        intents=["test"],
+        requirements=[Requirement(type="Tool", value="pytest")],
+        generated_by="claude-opus-4-6"
+        # No execution_payload - automatically becomes DeclarativeSkill
+    )
+    graph = Graph()
+    serialize_skill(graph, skill)  # Will add oc:DeclarativeSkill type
+    result = validate_skill_graph(graph)
+    # This should pass since it's a valid DeclarativeSkill (no payload required)
+    assert result.conforms is True
+
+
+def test_literal_as_state_fails():
+    """A skill with a literal string (not URI) as state should fail."""
+    from compiler.schemas import ExtractedSkill, Requirement, StateTransition, ExecutionPayload
+    from compiler.loader import serialize_skill, get_oc_namespace
+    from compiler.validator import validate_skill_graph
+
+    oc = get_oc_namespace()
+
+    skill = ExtractedSkill(
+        id="bad-state",
+        hash="mno345",
+        nature="Bad state skill",
+        genus="Test",
+        differentia="invalid state",
+        intents=["test"],
+        requirements=[Requirement(type="Tool", value="pytest")],
+        generated_by="claude-opus-4-6",
+        execution_payload=ExecutionPayload(executor="python", code="test")
+    )
+    graph = Graph()
+    serialize_skill(graph, skill)
+
+    # Manually add a literal (string) as state - this should fail
+    skill_uri = oc[f"skill_{skill.hash[:16]}"]
+    graph.add((skill_uri, oc.yieldsState, Literal("SomeState")))  # WRONG: Literal not URI
+
+    result = validate_skill_graph(graph)
+    assert result.conforms is False
+    assert "yieldsState" in result.results_text or "IRI" in result.results_text
+
+
+def test_skill_with_payload_is_executable():
+    """A skill with execution_payload becomes ExecutableSkill and passes."""
+    from compiler.schemas import ExtractedSkill, ExecutionPayload, Requirement
+    from compiler.loader import serialize_skill
+    from compiler.validator import validate_skill_graph
+
+    skill = ExtractedSkill(
+        id="code-skill",
+        hash="jkl012",
+        nature="Executable skill",
+        genus="Test",
+        differentia="has code to execute",
+        intents=["test"],
+        requirements=[Requirement(type="Tool", value="pytest")],
+        generated_by="claude-opus-4-6",
+        execution_payload=ExecutionPayload(executor="python", code="print('hello')")
+    )
+    # skill.skill_type will be "executable" because payload exists
+    # So this will be validated as ExecutableSkill
+    graph = Graph()
+    serialize_skill(graph, skill)
+    result = validate_skill_graph(graph)
+    assert result.conforms is True  # It's a valid ExecutableSkill
