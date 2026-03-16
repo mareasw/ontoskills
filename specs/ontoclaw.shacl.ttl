@@ -1,0 +1,167 @@
+# specs/ontoclaw.shacl.ttl
+
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix oc: <http://ontoclaw.marea.software/ontology#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+
+# ============================================================================
+# ONTOLOGY HEADER
+# ============================================================================
+
+<http://ontoclaw.marea.software/shacl>
+    a owl:Ontology ;
+    rdfs:label "OntoClaw SHACL Shapes" ;
+    rdfs:comment "Constitutional constraints for OntoClaw skill ontology" ;
+    .
+
+# ============================================================================
+# BASE SKILL SHAPE
+# Applies to all skills (both Executable and Declarative)
+# ============================================================================
+
+oc:SkillShape
+    a sh:NodeShape ;
+    sh:targetClass oc:Skill ;
+    rdfs:label "Skill Shape" ;
+    rdfs:comment "Base constraints that apply to all skills" ;
+
+    # Every skill MUST have at least one resolved intent
+    sh:property [
+        sh:path oc:resolvesIntent ;
+        sh:minCount 1 ;
+        sh:message "Ogni Skill deve avere almeno un resolvesIntent (intento risolto)" ;
+    ] ;
+
+    # Every skill MUST have exactly one generatedBy attestation
+    sh:property [
+        sh:path oc:generatedBy ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Ogni Skill deve avere esattamente un generatedBy (modello LLM)" ;
+    ] ;
+
+    # requiresState must be an IRI pointing to an oc:State instance
+    sh:property [
+        sh:path oc:requiresState ;
+        sh:nodeKind sh:IRI ;
+        sh:class oc:State ;
+        sh:message "requiresState deve essere un URI che punta a un'istanza di oc:State" ;
+    ] ;
+
+    # yieldsState must be an IRI pointing to an oc:State instance
+    sh:property [
+        sh:path oc:yieldsState ;
+        sh:nodeKind sh:IRI ;
+        sh:class oc:State ;
+        sh:message "yieldsState deve essere un URI che punta a un'istanza di oc:State" ;
+    ] ;
+
+    # handlesFailure must be an IRI pointing to an oc:State instance
+    sh:property [
+        sh:path oc:handlesFailure ;
+        sh:nodeKind sh:IRI ;
+        sh:class oc:State ;
+        sh:message "handlesFailure deve essere un URI che punta a un'istanza di oc:State" ;
+    ] ;
+    .
+
+# ============================================================================
+# EXECUTABLE SKILL SHAPE
+# Skills with execution payloads
+# ============================================================================
+
+oc:ExecutableSkillShape
+    a sh:NodeShape ;
+    sh:targetClass oc:ExecutableSkill ;
+    rdfs:label "Executable Skill Shape" ;
+    rdfs:comment "Constraints for skills with execution payloads" ;
+
+    # MUST have exactly one payload
+    sh:property [
+        sh:path oc:hasPayload ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class oc:ExecutionPayload ;
+        sh:message "Ogni ExecutableSkill deve avere esattamente un hasPayload" ;
+    ] ;
+    .
+
+# ============================================================================
+# DECLARATIVE SKILL SHAPE
+# Skills without execution payloads (knowledge only)
+# ============================================================================
+
+oc:DeclarativeSkillShape
+    a sh:NodeShape ;
+    sh:targetClass oc:DeclarativeSkill ;
+    rdfs:label "Declarative Skill Shape" ;
+    rdfs:comment "Constraints for declarative/knowledge skills" ;
+
+    # MUST NOT have a payload
+    sh:property [
+        sh:path oc:hasPayload ;
+        sh:maxCount 0 ;
+        sh:message "Le DeclarativeSkill non possono avere hasPayload" ;
+    ] ;
+    .
+
+# ============================================================================
+# EXECUTION PAYLOAD SHAPE
+# ============================================================================
+
+oc:ExecutionPayloadShape
+    a sh:NodeShape ;
+    sh:targetClass oc:ExecutionPayload ;
+    rdfs:label "Execution Payload Shape" ;
+
+    # MUST have exactly one executor
+    sh:property [
+        sh:path oc:executor ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:in ("shell" "python" "node" "claude_tool") ;
+        sh:message "ExecutionPayload deve avere un executor valido: shell, python, node, o claude_tool" ;
+    ] ;
+
+    # MUST have exactly one code block
+    sh:property [
+        sh:path oc:code ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "ExecutionPayload deve avere esattamente un campo code" ;
+    ] ;
+
+    # timeout is optional but must be integer if present
+    sh:property [
+        sh:path oc:timeout ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "Se presente, timeout deve essere un intero (secondi)" ;
+    ] ;
+    .
+
+# ============================================================================
+# STATE SHAPE
+# Validates that state instances are properly defined
+# ============================================================================
+
+oc:StateShape
+    a sh:NodeShape ;
+    sh:targetClass oc:State ;
+    rdfs:label "State Shape" ;
+
+    # States should have a label
+    sh:property [
+        sh:path rdfs:label ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Ogni State dovrebbe avere un rdfs:label" ;
+        sh:severity sh:Warning ;
+    ] ;
+    .
