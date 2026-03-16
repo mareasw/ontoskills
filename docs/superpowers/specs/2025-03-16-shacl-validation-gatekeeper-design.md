@@ -352,7 +352,8 @@ This avoids redundancy - the type is automatically derived from whether a payloa
 Modify `serialize_skill_to_module()` to include validation:
 
 ```python
-from compiler.validator import validate_and_raise, OntologyValidationError
+from compiler.validator import validate_and_raise
+from compiler.exceptions import OntologyValidationError
 
 def serialize_skill_to_module(skill: ExtractedSkill, output_path: Path) -> None:
     """Serialize a skill to a standalone skill.ttl module file with validation."""
