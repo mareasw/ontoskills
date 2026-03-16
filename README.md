@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="OntoClaw Logo">
+  <img src="assets/logo.png" alt="OntoClaw Logo" width="500px">
 </p>
 
 <h1 align="center">OntoClaw</h1>

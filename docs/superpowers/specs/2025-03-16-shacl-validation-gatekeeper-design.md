@@ -46,6 +46,8 @@ ontoclaw/
 
 The constitutional rules that every skill must follow.
 
+**IMPORTANT:** The `oc:` namespace prefix MUST match the `BASE_URI` defined in `compiler/config.py`. Currently this is `http://ontoclaw.marea.software/ontology#`.
+
 ```turtle
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix oc: <http://ontoclaw.marea.software/ontology#> .
@@ -231,11 +233,13 @@ from pyshacl import validate
 from rdflib import Graph
 
 from compiler.exceptions import OntologyValidationError
+from compiler.config import OUTPUT_DIR
 
 logger = logging.getLogger(__name__)
 
-# Path to SHACL shapes file (project root / specs /)
+# Paths to SHACL shapes and core ontology
 SHACL_SHAPES_PATH = Path(__file__).parent.parent / "specs" / "ontoclaw.shacl.ttl"
+CORE_ONTOLOGY_PATH = Path(OUTPUT_DIR) / "ontoclaw-core.ttl"
 
 
 class ValidationResult(NamedTuple):
@@ -256,6 +260,24 @@ def load_shacl_shapes() -> Graph:
     return shapes_graph
 
 
+def load_core_ontology() -> Graph | None:
+    """
+    Load the core ontology (TBox) for class definitions.
+
+    CRITICAL: This is needed for sh:class validation to work correctly.
+    Without the core ontology, pySHACL doesn't know that oc:SystemAuthenticated
+    is an oc:State, causing false negatives in state validation.
+    """
+    if not CORE_ONTOLOGY_PATH.exists():
+        logger.warning(f"Core ontology not found at {CORE_ONTOLOGY_PATH}, state validation may fail")
+        return None
+
+    ont_graph = Graph()
+    ont_graph.parse(CORE_ONTOLOGY_PATH, format="turtle")
+    logger.debug(f"Loaded core ontology from {CORE_ONTOLOGY_PATH}")
+    return ont_graph
+
+
 def validate_skill_graph(skill_graph: Graph, shapes_graph: Graph | None = None) -> ValidationResult:
     """
     Validate a skill RDF graph against SHACL shapes.
@@ -266,18 +288,18 @@ def validate_skill_graph(skill_graph: Graph, shapes_graph: Graph | None = None) 
 
     Returns:
         ValidationResult with conforms flag and detailed report
-
-    Raises:
-        OntologyValidationError: If validation fails (when raise_on_error=True)
     """
     if shapes_graph is None:
         shapes_graph = load_shacl_shapes()
+
+    # Load core ontology for class definitions (essential for sh:class validation)
+    ont_graph = load_core_ontology()
 
     # Run SHACL validation
     conforms, results_graph, results_text = validate(
         skill_graph,
         shacl_graph=shapes_graph,
-        ont_graph=None,
+        ont_graph=ont_graph,  # PASS CORE ONTOLOGY! Required for sh:class oc:State
         inference='rdfs',  # Use RDFS inference for class hierarchies
         abort_on_first=False,  # Collect all violations
         allow_warnings=True,
@@ -454,25 +476,25 @@ def test_skill_missing_intent_fails():
     assert "resolvesIntent" in result.results_text
 ```
 
-### Test 3: Executable Skill Missing Payload Fails
+### Test 3: Skill Without Payload Becomes Declarative (Passes)
 
 ```python
-def test_executable_skill_missing_payload_fails():
-    """An ExecutableSkill without hasPayload should fail."""
+def test_skill_without_payload_is_declarative():
+    """A skill without execution_payload becomes DeclarativeSkill and passes."""
     skill = ExtractedSkill(
-        id="no-payload",
+        id="knowledge-skill",
         hash="ghi789",
-        nature="Missing payload",
+        nature="Knowledge skill",
         genus="Test",
-        differentia="incomplete",
+        differentia="declarative knowledge",
         intents=["test"],
         generated_by="claude-opus-4-6"
-        # No execution_payload - this is a declarative skill
+        # No execution_payload - automatically becomes DeclarativeSkill
     )
     graph = Graph()
-    serialize_skill(graph, skill)  # Will mark as DeclarativeSkill
+    serialize_skill(graph, skill)  # Will add oc:DeclarativeSkill type
     result = validate_skill_graph(graph)
-    # This should pass since it's a valid DeclarativeSkill
+    # This should pass since it's a valid DeclarativeSkill (no payload required)
     assert result.conforms is True
 ```
 
@@ -506,28 +528,30 @@ def test_literal_as_state_fails():
     assert "yieldsState" in result.results_text or "IRI" in result.results_text
 ```
 
-### Test 5: Declarative Skill with Payload Fails
+### Test 5: Skill With Payload Becomes Executable (Passes)
 
 ```python
-def test_declarative_skill_cannot_have_payload():
-    """A DeclarativeSkill cannot have hasPayload (enforced by SHACL)."""
+def test_skill_with_payload_is_executable():
+    """A skill with execution_payload becomes ExecutableSkill and passes."""
     skill = ExtractedSkill(
-        id="confused-skill",
+        id="code-skill",
         hash="jkl012",
-        nature="Confused skill",
+        nature="Executable skill",
         genus="Test",
-        differentia="has payload but shouldn't",
+        differentia="has code to execute",
         intents=["test"],
         generated_by="claude-opus-4-6",
-        execution_payload=ExecutionPayload(executor="python", code="print('oops')")
+        execution_payload=ExecutionPayload(executor="python", code="print('hello')")
     )
     # skill.skill_type will be "executable" because payload exists
-    # So this will be validated as ExecutableSkill and pass
+    # So this will be validated as ExecutableSkill
     graph = Graph()
     serialize_skill(graph, skill)
     result = validate_skill_graph(graph)
     assert result.conforms is True  # It's a valid ExecutableSkill
 ```
+
+**Note:** The computed property `skill_type` automatically handles the classification. There's no way to have a "confused" skill - if it has a payload, it's executable; if not, it's declarative.
 
 ---
 
@@ -631,17 +655,41 @@ def merge_skill(ontology_path: Path, skill: ExtractedSkill) -> Graph:
 
 ---
 
-## 10. RDFS Inference for State Validation
+## 10. RDFS Inference and Core Ontology Loading
 
-The SHACL shapes use `sh:class oc:State` to validate that state references point to actual `oc:State` instances. For this to work correctly:
+The SHACL shapes use `sh:class oc:State` to validate that state references point to actual `oc:State` instances.
 
-1. **RDFS inference is enabled** via `inference='rdfs'` in the pySHACL validate call
-2. **State class hierarchy must be accessible** - the predefined states (SystemAuthenticated, PermissionDenied, etc.) are subclasses of `oc:State`
-3. **No additional ontology loading needed** - pySHACL's RDFS inference handles the subclass relationships
+**THE PROBLEM:** When validating a freshly-generated skill graph in memory (before saving to disk), the graph contains the skill URI but NOT the TBox definitions. The skill might reference `oc:SystemAuthenticated`, but pySHACL doesn't know that `oc:SystemAuthenticated` is a subclass of `oc:State` - that information is in `ontoclaw-core.ttl`.
 
-The skill graph includes `owl:imports` to the core ontology, which provides the state class definitions. If validation issues occur with states, ensure:
-- The core ontology file exists at `semantic-skills/ontoclaw-core.ttl`
-- State instances are properly typed as `rdfs:subClassOf oc:State`
+**THE SOLUTION:** The validator MUST load `ontoclaw-core.ttl` and pass it to pySHACL as `ont_graph`:
+
+```python
+# In load_core_ontology() - see Section 3.2
+CORE_ONTOLOGY_PATH = Path(__file__).parent.parent / "semantic-skills" / "ontoclaw-core.ttl"
+
+def load_core_ontology() -> Graph | None:
+    if CORE_ONTOLOGY_PATH.exists():
+        ont_graph = Graph()
+        ont_graph.parse(CORE_ONTOLOGY_PATH, format="turtle")
+        return ont_graph
+    return None
+```
+
+Then in `validate()`:
+```python
+conforms, results_graph, results_text = validate(
+    skill_graph,
+    shacl_graph=shapes_graph,
+    ont_graph=ont_graph,  # CRITICAL: Provides TBox for sh:class validation
+    inference='rdfs',
+    ...
+)
+```
+
+**Why this matters:**
+- Without `ont_graph`, `sh:class oc:State` validation will fail with "class not found"
+- With `ont_graph`, pySHACL can see that `oc:SystemAuthenticated rdfs:subClassOf oc:State`
+- RDFS inference then allows the constraint to pass correctly
 
 ---
 
