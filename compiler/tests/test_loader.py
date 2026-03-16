@@ -417,3 +417,18 @@ def test_load_skill_module_not_found():
 
     with pytest.raises(OntologyLoadError):
         load_skill_module(non_existent)
+
+
+def test_core_ontology_has_skill_subclasses(tmp_path):
+    """Test that core ontology defines ExecutableSkill and DeclarativeSkill."""
+    import tempfile
+
+    output_path = tmp_path / "ontoclaw-core.ttl"
+    g = create_core_ontology(output_path)
+    oc = get_oc_namespace()
+
+    # Check ExecutableSkill is subclass of Skill
+    assert (oc.ExecutableSkill, RDFS.subClassOf, oc.Skill) in g
+
+    # Check DeclarativeSkill is subclass of Skill
+    assert (oc.DeclarativeSkill, RDFS.subClassOf, oc.Skill) in g
