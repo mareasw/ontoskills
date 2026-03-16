@@ -4,15 +4,91 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.0] - 2026-03-16
+
+### Added
+
+#### SHACL Validation Gatekeeper
+
+A constitutional validation layer that ensures every skill ontology is logically valid before being written to disk. Invalid skills are blocked with detailed error reports.
+
+- **validator.py** - SHACL validation module
+  - `ValidationResult` NamedTuple with `conforms`, `results_text`, `results_graph`
+  - `load_shacl_shapes()` - Loads constitutional shapes from `specs/ontoclaw.shacl.ttl`
+  - `load_core_ontology()` - Loads TBox for `sh:class` validation (critical for state validation)
+  - `validate_skill_graph()` - Validates RDF graph against SHACL shapes with RDFS inference
+  - `validate_and_raise()` - Raises `OntologyValidationError` on failure
+
+- **specs/ontoclaw.shacl.ttl** - Constitutional SHACL shapes
+  - `oc:SkillShape` - Base constraints for all skills
+    - `resolvesIntent` minCount 1 (required)
+    - `generatedBy` exactly 1 (required attestation)
+    - `requiresState`, `yieldsState`, `handlesFailure` must be IRIs of `oc:State`
+  - `oc:ExecutableSkillShape` - Constraints for skills with payloads
+    - `hasPayload` exactly 1, must be `oc:ExecutionPayload`
+  - `oc:DeclarativeSkillShape` - Constraints for knowledge-only skills
+    - `hasPayload` maxCount 0 (forbidden)
+  - `oc:ExecutionPayloadShape` - Payload constraints
+    - `executor` must be one of: shell, python, node, claude_tool
+    - `code` required, string
+    - `timeout` optional, integer
+  - `oc:StateShape` - State instance constraints (warning level)
+    - `rdfs:label` recommended
+  - All error messages in Italian
+
+- **schemas.py** - Added computed `skill_type` property
+  - Automatically returns "executable" or "declarative" based on `execution_payload` presence
+  - Uses Pydantic `@computed_field` for serialization
+
+- **loader.py** - Added skill subclasses and validation hooks
+  - `oc:ExecutableSkill` and `oc:DeclarativeSkill` added to core ontology
+  - `serialize_skill()` now adds appropriate subclass type based on `skill_type`
+  - `serialize_skill_to_module()` validates before write - invalid skills NOT written
+  - `merge_skill()` validates before return - invalid skills NOT merged
+
+- **exceptions.py** - Added `OntologyValidationError`
+  - Exit code 8
+  - Includes full SHACL validation report
+
+#### Testing
+
+- **test_validation.py** - 5 comprehensive SHACL validation tests
+  - Valid executable skill passes
+  - Skill missing intent fails with appropriate message
+  - Declarative skill (no payload) passes
+  - Literal as state fails (IRI required)
+  - Executable skill with payload passes
+- **test_loader.py** - 3 new tests for validation hooks
+  - `serialize_skill_to_module` blocks invalid skills
+  - File not written on validation failure
+  - `merge_skill` blocks invalid skills
+- **test_schemas.py** - 2 new tests for `skill_type` property
+  - Computed as "executable" with payload
+  - Computed as "declarative" without payload
+- **test_exceptions.py** - 1 new test for `OntologyValidationError`
+
+### Changed
+
+- Existing tests updated to include required `generated_by` field for SHACL compliance
+- Test count increased from 42 to 91 tests
+
+### Dependencies
+
+- Added `pyshacl>=0.25.0` for SHACL validation
+
+---
+
 ## [0.1.0] - 2026-03-16
 
 ### Added
 
 #### Core Infrastructure
+
 - **schemas.py** - Pydantic models for structured skill extraction
   - `Requirement` model with types: EnvVar, Tool, Hardware, API, Knowledge
-  - `ExecutionPayload` model for code execution
+  - `ExecutionPayload` model for code execution (executor, code, timeout)
   - `ExtractedSkill` model with Knowledge Architecture fields (nature, genus, differentia)
+  - `StateTransition` model for state machine definitions
 
 - **exceptions.py** - Custom exception hierarchy with exit codes
   - `SkillETLError` (base, exit_code=1)
@@ -23,6 +99,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `SkillNotFoundError` (exit_code=7)
 
 #### Extraction Pipeline
+
 - **extractor.py** - Deterministic ID and hash generation
   - `generate_skill_id()` - Slugifies directory names to kebab-case (max 64 chars)
   - `compute_skill_hash()` - SHA-256 hash of all skill files (sorted, recursive)
@@ -32,8 +109,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - Tool-use loop with max 20 iterations, 120s timeout
   - Knowledge Architecture system prompt
   - Path traversal protection in file reading
+  - State transition extraction instructions
 
 #### Security Pipeline
+
 - **security.py** - Defense-in-depth security checks
   - Stage 1: Regex pattern matching for:
     - Prompt injection (ignore instructions, system:, you are now)
@@ -46,6 +125,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - Fail-closed error handling
 
 #### Ontology Loader
+
 - **loader.py** - OWL 2 RDF/Turtle serialization
   - Full OWL 2 property characteristics:
     - `ag:dependsOn` - AsymmetricProperty with inverse `ag:enables`
@@ -59,8 +139,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     - Add new skills
   - Atomic writes with backup/restore pattern
   - `--reason` flag for OWL reasoning with owlrl
+  - Predefined states: SystemAuthenticated, PermissionDenied, etc.
 
 #### SPARQL Engine
+
 - **sparql.py** - Query execution against ontology
   - SELECT query support
   - Mutation prevention (no INSERT/DELETE)
@@ -70,15 +152,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     - `turtle` - Turtle-formatted bindings
 
 #### CLI Interface
+
 - **cli.py** - Complete Click-based CLI
   - Commands:
+    - `init-core` - Initialize core ontology with predefined states
     - `compile [SKILL_NAME]` - Compile skills to ontology
     - `query "<sparql>"` - Execute SPARQL queries
     - `list-skills` - List all skills in ontology
     - `security-audit` - Re-validate skills against security patterns
   - Options:
     - `-i, --input` - Input directory (default: `./skills/`)
-    - `-o, --output` - Output file (default: `./ontology/skills.ttl`)
+    - `-o, --output` - Output file (default: `./semantic-skills/skills.ttl`)
     - `--dry-run` - Preview without saving
     - `--skip-security` - Skip security checks
     - `--reason/--no-reason` - Apply OWL reasoning
@@ -91,6 +175,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **compiler.py** - Entry point for package
 
 ### Dependencies
+
 - `anthropic>=0.39.0` - Claude API for extraction
 - `click>=8.1.0` - CLI framework
 - `pydantic>=2.0.0` - Data validation
@@ -99,13 +184,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `owlrl>=1.0.0` - OWL reasoning
 
 ### Dev Dependencies
+
 - `pytest>=8.0.0` - Testing
 - `pytest-cov>=4.0.0` - Coverage
 - `ruff>=0.1.0` - Linting
 - `mypy>=1.0.0` - Type checking
 
 ### Testing
-- **42 tests** with 86% code coverage
+
+- 42 tests with 86% code coverage
 - Test files:
   - `test_schemas.py` - Pydantic model validation
   - `test_exceptions.py` - Exception exit codes
@@ -117,7 +204,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `test_cli.py` - CLI commands and options
 
 ### Documentation
-- **README.md** - Updated with full usage instructions
+
+- README.md with full usage instructions
 - Architecture diagram
 - CLI command reference
 - Exit codes table
@@ -127,18 +215,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## Implementation Notes
 
 ### Knowledge Architecture Framework
+
 The extraction follows the Knowledge Architecture framework:
 - **Categories of Being**: Tool, Concept, Work
 - **Genus and Differentia**: "A is a B that C" definition structure
 - **Relations as First-Class Citizens**: depends-on, extends, contradicts, implements, exemplifies
 
 ### OWL 2 Design Decisions
+
 - Properties defined with characteristics for future reasoning
 - Inverse properties enable bidirectional queries
 - Transitive properties enable inference chains
 - Asymmetric properties prevent circular dependencies
 
+### SHACL Validation Philosophy
+
+- **Fail-closed**: Invalid skills are never written to disk
+- **Constitutional**: Shapes define the "laws" skills must follow
+- **RDFS-aware**: State validation uses TBox from core ontology
+- **Clear messages**: Italian error messages for debugging
+
 ### Security Philosophy
+
 - Fail-closed: Any error blocks content
 - Defense-in-depth: Regex + LLM review
 - Unicode normalization prevents bypass attempts
