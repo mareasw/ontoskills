@@ -247,15 +247,19 @@ ontoclaw/
 ## Architecture
 
 ```
-skills/                    semantic-skills/
-├── office/                ├── ontoclaw-core.ttl    # Core ontology (TBox)
-│   └── public/            ├── index.ttl            # Skill index
-│       ├── docx/          └── office/public/
-│       ├── pdf/               └── docx/skill.ttl   # Compiled skills
-│       ├── pptx/               └── pdf/skill.ttl
-│       └── xlsx/               └── pptx/skill.ttl
-       │                        └── xlsx/skill.ttl
-       │
+skills/                       semantic-skills/
+├── create-document/          ├── ontoclaw-core.ttl      # Core ontology (TBox)
+│   └── SKILL.md              ├── index.ttl              # Skill index
+├── analyze-data/             └── skills/
+│   └── SKILL.md                  ├── create-document/
+├── send-email/                   │   └── skill.ttl       # Compiled skill
+│   └── SKILL.md                  ├── analyze-data/
+├── query-database/               │   └── skill.ttl
+│   └── SKILL.md                  ├── send-email/
+└── ...any skill...               │   └── skill.ttl
+                                  └── query-database/
+                                      └── skill.ttl
+
        └────────► compiler/ (Python) ────────►
                   │
                   ├── extractor.py     # ID/hash
@@ -264,6 +268,8 @@ skills/                    semantic-skills/
                   ├── loader.py        # OWL serialization
                   └── validator.py     # SHACL validation
 ```
+
+**Any skill directory works** - just add a `SKILL.md` file and OntoClaw will compile it to a validated OWL 2 ontology module.
 
 ---
 
