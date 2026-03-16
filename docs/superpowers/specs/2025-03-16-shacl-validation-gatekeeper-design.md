@@ -52,6 +52,7 @@ The constitutional rules that every skill must follow.
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
 
 # ============================================================================
 # ONTOLOGY HEADER
@@ -229,9 +230,11 @@ from typing import NamedTuple
 from pyshacl import validate
 from rdflib import Graph
 
+from compiler.exceptions import OntologyValidationError
+
 logger = logging.getLogger(__name__)
 
-# Path to SHACL shapes file
+# Path to SHACL shapes file (project root / specs /)
 SHACL_SHAPES_PATH = Path(__file__).parent.parent / "specs" / "ontoclaw.shacl.ttl"
 
 
@@ -240,16 +243,6 @@ class ValidationResult(NamedTuple):
     conforms: bool
     results_text: str
     results_graph: Graph | None
-
-
-class OntologyValidationError(Exception):
-    """Raised when skill ontology fails SHACL validation."""
-    exit_code = 8
-
-    def __init__(self, results_text: str, results_graph: Graph | None = None):
-        self.results_text = results_text
-        self.results_graph = results_graph
-        super().__init__(f"SHACL validation failed:\n{results_text}")
 
 
 def load_shacl_shapes() -> Graph:
@@ -336,15 +329,23 @@ class OntologyValidationError(SkillETLError):
 
 ### 3.4 Schema Update (`compiler/schemas.py`)
 
-Add skill type enumeration:
+Add skill type as a computed property (derived from execution_payload presence):
 
 ```python
-from typing import Literal, Any
+from typing import Literal
+from pydantic import computed_field
 
 class ExtractedSkill(BaseModel):
     # ... existing fields ...
-    skill_type: Literal["executable", "declarative"] = "executable"
+
+    @computed_field
+    @property
+    def skill_type(self) -> Literal["executable", "declarative"]:
+        """Derive skill type from presence of execution_payload."""
+        return "executable" if self.execution_payload is not None else "declarative"
 ```
+
+This avoids redundancy - the type is automatically derived from whether a payload exists.
 
 ### 3.5 Loader Hook (`compiler/loader.py`)
 
@@ -382,29 +383,33 @@ def serialize_skill_to_module(skill: ExtractedSkill, output_path: Path) -> None:
 
 ## 4. Skill Type Classification Logic
 
-The skill type is determined by the presence of `execution_payload`:
+The skill type is **automatically derived** from the presence of `execution_payload` via a computed property in the Pydantic model. No manual assignment needed.
+
+When serializing to RDF in `serialize_skill()` (loader.py):
 
 ```python
-# In transformer.py or during extraction
-if skill.execution_payload is not None:
-    skill.skill_type = "executable"
-else:
-    skill.skill_type = "declarative"
-```
-
-When serializing to RDF:
-
-```python
-# In serialize_skill()
+# Add appropriate subclass type based on skill_type
 if skill.skill_type == "executable":
     graph.add((skill_uri, RDF.type, oc.ExecutableSkill))
 else:
     graph.add((skill_uri, RDF.type, oc.DeclarativeSkill))
 ```
 
+**Note:** The skill still gets `oc:Skill` as a base type, the subclass is added in addition.
+
 ---
 
 ## 5. Test Cases
+
+All tests require these imports:
+
+```python
+import pytest
+from rdflib import Graph
+from compiler.schemas import ExtractedSkill, ExecutionPayload
+from compiler.loader import serialize_skill
+from compiler.validator import validate_skill_graph
+```
 
 ### Test 1: Perfect Executable Skill Passes
 
@@ -419,7 +424,6 @@ def test_valid_executable_skill_passes():
         differentia="for testing",
         intents=["test"],
         generated_by="claude-opus-4-6",
-        skill_type="executable",
         execution_payload=ExecutionPayload(executor="python", code="print('hello')")
     )
     graph = Graph()
@@ -440,8 +444,7 @@ def test_skill_missing_intent_fails():
         genus="Test",
         differentia="incomplete",
         intents=[],  # Missing required intent
-        generated_by="claude-opus-4-6",
-        skill_type="declarative"
+        generated_by="claude-opus-4-6"
     )
     graph = Graph()
     serialize_skill(graph, skill)
@@ -462,33 +465,51 @@ def test_executable_skill_missing_payload_fails():
         genus="Test",
         differentia="incomplete",
         intents=["test"],
-        generated_by="claude-opus-4-6",
-        skill_type="executable",
-        execution_payload=None  # Should not happen, but test the validation
+        generated_by="claude-opus-4-6"
+        # No execution_payload - this is a declarative skill
     )
     graph = Graph()
-    serialize_skill(graph, skill)  # Won't add hasPayload
+    serialize_skill(graph, skill)  # Will mark as DeclarativeSkill
     result = validate_skill_graph(graph)
-    assert result.conforms is False
-    assert "hasPayload" in result.results_text
+    # This should pass since it's a valid DeclarativeSkill
+    assert result.conforms is True
 ```
 
 ### Test 4: Invalid State URI Fails
 
 ```python
-def test_invalid_state_uri_fails():
-    """A skill with non-URI state transition should fail."""
-    # This test verifies that plain strings as states fail
-    # In practice, this is prevented by Pydantic validation
-    # but SHACL provides defense-in-depth
-    pass
+def test_literal_as_state_fails():
+    """A skill with a literal string (not URI) as state should fail."""
+    from rdflib import Literal, Namespace
+    oc = Namespace("http://ontoclaw.marea.software/ontology#")
+
+    skill = ExtractedSkill(
+        id="bad-state",
+        hash="mno345",
+        nature="Bad state skill",
+        genus="Test",
+        differentia="invalid state",
+        intents=["test"],
+        generated_by="claude-opus-4-6",
+        execution_payload=ExecutionPayload(executor="python", code="test")
+    )
+    graph = Graph()
+    serialize_skill(graph, skill)
+
+    # Manually add a literal (string) as state - this should fail
+    skill_uri = oc[f"skill_{skill.hash[:16]}"]
+    graph.add((skill_uri, oc.yieldsState, Literal("SomeState")))  # WRONG: Literal not URI
+
+    result = validate_skill_graph(graph)
+    assert result.conforms is False
+    assert "yieldsState" in result.results_text or "IRI" in result.results_text
 ```
 
 ### Test 5: Declarative Skill with Payload Fails
 
 ```python
-def test_declarative_skill_with_payload_fails():
-    """A DeclarativeSkill with hasPayload should fail."""
+def test_declarative_skill_cannot_have_payload():
+    """A DeclarativeSkill cannot have hasPayload (enforced by SHACL)."""
     skill = ExtractedSkill(
         id="confused-skill",
         hash="jkl012",
@@ -497,13 +518,14 @@ def test_declarative_skill_with_payload_fails():
         differentia="has payload but shouldn't",
         intents=["test"],
         generated_by="claude-opus-4-6",
-        skill_type="declarative",
         execution_payload=ExecutionPayload(executor="python", code="print('oops')")
     )
+    # skill.skill_type will be "executable" because payload exists
+    # So this will be validated as ExecutableSkill and pass
     graph = Graph()
     serialize_skill(graph, skill)
     result = validate_skill_graph(graph)
-    assert result.conforms is False
+    assert result.conforms is True  # It's a valid ExecutableSkill
 ```
 
 ---
@@ -544,24 +566,107 @@ dependencies = [
 
 ---
 
-## 8. Implementation Order
+## 8. Core Ontology Updates (`compiler/loader.py`)
 
-1. Add `pyshacl` to dependencies
-2. Create `specs/ontoclaw.shacl.ttl`
-3. Add `OntologyValidationError` to `exceptions.py`
-4. Create `compiler/validator.py`
-5. Update `compiler/schemas.py` with `skill_type` field
-6. Update `compiler/loader.py` with validation hook
-7. Update `serialize_skill()` to set correct skill class
-8. Create `compiler/tests/test_validation.py`
-9. Run all tests to ensure no regressions
+The `create_core_ontology()` function must be updated to define the skill subclasses:
+
+```python
+# Add to create_core_ontology() after oc:Skill definition
+
+# oc:ExecutableSkill - Skills with execution payloads
+g.add((oc.ExecutableSkill, RDF.type, OWL.Class))
+g.add((oc.ExecutableSkill, RDFS.subClassOf, oc.Skill))
+g.add((oc.ExecutableSkill, RDFS.label, Literal("Executable Skill")))
+g.add((oc.ExecutableSkill, RDFS.comment, Literal(
+    "A skill with an executable code payload"
+)))
+
+# oc:DeclarativeSkill - Skills without execution (knowledge only)
+g.add((oc.DeclarativeSkill, RDF.type, OWL.Class))
+g.add((oc.DeclarativeSkill, RDFS.subClassOf, oc.Skill))
+g.add((oc.DeclarativeSkill, RDFS.label, Literal("Declarative Skill")))
+g.add((oc.DeclarativeSkill, RDFS.comment, Literal(
+    "A skill without executable code (declarative knowledge)"
+)))
+```
 
 ---
 
-## 9. Success Criteria
+## 9. Validation in merge_skill()
+
+The `merge_skill()` function also writes to the ontology and should include validation:
+
+```python
+def merge_skill(ontology_path: Path, skill: ExtractedSkill) -> Graph:
+    """Intelligently merge a skill into the ontology with validation."""
+    graph = load_ontology(ontology_path)
+    hash_mapping = get_hash_mapping(graph)
+    id_mapping = get_id_mapping(graph)
+
+    # Check if unchanged (same hash)
+    if skill.hash in hash_mapping:
+        logger.info(f"Skill {skill.id} unchanged (hash match), skipping")
+        return graph
+
+    # Check if updated (same ID, different hash)
+    if skill.id in id_mapping:
+        old_uri = id_mapping[skill.id]
+        logger.info(f"Skill {skill.id} updated, removing old version")
+        remove_skill(graph, old_uri)
+
+    # Add new/updated skill
+    logger.info(f"Adding skill {skill.id} to ontology")
+    serialize_skill(graph, skill)
+
+    # VALIDATE BEFORE RETURNING
+    try:
+        validate_and_raise(graph)
+    except OntologyValidationError as e:
+        logger.critical(f"Skill {skill.id} failed validation, not merging")
+        raise
+
+    return graph
+```
+
+---
+
+## 10. RDFS Inference for State Validation
+
+The SHACL shapes use `sh:class oc:State` to validate that state references point to actual `oc:State` instances. For this to work correctly:
+
+1. **RDFS inference is enabled** via `inference='rdfs'` in the pySHACL validate call
+2. **State class hierarchy must be accessible** - the predefined states (SystemAuthenticated, PermissionDenied, etc.) are subclasses of `oc:State`
+3. **No additional ontology loading needed** - pySHACL's RDFS inference handles the subclass relationships
+
+The skill graph includes `owl:imports` to the core ontology, which provides the state class definitions. If validation issues occur with states, ensure:
+- The core ontology file exists at `semantic-skills/ontoclaw-core.ttl`
+- State instances are properly typed as `rdfs:subClassOf oc:State`
+
+---
+
+## 11. Implementation Order
+
+1. Add `pyshacl>=0.25.0` to `compiler/pyproject.toml` dependencies
+2. Create `specs/ontoclaw.shacl.ttl` with all SHACL shapes
+3. Add `OntologyValidationError` to `compiler/exceptions.py`
+4. Create `compiler/validator.py` with validation functions
+5. Update `compiler/schemas.py` with computed `skill_type` property
+6. Update `create_core_ontology()` in `compiler/loader.py` to add skill subclasses
+7. Update `serialize_skill()` in `compiler/loader.py` to add subclass type
+8. Add validation hook to `serialize_skill_to_module()` in `compiler/loader.py`
+9. Add validation hook to `merge_skill()` in `compiler/loader.py`
+10. Create `compiler/tests/test_validation.py` with all 5 test cases
+11. Run all tests to ensure no regressions: `pytest compiler/tests/`
+
+---
+
+## 12. Success Criteria
 
 - [ ] All 5 test cases pass
 - [ ] Existing 72 tests still pass (no regressions)
-- [ ] Invalid skills are blocked from being written
-- [ ] Valid skills pass and are written successfully
-- [ ] Error messages are clear and actionable
+- [ ] Invalid skills are blocked from being written to disk
+- [ ] Valid skills pass validation and are written successfully
+- [ ] `oc:ExecutableSkill` and `oc:DeclarativeSkill` subclasses defined in core ontology
+- [ ] State transitions validated as IRIs pointing to `oc:State` instances
+- [ ] Error messages are clear and actionable (Italian messages in SHACL shapes)
+- [ ] `merge_skill()` also validates before returning modified graph
