@@ -21,3 +21,14 @@ class ValidationResult(NamedTuple):
     conforms: bool
     results_text: str
     results_graph: Graph | None
+
+
+def load_shacl_shapes() -> Graph:
+    """Load the SHACL shapes graph from disk."""
+    if not SHACL_SHAPES_PATH.exists():
+        raise FileNotFoundError(f"SHACL shapes file not found: {SHACL_SHAPES_PATH}")
+
+    shapes_graph = Graph()
+    shapes_graph.parse(SHACL_SHAPES_PATH, format="turtle")
+    logger.debug(f"Loaded SHACL shapes from {SHACL_SHAPES_PATH}")
+    return shapes_graph
