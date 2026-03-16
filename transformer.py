@@ -16,14 +16,12 @@ from anthropic import Anthropic
 
 from schemas import ExtractedSkill
 from exceptions import ExtractionError
+from config import ANTHROPIC_MODEL, MAX_ITERATIONS, EXTRACTION_TIMEOUT, CORE_STATES, FAILURE_STATES
 
 logger = logging.getLogger(__name__)
 
 # Configuration
-MAX_ITERATIONS = 20
-EXTRACTION_TIMEOUT = 120  # seconds per API call
 COMPLETION_TOOL = "extract_skill"
-MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6-20250514")
 
 # System prompt following Knowledge Architecture framework
 SYSTEM_PROMPT = """You are an Ontological Architect. Your task is to analyze agent skills
@@ -49,6 +47,26 @@ and extract their essential structure using the Knowledge Architecture framework
 ### Essential vs Accidental
 Essential: Remove it → becomes something else
 Accidental: Could be different without changing identity
+
+## STATE TRANSITION EXTRACTION (CRITICAL)
+
+Extract the skill's logic as a state machine using URIs, NOT strings.
+
+### requiresState (Pre-conditions)
+What must be true BEFORE this skill can run?
+- Prefer predefined URIs: oc:SystemAuthenticated, oc:NetworkAvailable, oc:FileExists,
+  oc:DirectoryWritable, oc:APIKeySet, oc:ToolInstalled, oc:EnvironmentReady
+- Create novel URIs for domain-specific states: oc:DocumentCreated, oc:NetworkScanned
+
+### yieldsState (Success outcomes)
+What becomes true AFTER successful execution?
+- Examples: oc:DocumentCreated, oc:NetworkDiscovered, oc:FileDownloaded
+
+### handlesFailure (Failure states)
+What states indicate this skill FAILED?
+- Examples: oc:PermissionDenied, oc:NetworkTimeout, oc:FileNotFound, oc:InvalidInput
+
+CRITICAL: Output URIs (oc:StateName), NOT string literals.
 
 ## YOUR TASK
 
@@ -194,7 +212,7 @@ Use the available tools to:
 
         try:
             response = client.messages.create(
-                model=MODEL,
+                model=ANTHROPIC_MODEL,
                 max_tokens=8192,
                 tools=TOOLS,
                 messages=messages,
@@ -220,6 +238,7 @@ Use the available tools to:
                         skill.id = skill_id
                         skill.hash = skill_hash
                         skill.provenance = str(skill_dir)
+                        skill.generated_by = ANTHROPIC_MODEL
                         logger.info(f"Successfully extracted skill: {skill_id}")
                         return skill
                     except Exception as e:

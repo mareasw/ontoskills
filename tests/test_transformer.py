@@ -6,8 +6,8 @@ from transformer import (
     execute_tool,
     tool_use_loop,
     TOOLS,
-    MAX_ITERATIONS,
 )
+from config import MAX_ITERATIONS
 from schemas import ExtractedSkill, Requirement, ExecutionPayload
 
 
@@ -124,3 +124,50 @@ def test_tool_use_loop_success(mock_client, tmp_path):
     result = tool_use_loop(skill_dir, "abc123hash", "test-skill")
     assert isinstance(result, ExtractedSkill)
     assert result.id == "test-skill"
+
+
+def test_system_prompt_includes_state_extraction():
+    """Test that SYSTEM_PROMPT includes state transition extraction instructions."""
+    from transformer import SYSTEM_PROMPT
+    assert "STATE TRANSITION EXTRACTION" in SYSTEM_PROMPT
+    assert "requiresState" in SYSTEM_PROMPT
+    assert "yieldsState" in SYSTEM_PROMPT
+    assert "handlesFailure" in SYSTEM_PROMPT
+    assert "oc:SystemAuthenticated" in SYSTEM_PROMPT
+    assert "oc:PermissionDenied" in SYSTEM_PROMPT
+    assert "URIs" in SYSTEM_PROMPT
+
+
+@patch("transformer.client")
+def test_tool_use_loop_sets_generated_by(mock_client, tmp_path):
+    """Test that tool_use_loop sets generated_by field."""
+    from config import ANTHROPIC_MODEL
+
+    skill_dir = tmp_path / "test-skill"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text("# Test")
+
+    extract_response = MagicMock()
+    extract_block = MagicMock()
+    extract_block.type = "tool_use"
+    extract_block.name = "extract_skill"
+    extract_block.input = {
+        "id": "test-skill",
+        "hash": "abc123",
+        "nature": "Test",
+        "genus": "Test",
+        "differentia": "test",
+        "intents": ["test"],
+        "requirements": [],
+        "constraints": [],
+        "execution_payload": None,
+        "provenance": None,
+    }
+    extract_response.content = [extract_block]
+    extract_response.stop_reason = "tool_use"
+
+    mock_client.messages.create.return_value = extract_response
+
+    result = tool_use_loop(skill_dir, "abc123hash", "test-skill")
+    assert result.generated_by == ANTHROPIC_MODEL
+
