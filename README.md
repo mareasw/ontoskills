@@ -58,45 +58,50 @@ Every skill is extracted with:
 
 ## How It Works
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         OntoClaw Pipeline                                │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                 │
-│  │   SKILL.md  │    │   Claude    │    │  Extracted  │                 │
-│  │  (Natural   │───▶│    API      │───▶│   Skill     │                 │
-│  │   Language) │    │             │    │  (Pydantic) │                 │
-│  └─────────────┘    └─────────────┘    └──────┬──────┘                 │
-│                                                │                         │
-│                                                ▼                         │
-│                                      ┌──────────────────┐               │
-│                                      │  Security Audit  │               │
-│                                      │  (Regex + LLM)   │               │
-│                                      └────────┬─────────┘               │
-│                                               │                          │
-│                                               ▼                          │
-│                                      ┌──────────────────┐               │
-│                                      │  RDF Graph       │               │
-│                                      │  Serialization   │               │
-│                                      └────────┬─────────┘               │
-│                                               │                          │
-│                                               ▼                          │
-│                                      ┌──────────────────┐               │
-│                                      │  SHACL Validator │               │
-│                                      │  (Gatekeeper)    │               │
-│                                      └────────┬─────────┘               │
-│                                               │                          │
-│                                    ┌──────────┴──────────┐              │
-│                                    │                     │              │
-│                                    ▼                     ▼              │
-│                              ┌──────────┐         ┌──────────┐          │
-│                              │  PASS    │         │  FAIL    │          │
-│                              │  Write   │         │  Block   │          │
-│                              │  .ttl    │         │  & Error │          │
-│                              └──────────┘         └──────────┘          │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Input["📥 Input"]
+        SKILL[SKILL.md<br/>Natural Language]
+    end
+
+    subgraph Extraction["🔄 Extraction"]
+        CLAUDE[Claude API<br/>LLM Extraction]
+        PYDANTIC[Extracted Skill<br/>Pydantic Model]
+    end
+
+    subgraph Security["🔒 Security"]
+        AUDIT[Security Audit<br/>Regex + LLM Review]
+    end
+
+    subgraph Serialization["📦 Serialization"]
+        RDF[RDF Graph<br/>OWL 2 Triples]
+    end
+
+    subgraph Validation["✅ Validation"]
+        SHACL[SHACL Validator<br/>Gatekeeper]
+    end
+
+    subgraph Output["📤 Output"]
+        PASS["PASS<br/>Write .ttl"]
+        FAIL["FAIL<br/>Block & Error"]
+    end
+
+    SKILL --> CLAUDE
+    CLAUDE --> PYDANTIC
+    PYDANTIC --> AUDIT
+    AUDIT --> RDF
+    RDF --> SHACL
+    SHACL --> PASS
+    SHACL --> FAIL
+
+    style Input fill:#1a1a2e,stroke:#16213e,color:#fff
+    style Extraction fill:#2196F3,stroke:#16213e,color:#fff
+    style Security fill:#f39c12,stroke:#16213e,color:#fff
+    style Serialization fill:#9333EA,stroke:#16213e,color:#fff
+    style Validation fill:#e91e63,stroke:#16213e,color:#fff
+    style Output fill:#00bf63,stroke:#16213e,color:#fff
+    style PASS fill:#00bf63,stroke:#000,color:#fff
+    style FAIL fill:#ff6b6b,stroke:#000,color:#fff
 ```
 
 ### The Validation Gatekeeper
@@ -115,12 +120,20 @@ Every skill must pass SHACL validation before being written to disk. The constit
 
 ## Skill Types
 
-OntoClaw automatically classifies skills into two types:
+```mermaid
+flowchart LR
+    SKILL[oc:Skill] --> EXE{oc:ExecutableSkill}
+    SKILL --> DEC{oc:DeclarativeSkill}
 
-| Type | Condition | SHACL Constraints |
-|------|-----------|-------------------|
-| `oc:ExecutableSkill` | Has `execution_payload` | Must have exactly one `hasPayload` |
-| `oc:DeclarativeSkill` | No `execution_payload` | Must NOT have `hasPayload` |
+    EXE --> PAYLOAD["hasPayload<br/>exactly 1"]
+    DEC --> NOPAYLOAD["hasPayload<br/>forbidden"]
+
+    style SKILL fill:#533483,stroke:#16213e,color:#fff
+    style EXE fill:#00bf63,stroke:#000,color:#fff
+    style DEC fill:#0abde3,stroke:#000,color:#fff
+    style PAYLOAD fill:#00bf63,stroke:#000,color:#fff
+    style NOPAYLOAD fill:#ff6b6b,stroke:#000,color:#fff
+```
 
 The classification is **automatic** - you don't specify it. If a skill has code to execute, it's executable. If it's knowledge-only, it's declarative.
 
@@ -246,27 +259,62 @@ ontoclaw/
 
 ## Architecture
 
-```
-skills/                       semantic-skills/
-├── create-document/          ├── ontoclaw-core.ttl      # Core ontology (TBox)
-│   └── SKILL.md              ├── index.ttl              # Skill index
-├── analyze-data/             └── skills/
-│   └── SKILL.md                  ├── create-document/
-├── send-email/                   │   └── skill.ttl       # Compiled skill
-│   └── SKILL.md                  ├── analyze-data/
-├── query-database/               │   └── skill.ttl
-│   └── SKILL.md                  ├── send-email/
-└── ...any skill...               │   └── skill.ttl
-                                  └── query-database/
-                                      └── skill.ttl
+```mermaid
+flowchart LR
+    subgraph Input["📥 skills/"]
+        S1[create-document/<br/>SKILL.md]
+        S2[analyze-data/<br/>SKILL.md]
+        S3[send-email/<br/>SKILL.md]
+        SN[...any skill...<br/>SKILL.md]
+    end
 
-       └────────► compiler/ (Python) ────────►
-                  │
-                  ├── extractor.py     # ID/hash
-                  ├── transformer.py   # LLM extraction
-                  ├── security.py      # Security audit
-                  ├── loader.py        # OWL serialization
-                  └── validator.py     # SHACL validation
+    subgraph Compiler["⚙️ compiler/"]
+        E[extractor.py<br/>ID & Hash]
+        T[transformer.py<br/>LLM Extraction]
+        SEC[security.py<br/>Security Audit]
+        L[loader.py<br/>OWL Serialization]
+        V[validator.py<br/>SHACL Validation]
+    end
+
+    subgraph Output["📤 semantic-skills/"]
+        CORE[ontoclaw-core.ttl<br/>Core Ontology]
+        IDX[index.ttl<br/>Skill Index]
+        O1[create-document/<br/>skill.ttl]
+        O2[analyze-data/<br/>skill.ttl]
+        O3[send-email/<br/>skill.ttl]
+    end
+
+    S1 --> E
+    S2 --> E
+    S3 --> E
+    SN --> E
+    E --> T
+    T --> SEC
+    SEC --> L
+    L --> V
+    V --> CORE
+    V --> IDX
+    V --> O1
+    V --> O2
+    V --> O3
+
+    style Input fill:#1a1a2e,stroke:#16213e,color:#fff
+    style Compiler fill:#2196F3,stroke:#16213e,color:#fff
+    style Output fill:#00bf63,stroke:#16213e,color:#fff
+    style S1 fill:#1a1a2e,stroke:#16213e,color:#eee
+    style S2 fill:#1a1a2e,stroke:#16213e,color:#eee
+    style S3 fill:#1a1a2e,stroke:#16213e,color:#eee
+    style SN fill:#1a1a2e,stroke:#16213e,color:#eee
+    style E fill:#2196F3,stroke:#16213e,color:#eee
+    style T fill:#2196F3,stroke:#16213e,color:#eee
+    style SEC fill:#2196F3,stroke:#16213e,color:#eee
+    style L fill:#2196F3,stroke:#16213e,color:#eee
+    style V fill:#2196F3,stroke:#16213e,color:#eee
+    style CORE fill:#00bf63,stroke:#16213e,color:#eee
+    style IDX fill:#00bf63,stroke:#16213e,color:#eee
+    style O1 fill:#00bf63,stroke:#16213e,color:#eee
+    style O2 fill:#00bf63,stroke:#16213e,color:#eee
+    style O3 fill:#00bf63,stroke:#16213e,color:#eee
 ```
 
 **Any skill directory works** - just add a `SKILL.md` file and OntoClaw will compile it to a validated OWL 2 ontology module.
@@ -310,24 +358,52 @@ Skills are extracted following the **Knowledge Architecture** framework:
 
 ## OWL 2 Design
 
-The ontology uses full OWL 2 property characteristics:
+```mermaid
+flowchart LR
+    subgraph Properties["OWL 2 Property Characteristics"]
+        A[ag:dependsOn<br/>AsymmetricProperty<br/>inverse: ag:enables]
+        B[ag:extends<br/>TransitiveProperty<br/>inverse: ag:isExtendedBy]
+        C[ag:contradicts<br/>SymmetricProperty]
+        D[ag:implements<br/>inverse: ag:isImplementedBy]
+        E[ag:exemplifies<br/>inverse: ag:isExemplifiedBy]
+    end
 
-| Property | Characteristics | Purpose |
-|----------|-----------------|---------|
-| `ag:dependsOn` | AsymmetricProperty, inverse `ag:enables` | Skill dependencies |
-| `ag:extends` | TransitiveProperty, inverse `ag:isExtendedBy` | Skill inheritance |
-| `ag:contradicts` | SymmetricProperty | Incompatible skills |
-| `ag:implements` | Inverse `ag:isImplementedBy` | Interface compliance |
-| `ag:exemplifies` | Inverse `ag:isExemplifiedBy` | Pattern demonstration |
+    A --> |Skill Dependencies|
+    B --> |Skill Inheritance|
+    C --> |Incompatible Skills|
+    D --> |Interface Compliance|
+    E --> |Pattern Demonstration|
+
+    style Properties fill:#9333EA,stroke:#16213e,color:#fff
+    style A fill:#00bf63,stroke:#000,color:#fff
+    style B fill:#00bf63,stroke:#000,color:#fff
+    style C fill:#ff6b6b,stroke:#000,color:#fff
+    style D fill:#2196F3,stroke:#000,color:#fff
+    style E fill:#a855f4,stroke:#000,color:#fff
+```
 
 ---
 
 ## Security Philosophy
 
-1. **Fail-closed**: Any error blocks content
-2. **Defense-in-depth**: Regex patterns + LLM review
-3. **Unicode normalization**: NFC + zero-width removal prevents bypass
-4. **Pattern matching**: Common attack vectors detected
+```mermaid
+flowchart LR
+    INPUT[User Content] --> NORM[Unicode NFC<br/>Normalize]
+    NORM --> PATTERNS[Regex Patterns<br/>Check Attacks]
+    PATTERNS --> LLM[LLM Review<br/>Final Check]
+    LLM --> DECISION{Safe?}
+
+    DECISION -->|Yes| PASS["PASS<br/>Allow Content"]
+    DECISION -->|No| BLOCK["BLOCK<br/>Reject Content"]
+
+    style INPUT fill:#1a1a2e,stroke:#16213e,color:#eee
+    style NORM fill:#2196F3,stroke:#16213e,color:#eee
+    style PATTERNS fill:#ff6b6b,stroke:#16213e,color:#eee
+    style LLM fill:#a855f4,stroke:#16213e,color:#eee
+    style DECISION fill:#feca57,stroke:#16213e,color:#000
+    style PASS fill:#00bf63,stroke:#000,color:#fff
+    style BLOCK fill:#ff6b6b,stroke:#000,color:#fff
+```
 
 Detected threats:
 - Prompt injection (`ignore instructions`, `system:`, `you are now`)
