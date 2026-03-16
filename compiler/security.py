@@ -18,7 +18,7 @@ from typing import Optional
 import anthropic
 from anthropic import Anthropic
 
-from exceptions import SecurityError
+from compiler.exceptions import SecurityError
 
 logger = logging.getLogger(__name__)
 

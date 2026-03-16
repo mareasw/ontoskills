@@ -14,9 +14,9 @@ from typing import Any
 import anthropic
 from anthropic import Anthropic
 
-from schemas import ExtractedSkill
-from exceptions import ExtractionError
-from config import ANTHROPIC_MODEL, MAX_ITERATIONS, EXTRACTION_TIMEOUT, CORE_STATES, FAILURE_STATES
+from compiler.schemas import ExtractedSkill
+from compiler.exceptions import ExtractionError
+from compiler.config import ANTHROPIC_MODEL, MAX_ITERATIONS, EXTRACTION_TIMEOUT, CORE_STATES, FAILURE_STATES
 
 logger = logging.getLogger(__name__)
 

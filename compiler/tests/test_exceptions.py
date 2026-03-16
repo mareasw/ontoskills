@@ -1,5 +1,5 @@
 import pytest
-from exceptions import SkillETLError, SecurityError
+from compiler.exceptions import SkillETLError, SecurityError
 
 
 def test_exceptions_exit_codes():

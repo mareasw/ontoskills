@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-from security import (
+from compiler.security import (
     normalize_content,
     check_patterns,
     llm_security_review,
@@ -52,7 +52,7 @@ def test_check_patterns_data_exfiltration():
     assert len(threats) > 0
 
 
-@patch("security.client")
+@patch("compiler.security.client")
 def test_llm_security_review_safe(mock_client):
     """Test LLM review with safe content."""
     mock_response = MagicMock()
@@ -63,7 +63,7 @@ def test_llm_security_review_safe(mock_client):
     assert result.safe is True
 
 
-@patch("security.client")
+@patch("compiler.security.client")
 def test_llm_security_review_unsafe(mock_client):
     """Test LLM review with unsafe content."""
     mock_response = MagicMock()
@@ -75,8 +75,8 @@ def test_llm_security_review_unsafe(mock_client):
     assert "Malicious" in result.reason
 
 
-@patch("security.llm_security_review")
-@patch("security.check_patterns")
+@patch("compiler.security.llm_security_review")
+@patch("compiler.security.check_patterns")
 def test_security_check_clean(mock_patterns, mock_llm):
     """Test full security check with clean content."""
     mock_patterns.return_value = []
@@ -87,7 +87,7 @@ def test_security_check_clean(mock_patterns, mock_llm):
     assert threats == []
 
 
-@patch("security.check_patterns")
+@patch("compiler.security.check_patterns")
 def test_security_check_with_threats(mock_patterns):
     """Test full security check with detected threats."""
     mock_patterns.return_value = [SecurityThreat(type="prompt_injection", match="ignore")]

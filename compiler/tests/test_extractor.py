@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from extractor import generate_skill_id, compute_skill_hash
+from compiler.extractor import generate_skill_id, compute_skill_hash
 
 
 def test_generate_skill_id():
