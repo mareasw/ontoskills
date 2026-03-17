@@ -4,14 +4,18 @@ This module centralizes all configuration settings with environment variable sup
 Environment variables allow enterprise deployment with custom namespaces and paths.
 """
 import os
+from pathlib import Path
 
+
+# Project root (parent of core/ directory where this file lives)
+PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
 # Base URI for the ontology (can be customized via environment)
 BASE_URI = os.getenv('ONTOCLAW_BASE_URI', 'http://ontoclaw.marea.software/ontology#')
 
-# Directory paths (relative to project root or absolute)
-SKILLS_DIR = os.getenv('ONTOCLAW_SKILLS_DIR', './skills/')
-OUTPUT_DIR = os.getenv('ONTOCLAW_OUTPUT_DIR', './ontoskills/')
+# Directory paths (relative to project root by default)
+SKILLS_DIR = os.getenv('ONTOCLAW_SKILLS_DIR', str(PROJECT_ROOT / 'skills'))
+OUTPUT_DIR = os.getenv('ONTOCLAW_OUTPUT_DIR', str(PROJECT_ROOT / 'ontoskills'))
 
 # Anthropic API model configurations
 ANTHROPIC_MODEL = os.getenv('ANTHROPIC_MODEL', 'claude-opus-4-6')
