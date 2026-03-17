@@ -19,7 +19,7 @@
 
 <p align="center">
   <a href="#the-ontoclaw-ecosystem">Ecosystem</a> •
-  <a href="#ontocore--the-compiler">OntoCore</a> •
+  <a href="#use-cases">Use Cases</a> •
   <a href="#installation">Installation</a> •
   <a href="#cli-commands">CLI</a> •
   <a href="PHILOSOPHY.md">Philosophy</a>
@@ -56,25 +56,21 @@ flowchart LR
 
 ---
 
+## Use Cases
+
+| Use Case | How OntoClaw Helps |
+|----------|-------------------|
+| **Enterprise AI Agents** | Deterministic skill selection via SPARQL queries instead of LLM judgment |
+| **Edge Deployment** | Smaller models query large skill ecosystems without loading all files |
+| **Multi-Agent Systems** | Shared OWL 2 ontology as coordination and knowledge layer |
+| **Compliance & Audit** | Every skill carries `oc:generatedBy` attestation and content hash |
+| **Skill Marketplaces** | OntoStore enables versioned, plug-and-play skill distribution |
+
+---
+
 ## OntoCore — The Compiler
 
 **OntoCore** is the first component of the ecosystem. It's a **skill compiler** that transforms natural language skill definitions into **validated semantic knowledge graphs**.
-
-### Design Time vs Runtime
-
-OntoCore separates the skill lifecycle into two distinct phases:
-
-```mermaid
-flowchart LR
-    MD["SKILL.md<br/>━━━━━━━━━━<br/>Human-authored<br/>source code"] -->|"LLM extraction"| CORE["OntoCore<br/>━━━━━━━━━━<br/>Compile + validate"] -->|"SHACL pass"| TTL["ontoskill.ttl<br/>━━━━━━━━━━<br/>Executable artifact"]
-    TTL -.->|"load"| MCP["OntoMCP<br/>━━━━━━━━━━<br/>Rust SPARQL"] <-->|"query"| AGENT["Agent<br/>━━━━━━━━━━<br/>Deterministic"]
-
-    style MD fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
-    style CORE fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
-    style TTL fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
-    style MCP fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
-    style AGENT fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
-```
 
 - **OntoMCP** (the Rust MCP server) loads only compiled `.ttl` files into an in-memory graph
 - Skills are **self-contained** — all logic, requirements, and execution payloads live in the ontology
