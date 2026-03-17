@@ -21,7 +21,7 @@ You need:
 
 - Rust toolchain installed
 - Claude Code installed
-- a compiled ontology directory such as `semantic-skills/`
+- a compiled ontology directory such as `ontoskills/`
 
 The server reads compiled `.ttl` files, not raw `SKILL.md`.
 
@@ -54,28 +54,28 @@ Simple run:
 cargo run --manifest-path mcp/Cargo.toml
 ```
 
-This works when `semantic-skills/` can be auto-discovered from the current directory or its parents.
+This works when `ontoskills/` can be auto-discovered from the current directory or its parents.
 
 Explicit ontology root:
 
 ```bash
-cargo run --manifest-path mcp/Cargo.toml -- --ontology-root ./semantic-skills
+cargo run --manifest-path mcp/Cargo.toml -- --ontology-root ./ontoskills
 ```
 
 Direct binary:
 
 ```bash
-./mcp/target/debug/ontoclaw-mcp --ontology-root ./semantic-skills
+./mcp/target/debug/ontoclaw-mcp --ontology-root ./ontoskills
 ```
 
 ## How Ontology Root Resolution Works
 
 The server resolves ontology input in this order:
 
-1. `--ontology-root /path/to/semantic-skills`
-2. `ONTOCLAW_MCP_ONTOLOGY_ROOT=/path/to/semantic-skills`
-3. auto-discovery of `semantic-skills/` from the current directory and its parents
-4. fallback to `./semantic-skills`
+1. `--ontology-root /path/to/ontoskills`
+2. `ONTOCLAW_MCP_ONTOLOGY_ROOT=/path/to/ontoskills`
+3. auto-discovery of `ontoskills/` from the current directory and its parents
+4. fallback to `./ontoskills`
 
 ## Register In Claude Code
 
@@ -84,7 +84,7 @@ Recommended command from the repository root:
 ```bash
 claude mcp add --scope local ontoclaw \
   /absolute/path/to/ontoclaw/mcp/target/debug/ontoclaw-mcp \
-  -- --ontology-root /absolute/path/to/ontoclaw/semantic-skills
+  -- --ontology-root /absolute/path/to/ontoclaw/ontoskills
 ```
 
 If you want to rely on auto-discovery:
@@ -188,7 +188,7 @@ Then remove and re-add the MCP server in Claude Code.
 Run with an explicit path:
 
 ```bash
-./mcp/target/debug/ontoclaw-mcp --ontology-root ./semantic-skills
+./mcp/target/debug/ontoclaw-mcp --ontology-root ./ontoskills
 ```
 
 ### I only have `SKILL.md`

@@ -175,7 +175,7 @@ fn parse_ontology_root() -> PathBuf {
         return PathBuf::from(path);
     }
 
-    discover_ontology_root().unwrap_or_else(|| PathBuf::from("semantic-skills"))
+    discover_ontology_root().unwrap_or_else(|| PathBuf::from("ontoskills"))
 }
 
 fn discover_ontology_root() -> Option<PathBuf> {
@@ -194,8 +194,8 @@ fn candidate_roots(start: &PathBuf) -> Vec<PathBuf> {
     let mut candidates = Vec::new();
 
     for dir in start.ancestors() {
-        candidates.push(dir.join("semantic-skills"));
-        candidates.push(dir.join("../semantic-skills"));
+        candidates.push(dir.join("ontoskills"));
+        candidates.push(dir.join("../ontoskills"));
     }
 
     candidates
