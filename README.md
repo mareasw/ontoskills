@@ -311,12 +311,12 @@ From the repository root:
 cargo run --manifest-path mcp/Cargo.toml
 ```
 
-The server auto-discovers `semantic-skills/` by looking in the current directory and its parents.
+The server auto-discovers `ontoskills/` by looking in the current directory and its parents.
 
 To force a specific ontology root:
 
 ```bash
-cargo run --manifest-path mcp/Cargo.toml -- --ontology-root ./semantic-skills
+cargo run --manifest-path mcp/Cargo.toml -- --ontology-root ./ontoskills
 ```
 
 ### Claude Code Guide
