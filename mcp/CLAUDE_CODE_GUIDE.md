@@ -181,7 +181,10 @@ Rebuild:
 cargo build --manifest-path mcp/Cargo.toml
 ```
 
-Then remove and re-add the MCP server in Claude Code.
+Then remove and re-add the MCP server in Claude Code, or restart the Claude Code session.
+
+If Claude Code still reports tool schema errors after a rebuild, it may still be talking to an
+older background MCP process. Reconnecting forces it to spawn the rebuilt binary.
 
 ### No ontology found
 

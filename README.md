@@ -215,6 +215,22 @@ cd core
 pip install -e ".[dev]"
 ```
 
+### Compiler Configuration
+
+The compiler reads environment variables directly and also auto-loads a repo-local `.env` file.
+
+Typical settings:
+
+```env
+ANTHROPIC_API_KEY=your_api_key
+ANTHROPIC_BASE_URL=https://your-provider-compatible-base-url
+ANTHROPIC_MODEL=claude-opus-4-6
+SECURITY_MODEL=claude-opus-4-6
+```
+
+This is useful when routing extraction through an Anthropic-compatible provider and avoids
+re-exporting credentials before every compile run.
+
 ### Dependencies
 
 | Package | Purpose |
@@ -248,6 +264,9 @@ ontoclaw compile
 
 # Compile specific skill
 ontoclaw compile my-skill
+
+# Compile a nested skill path
+ontoclaw compile demo/markdown-inventory
 
 # Query ontology with SPARQL
 ontoclaw query "SELECT ?s WHERE { ?s a oc:Skill }"

@@ -14,11 +14,14 @@ from typing import Any
 import anthropic
 from anthropic import Anthropic
 
+from compiler.env import load_local_env
 from compiler.schemas import ExtractedSkill
 from compiler.exceptions import ExtractionError
 from compiler.config import ANTHROPIC_MODEL, MAX_ITERATIONS, EXTRACTION_TIMEOUT, CORE_STATES, FAILURE_STATES
 
 logger = logging.getLogger(__name__)
+
+load_local_env()
 
 # Configuration
 COMPLETION_TOOL = "extract_skill"
