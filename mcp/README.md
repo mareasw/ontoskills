@@ -4,152 +4,158 @@ Rust-based local MCP (Model Context Protocol) server for the OntoClaw ecosystem.
 
 **Status:** ✅ Ready
 
+---
+
 ## Overview
 
 OntoMCP is the **runtime layer** of OntoClaw. It loads compiled OntoSkills (`.ttl` files) into an in-memory RDF graph and provides blazing-fast SPARQL queries to AI agents via the Model Context Protocol.
 
+```mermaid
+flowchart LR
+    AGENT["AI Agent<br/>━━━━━━━━━━<br/>Claude Code<br/>Cursor<br/>Other MCP clients"] <-->|"SPARQL queries"| MCP["OntoMCP<br/>━━━━━━━━━━<br/>Rust runtime<br/>in-memory graph"]
+    MCP <-->|"loads"| TTL[".ttl files<br/>━━━━━━━━━━<br/>ontoskills/<br/>compiled ontologies"]
+
+    style AGENT fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style MCP fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
+    style TTL fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
 ```
-┌─────────────────────────────────────────────────────────┐
-│                      RUNTIME                            │
-│                                                         │
-│   Agent ◄──────► OntoMCP (Rust) ◄──────► .ttl files    │
-│                                                         │
-│   SKILL.md files DO NOT EXIST in the agent's context    │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
+
+**SKILL.md files DO NOT EXIST in the agent's context.** Only compiled `.ttl` artifacts are loaded.
+
+---
 
 ## Scope
 
 The MCP server is intentionally focused on:
 
-- skill discovery from compiled ontologies
-- semantic lookup by intent, dependency, and state transitions
-- planning support from `requiresState` and `yieldsState`
-- payload retrieval for the calling agent
+- **Skill discovery** — Find skills by intent, state, or capability
+- **Semantic lookup** — Query dependencies, conflicts, and transitions
+- **Planning** — Generate execution plans from `requiresState`/`yieldsState`
+- **Payload retrieval** — Return `oc:code` or `oc:executionPath` for execution
 
 The server does **not** execute skill payloads. Payload execution is delegated to the calling agent in its current runtime context.
 
-## Transport
-
-The server speaks MCP over `stdio`.
-
-## Ontology Source
-
-The server loads the global compiled ontology catalog from a directory containing `.ttl` files such as:
-
-- `ontoclaw-core.ttl`
-- `index.ttl`
-- skill modules under nested `ontoskill.ttl` files
-
-Default ontology root:
-
-- auto-discovered by looking for `ontoskills/` from the current directory and its parents
-- fallback: `./ontoskills`
-
-Override with:
-
-- `--ontology-root /path/to/ontoskills`
-- or `ONTOCLAW_MCP_ONTOLOGY_ROOT=/path/to/ontoskills`
-
-## Implemented Tools
-
-- `list_skills`
-- `find_skills_by_intent`
-- `get_skill`
-- `get_skill_requirements`
-- `get_skill_transitions`
-- `get_skill_dependencies`
-- `get_skill_conflicts`
-- `find_skills_yielding_state`
-- `find_skills_requiring_state`
-- `check_skill_applicability`
-- `plan_from_intent`
-- `get_skill_payload`
-
-## Why Rust?
-
-- **Performance**: Sub-millisecond SPARQL queries for real-time agent interaction
-- **Memory efficiency**: Compact in-memory graph representation
-- **Safety**: Memory-safe by design, critical for production deployments
-- **Concurrency**: Parallel query execution without GIL limitations
+---
 
 ## Architecture
 
+```mermaid
+flowchart LR
+    CLIENT["MCP Client<br/>━━━━━━━━━━<br/>Claude Code<br/>stdio transport"] -->|"tools/call"| TOOLS["MCP Tools<br/>━━━━━━━━━━<br/>12 semantic tools<br/>list_skills, plan..."]
+    TOOLS -->|"SPARQL"| SPARQL["oxigraph<br/>━━━━━━━━━━<br/>SPARQL 1.1 engine<br/>in-memory store"]
+    SPARQL -->|"query"| GRAPH["RDF Graph<br/>━━━━━━━━━━<br/>Loaded .ttl files<br/>OntoSkills catalog"]
+
+    style CLIENT fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style TOOLS fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
+    style SPARQL fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
+    style GRAPH fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
 ```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│   MCP Tool   │     │  SPARQL      │     │  RDF Graph   │
-│   Interface  │────►│  Engine      │────►│  (In-Memory) │
-│              │     │              │     │              │
-└──────────────┘     └──────────────┘     └──────────────┘
-                                               │
-                                               ▼
-                                       ┌──────────────┐
-                                       │  .ttl files  │
-                                       │  (OntoSkills)│
-                                       └──────────────┘
+
+### Why Rust?
+
+| Benefit | Description |
+|---------|-------------|
+| **Performance** | Sub-millisecond SPARQL queries for real-time agent interaction |
+| **Memory efficiency** | Compact in-memory graph representation |
+| **Safety** | Memory-safe by design, critical for production deployments |
+| **Concurrency** | Parallel query execution without GIL limitations |
+
+---
+
+## Implemented Tools
+
+| Tool | Purpose |
+|------|---------|
+| `list_skills` | List all available skills |
+| `find_skills_by_intent` | Find skills matching a user intent |
+| `get_skill` | Get full skill details by ID |
+| `get_skill_requirements` | Get skill dependencies and prerequisites |
+| `get_skill_transitions` | Get state transitions (requires/yields/handles) |
+| `get_skill_dependencies` | Get skills this one depends on |
+| `get_skill_conflicts` | Get skills that contradict this one |
+| `find_skills_yielding_state` | Find skills that produce a given state |
+| `find_skills_requiring_state` | Find skills that need a given state |
+| `check_skill_applicability` | Check if skill can run with current states |
+| `plan_from_intent` | Generate execution plan from intent |
+| `get_skill_payload` | Get execution code/path for a skill |
+
+---
+
+## Ontology Source
+
+The server loads compiled `.ttl` files from a directory:
+
+- `ontoclaw-core.ttl` — Core TBox ontology with states
+- `index.ttl` — Manifest with `owl:imports`
+- `*/ontoskill.ttl` — Individual skill modules
+
+**Auto-discovery**: Looks for `ontoskills/` from current directory upward.
+
+**Override**:
+```bash
+--ontology-root /path/to/ontoskills
+# or
+ONTOCLAW_MCP_ONTOLOGY_ROOT=/path/to/ontoskills
 ```
+
+---
 
 ## Run
 
-Simple run from repository root:
+From repository root:
 
 ```bash
 cargo run --manifest-path mcp/Cargo.toml
 ```
 
-Explicit path when needed:
+With explicit ontology path:
 
 ```bash
 cargo run --manifest-path mcp/Cargo.toml -- --ontology-root ./ontoskills
 ```
 
+---
+
 ## Claude Code Integration
 
-You can register the OntoClaw MCP server in Claude Code using the local stdio transport.
-
-Example from the repository root:
-
-```bash
-claude mcp add ontoclaw -- \
-  cargo run --manifest-path /absolute/path/to/ontoclaw/mcp/Cargo.toml -- \
-  --ontology-root /absolute/path/to/ontoclaw/ontoskills
-```
-
-Or, if you want to rely on auto-discovery of `ontoskills/`:
+Register the MCP server:
 
 ```bash
 claude mcp add ontoclaw -- \
   cargo run --manifest-path /absolute/path/to/ontoclaw/mcp/Cargo.toml
 ```
 
-After registration, Claude Code can call tools such as:
+After registration, Claude Code can call:
 
-- `ontoclaw.list_skills`
-- `ontoclaw.find_skills_by_intent`
-- `ontoclaw.get_skill`
-- `ontoclaw.plan_from_intent`
-- `ontoclaw.get_skill_payload`
+```mermaid
+flowchart LR
+    CLAUDE["Claude Code"] -->|"list_skills"| TOOLS["ontoclaw MCP"]
+    CLAUDE -->|"find_skills_by_intent"| TOOLS
+    CLAUDE -->|"plan_from_intent"| TOOLS
+    CLAUDE -->|"get_skill_payload"| TOOLS
 
-For a full step-by-step guide, see [CLAUDE_CODE_GUIDE.md](CLAUDE_CODE_GUIDE.md).
+    style CLAUDE fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style TOOLS fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
+```
 
-## Manual MCP Smoke Test
+For full setup steps, see [CLAUDE_CODE_GUIDE.md](CLAUDE_CODE_GUIDE.md).
 
-If you want to verify the protocol directly without a client, you can run the server and send MCP `initialize`, `tools/list`, and `tools/call` messages over `stdio`.
+---
 
-The simplest maintained verification path is:
+## Testing
 
 ```bash
 cd mcp
 cargo test
 ```
 
-Current Rust test coverage includes:
+**Rust test coverage**:
+- Intent lookup
+- Payload lookup
+- Planning with preparatory skills
+- Planner preference for direct skills over setup-heavy alternatives
 
-- intent lookup
-- payload lookup
-- planning with preparatory skills
-- planner preference for direct skills over setup-heavy alternatives
+---
 
 ## Related Components
 
