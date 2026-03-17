@@ -12,8 +12,8 @@ interface Props {
 }
 
 const {
-  title = 'OntoClaw - Neuro-Symbolic Skill Compiler',
-  description = 'The first neuro-symbolic skill compiler for the Agentic Web. Transform natural language skill definitions into validated OWL 2 ontologies.'
+  title = 'OntoClaw - MCP Server for AI Agents',
+  description = 'An MCP server that exposes ontoskills — queryable, evolving knowledge for deterministic AI agents.'
 } = Astro.props;
 ---
 
@@ -30,6 +30,7 @@ const {
     <meta name="twitter:card" content="summary_large_image" />
     <title>{title}</title>
     <ViewTransitions />
+    <script defer src="/_vercel/insights/script.js"></script>
   </head>
   <body class="min-h-screen bg-bg-primary">
     <slot />
