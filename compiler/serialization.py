@@ -121,7 +121,7 @@ def serialize_skill_to_module(
     Serialize a skill to a standalone skill.ttl module file.
 
     Creates a skill module that mirrors the skills directory structure:
-    - skills/xlsx/pdf/pptx/SKILL.md -> semantic-skills/xlsx/pdf/pptx/skill.ttl
+    - skills/xlsx/pdf/pptx/SKILL.md -> ontoskills/xlsx/pdf/pptx/skill.ttl
 
     Args:
         skill: ExtractedSkill to serialize

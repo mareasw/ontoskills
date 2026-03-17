@@ -74,7 +74,7 @@ def cli(ctx, verbose, quiet):
 @click.option('-i', '--input', 'input_dir', default=SKILLS_DIR,
               type=click.Path(exists=False), help='Input skills directory')
 @click.option('-o', '--output', 'output_dir', default=OUTPUT_DIR,
-              type=click.Path(), help='Output directory for semantic-skills')
+              type=click.Path(), help='Output directory for ontoskills')
 @click.option('--dry-run', is_flag=True, help='Preview without saving')
 @click.option('--skip-security', is_flag=True, help='Skip security checks')
 @click.option('-f', '--force', is_flag=True,
@@ -90,7 +90,7 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
     With SKILL_NAME: Compile specific skill.
 
     Output structure:
-      semantic-skills/
+      ontoskills/
       ├── ontoclaw-core.ttl
       ├── index.ttl
       └── <mirrored paths>/skill.ttl
@@ -234,7 +234,7 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
 
 @cli.command('init-core')
 @click.option('-o', '--output', 'output_dir', default=OUTPUT_DIR,
-              type=click.Path(), help='Output directory for semantic-skills')
+              type=click.Path(), help='Output directory for ontoskills')
 @click.option('-f', '--force', is_flag=True, help='Overwrite existing core ontology')
 @click.pass_context
 def init_core(ctx, output_dir, force):

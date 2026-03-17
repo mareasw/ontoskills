@@ -215,7 +215,7 @@ A constitutional validation layer that ensures every skill ontology is logically
     - `security-audit` - Re-validate skills against security patterns
   - Options:
     - `-i, --input` - Input directory (default: `./skills/`)
-    - `-o, --output` - Output file (default: `./semantic-skills/skills.ttl`)
+    - `-o, --output` - Output file (default: `./ontoskills/skills.ttl`)
     - `--dry-run` - Preview without saving
     - `--skip-security` - Skip security checks
     - `--reason/--no-reason` - Apply OWL reasoning

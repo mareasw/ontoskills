@@ -38,14 +38,14 @@ def mirror_skill_path(skill_dir: Path, output_base: Path) -> Path:
     Mirror the skills directory structure to the output directory.
 
     Mirroring rule:
-        skills/{path}/SKILL.md → semantic-skills/{path}/skill.ttl
+        skills/{path}/SKILL.md → ontoskills/{path}/skill.ttl
 
     Args:
         skill_dir: Path to skill directory (e.g., skills/xlsx/pdf/pptx)
-        output_base: Base output directory (e.g., semantic-skills/)
+        output_base: Base output directory (e.g., ontoskills/)
 
     Returns:
-        Path to output skill.ttl file (e.g., semantic-skills/xlsx/pdf/pptx/skill.ttl)
+        Path to output skill.ttl file (e.g., ontoskills/xlsx/pdf/pptx/skill.ttl)
     """
     # Convert to absolute paths if needed
     skill_dir = skill_dir.resolve()
@@ -449,7 +449,7 @@ def clean_orphaned_skills(
 
     Args:
         skills_dir: Path to skills/ directory
-        output_dir: Path to semantic-skills/ directory
+        output_dir: Path to ontoskills/ directory
         dry_run: If True, log what would be deleted without deleting
 
     Returns:

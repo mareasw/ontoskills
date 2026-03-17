@@ -71,7 +71,7 @@ def test_serialize_skill_to_module_creates_file(tmp_path):
 def test_serialize_skill_to_module_with_output_base(tmp_path):
     """Test serialize_skill_to_module uses output_base parameter for core ontology lookup."""
     # Create a mock core ontology in a custom output_base directory
-    output_base = tmp_path / "custom-semantic-skills"
+    output_base = tmp_path / "custom-ontoskills"
     output_base.mkdir(parents=True, exist_ok=True)
 
     # Create a minimal core ontology file

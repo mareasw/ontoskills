@@ -11,7 +11,7 @@ BASE_URI = os.getenv('ONTOCLAW_BASE_URI', 'http://ontoclaw.marea.software/ontolo
 
 # Directory paths (relative to project root or absolute)
 SKILLS_DIR = os.getenv('ONTOCLAW_SKILLS_DIR', '../../skills/')
-OUTPUT_DIR = os.getenv('ONTOCLAW_OUTPUT_DIR', '../../semantic-skills/')
+OUTPUT_DIR = os.getenv('ONTOCLAW_OUTPUT_DIR', '../../ontoskills/')
 
 # Anthropic API model configurations
 ANTHROPIC_MODEL = os.getenv('ANTHROPIC_MODEL', 'claude-opus-4-6')

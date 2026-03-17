@@ -76,7 +76,7 @@ def test_real_compile_xlsx(xlsx_skill_dir, tmp_path):
     from loader import create_core_ontology, serialize_skill_to_module, generate_index_manifest
 
     # Setup output directory
-    output_dir = tmp_path / "semantic-skills"
+    output_dir = tmp_path / "ontoskills"
     output_dir.mkdir(parents=True)
 
     # Create core ontology

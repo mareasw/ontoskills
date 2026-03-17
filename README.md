@@ -185,7 +185,7 @@ The classification is **automatic** - you don't specify it. If a skill has code 
 | [compiler/](compiler/) | Python | ✅ Ready | Skill compiler to OWL 2 ontology |
 | [mcp/](mcp/) | Rust | 🚧 Planned | Fast MCP server for ontology queries |
 | skills/ | Markdown | ✅ Ready | Input skill definitions |
-| semantic-skills/ | Turtle | Generated | Compiled ontology output |
+| ontoskills/ | Turtle | Generated | Compiled ontology output |
 | specs/ | Turtle | ✅ Ready | SHACL shapes constitution |
 
 ---
@@ -243,7 +243,7 @@ ontoclaw security-audit
 | Option | Description |
 |--------|-------------|
 | `-i, --input` | Input directory (default: `./skills/`) |
-| `-o, --output` | Output file (default: `./semantic-skills/skills.ttl`) |
+| `-o, --output` | Output file (default: `./ontoskills/skills.ttl`) |
 | `--dry-run` | Preview without saving |
 | `--skip-security` | Skip security checks (not recommended) |
 | `-f, --force` | Force recompilation (bypass hash-based cache) |
@@ -290,7 +290,7 @@ ontoclaw/
 ├── specs/
 │   └── ontoclaw.shacl.ttl   # SHACL shapes constitution
 ├── skills/                  # Input: SKILL.md definitions
-├── semantic-skills/         # Output: compiled .ttl files
+├── ontoskills/         # Output: compiled .ttl files
 │   ├── ontoclaw-core.ttl    # Core ontology with states
 │   ├── index.ttl            # Index of all skills
 │   └── */skill.ttl          # Individual skill modules
@@ -319,7 +319,7 @@ flowchart LR
         ST[storage.py<br/>File I/O + Merge]
     end
 
-    subgraph Output["📤 semantic-skills/"]
+    subgraph Output["📤 ontoskills/"]
         CORE[ontoclaw-core.ttl<br/>Core Ontology]
         IDX[index.ttl<br/>Skill Index]
         O1[create-document/<br/>skill.ttl]

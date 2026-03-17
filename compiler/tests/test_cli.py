@@ -27,7 +27,7 @@ def test_init_core_command(tmp_path):
     """Test init-core command creates core ontology."""
     from cli import cli
     runner = CliRunner()
-    output_dir = tmp_path / "semantic-skills"
+    output_dir = tmp_path / "ontoskills"
     result = runner.invoke(cli, ['init-core', '-o', str(output_dir)])
 
     assert result.exit_code == 0
@@ -39,7 +39,7 @@ def test_init_core_idempotent(tmp_path):
     """Test that init-core doesn't overwrite existing core without --force."""
     from cli import cli
     runner = CliRunner()
-    output_dir = tmp_path / "semantic-skills"
+    output_dir = tmp_path / "ontoskills"
 
     # First run
     result1 = runner.invoke(cli, ['init-core', '-o', str(output_dir)])

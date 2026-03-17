@@ -88,21 +88,21 @@ def core_ontology(tmp_path):
 def test_mirror_skill_path_simple():
     """Test path mirroring with simple skill path."""
     skill_dir = Path("/skills/xlsx")
-    output_base = Path("/semantic-skills")
+    output_base = Path("/ontoskills")
 
     result = mirror_skill_path(skill_dir, output_base)
 
-    assert result == Path("/semantic-skills/xlsx/skill.ttl")
+    assert result == Path("/ontoskills/xlsx/skill.ttl")
 
 
 def test_mirror_skill_path_nested():
     """Test path mirroring with nested skill path."""
     skill_dir = Path("/skills/xlsx/pdf/pptx")
-    output_base = Path("/semantic-skills")
+    output_base = Path("/ontoskills")
 
     result = mirror_skill_path(skill_dir, output_base)
 
-    assert result == Path("/semantic-skills/xlsx/pdf/pptx/skill.ttl")
+    assert result == Path("/ontoskills/xlsx/pdf/pptx/skill.ttl")
 
 
 def test_mirror_skill_path_with_config():
@@ -130,7 +130,7 @@ def test_get_output_path():
 
     assert result.name == "skill.ttl"
     # Should resolve OUTPUT_DIR to absolute path
-    assert "semantic-skills" in str(result) or "test-skill" in str(result)
+    assert "ontoskills" in str(result) or "test-skill" in str(result)
 
 
 def test_get_output_path_with_custom_base(tmp_path):
@@ -558,12 +558,12 @@ def test_apply_reasoning(tmp_path, core_ontology):
 def test_generate_index_manifest(tmp_path, core_ontology, sample_skill):
     """Test generating the index.ttl manifest."""
     # Create a skill module
-    skill_path = tmp_path / "semantic-skills" / "test" / "skill.ttl"
+    skill_path = tmp_path / "ontoskills" / "test" / "skill.ttl"
     serialize_skill_to_module(sample_skill, skill_path)
 
-    index_path = tmp_path / "semantic-skills" / "index.ttl"
+    index_path = tmp_path / "ontoskills" / "index.ttl"
 
-    generate_index_manifest([skill_path], index_path, tmp_path / "semantic-skills")
+    generate_index_manifest([skill_path], index_path, tmp_path / "ontoskills")
 
     assert index_path.exists()
 
@@ -579,14 +579,14 @@ def test_generate_index_manifest(tmp_path, core_ontology, sample_skill):
 def test_generate_index_manifest_multiple_skills(tmp_path, core_ontology, sample_skill, sample_skill_with_payload):
     """Test generating index with multiple skill modules."""
     # Create skill modules
-    skill_path1 = tmp_path / "semantic-skills" / "skill1" / "skill.ttl"
-    skill_path2 = tmp_path / "semantic-skills" / "skill2" / "skill.ttl"
+    skill_path1 = tmp_path / "ontoskills" / "skill1" / "skill.ttl"
+    skill_path2 = tmp_path / "ontoskills" / "skill2" / "skill.ttl"
     serialize_skill_to_module(sample_skill, skill_path1)
     serialize_skill_to_module(sample_skill_with_payload, skill_path2)
 
-    index_path = tmp_path / "semantic-skills" / "index.ttl"
+    index_path = tmp_path / "ontoskills" / "index.ttl"
 
-    generate_index_manifest([skill_path1, skill_path2], index_path, tmp_path / "semantic-skills")
+    generate_index_manifest([skill_path1, skill_path2], index_path, tmp_path / "ontoskills")
 
     assert index_path.exists()
 
@@ -608,7 +608,7 @@ def test_clean_orphaned_skills_removes_orphan(tmp_path, core_ontology, sample_sk
     """Test that clean_orphaned_skills removes .ttl when source is missing."""
     # Set up directories
     skills_dir = tmp_path / "skills"
-    output_dir = tmp_path / "semantic-skills"
+    output_dir = tmp_path / "ontoskills"
 
     # Create a skill module in output (but no source SKILL.md)
     orphan_path = output_dir / "orphan-skill" / "skill.ttl"
@@ -633,7 +633,7 @@ def test_clean_orphaned_skills_preserves_valid(tmp_path, core_ontology, sample_s
     """Test that clean_orphaned_skills keeps .ttl when source exists."""
     # Set up directories
     skills_dir = tmp_path / "skills"
-    output_dir = tmp_path / "semantic-skills"
+    output_dir = tmp_path / "ontoskills"
 
     # Create both source SKILL.md and output skill.ttl
     skill_dir = skills_dir / "valid-skill"
@@ -661,7 +661,7 @@ def test_clean_orphaned_skills_dry_run(tmp_path, core_ontology, sample_skill):
     """Test that clean_orphaned_skills doesn't delete in dry_run mode."""
     # Set up directories
     skills_dir = tmp_path / "skills"
-    output_dir = tmp_path / "semantic-skills"
+    output_dir = tmp_path / "ontoskills"
 
     # Create an orphan
     orphan_path = output_dir / "orphan-skill" / "skill.ttl"
@@ -682,7 +682,7 @@ def test_clean_orphaned_skills_returns_zero_when_no_orphans(tmp_path, core_ontol
     """Test that clean_orphaned_skills returns 0 when no orphans exist."""
     # Set up directories
     skills_dir = tmp_path / "skills"
-    output_dir = tmp_path / "semantic-skills"
+    output_dir = tmp_path / "ontoskills"
 
     # Create valid skill with source
     skill_dir = skills_dir / "valid-skill"
@@ -703,7 +703,7 @@ def test_clean_orphaned_skills_returns_zero_when_no_orphans(tmp_path, core_ontol
 def test_clean_orphaned_skills_empty_output_dir(tmp_path):
     """Test clean_orphaned_skills on empty output directory."""
     skills_dir = tmp_path / "skills"
-    output_dir = tmp_path / "semantic-skills"
+    output_dir = tmp_path / "ontoskills"
     output_dir.mkdir(parents=True)
 
     removed = clean_orphaned_skills(skills_dir, output_dir, dry_run=False)
@@ -715,7 +715,7 @@ def test_clean_orphaned_skills_nested_paths(tmp_path, core_ontology, sample_skil
     """Test clean_orphaned_skills handles nested directory structures."""
     # Set up directories
     skills_dir = tmp_path / "skills"
-    output_dir = tmp_path / "semantic-skills"
+    output_dir = tmp_path / "ontoskills"
 
     # Create nested orphan
     orphan_path = output_dir / "xlsx" / "pdf" / "convert" / "skill.ttl"
