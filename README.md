@@ -1,30 +1,40 @@
 <p align="center">
-  <img src="assets/logo.png" alt="OntoClaw Logo" width="500px">
+  <img src="assets/ontoclaw-banner.png" alt="OntoClaw: Neuro-Symbolic Skill Compiler" width="100%">
 </p>
 
-<h1 align="center">OntoClaw</h1>
+<h1 align="center">
+  <a href="https://ontoclaw.marea.software">
+    <img src="assets/ontoclaw-logo.png" alt="OntoClaw Logo Inline" height="40px" style="vertical-align: middle;">
+    OntoClaw
+  </a>
+</h1>
 
 <p align="center">
-  <strong>The first neuro-symbolic skill compiler for the Agentic Web.</strong>
+  <strong>The first <span style="color:#e91e63">neuro-symbolic</span> skill compiler for the Agentic Web.</strong>
 </p>
 
 <p align="center">
-  Transform natural language skill definitions into validated OWL 2 ontologies.
+  Transform natural language skill definitions into <span style="color:#00bf63;font-weight:bold">validated OWL 2 ontologies</span>.
 </p>
 
 <p align="center">
   <a href="#what-is-ontoclaw">What is it?</a> •
   <a href="#how-it-works">How it works</a> •
   <a href="#installation">Installation</a> •
-  <a href="#cli-commands">CLI Commands</a>
+  <a href="#cli-commands">CLI Commands</a> •
+  <a href="PHILOSOPHY.md">Philosophy</a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+">
-  <img src="https://img.shields.io/badge/OWL%202-RDF%2FTurtle-green" alt="OWL 2 RDF/Turtle">
-  <img src="https://img.shields.io/badge/SHACL-Validation-purple" alt="SHACL Validation">
-  <img src="https://img.shields.io/badge/license-MIT-orange" alt="MIT License">
+  <img src="https://img.shields.io/badge/python-3.10%2B-blue?style=for-the-badge&logo=python" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/OWL%202-RDF%2FTurtle-green?style=for-the-badge&logo=w3c" alt="OWL 2 RDF/Turtle">
+  <img src="https://img.shields.io/badge/SHACL-Validation-purple?style=for-the-badge&logo=graphql" alt="SHACL Validation">
+  <a href="#license">
+    <img src="https://img.shields.io/badge/license-MIT-orange?style=for-the-badge" alt="MIT License">
+  </a>
 </p>
+
+<hr style="border:1px solid #ddd;"/>
 
 ---
 
