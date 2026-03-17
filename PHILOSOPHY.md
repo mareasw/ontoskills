@@ -114,7 +114,7 @@ This is the **knowledge retrieval problem** in the age of LLMs.
 
 ## 3. The Ontological Solution
 
-OntoClaw applies **Description Logics (DL)** — specifically the 𝒜𝒞ℛ𝒪ℐ𝒟 fragment underlying OWL 2 — to transform unstructured skill definitions into **formal, queryable knowledge graphs**.
+OntoClaw applies **Description Logics (DL)** — specifically the **SROIQ** fragment underlying OWL 2 DL — to transform unstructured skill definitions into **formal, queryable knowledge graphs**.
 
 Key properties:
 
