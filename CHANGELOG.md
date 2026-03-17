@@ -60,6 +60,27 @@ The compiler now acts as a **Semantic Bundler** - the output directory (`ontoski
 
 - **156 tests** pass (3 deselected integration tests)
 
+### Added
+
+#### Core Ontology Enhancements
+
+- **`oc:executionPath`** - New DatatypeProperty for external asset paths
+  - Domain: `oc:ExecutionPayload`
+  - Supports Perfect Mirroring asset bundler architecture
+  - Enables referencing external script files (`.py`, `.cjs`, etc.) copied by the compiler
+
+- **`owl:disjointWith`** - DeclarativeSkill and ExecutableSkill are now explicitly mutually exclusive
+  - Enforces OWL 2 DL ($\mathcal{SROIQ}^{(D)}$) strictness
+  - A skill cannot be both declarative and executable
+
+#### SHACL Validation Updates
+
+- **XOR constraint** - ExecutionPayload must have either `oc:code` OR `oc:executionPath`
+  - `sh:or` constraint ensures at least one is present
+  - Inline code or external asset path (not both required)
+- **`oc:code`** - No longer strictly mandatory (minCount removed)
+- **`oc:executionPath`** - New property constraint (maxCount 1, xsd:string)
+
 ---
 
 ## [0.3.0] - 2026-03-17

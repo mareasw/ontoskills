@@ -131,7 +131,7 @@ Every skill is extracted with:
 - **Identity**: `nature`, `genus`, `differentia` (Knowledge Architecture)
 - **Intents**: What user intentions this skill resolves
 - **Requirements**: Dependencies (EnvVar, Tool, Hardware, API, Knowledge)
-- **Execution Payload**: Optional code to execute (shell, python, node, claude_tool)
+- **Execution Payload**: Optional code to execute (`oc:code` inline or `oc:executionPath` for external assets)
 - **State Transitions**: `requiresState`, `yieldsState`, `handlesFailure`
 - **Provenance**: `generatedBy` attestation (LLM model used)
 
@@ -188,7 +188,7 @@ flowchart LR
     style NOPAYLOAD fill:#ff6b6b,stroke:#2a2a3e,color:#f0f0f5
 ```
 
-The classification is **automatic** - you don't specify it. If a skill has code to execute, it's executable. If it's knowledge-only, it's declarative.
+The classification is **automatic** - you don't specify it. If a skill has code to execute, it's executable. If it's knowledge-only, it's declarative. These classes are **mutually exclusive** (`owl:disjointWith`) per OWL 2 DL semantics.
 
 ---
 

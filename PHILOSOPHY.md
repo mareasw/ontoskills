@@ -47,7 +47,7 @@ Why Markdown? Because writing raw Turtle by hand is a terrible developer experie
 OntoCore extracts **everything** into the TTL:
 - Intents (`oc:resolvesIntent`)
 - State transitions (`oc:requiresState`, `oc:yieldsState`, `oc:handlesFailure`)
-- **Execution payload** (`oc:hasPayload` with `oc:executor` + `oc:code`)
+- **Execution payload** (`oc:hasPayload` with `oc:executor` + `oc:code` or `oc:executionPath`)
 - Dependencies and relations (`oc:dependsOn`, `oc:extends`, `oc:contradicts`)
 
 ### Runtime (Artifact)
