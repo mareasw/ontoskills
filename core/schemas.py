@@ -28,13 +28,14 @@ class StateTransition(BaseModel):
     @field_validator('requires_state', 'yields_state', 'handles_failure')
     @classmethod
     def validate_state_uris(cls, v: list[str]) -> list[str]:
-        """Validate that all state URIs match the pattern oc:[A-Z][a-zA-Z0-9]*"""
+        """Validate that all state URIs match the pattern oc:[A-Z][a-zA-Z0-9]*(?::[a-zA-Z0-9_-]+)?"""
         import re
-        pattern = r'^oc:[A-Z][a-zA-Z0-9]*$'
+        # Pattern allows: oc:StateName or oc:StateName:parameter
+        pattern = r'^oc:[A-Z][a-zA-Z0-9]*(?::[a-zA-Z0-9_-]+)?$'
         for uri in v:
             if not re.match(pattern, uri):
                 raise ValueError(
-                    f"Invalid state URI '{uri}'. Must match pattern {pattern}"
+                    f"Invalid state URI '{uri}'. Must match pattern oc:StateName or oc:StateName:parameter"
                 )
         return v
 

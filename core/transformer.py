@@ -68,12 +68,30 @@ What states indicate this skill FAILED?
 
 CRITICAL: Output URIs (oc:StateName), NOT string literals.
 
+## INTENT EXTRACTION (MANDATORY)
+
+CRITICAL: You MUST extract at least one intent for EVERY skill. An intent is a user-facing goal this skill addresses.
+
+Common intent patterns:
+- "create X" / "generate X" / "make X" (creation intents)
+- "edit X" / "modify X" / "update X" (modification intents)
+- "analyze X" / "extract from X" / "read X" (analysis intents)
+- "convert X to Y" / "transform X" (conversion intents)
+
+Examples:
+- For xlsx skill: "create spreadsheet", "analyze excel data", "edit xlsx file"
+- For pdf skill: "create pdf", "extract text from pdf", "merge pdfs"
+- For pptx skill: "create presentation", "edit powerpoint"
+
+If you cannot identify at least one intent, the skill is incomplete and you should note this.
+
 ## YOUR TASK
 
 1. Use list_files to discover all files in the skill directory
 2. Use read_file to read SKILL.md and any reference files
-3. Analyze the skill and extract its structure
-4. Call extract_skill with the structured data
+3. Identify at least ONE intent the skill resolves
+4. Analyze the skill and extract its structure
+5. Call extract_skill with the structured data (including at least one intent)
 
 Be thorough but concise. Focus on the essential nature of the skill."""
 

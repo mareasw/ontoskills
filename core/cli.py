@@ -266,17 +266,17 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
             console.print(f"  Nature: {skill.nature[:80]}...")
             console.print(f"  Genus: {skill.genus}")
             console.print(f"  Intents: {', '.join(skill.intents)}")
-            if skill.state_transitions.requires_state:
+            if skill.state_transitions and skill.state_transitions.requires_state:
                 console.print(f"  Requires: {', '.join(skill.state_transitions.requires_state)}")
-            if skill.state_transitions.yields_state:
+            if skill.state_transitions and skill.state_transitions.yields_state:
                 console.print(f"  Yields: {', '.join(skill.state_transitions.yields_state)}")
 
     if dry_run:
         console.print("\n[yellow]Dry run - no changes saved[/yellow]")
         return
 
-    # Confirmation for single skill
-    if not yes and skill_name and compiled_skills:
+    # Confirmation for single skill (only when a specific skill is requested)
+    if skill_name and compiled_skills and not yes:
         if not click.confirm("\nAdd this skill to the ontology?", default=True):
             console.print("[yellow]Cancelled[/yellow]")
             return
