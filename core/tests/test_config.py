@@ -42,8 +42,8 @@ def test_default_paths():
         import config
         importlib.reload(config)
 
-        assert config.SKILLS_DIR == '../../skills/'
-        assert config.OUTPUT_DIR == '../../ontoskills/'
+        assert config.SKILLS_DIR == './skills/'
+        assert config.OUTPUT_DIR == './ontoskills/'
 
 
 def test_custom_skills_dir():

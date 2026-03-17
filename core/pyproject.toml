@@ -1,7 +1,7 @@
 [project]
-name = "ontoclaw-compiler"
+name = "ontocore"
 version = "0.2.0"
-description = "CLI tool that compiles markdown agent skills into a queryable OWL 2 RDF/Turtle ontology"
+description = "OntoCore — The skill compiler for the OntoClaw ecosystem. Compiles SKILL.md into validated OWL 2 ontologies."
 requires-python = ">=3.10"
 dependencies = [
     "click>=8.1.0",
