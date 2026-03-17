@@ -5,7 +5,7 @@
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 
 <http://ontoclaw.marea.software/ontology> a owl:Ontology ;
-    dcterms:created "2026-03-17T20:31:22.458442" ;
+    dcterms:created "2026-03-17T22:49:20.500630" ;
     dcterms:description "Core TBox ontology for skill state transitions and execution" ;
     dcterms:title "OntoClaw Core Ontology" .
 
@@ -17,7 +17,8 @@ oc:APIKeySet a owl:Class ;
 oc:DeclarativeSkill a owl:Class ;
     rdfs:label "Declarative Skill" ;
     rdfs:comment "A skill without executable code (declarative knowledge)" ;
-    rdfs:subClassOf oc:Skill .
+    rdfs:subClassOf oc:Skill ;
+    owl:disjointWith oc:ExecutableSkill .
 
 oc:DirectoryWritable a owl:Class ;
     rdfs:label "DirectoryWritable" ;
@@ -28,11 +29,6 @@ oc:EnvironmentReady a owl:Class ;
     rdfs:label "EnvironmentReady" ;
     rdfs:subClassOf oc:State ;
     skos:prefLabel "EnvironmentReady" .
-
-oc:ExecutableSkill a owl:Class ;
-    rdfs:label "Executable Skill" ;
-    rdfs:comment "A skill with an executable code payload" ;
-    rdfs:subClassOf oc:Skill .
 
 oc:FileExists a owl:Class ;
     rdfs:label "FileExists" ;
@@ -108,6 +104,11 @@ oc:differentia a owl:DatatypeProperty ;
     rdfs:label "differentia" ;
     rdfs:comment "Specific characteristics that differentiate this skill" ;
     rdfs:domain oc:Skill .
+
+oc:executionPath a owl:DatatypeProperty ;
+    rdfs:label "execution path" ;
+    rdfs:comment "Relative URI/path to the executable asset file copied by the compiler (e.g., './scripts/document.py')" ;
+    rdfs:domain oc:ExecutionPayload .
 
 oc:executor a owl:DatatypeProperty ;
     rdfs:label "executor" ;
@@ -193,6 +194,11 @@ oc:yieldsState a owl:ObjectProperty ;
 oc:Attempt a owl:Class ;
     rdfs:label "Attempt" ;
     rdfs:comment "Record of a skill execution attempt, used for negative memory" .
+
+oc:ExecutableSkill a owl:Class ;
+    rdfs:label "Executable Skill" ;
+    rdfs:comment "A skill with an executable code payload" ;
+    rdfs:subClassOf oc:Skill .
 
 oc:enables a owl:ObjectProperty ;
     rdfs:label "enables" ;
