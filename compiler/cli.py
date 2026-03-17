@@ -13,14 +13,16 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 
+from rdflib import Graph, RDF
+
 from compiler.extractor import generate_skill_id, compute_skill_hash
 from compiler.transformer import tool_use_loop
 from compiler.security import security_check, SecurityError
-from compiler.loader import (
-    create_core_ontology,
-    serialize_skill_to_module,
+from compiler.core_ontology import get_oc_namespace, create_core_ontology
+from compiler.serialization import serialize_skill_to_module
+from compiler.storage import (
     generate_index_manifest,
-    get_oc_namespace,
+    clean_orphaned_skills,
 )
 from compiler.sparql import execute_sparql, format_results
 from compiler.exceptions import (
@@ -75,11 +77,13 @@ def cli(ctx, verbose, quiet):
               type=click.Path(), help='Output directory for semantic-skills')
 @click.option('--dry-run', is_flag=True, help='Preview without saving')
 @click.option('--skip-security', is_flag=True, help='Skip security checks')
+@click.option('-f', '--force', is_flag=True,
+              help='Force recompilation of all skills (bypass cache)')
 @click.option('-y', '--yes', is_flag=True, help='Skip confirmation prompt')
 @click.option('-v', '--verbose', is_flag=True, help='Enable debug logging')
 @click.option('-q', '--quiet', is_flag=True, help='Suppress progress output')
 @click.pass_context
-def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, yes, verbose, quiet):
+def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, force, yes, verbose, quiet):
     """Compile skills into modular ontology.
 
     Without SKILL_NAME: Compile all skills in input directory.
@@ -127,6 +131,11 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, yes,
 
     logger.info(f"Found {len(skill_dirs)} skill(s) to compile")
 
+    # Clean orphaned skills before compilation
+    orphans_removed = clean_orphaned_skills(input_path, output_path, dry_run=dry_run)
+    if orphans_removed > 0:
+        console.print(f"[yellow]Cleaned {orphans_removed} orphaned skill file(s)[/yellow]")
+
     # Process each skill
     compiled_skills = []
     skill_output_paths = []
@@ -136,6 +145,28 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, yes,
         skill_hash = compute_skill_hash(skill_dir)
 
         logger.info(f"Processing skill: {skill_id}")
+
+        # Check if skill is unchanged (unless --force)
+        output_skill_path = output_path / skill_dir.relative_to(input_path) / "skill.ttl"
+        if not force and output_skill_path.exists():
+            # Read existing hash from TTL file
+            existing_graph = Graph()
+            try:
+                existing_graph.parse(output_skill_path, format="turtle")
+                oc = get_oc_namespace()
+                existing_hash = None
+                for skill_uri in existing_graph.subjects(RDF.type, oc.Skill):
+                    hash_val = existing_graph.value(skill_uri, oc.contentHash)
+                    if hash_val:
+                        existing_hash = str(hash_val)
+                        break
+
+                if existing_hash == skill_hash:
+                    logger.info(f"Skill {skill_id} unchanged (hash match), skipping")
+                    skill_output_paths.append(output_skill_path)
+                    continue
+            except Exception as e:
+                logger.debug(f"Could not read existing skill: {e}")
 
         # Security check
         skill_file = skill_dir / "SKILL.md"
@@ -156,10 +187,6 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, yes,
         try:
             extracted = tool_use_loop(skill_dir, skill_hash, skill_id)
             compiled_skills.append(extracted)
-
-            # Calculate output path (mirror directory structure)
-            rel_path = skill_dir.relative_to(input_path)
-            output_skill_path = output_path / rel_path / "skill.ttl"
             skill_output_paths.append(output_skill_path)
 
             logger.info(f"Successfully extracted: {skill_id}")
