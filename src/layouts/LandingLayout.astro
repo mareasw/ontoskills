@@ -4,6 +4,7 @@ import '@fontsource-variable/inter';
 import '@fontsource-variable/jetbrains-mono';
 
 import { ViewTransitions } from 'astro:transitions';
+import Analytics from '@vercel/analytics/astro';
 import '../styles/global.css';
 
 interface Props {
@@ -30,9 +31,9 @@ const {
     <meta name="twitter:card" content="summary_large_image" />
     <title>{title}</title>
     <ViewTransitions />
-    <script defer src="/_vercel/insights/script.js"></script>
   </head>
   <body class="min-h-screen bg-bg-primary">
     <slot />
+    <Analytics />
   </body>
 </html>
