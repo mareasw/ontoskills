@@ -40,48 +40,43 @@
 
 OntoClaw is a **complete neuro-symbolic platform** for building deterministic, enterprise-grade AI agents. It consists of four layered components:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         OntoClaw                                 │
-│                    (Enterprise AI Agent)                         │
-│                                                                  │
-│        Deterministic • Fast • Reliable • Production-Ready        │
-│                                                                  │
-│     Inspired by OpenClaw, Claude Code, and Cursor — but          │
-│     built for enterprise with OWL 2 at its core.                 │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        OntoStore                                 │
-│                    (Skill Registry / Store)                      │
-│                                                                  │
-│        🚧 Planned — Versioned skill distribution                 │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        OntoMCP                                   │
-│                  (Rust MCP Server — Runtime)                     │
-│                                                                  │
-│        🚧 Planned — Blazing-fast SPARQL queries via MCP          │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                       OntoSkills                                 │
-│               (Compiled OWL 2 Ontologies)                        │
-│                                                                  │
-│        ✅ Ready — Self-contained, modular, pluggable             │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        OntoCore                                  │
-│              (Python Compiler — Design Time)                     │
-│                                                                  │
-│        ✅ Ready — SKILL.md → validated OWL 2 TTL                 │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph ONTOCLAW["OntoClaw — Enterprise AI Agent"]
+        TAG1["Deterministic • Fast • Reliable • Production-Ready"]
+    end
+
+    subgraph ONTOSTORE["OntoStore — Skill Registry"]
+        TAG2["🚧 Planned — Versioned skill distribution"]
+    end
+
+    subgraph ONTOMCP["OntoMCP — Rust MCP Server"]
+        TAG3["🚧 Planned — Blazing-fast SPARQL via MCP"]
+    end
+
+    subgraph ONTOSKILLS["OntoSkills — Compiled OWL 2 Ontologies"]
+        TAG4["✅ Ready — Self-contained, modular, pluggable"]
+    end
+
+    subgraph ONTOCORE["OntoCore — Python Compiler"]
+        TAG5["✅ Ready — SKILL.md → validated OWL 2 TTL"]
+    end
+
+    ONTOCLAW --> ONTOSTORE
+    ONTOSTORE --> ONTOMCP
+    ONTOMCP --> ONTOSKILLS
+    ONTOSKILLS --> ONTOCORE
+
+    style ONTOCLAW fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style ONTOSTORE fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
+    style ONTOMCP fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
+    style ONTOSKILLS fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
+    style ONTOCORE fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
+    style TAG1 fill:#6dc9ee,stroke:none,color:#0d0d14
+    style TAG2 fill:#9763e1,stroke:none,color:#f0f0f5
+    style TAG3 fill:#92eff4,stroke:none,color:#0d0d14
+    style TAG4 fill:#abf9cc,stroke:none,color:#0d0d14
+    style TAG5 fill:#e91e63,stroke:none,color:#f0f0f5
 ```
 
 ---
@@ -94,34 +89,34 @@ OntoClaw is a **complete neuro-symbolic platform** for building deterministic, e
 
 OntoCore separates the skill lifecycle into two distinct phases:
 
-#### Design Time (Human Authored)
+```mermaid
+flowchart LR
+    subgraph DESIGN["🎨 Design Time"]
+        MD["SKILL.md<br/>(Human-authored)"]
+        CORE["OntoCore<br/>(Python)"]
+        TTL["ontoskill.ttl<br/>(Self-contained)"]
+        MD -->|"LLM extraction<br/>+ SHACL"| CORE
+        CORE --> TTL
+    end
 
-```
-SKILL.md  ───────►  OntoCore  ───────►  skill.ttl
-   │                     │                        │
-   ▼                     ▼                        ▼
-Human-friendly      LLM extraction +          Self-contained
-syntactic sugar     SHACL validation          OWL 2 artifact
-```
+    subgraph RUNTIME["🚀 Runtime"]
+        MCP["OntoMCP (Rust)"]
+        GRAPH["In-memory<br/>RDF Graph"]
+        AGENT["LLM Agent"]
+        MCP <--> AGENT
+        MCP --> GRAPH
+    end
 
-- **SKILL.md files are source code** — humans write Markdown because writing raw OWL/Turtle is a terrible developer experience
-- OntoCore extracts **everything** into the TTL: intents, state transitions, AND the execution payload (actual code/schema to run)
-- SKILL.md files are **NOT deployed to production**
+    TTL -.->|"deployed"| MCP
 
-#### Runtime (Agent via OntoMCP)
-
-```
-┌─────────────────────────────────────────────────────┐
-│                                                     │
-│    Agent ◄──────► OntoMCP (Rust)                    │
-│                        │                            │
-│                        ▼                            │
-│              In-memory RDF Graph                    │
-│              (loads ONLY .ttl files)                │
-│                                                     │
-│    SKILL.md files DO NOT EXIST in runtime context   │
-│                                                     │
-└─────────────────────────────────────────────────────┘
+    style DESIGN fill:#1a1a2e,stroke:#2a2a3e,color:#f0f0f5
+    style RUNTIME fill:#16213e,stroke:#2a2a3e,color:#f0f0f5
+    style MD fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style CORE fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
+    style TTL fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
+    style MCP fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
+    style GRAPH fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
+    style AGENT fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
 ```
 
 - **OntoMCP** (the Rust MCP server) loads only compiled `.ttl` files into an in-memory graph
@@ -188,46 +183,45 @@ Every skill is extracted with:
 ## How It Works
 
 ```mermaid
-flowchart TB
-    subgraph DesignTime["🎨 DESIGN TIME (Human)"]
-        SKILL["SKILL.md<br/>(Source Code)"]
+flowchart LR
+    subgraph DT["Design Time"]
+        MD["SKILL.md"]
     end
 
-    subgraph OntoCore["⚙️ ONTOCORE (Python)"]
-        CLAUDE["Claude API<br/>LLM Extraction"]
-        PYDANTIC["Extracted Skill<br/>Pydantic Model"]
-        AUDIT["Security Audit<br/>Regex + LLM Review"]
-        RDF["RDF Graph<br/>OWL 2 Triples"]
-        SHACL["SHACL Validator<br/>Gatekeeper"]
+    subgraph OC["OntoCore Pipeline"]
+        LLM["Claude API"] --> PYD["Pydantic"]
+        PYD --> SEC["Security"]
+        SEC --> RDF["RDF Graph"]
+        RDF --> SHACL["SHACL"]
     end
 
-    subgraph OntoSkills["📦 ONTOSKILLS"]
-        TTL["skill.ttl<br/>(Self-Contained Ontology)"]
+    subgraph OS["OntoSkills"]
+        TTL["ontoskill.ttl"]
     end
 
-    subgraph Runtime["🚀 RUNTIME (OntoMCP)"]
-        MCP["OntoMCP (Rust)<br/>(In-Memory Graph)"]
-        AGENT["LLM Agent"]
-        FAIL["FAIL<br/>Block & Error"]
+    subgraph RT["Runtime"]
+        MCP["OntoMCP"] <--> AGENT["Agent"]
     end
 
-    SKILL --> CLAUDE
-    CLAUDE --> PYDANTIC
-    PYDANTIC --> AUDIT
-    AUDIT --> RDF
-    RDF --> SHACL
-    SHACL -->|PASS| TTL
-    SHACL -->|FAIL| FAIL
+    MD --> LLM
+    SHACL -->|"PASS"| TTL
+    SHACL -->|"FAIL"| FAIL["❌ Block"]
     TTL --> MCP
-    MCP <--> AGENT
 
-    style DesignTime fill:#1a1a2e,stroke:#16213e,color:#fff
-    style OntoCore fill:#e91e63,stroke:#16213e,color:#fff
-    style OntoSkills fill:#9333EA,stroke:#16213e,color:#fff
-    style Runtime fill:#00bf63,stroke:#16213e,color:#fff
-    style SKILL fill:#1a1a2e,stroke:#16213e,color:#eee
-    style TTL fill:#9333EA,stroke:#16213e,color:#fff
-    style FAIL fill:#ff6b6b,stroke:#000,color:#fff
+    style DT fill:#1a1a2e,stroke:#2a2a3e,color:#f0f0f5
+    style OC fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
+    style OS fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
+    style RT fill:#16213e,stroke:#2a2a3e,color:#f0f0f5
+    style MD fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style LLM fill:#e91e63,stroke:none,color:#f0f0f5
+    style PYD fill:#e91e63,stroke:none,color:#f0f0f5
+    style SEC fill:#e91e63,stroke:none,color:#f0f0f5
+    style RDF fill:#e91e63,stroke:none,color:#f0f0f5
+    style SHACL fill:#e91e63,stroke:none,color:#f0f0f5
+    style TTL fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
+    style MCP fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
+    style AGENT fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style FAIL fill:#ff6b6b,stroke:#2a2a3e,color:#f0f0f5
 ```
 
 ### The Validation Gatekeeper
@@ -248,17 +242,17 @@ Every skill must pass SHACL validation before being written to disk. The constit
 
 ```mermaid
 flowchart LR
-    SKILL[oc:Skill] --> EXE{oc:ExecutableSkill}
-    SKILL --> DEC{oc:DeclarativeSkill}
+    SKILL["oc:Skill"] --> EXE["oc:ExecutableSkill"]
+    SKILL --> DEC["oc:DeclarativeSkill"]
 
     EXE --> PAYLOAD["hasPayload<br/>exactly 1"]
     DEC --> NOPAYLOAD["hasPayload<br/>forbidden"]
 
-    style SKILL fill:#533483,stroke:#16213e,color:#fff
-    style EXE fill:#00bf63,stroke:#000,color:#fff
-    style DEC fill:#0abde3,stroke:#000,color:#fff
-    style PAYLOAD fill:#00bf63,stroke:#000,color:#fff
-    style NOPAYLOAD fill:#ff6b6b,stroke:#000,color:#fff
+    style SKILL fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
+    style EXE fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
+    style DEC fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style PAYLOAD fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
+    style NOPAYLOAD fill:#ff6b6b,stroke:#2a2a3e,color:#f0f0f5
 ```
 
 The classification is **automatic** - you don't specify it. If a skill has code to execute, it's executable. If it's knowledge-only, it's declarative.
@@ -403,7 +397,7 @@ ontoclaw/
 │   ├── storage.py           # File I/O, merging, orphan cleanup
 │   ├── transformer.py       # LLM tool-use extraction
 │   ├── validator.py         # SHACL validation gatekeeper
-│   └── tests/               # Test suite (150 tests)
+│   └── tests/               # Test suite (156 tests)
 ├── mcp/                     # OntoMCP — Rust MCP server (planned)
 ├── specs/
 │   └── ontoclaw.shacl.ttl   # SHACL shapes constitution
@@ -411,7 +405,7 @@ ontoclaw/
 ├── ontoskills/              # Output: compiled .ttl files (artifacts)
 │   ├── ontoclaw-core.ttl    # Core ontology with states
 │   ├── index.ttl            # Index of all skills
-│   └── */skill.ttl          # Individual skill modules
+│   └── */ontoskill.ttl      # Individual skill modules
 └── docs/                    # Documentation
 ```
 
@@ -421,69 +415,54 @@ ontoclaw/
 
 ```mermaid
 flowchart LR
-    subgraph DesignTime["🎨 DESIGN TIME"]
-        subgraph Input["skills/ (Source)"]
-            S1[create-document/<br/>SKILL.md]
-            S2[analyze-data/<br/>SKILL.md]
-            S3[send-email/<br/>SKILL.md]
-            SN[...any skill...<br/>SKILL.md]
-        end
-
-        subgraph OntoCore["OntoCore (core/)"]
-            E[extractor.py<br/>ID & Hash]
-            T[transformer.py<br/>LLM Extraction]
-            SEC[security.py<br/>Security Audit]
-            CO[core_ontology.py<br/>Namespace + TBox]
-            SR[serialization.py<br/>RDF + SHACL]
-            ST[storage.py<br/>File I/O + Merge]
-        end
+    subgraph IN["skills/ (Source)"]
+        S1["create-document/<br/>SKILL.md"]
+        S2["analyze-data/<br/>SKILL.md"]
+        S3["send-email/<br/>SKILL.md"]
     end
 
-    subgraph RuntimeOutput["🚀 RUNTIME ARTIFACTS"]
-        subgraph OntoSkills["ontoskills/ (OntoSkills)"]
-            CORE[ontoclaw-core.ttl<br/>Core Ontology]
-            IDX[index.ttl<br/>Skill Index]
-            O1[create-document/<br/>skill.ttl]
-            O2[analyze-data/<br/>skill.ttl]
-            O3[send-email/<br/>skill.ttl]
-        end
+    subgraph CORE["OntoCore Pipeline"]
+        E["extractor.py"] --> T["transformer.py"]
+        T --> SEC["security.py"]
+        SEC --> CO["core_ontology.py"]
+        CO --> SR["serialization.py"]
+        SR --> ST["storage.py"]
+    end
+
+    subgraph OUT["ontoskills/ (Artifacts)"]
+        CORE_TTL["ontoclaw-core.ttl"]
+        IDX["index.ttl"]
+        O1["create-document/<br/>ontoskill.ttl"]
+        O2["analyze-data/<br/>ontoskill.ttl"]
+        O3["send-email/<br/>ontoskill.ttl"]
     end
 
     S1 --> E
     S2 --> E
     S3 --> E
-    SN --> E
-    E --> T
-    T --> SEC
-    SEC --> CO
-    CO --> SR
-    SR --> ST
-    ST --> CORE
+    ST --> CORE_TTL
     ST --> IDX
     ST --> O1
     ST --> O2
     ST --> O3
 
-    style DesignTime fill:#1a1a2e,stroke:#16213e,color:#fff
-    style RuntimeOutput fill:#00bf63,stroke:#16213e,color:#fff
-    style Input fill:#1a1a2e,stroke:#16213e,color:#fff
-    style OntoCore fill:#e91e63,stroke:#16213e,color:#fff
-    style OntoSkills fill:#00bf63,stroke:#16213e,color:#fff
-    style S1 fill:#1a1a2e,stroke:#16213e,color:#eee
-    style S2 fill:#1a1a2e,stroke:#16213e,color:#eee
-    style S3 fill:#1a1a2e,stroke:#16213e,color:#eee
-    style SN fill:#1a1a2e,stroke:#16213e,color:#eee
-    style E fill:#e91e63,stroke:#16213e,color:#eee
-    style T fill:#e91e63,stroke:#16213e,color:#eee
-    style SEC fill:#e91e63,stroke:#16213e,color:#eee
-    style CO fill:#9333EA,stroke:#16213e,color:#eee
-    style SR fill:#e91e63,stroke:#16213e,color:#eee
-    style ST fill:#00bf63,stroke:#16213e,color:#eee
-    style CORE fill:#00bf63,stroke:#16213e,color:#eee
-    style IDX fill:#00bf63,stroke:#16213e,color:#eee
-    style O1 fill:#00bf63,stroke:#16213e,color:#eee
-    style O2 fill:#00bf63,stroke:#16213e,color:#eee
-    style O3 fill:#00bf63,stroke:#16213e,color:#eee
+    style IN fill:#1a1a2e,stroke:#2a2a3e,color:#f0f0f5
+    style CORE fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
+    style OUT fill:#16213e,stroke:#2a2a3e,color:#f0f0f5
+    style S1 fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style S2 fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style S3 fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style E fill:#e91e63,stroke:none,color:#f0f0f5
+    style T fill:#e91e63,stroke:none,color:#f0f0f5
+    style SEC fill:#e91e63,stroke:none,color:#f0f0f5
+    style CO fill:#9763e1,stroke:none,color:#f0f0f5
+    style SR fill:#e91e63,stroke:none,color:#f0f0f5
+    style ST fill:#abf9cc,stroke:none,color:#0d0d14
+    style CORE_TTL fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
+    style IDX fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
+    style O1 fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
+    style O2 fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
+    style O3 fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
 ```
 
 **Any skill directory works** - just add a `SKILL.md` file and OntoCore will compile it to a validated OWL 2 ontology module.
@@ -497,7 +476,7 @@ cd core
 pytest tests/ -v
 ```
 
-**Test Coverage**: 150 tests covering:
+**Test Coverage**: 156 tests covering:
 - Pydantic model validation
 - Exception exit codes
 - ID/hash generation
@@ -529,35 +508,35 @@ Skills are extracted following the **Knowledge Architecture** framework:
 
 ```mermaid
 flowchart LR
-    subgraph Properties["OWL 2 Property Characteristics"]
-        A["oc:dependsOn<br/>AsymmetricProperty<br/>inverse: oc:enables"]
-        B["oc:extends<br/>TransitiveProperty<br/>inverse: oc:isExtendedBy"]
-        C["oc:contradicts<br/>SymmetricProperty"]
-        D["oc:implements<br/>inverse: oc:isImplementedBy"]
-        E["oc:exemplifies<br/>inverse: oc:isExemplifiedBy"]
+    subgraph PROPS["OWL 2 Properties"]
+        A["dependsOn<br/>Asymmetric"]
+        B["extends<br/>Transitive"]
+        C["contradicts<br/>Symmetric"]
+        D["implements"]
+        E["exemplifies"]
     end
 
-    subgraph UseCases["Use Cases"]
-        UC1["Skill Dependencies"]
-        UC2["Skill Inheritance"]
-        UC3["Incompatible Skills"]
-        UC4["Interface Compliance"]
-        UC5["Pattern Demonstration"]
+    subgraph USE["Use Cases"]
+        UC1["Dependencies"]
+        UC2["Inheritance"]
+        UC3["Conflicts"]
+        UC4["Interfaces"]
+        UC5["Patterns"]
     end
 
-    A -->|"connects"| UC1
-    B -->|"connects"| UC2
-    C -->|"connects"| UC3
-    D -->|"connects"| UC4
-    E -->|"connects"| UC5
+    A --> UC1
+    B --> UC2
+    C --> UC3
+    D --> UC4
+    E --> UC5
 
-    style Properties fill:#9333EA,stroke:#16213e,color:#fff
-    style UseCases fill:#1a1a2e,stroke:#16213e,color:#fff
-    style A fill:#00bf63,stroke:#000,color:#fff
-    style B fill:#00bf63,stroke:#000,color:#fff
-    style C fill:#ff6b6b,stroke:#000,color:#fff
-    style D fill:#2196F3,stroke:#000,color:#fff
-    style E fill:#a855f4,stroke:#000,color:#fff
+    style PROPS fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
+    style USE fill:#1a1a2e,stroke:#2a2a3e,color:#f0f0f5
+    style A fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
+    style B fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
+    style C fill:#ff6b6b,stroke:#2a2a3e,color:#f0f0f5
+    style D fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style E fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
 ```
 
 ---
@@ -566,21 +545,21 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    INPUT[User Content] --> NORM[Unicode NFC<br/>Normalize]
-    NORM --> PATTERNS[Regex Patterns<br/>Check Attacks]
-    PATTERNS --> LLM[LLM Review<br/>Final Check]
-    LLM --> DECISION{Safe?}
+    INPUT["User Content"] --> NORM["Unicode NFC"]
+    NORM --> PATTERNS["Regex Check"]
+    PATTERNS --> LLM["LLM Review"]
+    LLM --> DECISION{"Safe?"}
 
-    DECISION -->|Yes| PASS["PASS<br/>Allow Content"]
-    DECISION -->|No| BLOCK["BLOCK<br/>Reject Content"]
+    DECISION -->|"Yes"| PASS["✅ Allow"]
+    DECISION -->|"No"| BLOCK["❌ Reject"]
 
-    style INPUT fill:#1a1a2e,stroke:#16213e,color:#eee
-    style NORM fill:#2196F3,stroke:#16213e,color:#eee
-    style PATTERNS fill:#ff6b6b,stroke:#16213e,color:#eee
-    style LLM fill:#a855f4,stroke:#16213e,color:#eee
-    style DECISION fill:#feca57,stroke:#16213e,color:#000
-    style PASS fill:#00bf63,stroke:#000,color:#fff
-    style BLOCK fill:#ff6b6b,stroke:#000,color:#fff
+    style INPUT fill:#1a1a2e,stroke:#2a2a3e,color:#f0f0f5
+    style NORM fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style PATTERNS fill:#ff6b6b,stroke:#2a2a3e,color:#f0f0f5
+    style LLM fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
+    style DECISION fill:#feca57,stroke:#2a2a3e,color:#0d0d14
+    style PASS fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
+    style BLOCK fill:#ff6b6b,stroke:#2a2a3e,color:#f0f0f5
 ```
 
 Detected threats:
