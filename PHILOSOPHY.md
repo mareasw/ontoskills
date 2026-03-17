@@ -2,40 +2,17 @@
 
 ## 0. The OntoClaw Ecosystem
 
-OntoClaw is not just a compiler — it's a **complete neuro-symbolic platform** for building deterministic, enterprise-grade AI agents. The ecosystem consists of four layered components:
+OntoClaw is not just a compiler — it's a **complete neuro-symbolic platform** for building deterministic, enterprise-grade AI agents. The ecosystem consists of five layered components:
 
 ```mermaid
-flowchart TB
-    subgraph ONTOCLAW["OntoClaw — Enterprise AI Agent"]
-        TAG1["Deterministic • Fast • Reliable • Production-Ready"]
-    end
+flowchart LR
+    A["OntoClaw<br/>Enterprise Agent"] --> B["OntoStore<br/>Registry"] --> C["OntoMCP<br/>Rust Server"] --> D["OntoSkills<br/>OWL 2"] --> E["OntoCore<br/>Compiler"]
 
-    subgraph ONTOSTORE["OntoStore — Skill Registry"]
-        TAG2["🚧 Planned — Versioned skill distribution"]
-    end
-
-    subgraph ONTOMCP["OntoMCP — Rust MCP Server"]
-        TAG3["🚧 Planned — Blazing-fast SPARQL via MCP"]
-    end
-
-    subgraph ONTOSKILLS["OntoSkills — Compiled OWL 2 Ontologies"]
-        TAG4["✅ Ready — Self-contained, modular, pluggable"]
-    end
-
-    subgraph ONTOCORE["OntoCore — Python Compiler"]
-        TAG5["✅ Ready — SKILL.md → validated OWL 2 TTL"]
-    end
-
-    ONTOCLAW --> ONTOSTORE
-    ONTOSTORE --> ONTOMCP
-    ONTOMCP --> ONTOSKILLS
-    ONTOSKILLS --> ONTOCORE
-
-    style ONTOCLAW fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
-    style ONTOSTORE fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
-    style ONTOMCP fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
-    style ONTOSKILLS fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
-    style ONTOCORE fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
+    style A fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style B fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
+    style C fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
+    style D fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
+    style E fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
 ```
 
 ### The Vision
@@ -59,16 +36,10 @@ OntoCore implements a **compile-time paradigm** for skills, separating human aut
 
 ```mermaid
 flowchart LR
-    subgraph DT["Design Time"]
-        MD["Human writes<br/>SKILL.md"]
-        NOTE["Markdown = syntactic sugar for OWL"]
-    end
+    MD["Human writes<br/>SKILL.md"] -.-> NOTE["Markdown = syntactic sugar<br/>for OWL"]
 
-    MD -.-> NOTE
-
-    style DT fill:#1a1a2e,stroke:#2a2a3e,color:#f0f0f5
     style MD fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
-    style NOTE fill:#1a1a2e,stroke:none,color:#8b8ba3
+    style NOTE fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
 ```
 
 Why Markdown? Because writing raw Turtle by hand is a terrible developer experience.
@@ -83,12 +54,8 @@ OntoCore extracts **everything** into the TTL:
 
 ```mermaid
 flowchart LR
-    subgraph RT["Runtime"]
-        AGENT["LLM Agent"] <--> MCP["OntoMCP<br/>(Rust)"]
-        MCP --> TTL[".ttl files<br/>(In-memory Graph)"]
-    end
+    AGENT["LLM Agent"] <--> MCP["OntoMCP<br/>(Rust)"] --> TTL[".ttl files<br/>(In-memory Graph)"]
 
-    style RT fill:#16213e,stroke:#2a2a3e,color:#f0f0f5
     style AGENT fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
     style MCP fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
     style TTL fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
@@ -193,22 +160,10 @@ OntoClaw exposes the **TBox** (terminological box) — the schema of classes and
 
 ```mermaid
 flowchart LR
-    subgraph TBOX["TBox (Schema)"]
-        TQ["What properties does<br/>oc:Skill have?"]
-        TA["→ oc:resolvesIntent<br/>→ oc:dependsOn<br/>→ oc:extends"]
-    end
-
-    subgraph ABOX["ABox (Instances)"]
-        AQ["Which skills resolve<br/>'create_pdf'?"]
-        AA["→ oc:pdf-generation<br/>→ oc:docx-to-pdf"]
-    end
+    TBOX["TBox (Schema)<br/>What properties does<br/>oc:Skill have?"] --> ABOX["ABox (Instances)<br/>Which skills resolve<br/>'create_pdf'?"]
 
     style TBOX fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
     style ABOX fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
-    style TQ fill:#9763e1,stroke:none,color:#f0f0f5
-    style TA fill:#9763e1,stroke:none,color:#f0f0f5
-    style AQ fill:#abf9cc,stroke:none,color:#0d0d14
-    style AA fill:#abf9cc,stroke:none,color:#0d0d14
 ```
 
 This two-stage querying prevents "blind" questions and improves precision.
