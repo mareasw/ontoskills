@@ -1,0 +1,39 @@
+---
+import Button from '../ui/Button.astro';
+---
+
+<section class="relative overflow-hidden">
+  <!-- Banner Image Background -->
+  <div class="absolute inset-0 z-0">
+    <img
+      src="/ontoclaw-banner.png"
+      alt=""
+      class="w-full h-full object-cover opacity-30"
+    />
+    <div class="absolute inset-0 bg-gradient-to-b from-bg-primary/50 via-bg-primary/80 to-bg-primary"></div>
+  </div>
+
+  <!-- Content -->
+  <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32 text-center">
+    <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
+      <span class="gradient-text">The first neuro-symbolic</span>
+      <br />
+      <span class="text-text-primary">skill compiler</span>
+    </h1>
+
+    <p class="text-lg sm:text-xl text-text-muted max-w-2xl mx-auto mb-8">
+      Transform natural language skill definitions into
+      <span class="text-accent-mint font-medium">validated OWL 2 ontologies</span>.
+      Deterministic knowledge retrieval for the Agentic Web.
+    </p>
+
+    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+      <Button href="/docs/getting-started/" size="lg">
+        Get Started
+      </Button>
+      <Button href="https://github.com/marea-software/ontoclaw" variant="secondary" size="lg">
+        View on GitHub
+      </Button>
+    </div>
+  </div>
+</section>
