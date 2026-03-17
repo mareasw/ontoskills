@@ -3,9 +3,9 @@
 </p>
 
 <h1 align="center">
-  <a href="https://ontoclaw.marea.software">
-    <img src="assets/ontoclaw-logo.png" alt="OntoClaw Logo Inline" height="40px" style="vertical-align: middle;">
-    OntoClaw
+  <a href="https://ontoclaw.marea.software" style="text-decoration: none; color: inherit; display: flex; align-items: center; justify-content: center; gap: 10px;">
+    <img src="assets/ontoclaw-logo.png" alt="OntoClaw Logo Inline" height="40px" style="display: block;">
+    <span>OntoClaw</span>
   </a>
 </h1>
 
@@ -33,8 +33,6 @@
     <img src="https://img.shields.io/badge/license-MIT-orange?style=for-the-badge" alt="MIT License">
   </a>
 </p>
-
-<hr style="border:1px solid #ddd;"/>
 
 ---
 
