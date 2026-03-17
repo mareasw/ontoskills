@@ -65,15 +65,19 @@ def serialize_skill(graph: Graph, skill: ExtractedSkill) -> None:
         graph.add((req_uri, oc.isOptional, Literal(req.optional)))
         graph.add((skill_uri, oc.hasRequirement, req_uri))
 
-    # Relations
+    # Relations - reference by ID only, not creating new skill nodes
     for dep in skill.depends_on:
-        graph.add((skill_uri, oc.dependsOn, oc[f"skill_{dep}"]))
+        # Create a simple reference to the skill ID
+        dep_uri = URIRef(BASE_URI + f"skills/{dep}#skill_{dep}")
+        graph.add((skill_uri, oc.dependsOn, dep_uri))
 
     for ext in skill.extends:
-        graph.add((skill_uri, oc.extends, oc[f"skill_{ext}"]))
+        ext_uri = URIRef(BASE_URI + f"skills/{ext}#skill_{ext}")
+        graph.add((skill_uri, oc.extends, ext_uri))
 
     for cont in skill.contradicts:
-        graph.add((skill_uri, oc.contradicts, oc[f"skill_{cont}"]))
+        cont_uri = URIRef(BASE_URI + f"skills/{cont}#skill_{cont}")
+        graph.add((skill_uri, oc.contradicts, cont_uri))
 
     # State transitions (new schema feature)
     if skill.state_transitions:
