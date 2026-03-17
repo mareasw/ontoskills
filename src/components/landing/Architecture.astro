@@ -1,0 +1,69 @@
+---
+
+const mermaidCode = `flowchart TB
+    subgraph Input["📥 Input"]
+        SKILL[SKILL.md<br/>Natural Language]
+    end
+
+    subgraph Extraction["🔄 Extraction"]
+        CLAUDE[Claude API<br/>LLM Extraction]
+        PYDANTIC[Extracted Skill<br/>Pydantic Model]
+    end
+
+    subgraph Security["🔒 Security"]
+        AUDIT[Security Audit<br/>Regex + LLM Review]
+    end
+
+    subgraph Serialization["📦 Serialization"]
+        RDF[RDF Graph<br/>OWL 2 Triples]
+    end
+
+    subgraph Validation["✅ Validation"]
+        SHACL[SHACL Validator<br/>Gatekeeper]
+    end
+
+    subgraph Output["📤 Output"]
+        PASS["PASS<br/>Write .ttl"]
+        FAIL["FAIL<br/>Block & Error"]
+    end
+
+    SKILL --> CLAUDE
+    CLAUDE --> PYDANTIC
+    PYDANTIC --> AUDIT
+    AUDIT --> RDF
+    RDF --> SHACL
+    SHACL --> PASS
+    SHACL --> FAIL`;
+---
+
+<section id="architecture" class="py-20">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-12">
+      <h2 class="text-3xl sm:text-4xl font-bold text-text-primary mb-4">
+        <span class="gradient-text">Architecture</span>
+      </h2>
+      <p class="text-text-muted max-w-2xl mx-auto">
+        The OntoClaw pipeline: from natural language to validated ontology.
+      </p>
+    </div>
+
+    <div class="bg-bg-secondary border border-border rounded-xl p-6 overflow-x-auto">
+      <pre class="mermaid text-sm">{mermaidCode}</pre>
+    </div>
+
+    <div class="mt-8 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div class="p-4 bg-bg-secondary rounded-lg border border-border">
+        <h4 class="font-semibold text-accent-cyan mb-2">Neural Layer</h4>
+        <p class="text-sm text-text-muted">Claude extracts structured knowledge from natural language using tool-use.</p>
+      </div>
+      <div class="p-4 bg-bg-secondary rounded-lg border border-border">
+        <h4 class="font-semibold text-accent-purple mb-2">Symbolic Layer</h4>
+        <p class="text-sm text-text-muted">OWL 2 ontology stores knowledge with formal Description Logic semantics.</p>
+      </div>
+      <div class="p-4 bg-bg-secondary rounded-lg border border-border">
+        <h4 class="font-semibold text-accent-mint mb-2">Query Layer</h4>
+        <p class="text-sm text-text-muted">SPARQL provides precise, indexed retrieval for deterministic results.</p>
+      </div>
+    </div>
+  </div>
+</section>
