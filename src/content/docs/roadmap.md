@@ -5,7 +5,7 @@ description: OntoClaw development phases and future direction
 
 # Roadmap
 
-> **Note:** We ship fast. This roadmap is mutable and changes frequently.
+> **Note:** We ship fast. This roadmap evolves with the project.
 
 ## Phase 1: Compiler ✅
 
@@ -13,30 +13,31 @@ description: OntoClaw development phases and future direction
 
 Transform `SKILL.md` files into validated OWL 2 DL ontologies.
 
-- [x] Natural language parsing
+- [x] Natural language parsing with Claude
 - [x] OWL 2 DL serialization (RDF/Turtle)
-- [x] SHACL validation pipeline
-- [x] Security audit layer
+- [x] SHACL validation gatekeeper
+- [x] Security audit pipeline
+- [x] 150+ tests
 
 ## Phase 2: MCP Server 🔨
 
 **Status:** In Development
 
-Expose ontoskills via the Model Context Protocol.
+Expose ontologies via the Model Context Protocol.
 
 - [ ] Rust MCP server with stdio transport
 - [ ] Oxigraph in-memory graph store
 - [ ] SPARQL query interface
-- [ ] ABox runtime updates
+- [ ] Runtime ABox updates
 - [ ] Claude Desktop integration
 
 ## Phase 3: OntoStore 💡
 
 **Status:** Planned
 
-Centralized repository for ontoskills.
+Centralized repository for compiled ontologies.
 
-- [ ] Ontoskill registry
+- [ ] Ontology registry
 - [ ] Version management
 - [ ] Dependency resolution
 - [ ] Community contributions
@@ -49,9 +50,8 @@ Broader ecosystem integration.
 
 - [ ] VSCode extension
 - [ ] Multi-agent collaboration
-- [ ] Shared ABox between agents
-- [ ] Cross-platform ontoskill sharing
-- [ ] ??? — We're still exploring
+- [ ] Shared knowledge graphs
+- [ ] Cross-platform skill sharing
 
 ---
 
@@ -59,4 +59,4 @@ Broader ecosystem integration.
 
 Follow development on [GitHub](https://github.com/mareasoftware/ontoclaw).
 
-Have ideas? [Open an issue](https://github.com/mareasoftware/ontoclaw/issues) or join the discussion.
+Have ideas? [Open an issue](https://github.com/mareasoftware/ontoclaw/issues).

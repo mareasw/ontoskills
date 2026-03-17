@@ -33,17 +33,26 @@ const mermaidCode = `flowchart TB
     AUDIT --> RDF
     RDF --> SHACL
     SHACL --> PASS
-    SHACL --> FAIL`;
+    SHACL --> FAIL
+
+    style Input fill:#1a1a2e,stroke:#16213e,color:#fff
+    style Extraction fill:#2196F3,stroke:#16213e,color:#fff
+    style Security fill:#f39c12,stroke:#16213e,color:#fff
+    style Serialization fill:#9333EA,stroke:#16213e,color:#fff
+    style Validation fill:#e91e63,stroke:#16213e,color:#fff
+    style Output fill:#00bf63,stroke:#16213e,color:#fff
+    style PASS fill:#00bf63,stroke:#000,color:#fff
+    style FAIL fill:#ff6b6b,stroke:#000,color:#fff`;
 ---
 
 <section id="architecture" class="py-20">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="text-center mb-12">
       <h2 class="text-3xl sm:text-4xl font-bold text-text-primary mb-4">
-        <span class="gradient-text">Architecture</span>
+        <span class="gradient-text">How It Works</span>
       </h2>
       <p class="text-text-muted max-w-2xl mx-auto">
-        The OntoClaw pipeline: from natural language to validated ontology.
+        From natural language to validated OWL 2 ontology in one pipeline.
       </p>
     </div>
 
