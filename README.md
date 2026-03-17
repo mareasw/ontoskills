@@ -365,7 +365,7 @@ cd compiler
 pytest tests/ -v
 ```
 
-**Test Coverage**: 91 tests covering:
+**Test Coverage**: 150 tests covering:
 - Pydantic model validation
 - Exception exit codes
 - ID/hash generation
@@ -398,11 +398,11 @@ Skills are extracted following the **Knowledge Architecture** framework:
 ```mermaid
 flowchart LR
     subgraph Properties["OWL 2 Property Characteristics"]
-        A["ag:dependsOn<br/>AsymmetricProperty<br/>inverse: ag:enables"]
-        B["ag:extends<br/>TransitiveProperty<br/>inverse: ag:isExtendedBy"]
-        C["ag:contradicts<br/>SymmetricProperty"]
-        D["ag:implements<br/>inverse: ag:isImplementedBy"]
-        E["ag:exemplifies<br/>inverse: ag:isExemplifiedBy"]
+        A["oc:dependsOn<br/>AsymmetricProperty<br/>inverse: oc:enables"]
+        B["oc:extends<br/>TransitiveProperty<br/>inverse: oc:isExtendedBy"]
+        C["oc:contradicts<br/>SymmetricProperty"]
+        D["oc:implements<br/>inverse: oc:isImplementedBy"]
+        E["oc:exemplifies<br/>inverse: oc:isExemplifiedBy"]
     end
 
     subgraph UseCases["Use Cases"]
