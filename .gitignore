@@ -11,8 +11,9 @@ node_modules/
 !.env.example
 
 # IDE
-.vscode/
 .idea/
+# Keep .vscode extensions recommendations
+!.vscode/
 
 # OS
 .DS_Store
