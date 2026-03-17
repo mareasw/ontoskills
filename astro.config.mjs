@@ -3,6 +3,10 @@ import tailwind from '@astrojs/tailwind';
 import starlight from '@astrojs/starlight';
 
 export default defineConfig({
+  prefetch: {
+    prefetchAll: true,
+    defaultStrategy: 'hover'
+  },
   integrations: [
     starlight({
       title: 'OntoClaw',

@@ -1,15 +1,15 @@
 ---
 title: Roadmap
-description: OntoClaw development phases and future direction
+description: From compiler to autonomous agent — the OntoClaw ecosystem
 ---
 
-> **Note:** We ship fast. This roadmap evolves with the project.
+> **We ship fast.** This roadmap evolves with the project.
 
-## Phase 1: Compiler ✅
+## Phase 1: OntoCore ✅
 
 **Status:** Complete
 
-Transform `SKILL.md` files into validated OWL 2 DL ontologies.
+The foundation. OntoCore is our neuro-symbolic compiler that transforms natural language skill definitions into validated OWL 2 DL ontologies.
 
 - [x] Natural language parsing with Claude
 - [x] OWL 2 DL serialization (RDF/Turtle)
@@ -17,11 +17,22 @@ Transform `SKILL.md` files into validated OWL 2 DL ontologies.
 - [x] Security audit pipeline
 - [x] 150+ tests
 
-## Phase 2: MCP Server 🔨
+## Phase 2: OntoSkills 🔨
 
 **Status:** In Development
 
-Expose ontologies via the Model Context Protocol.
+The knowledge base. OntoSkills are the compiled, validated skills published from OntoCore — ready to be queried by agents.
+
+- [x] Core skill library compilation
+- [ ] Public skill registry
+- [ ] Skill versioning and updates
+- [ ] Dependency management
+
+## Phase 3: OntoMCP 💡
+
+**Status:** Planned
+
+The interface. OntoMCP exposes OntoSkills via the Model Context Protocol, giving any MCP-compatible agent instant access to structured knowledge.
 
 - [ ] Rust MCP server with stdio transport
 - [ ] Oxigraph in-memory graph store
@@ -29,27 +40,27 @@ Expose ontologies via the Model Context Protocol.
 - [ ] Runtime ABox updates
 - [ ] Claude Desktop integration
 
-## Phase 3: OntoStore 💡
-
-**Status:** Planned
-
-Centralized repository for compiled ontologies.
-
-- [ ] Ontology registry
-- [ ] Version management
-- [ ] Dependency resolution
-- [ ] Community contributions
-
-## Phase 4+: Ecosystem 🔮
+## Phase 4: OntoStore 🔮
 
 **Status:** Exploratory
 
-Broader ecosystem integration.
+The marketplace. OntoStore is a centralized repository where teams can publish, discover, and share ontologies.
 
-- [ ] VSCode extension
+- [ ] Ontology registry with search
+- [ ] Version management
+- [ ] Team collaboration features
+- [ ] Community contributions
+
+## Phase 5: OntoClaw 🤖
+
+**Status:** Vision
+
+The agent. OntoClaw joins the Claw family (OpenClaw, NanoClaw, ZeroClaw) as an autonomous agent powered by structured knowledge — reasoning with precision, not hallucination.
+
+- [ ] Agent architecture design
 - [ ] Multi-agent collaboration
-- [ ] Shared knowledge graphs
-- [ ] Cross-platform skill sharing
+- [ ] Knowledge graph reasoning
+- [ ] Production deployment
 
 ---
 
