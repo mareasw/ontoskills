@@ -3,8 +3,6 @@ title: Getting Started
 description: Install and use OntoClaw to compile skills into ontologies
 ---
 
-# Getting Started
-
 OntoClaw is currently in **Phase 2** development. The compiler is ready, MCP server is in progress.
 
 ## Prerequisites

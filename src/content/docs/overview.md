@@ -3,8 +3,6 @@ title: What is OntoClaw?
 description: Neuro-symbolic skill compiler for the Agentic Web
 ---
 
-# What is OntoClaw?
-
 OntoClaw is a **skill compiler** that transforms natural language skill definitions into **validated semantic knowledge graphs**. It bridges the gap between human-readable documentation and machine-executable ontologies.
 
 ## Why OntoClaw?

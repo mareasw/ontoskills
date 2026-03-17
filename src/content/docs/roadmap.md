@@ -3,8 +3,6 @@ title: Roadmap
 description: OntoClaw development phases and future direction
 ---
 
-# Roadmap
-
 > **Note:** We ship fast. This roadmap evolves with the project.
 
 ## Phase 1: Compiler ✅

@@ -6,8 +6,9 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'OntoClaw',
-      description: 'MCP server for deterministic AI agents with ontoskills',
+      description: 'Neuro-symbolic skill compiler for the Agentic Web',
       disable404Route: true,
+      customCss: ['./src/styles/starlight.css'],
       sidebar: [
         { label: 'Overview', slug: 'overview' },
         { label: 'Getting Started', slug: 'getting-started' },
