@@ -3,37 +3,45 @@ title: What is OntoClaw?
 description: Neuro-symbolic skill compiler for the Agentic Web
 ---
 
-OntoClaw is a **skill compiler** that transforms natural language skill definitions into **validated semantic knowledge graphs**. It bridges the gap between human-readable documentation and machine-executable ontologies.
+**OntoCore** is a neuro-symbolic compiler that transforms natural language skill definitions into **validated OWL 2 ontologies** — queryable knowledge graphs that enable deterministic reasoning.
 
-## Why OntoClaw?
+## Why OntoCore?
 
 ### The Determinism Problem
 
-LLMs are inherently **non-deterministic** — the same query can yield different results, and reasoning about skill relationships requires reading entire documents. This creates:
+LLMs read skills probabilistically. Same query, different results. Long skill files are expensive for large models and confusing for small ones.
 
-- **Context rot** from lengthy skill files
-- **Hallucinations** when information is scattered
-- **No verifiable structure** for skill relationships
+- **Non-deterministic reading** — LLMs interpret text differently each time
+- **Token waste** — Large models burn tokens parsing long documentation
+- **Small model limits** — Complex skills are unreadable by edge models
 
-OntoClaw transforms this into **deterministic, queryable knowledge graphs**.
+### The Ontological Solution
 
-### Description Logics Foundation
+OntoCore transforms skills into formal ontologies with **Description Logics (OWL 2)**:
 
-Built on **OWL 2** (𝒜𝒞ℛ𝒪ℐ𝒟 Description Logic), enabling:
+- **Deterministic queries** — SPARQL returns exact answers, every time
+- **Entailment reasoning** — Infer dependencies, conflicts, capabilities
+- **Democratized intelligence** — Small models query what large models read
 
-- **Decidable reasoning** — transitive, symmetric, inverse properties
-- **Formal semantics** — no ambiguity in skill relationships
-- **SPARQL queries** with O(1) indexed lookup vs O(n) text scanning
+### Performance Comparison
+
+| Operation | Reading Files | Ontology Query |
+|-----------|---------------|----------------|
+| Find skill by intent | O(n) text scan | O(1) indexed lookup |
+| Check dependencies | Parse each file | Follow `dependsOn` edges |
+| Detect conflicts | Compare all pairs | Single SPARQL query |
+
+For 100 skills: **~500KB text scan → ~1KB query**
 
 ## How It Works
 
-<img src="/architecture.svg" alt="OntoClaw Architecture" style="max-height: 500px; width: auto !important; max-width: 100%; display: block; margin: 0 auto;" />
+<img src="/architecture.svg" alt="OntoCore Architecture" style="max-height: 500px; width: auto !important; max-width: 100%; display: block; margin: 0 auto;" />
 
 ## Key Capabilities
 
 | Capability | Description |
 |------------|-------------|
-| **LLM Extraction** | Uses Claude to extract structured knowledge from SKILL.md files |
+| **LLM Extraction** | Claude extracts structured knowledge from SKILL.md files |
 | **Knowledge Architecture** | Follows the "A is a B that C" definition pattern (genus + differentia) |
 | **OWL 2 Serialization** | Outputs valid OWL 2 ontologies in RDF/Turtle format |
 | **SHACL Validation** | Constitutional gatekeeper ensures logical validity before write |
@@ -44,15 +52,15 @@ Built on **OWL 2** (𝒜𝒞ℛ𝒪ℐ𝒟 Description Logic), enabling:
 
 | Component | Language | Status | Description |
 |-----------|----------|--------|-------------|
-| **compiler/** | Python | ✅ Ready | Skill compiler to OWL 2 ontology |
-| **mcp/** | Rust | 🚧 Planned | Fast MCP server for ontology queries |
+| **OntoCore** | Python | ✅ Ready | Skill compiler to OWL 2 ontology |
+| **OntoSkills** | Turtle | Generated | Compiled ontology output |
+| **OntoMCP** | Rust | 🚧 Planned | MCP server for ontology queries |
 | **skills/** | Markdown | ✅ Ready | Input skill definitions |
-| **ontoskills/** | Turtle | Generated | Compiled ontology output |
 | **specs/** | Turtle | ✅ Ready | SHACL shapes constitution |
 
 ## Get Started
 
-[Get Started](/getting-started/) with OntoClaw in minutes.
+[Get Started](/getting-started/) with OntoCore in minutes.
 
 ## Links
 
