@@ -1,60 +1,73 @@
 ---
 title: Getting Started
-description: Set up OntoClaw and query your first ontoskill
+description: Install and use OntoClaw to compile skills into ontologies
 ---
 
 # Getting Started
 
-OntoClaw is currently in **Phase 2** development. Here's how to get started with what's available.
+OntoClaw is currently in **Phase 2** development. The compiler is ready, MCP server is in progress.
 
 ## Prerequisites
 
-- **Rust** 1.70+ (for building from source)
-- **Node.js** 18+ (for the compiler CLI)
-- **Claude Desktop** (for MCP integration)
+- **Python** 3.10+
+- **pip** or **uv** package manager
 
-## Phase 1: Compiler
-
-The compiler transforms `SKILL.md` files into RDF/Turtle ontologies.
-
-### Installation
+## Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/mareasoftware/ontoclaw.git
 cd ontoclaw
 
-# Build the compiler
-cargo build --release
+# Install compiler
+cd compiler
+pip install -e ".[dev]"
 ```
 
-### Usage
+## CLI Commands
 
 ```bash
-# Compile a skill definition
-ontoclaw compile ./skills/SKILL.md --output ./ontoskills/
+# Initialize core ontology with predefined states
+ontoclaw init-core
+
+# Compile all skills to ontology
+ontoclaw compile
+
+# Compile specific skill
+ontoclaw compile my-skill
+
+# Query ontology with SPARQL
+ontoclaw query "SELECT ?s WHERE { ?s a oc:Skill }"
+
+# List all skills
+ontoclaw list-skills
+
+# Run security audit
+ontoclaw security-audit
 ```
 
-This produces:
-- `ontoskills/skill.ttl` — OWL 2 DL ontology
-- `ontoskills/skill.shacl.ttl` — SHACL shapes for validation
+## Command Options
 
-## Phase 2: MCP Server (In Progress)
+| Option | Description |
+|--------|-------------|
+| `-i, --input` | Input directory (default: `./skills/`) |
+| `-o, --output` | Output file (default: `./ontoskills/skills.ttl`) |
+| `--dry-run` | Preview without saving |
+| `--skip-security` | Skip security checks (not recommended) |
+| `-f, --force` | Force recompilation (bypass hash-based cache) |
+| `--reason/--no-reason` | Apply OWL reasoning |
+| `-v, --verbose` | Debug logging |
 
-The MCP server exposes ontoskills via the Model Context Protocol.
+## MCP Server (Phase 2)
 
-### Build Status
-
-The MCP server is currently under active development. Track progress on [GitHub](https://github.com/mareasoftware/ontoclaw).
-
-### Expected Usage
+The MCP server will expose ontologies via the Model Context Protocol:
 
 ```bash
-# Start the MCP server (coming soon)
+# Coming soon
 ontoclaw-mcp --ontologies ./ontoskills/
 ```
 
-### Claude Desktop Configuration
+### Claude Desktop Integration
 
 Once available, add to your Claude Desktop config:
 
