@@ -12,7 +12,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from compiler.differ import DriftReport
+from compiler.differ import DriftReport, MigrationSuggestion
 
 console = Console()
 
@@ -66,6 +66,20 @@ def print_report(report: DriftReport, breaking_only: bool = False) -> None:
         f'[green]{len(report.additive)} additive[/] | '
         f'[blue]{len(report.cosmetic)} cosmetic[/]'
     )
+
+
+def print_suggestions(suggestions: list[MigrationSuggestion]) -> None:
+    """Print migration suggestions for all breaking changes."""
+    if not suggestions:
+        return
+
+    console.print("\n[bold yellow]Migration Guidance[/bold yellow]")
+    for i, s in enumerate(suggestions, 1):
+        console.print(f"\n[bold]{i}. {s.summary}[/bold]")
+        console.print(f"   [cyan]Action:[/cyan] {s.action}")
+        console.print(f"   [dim]SPARQL to find affected agents:[/dim]")
+        for line in s.sparql_query.splitlines():
+            console.print(f"     [dim]{line}[/dim]")
 
 
 def export_json(report: DriftReport, output_path: str) -> None:

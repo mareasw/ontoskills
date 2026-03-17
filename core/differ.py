@@ -16,6 +16,16 @@ ChangeType = Literal['breaking', 'additive', 'cosmetic']
 
 
 @dataclass
+class MigrationSuggestion:
+    """Actionable migration guidance generated for a single breaking change."""
+    skill_id: str
+    category: str
+    summary: str            # one-line human description
+    sparql_query: str       # SPARQL to locate affected agents/callers
+    action: str             # what the developer should do
+
+
+@dataclass
 class SkillChange:
     skill_id: str
     change_type: ChangeType
@@ -46,6 +56,89 @@ class DriftReport:
             or self.removed_skills
             or self.added_skills
         )
+
+    def suggestions(self) -> list[MigrationSuggestion]:
+        """Generate actionable migration suggestions for every breaking change."""
+        result: list[MigrationSuggestion] = []
+
+        for sid in self.removed_skills:
+            local = sid.split('#')[-1].split('/')[-1]
+            result.append(MigrationSuggestion(
+                skill_id=local,
+                category='skill-removed',
+                summary=f"Skill '{local}' was removed from the ontology",
+                sparql_query=(
+                    f'PREFIX oc: <https://ontoclaw.marea.software/ontology#>\n'
+                    f'SELECT ?agent WHERE {{\n'
+                    f'  ?agent oc:dependsOn oc:{local} .\n'
+                    f'}}'
+                ),
+                action=(
+                    f"Remove or replace all oc:dependsOn oc:{local} references. "
+                    f"Check if a replacement skill covers the same intents."
+                ),
+            ))
+
+        for change in self.breaking:
+            if change.category == 'intent' and change.old_value:
+                result.append(MigrationSuggestion(
+                    skill_id=change.skill_id,
+                    category='intent-renamed',
+                    summary=(
+                        f"Intent '{change.old_value}' removed from '{change.skill_id}'"
+                        + (f" (replaced by '{change.new_value}')" if change.new_value else "")
+                    ),
+                    sparql_query=(
+                        f'PREFIX oc: <https://ontoclaw.marea.software/ontology#>\n'
+                        f'SELECT ?skill WHERE {{\n'
+                        f'  ?skill oc:resolvesIntent "{change.old_value}" .\n'
+                        f'}}'
+                    ),
+                    action=(
+                        f"Update all agents and queries that reference intent "
+                        f"'{change.old_value}'"
+                        + (f" to use '{change.new_value}' instead." if change.new_value
+                           else ". No replacement intent was found in the new ontology.")
+                    ),
+                ))
+
+            elif change.category == 'state' and change.old_value:
+                result.append(MigrationSuggestion(
+                    skill_id=change.skill_id,
+                    category='state-removed',
+                    summary=f"State '{change.old_value}' removed from '{change.skill_id}'",
+                    sparql_query=(
+                        f'PREFIX oc: <https://ontoclaw.marea.software/ontology#>\n'
+                        f'SELECT ?skill WHERE {{\n'
+                        f'  ?skill oc:requiresState oc:{change.old_value.split("#")[-1]} .\n'
+                        f'}}'
+                    ),
+                    action=(
+                        f"Review state machine transitions. '{change.old_value}' is no longer "
+                        f"declared as a precondition for '{change.skill_id}'. "
+                        f"Update agent planning logic accordingly."
+                    ),
+                ))
+
+            elif change.category == 'requirement' and change.new_value:
+                req_local = change.new_value.split('#')[-1].split('/')[-1]
+                result.append(MigrationSuggestion(
+                    skill_id=change.skill_id,
+                    category='requirement-added',
+                    summary=f"New requirement '{req_local}' added to '{change.skill_id}'",
+                    sparql_query=(
+                        f'PREFIX oc: <https://ontoclaw.marea.software/ontology#>\n'
+                        f'SELECT ?skill WHERE {{\n'
+                        f'  ?skill oc:requires oc:{req_local} .\n'
+                        f'}}'
+                    ),
+                    action=(
+                        f"Ensure all agents invoking '{change.skill_id}' can satisfy "
+                        f"the new requirement '{req_local}' before execution."
+                    ),
+                ))
+
+        return result
 
 
 def compute_diff(old_ttl: str, new_ttl: str) -> DriftReport:

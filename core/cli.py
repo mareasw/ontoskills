@@ -32,7 +32,7 @@ from compiler.exceptions import (
     SkillNotFoundError,
 )
 from compiler.differ import compute_diff
-from compiler.drift_report import print_report, export_json
+from compiler.drift_report import print_report, export_json, print_suggestions
 from compiler.snapshot import save_snapshot, get_latest_snapshot
 from compiler.linter import lint_ontology, LintIssue
 from compiler.graph_export import build_graph
@@ -589,7 +589,8 @@ def graph_cmd(ctx, ontology_file, fmt, skill, output):
     help='Output format',
 )
 @click.option('--output', default=None, help='Output file path for JSON/MD format')
-def diff_cmd(skill, from_path, to_path, breaking_only, fmt, output):
+@click.option('--suggest', is_flag=True, help='Show migration guidance for each breaking change')
+def diff_cmd(skill, from_path, to_path, breaking_only, fmt, output, suggest):
     """Detect semantic drift between ontology versions.
 
     Compares the current ontology against a previous snapshot and reports
@@ -614,6 +615,8 @@ def diff_cmd(skill, from_path, to_path, breaking_only, fmt, output):
         export_json(report, out)
     else:
         print_report(report, breaking_only=breaking_only)
+        if suggest and report.has_breaking:
+            print_suggestions(report.suggestions())
 
     if report.has_breaking:
         raise SystemExit(9)

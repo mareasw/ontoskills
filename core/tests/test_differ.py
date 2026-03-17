@@ -1,4 +1,4 @@
-"""Tests for OntoClaw Skill Drift Detector — differ module."""
+"""Tests for OntoClaw Skill Drift Detector — differ module and migration suggestions."""
 
 import pytest
 
@@ -94,3 +94,70 @@ oc:CreatePDF a oc:Skill ;
 
     assert report.has_breaking
     assert any(c.category == 'requirement' for c in report.breaking)
+
+
+# ─── Migration suggestion tests ───────────────────────────────────────────────
+
+
+def test_suggest_intent_renamed(tmp_path):
+    """A renamed intent should produce an intent-renamed migration suggestion."""
+    old_f = tmp_path / 'old.ttl'
+    new_f = tmp_path / 'new.ttl'
+    old_f.write_text(OLD_TTL)
+    new_f.write_text(NEW_TTL_INTENT_REMOVED)
+
+    report = compute_diff(str(old_f), str(new_f))
+    suggestions = report.suggestions()
+
+    assert any(s.category == 'intent-renamed' for s in suggestions)
+    intent_sug = next(s for s in suggestions if s.category == 'intent-renamed')
+    assert 'create_pdf' in intent_sug.summary
+    assert 'create_pdf' in intent_sug.sparql_query
+    assert intent_sug.action
+
+
+def test_suggest_skill_removed(tmp_path):
+    """A removed skill should produce a skill-removed migration suggestion."""
+    old_f = tmp_path / 'old.ttl'
+    new_f = tmp_path / 'new.ttl'
+    old_f.write_text(OLD_TTL)
+    new_f.write_text("@prefix oc: <https://ontoclaw.marea.software/ontology#> .\n")
+
+    report = compute_diff(str(old_f), str(new_f))
+    suggestions = report.suggestions()
+
+    assert any(s.category == 'skill-removed' for s in suggestions)
+    skill_sug = next(s for s in suggestions if s.category == 'skill-removed')
+    assert 'CreatePDF' in skill_sug.summary
+    assert 'dependsOn' in skill_sug.sparql_query
+
+
+def test_suggest_requirement_added(tmp_path):
+    """A new requirement should produce a requirement-added migration suggestion."""
+    old_f = tmp_path / 'old.ttl'
+    new_f = tmp_path / 'new.ttl'
+    old_f.write_text(OLD_TTL)
+    new_f.write_text("""
+@prefix oc: <https://ontoclaw.marea.software/ontology#> .
+oc:CreatePDF a oc:Skill ;
+    oc:resolvesIntent "create_pdf" ;
+    oc:requiresState oc:Idle ;
+    oc:requires oc:APIKeySet .
+""")
+
+    report = compute_diff(str(old_f), str(new_f))
+    suggestions = report.suggestions()
+
+    assert any(s.category == 'requirement-added' for s in suggestions)
+    req_sug = next(s for s in suggestions if s.category == 'requirement-added')
+    assert 'APIKeySet' in req_sug.summary
+    assert 'APIKeySet' in req_sug.sparql_query
+
+
+def test_clean_diff_has_no_suggestions(tmp_path):
+    """A clean diff (no changes) should produce no migration suggestions."""
+    f = tmp_path / 'skill.ttl'
+    f.write_text(OLD_TTL)
+
+    report = compute_diff(str(f), str(f))
+    assert report.suggestions() == []
