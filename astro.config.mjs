@@ -7,8 +7,24 @@ export default defineConfig({
     starlight({
       title: 'OntoClaw',
       description: 'Neuro-symbolic skill compiler for the Agentic Web',
+      logo: {
+        src: './src/assets/ontoclaw-logo.png',
+        replacesTitle: true,
+      },
+      favicon: '/ontoclaw-logo.png',
       disable404Route: true,
       customCss: ['./src/styles/starlight.css'],
+      head: [
+        {
+          tag: 'script',
+          attrs: { src: 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js' }
+        },
+        {
+          tag: 'script',
+          attrs: { type: 'module' },
+          content: `mermaid.initialize({ startOnLoad: true, theme: 'dark' });`
+        },
+      ],
       sidebar: [
         { label: 'Overview', slug: 'overview' },
         { label: 'Getting Started', slug: 'getting-started' },
