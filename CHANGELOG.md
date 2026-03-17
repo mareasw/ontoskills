@@ -4,6 +4,53 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0] - 2026-03-17
+
+### Added
+
+#### Skill Drift Detector (`ontoclaw diff`)
+
+Semantic diffing system that compares two versions of the compiled ontology
+and classifies every change by its impact on agents querying the graph.
+
+- **core/snapshot.py** — Snapshot manager
+  - `save_snapshot(ttl_path)`: saves a timestamped, SHA-256-hashed copy of
+    `index.ttl` into `.ontoclaw/snapshots/` after every successful compile
+  - `get_latest_snapshot()`: returns the second-to-last snapshot (baseline
+    for the next diff)
+  - `_prune_snapshots(keep=10)`: keeps only the 10 most recent snapshots
+
+- **core/differ.py** — Semantic diff engine
+  - `SkillChange` dataclass: `skill_id`, `change_type` (breaking / additive /
+    cosmetic), `category`, `description`, `old_value`, `new_value`
+  - `DriftReport` dataclass: aggregates changes with `has_breaking` and
+    `is_clean` properties
+  - `compute_diff(old_ttl, new_ttl)`: loads two RDF graphs and diffs them
+    across four semantic axes — intents, requiresState/yieldsState, oc:requires,
+    and skill presence
+  - Removed intent → breaking; added intent → additive
+  - Added oc:requires → breaking; removed oc:requires → additive
+  - Removed skill entirely → breaking; new skill → additive
+
+- **core/drift_report.py** — Report formatter
+  - `print_report()`: Rich-formatted terminal output with colour-coded panels
+    and summary table
+  - `export_json()`: serialises `DriftReport` to JSON for CI/CD pipelines
+
+- **core/cli.py** — `diff` command and compile hook
+  - New `diff` command with options: `--from`, `--to`, `--breaking-only`,
+    `--format` (rich/json/md), `--output`
+  - Exit code 9 on breaking changes (pipeline gate)
+  - `save_snapshot()` hook added to `compile`: every successful compile
+    automatically creates a snapshot
+
+- **core/exceptions.py** — `DriftDetectedError(SkillETLError)`, exit code 9
+
+- **core/tests/test_differ.py** — 5 unit tests for the differ module
+- **core/tests/test_cli.py** — 6 CLI tests for the `diff` command
+
+---
+
 ## [0.3.0] - 2026-03-17
 
 ### Changed
