@@ -328,6 +328,8 @@ fn handle_tool_call(catalog: &Catalog, params: Value) -> Result<Value, String> {
         _ => return Err(format!("Unknown tool: {tool_name}")),
     };
 
+    let structured_content = normalize_structured_content(structured.clone());
+
     Ok(json!({
         "content": [
             {
@@ -335,9 +337,16 @@ fn handle_tool_call(catalog: &Catalog, params: Value) -> Result<Value, String> {
                 "text": serde_json::to_string_pretty(&structured).unwrap_or_else(|_| structured.to_string())
             }
         ],
-        "structuredContent": structured,
+        "structuredContent": structured_content,
         "isError": false
     }))
+}
+
+fn normalize_structured_content(value: Value) -> Value {
+    match value {
+        Value::Object(_) => value,
+        other => json!({ "result": other }),
+    }
 }
 
 fn required_string<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
