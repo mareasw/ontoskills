@@ -35,7 +35,7 @@ For 100 skills: **~500KB text scan → ~1KB query**
 
 ## How It Works
 
-<img src="/architecture.svg" alt="OntoCore Architecture" style="max-height: 500px; width: auto !important; max-width: 100%; display: block; margin: 0 auto;" />
+<img src="/architecture.webp" alt="OntoCore Architecture" style="max-height: 500px; width: auto; max-width: 100%; display: block; margin: 0 auto;" />
 
 ## Key Capabilities
 
