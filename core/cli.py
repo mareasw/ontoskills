@@ -31,6 +31,9 @@ from compiler.exceptions import (
     SPARQLError,
     SkillNotFoundError,
 )
+from compiler.differ import compute_diff
+from compiler.drift_report import print_report, export_json
+from compiler.snapshot import save_snapshot, get_latest_snapshot
 from compiler.config import SKILLS_DIR, OUTPUT_DIR
 
 # Configure logging
@@ -231,6 +234,11 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
 
     console.print(f"\n[green]Compiled {len(compiled_skills)} skill(s) to {output_path}[/green]")
 
+    index_ttl = output_path / "index.ttl"
+    if index_ttl.exists():
+        snap = save_snapshot(index_ttl)
+        console.print(f"[dim]Snapshot saved to {snap}[/dim]")
+
 
 @cli.command('init-core')
 @click.option('-o', '--output', 'output_dir', default=OUTPUT_DIR,
@@ -379,6 +387,48 @@ def security_audit(ctx, input_dir, verbose, quiet):
             issues_found += 1
 
     console.print(f"\n[bold]Audit complete:[/bold] {issues_found} issue(s) found")
+
+
+@cli.command('diff')
+@click.option('--skill', default=None, help='Analyse only this specific skill')
+@click.option('--from', 'from_path', default=None, help='Previous .ttl snapshot path')
+@click.option('--to', 'to_path', default=None, help='Current .ttl ontology path')
+@click.option('--breaking-only', is_flag=True, help='Show only breaking changes (exit code 9 if found)')
+@click.option(
+    '--format', 'fmt',
+    default='rich',
+    type=click.Choice(['rich', 'json', 'md']),
+    help='Output format',
+)
+@click.option('--output', default=None, help='Output file path for JSON/MD format')
+def diff_cmd(skill, from_path, to_path, breaking_only, fmt, output):
+    """Detect semantic drift between ontology versions.
+
+    Compares the current ontology against a previous snapshot and reports
+    changes classified by impact: breaking, additive, or cosmetic.
+
+    Exit code 9 if breaking changes are detected (useful for CI/CD pipelines).
+    """
+    if not to_path:
+        to_path = './ontoskills/index.ttl'
+    if not from_path:
+        snap = get_latest_snapshot()
+        if not snap:
+            raise click.ClickException(
+                'No snapshot found. Run compile first to create a snapshot.'
+            )
+        from_path = str(snap)
+
+    report = compute_diff(from_path, to_path)
+
+    if fmt == 'json':
+        out = output or 'drift-report.json'
+        export_json(report, out)
+    else:
+        print_report(report, breaking_only=breaking_only)
+
+    if report.has_breaking:
+        raise SystemExit(9)
 
 
 def main():
