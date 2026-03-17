@@ -144,6 +144,7 @@ ENV/
 env.bak/
 venv.bak/
 skills/
+.DS_Store
 
 # Spyder project settings
 .spyderproject
@@ -210,3 +211,4 @@ __marimo__/
 # Development workflow artifacts (GSD/superpowers)
 .planning/
 docs/superpowers/
+ontoskills/

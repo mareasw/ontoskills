@@ -18,9 +18,12 @@ from typing import Optional
 import anthropic
 from anthropic import Anthropic
 
+from compiler.env import load_local_env
 from compiler.exceptions import SecurityError
 
 logger = logging.getLogger(__name__)
+
+load_local_env()
 
 # Security model for LLM-as-judge
 SECURITY_MODEL = os.getenv("SECURITY_MODEL", "claude-opus-4-6")

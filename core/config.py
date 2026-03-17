@@ -6,6 +6,11 @@ Environment variables allow enterprise deployment with custom namespaces and pat
 import os
 from pathlib import Path
 
+from compiler.env import load_local_env
+
+
+load_local_env()
+
 
 # Project root (parent of core/ directory where this file lives)
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
