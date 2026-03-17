@@ -248,6 +248,33 @@ oc:TestSkill a oc:Skill ;
     assert 'additive' in data
 
 
+def test_diff_suggest_shows_migration_guidance(tmp_path):
+    """--suggest should print migration guidance when breaking changes exist."""
+    from cli import cli
+    runner = CliRunner()
+
+    old_ttl = tmp_path / 'old.ttl'
+    new_ttl = tmp_path / 'new.ttl'
+    old_ttl.write_text("""
+@prefix oc: <https://ontoclaw.marea.software/ontology#> .
+oc:SkillA a oc:Skill ; oc:resolvesIntent "old_intent" .
+""")
+    new_ttl.write_text("""
+@prefix oc: <https://ontoclaw.marea.software/ontology#> .
+oc:SkillA a oc:Skill ; oc:resolvesIntent "new_intent" .
+""")
+
+    result = runner.invoke(cli, [
+        'diff',
+        '--from', str(old_ttl),
+        '--to', str(new_ttl),
+        '--suggest',
+    ])
+
+    assert result.exit_code == 9
+    assert 'migration' in result.output.lower() or 'action' in result.output.lower()
+
+
 def test_force_flag_accepted():
     """Test that --force flag appears in compile --help output."""
     from cli import cli
