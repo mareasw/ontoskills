@@ -76,7 +76,7 @@ def test_load_core_ontology_returns_none_if_missing():
 def test_valid_executable_skill_passes():
     """A skill with all required fields and valid payload should pass."""
     from compiler.schemas import ExtractedSkill, ExecutionPayload, Requirement
-    from compiler.loader import serialize_skill
+    from compiler.serialization import serialize_skill
     from compiler.validator import validate_skill_graph
 
     skill = ExtractedSkill(
@@ -99,7 +99,7 @@ def test_valid_executable_skill_passes():
 def test_skill_missing_intent_fails():
     """A skill without resolvesIntent should fail validation."""
     from compiler.schemas import ExtractedSkill, Requirement
-    from compiler.loader import serialize_skill
+    from compiler.serialization import serialize_skill
     from compiler.validator import validate_skill_graph
 
     skill = ExtractedSkill(
@@ -122,7 +122,7 @@ def test_skill_missing_intent_fails():
 def test_skill_without_payload_is_declarative():
     """A skill without execution_payload becomes DeclarativeSkill and passes."""
     from compiler.schemas import ExtractedSkill, Requirement
-    from compiler.loader import serialize_skill
+    from compiler.serialization import serialize_skill
     from compiler.validator import validate_skill_graph
 
     skill = ExtractedSkill(
@@ -146,7 +146,8 @@ def test_skill_without_payload_is_declarative():
 def test_literal_as_state_fails():
     """A skill with a literal string (not URI) as state should fail."""
     from compiler.schemas import ExtractedSkill, Requirement, StateTransition, ExecutionPayload
-    from compiler.loader import serialize_skill, get_oc_namespace
+    from compiler.serialization import serialize_skill
+    from compiler.core_ontology import get_oc_namespace
     from compiler.validator import validate_skill_graph
 
     oc = get_oc_namespace()
@@ -177,7 +178,7 @@ def test_literal_as_state_fails():
 def test_skill_with_payload_is_executable():
     """A skill with execution_payload becomes ExecutableSkill and passes."""
     from compiler.schemas import ExtractedSkill, ExecutionPayload, Requirement
-    from compiler.loader import serialize_skill
+    from compiler.serialization import serialize_skill
     from compiler.validator import validate_skill_graph
 
     skill = ExtractedSkill(

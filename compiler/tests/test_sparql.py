@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 from rdflib import Graph, RDF, Literal
-from compiler.loader import create_core_ontology, get_oc_namespace
+from compiler.core_ontology import create_core_ontology, get_oc_namespace
 from compiler.sparql import execute_sparql, format_results
 
 

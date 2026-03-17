@@ -109,3 +109,98 @@ def test_security_audit_no_skills(tmp_path):
     ])
 
     assert "not found" in result.output.lower()
+
+
+def test_force_flag_accepted():
+    """Test that --force flag appears in compile --help output."""
+    from cli import cli
+    runner = CliRunner()
+    result = runner.invoke(cli, ['compile', '--help'])
+
+    assert result.exit_code == 0
+    assert '--force' in result.output or '-f' in result.output
+    # Check for the help text describing the force flag
+    assert 'force' in result.output.lower()
+
+
+def test_force_flag_bypasses_hash(tmp_path):
+    """Test that --force flag bypasses hash check and triggers recompilation."""
+    from unittest.mock import patch, MagicMock
+    from cli import cli
+    from compiler.extractor import compute_skill_hash
+    from compiler.config import BASE_URI
+
+    # Create a skill directory with SKILL.md
+    skill_dir = tmp_path / "skills" / "test-skill"
+    skill_dir.mkdir(parents=True)
+    skill_file = skill_dir / "SKILL.md"
+    skill_file.write_text("# Test Skill\n\nThis is a test skill.", encoding="utf-8")
+
+    # Create output directory with an existing skill.ttl that has matching hash
+    output_dir = tmp_path / "output"
+    output_skill_dir = output_dir / "test-skill"
+    output_skill_dir.mkdir(parents=True)
+    output_skill_path = output_skill_dir / "skill.ttl"
+
+    # Create a fake existing skill with the same hash
+    # Use the correct namespace from config
+    skill_hash = compute_skill_hash(skill_dir)
+    existing_ttl = f'''
+@prefix oc: <{BASE_URI}> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix skill: <{BASE_URI}skills/test-skill#> .
+
+skill:test-skill a oc:Skill ;
+    dcterms:identifier "test-skill" ;
+    oc:contentHash "{skill_hash}" ;
+    oc:nature "Existing skill" .
+'''
+    output_skill_path.write_text(existing_ttl, encoding="utf-8")
+
+    # Create core ontology
+    core_path = output_dir / "ontoclaw-core.ttl"
+    core_path.parent.mkdir(parents=True, exist_ok=True)
+    core_path.write_text(f"@prefix oc: <{BASE_URI}> .", encoding="utf-8")
+
+    runner = CliRunner()
+
+    # Create mock for extracted skill
+    mock_extracted = MagicMock()
+    mock_extracted.id = "test-skill"
+    mock_extracted.nature = "Extracted skill"
+    mock_extracted.genus = "action"
+    mock_extracted.intents = ["test"]
+    mock_extracted.state_transitions.requires_state = []
+    mock_extracted.state_transitions.yields_state = []
+
+    with patch('cli.tool_use_loop') as mock_tool_use_loop, \
+         patch('cli.serialize_skill_to_module'):
+        mock_tool_use_loop.return_value = mock_extracted
+
+        # Without --force, the hash matches and tool_use_loop should NOT be called
+        result_no_force = runner.invoke(cli, [
+            'compile',
+            '-i', str(tmp_path / "skills"),
+            '-o', str(output_dir),
+            '-y'  # Skip confirmation
+        ])
+
+        assert result_no_force.exit_code == 0
+        # tool_use_loop should NOT have been called since hash matches
+        assert mock_tool_use_loop.call_count == 0
+
+        # Reset the mock
+        mock_tool_use_loop.reset_mock()
+
+        # With --force, tool_use_loop SHOULD be called even though hash matches
+        result_with_force = runner.invoke(cli, [
+            'compile',
+            '-i', str(tmp_path / "skills"),
+            '-o', str(output_dir),
+            '--force',
+            '-y'  # Skip confirmation
+        ])
+
+        assert result_with_force.exit_code == 0
+        # tool_use_loop SHOULD have been called with --force
+        assert mock_tool_use_loop.call_count == 1
