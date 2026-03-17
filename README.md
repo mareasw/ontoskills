@@ -41,42 +41,17 @@
 OntoClaw is a **complete neuro-symbolic platform** for building deterministic, enterprise-grade AI agents. It consists of four layered components:
 
 ```mermaid
-flowchart TB
-    subgraph ONTOCLAW["OntoClaw — Enterprise AI Agent"]
-        TAG1["Deterministic • Fast • Reliable • Production-Ready"]
-    end
+flowchart LR
+    A["OntoClaw<br/>Enterprise Agent"] --> B["OntoStore<br/>Registry"]
+    B --> C["OntoMCP<br/>Rust Server"]
+    C --> D["OntoSkills<br/>OWL 2"]
+    D --> E["OntoCore<br/>Compiler"]
 
-    subgraph ONTOSTORE["OntoStore — Skill Registry"]
-        TAG2["🚧 Planned — Versioned skill distribution"]
-    end
-
-    subgraph ONTOMCP["OntoMCP — Rust MCP Server"]
-        TAG3["🚧 Planned — Blazing-fast SPARQL via MCP"]
-    end
-
-    subgraph ONTOSKILLS["OntoSkills — Compiled OWL 2 Ontologies"]
-        TAG4["✅ Ready — Self-contained, modular, pluggable"]
-    end
-
-    subgraph ONTOCORE["OntoCore — Python Compiler"]
-        TAG5["✅ Ready — SKILL.md → validated OWL 2 TTL"]
-    end
-
-    ONTOCLAW --> ONTOSTORE
-    ONTOSTORE --> ONTOMCP
-    ONTOMCP --> ONTOSKILLS
-    ONTOSKILLS --> ONTOCORE
-
-    style ONTOCLAW fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
-    style ONTOSTORE fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
-    style ONTOMCP fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
-    style ONTOSKILLS fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
-    style ONTOCORE fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
-    style TAG1 fill:#6dc9ee,stroke:none,color:#0d0d14
-    style TAG2 fill:#9763e1,stroke:none,color:#f0f0f5
-    style TAG3 fill:#92eff4,stroke:none,color:#0d0d14
-    style TAG4 fill:#abf9cc,stroke:none,color:#0d0d14
-    style TAG5 fill:#e91e63,stroke:none,color:#f0f0f5
+    style A fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style B fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
+    style C fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
+    style D fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
+    style E fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
 ```
 
 ---
@@ -91,31 +66,13 @@ OntoCore separates the skill lifecycle into two distinct phases:
 
 ```mermaid
 flowchart LR
-    subgraph DESIGN["🎨 Design Time"]
-        MD["SKILL.md<br/>(Human-authored)"]
-        CORE["OntoCore<br/>(Python)"]
-        TTL["ontoskill.ttl<br/>(Self-contained)"]
-        MD -->|"LLM extraction<br/>+ SHACL"| CORE
-        CORE --> TTL
-    end
+    MD["SKILL.md"] --> CORE["OntoCore"] --> TTL["ontoskill.ttl"]
+    TTL -.-> MCP["OntoMCP"] <--> AGENT["Agent"]
 
-    subgraph RUNTIME["🚀 Runtime"]
-        MCP["OntoMCP (Rust)"]
-        GRAPH["In-memory<br/>RDF Graph"]
-        AGENT["LLM Agent"]
-        MCP <--> AGENT
-        MCP --> GRAPH
-    end
-
-    TTL -.->|"deployed"| MCP
-
-    style DESIGN fill:#1a1a2e,stroke:#2a2a3e,color:#f0f0f5
-    style RUNTIME fill:#16213e,stroke:#2a2a3e,color:#f0f0f5
     style MD fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
     style CORE fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
     style TTL fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
     style MCP fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
-    style GRAPH fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
     style AGENT fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
 ```
 
@@ -184,40 +141,16 @@ Every skill is extracted with:
 
 ```mermaid
 flowchart LR
-    subgraph DT["Design Time"]
-        MD["SKILL.md"]
-    end
-
-    subgraph OC["OntoCore Pipeline"]
-        LLM["Claude API"] --> PYD["Pydantic"]
-        PYD --> SEC["Security"]
-        SEC --> RDF["RDF Graph"]
-        RDF --> SHACL["SHACL"]
-    end
-
-    subgraph OS["OntoSkills"]
-        TTL["ontoskill.ttl"]
-    end
-
-    subgraph RT["Runtime"]
-        MCP["OntoMCP"] <--> AGENT["Agent"]
-    end
-
-    MD --> LLM
-    SHACL -->|"PASS"| TTL
+    MD["SKILL.md"] --> LLM["Claude"] --> PYD["Pydantic"] --> SEC["Security"] --> RDF["RDF"] --> SHACL["SHACL"]
+    SHACL -->|"PASS"| TTL["ontoskill.ttl"] --> MCP["OntoMCP"] <--> AGENT["Agent"]
     SHACL -->|"FAIL"| FAIL["❌ Block"]
-    TTL --> MCP
 
-    style DT fill:#1a1a2e,stroke:#2a2a3e,color:#f0f0f5
-    style OC fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
-    style OS fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
-    style RT fill:#16213e,stroke:#2a2a3e,color:#f0f0f5
     style MD fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
-    style LLM fill:#e91e63,stroke:none,color:#f0f0f5
-    style PYD fill:#e91e63,stroke:none,color:#f0f0f5
-    style SEC fill:#e91e63,stroke:none,color:#f0f0f5
-    style RDF fill:#e91e63,stroke:none,color:#f0f0f5
-    style SHACL fill:#e91e63,stroke:none,color:#f0f0f5
+    style LLM fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
+    style PYD fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
+    style SEC fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
+    style RDF fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
+    style SHACL fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
     style TTL fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
     style MCP fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
     style AGENT fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
@@ -415,54 +348,15 @@ ontoclaw/
 
 ```mermaid
 flowchart LR
-    subgraph IN["skills/ (Source)"]
-        S1["create-document/<br/>SKILL.md"]
-        S2["analyze-data/<br/>SKILL.md"]
-        S3["send-email/<br/>SKILL.md"]
-    end
+    IN["skills/<br/>SKILL.md"] --> E["extractor"] --> T["transformer"] --> SEC["security"] --> SR["serialization"] --> ST["storage"] --> OUT["ontoskills/<br/>ontoskill.ttl"]
 
-    subgraph CORE["OntoCore Pipeline"]
-        E["extractor.py"] --> T["transformer.py"]
-        T --> SEC["security.py"]
-        SEC --> CO["core_ontology.py"]
-        CO --> SR["serialization.py"]
-        SR --> ST["storage.py"]
-    end
-
-    subgraph OUT["ontoskills/ (Artifacts)"]
-        CORE_TTL["ontoclaw-core.ttl"]
-        IDX["index.ttl"]
-        O1["create-document/<br/>ontoskill.ttl"]
-        O2["analyze-data/<br/>ontoskill.ttl"]
-        O3["send-email/<br/>ontoskill.ttl"]
-    end
-
-    S1 --> E
-    S2 --> E
-    S3 --> E
-    ST --> CORE_TTL
-    ST --> IDX
-    ST --> O1
-    ST --> O2
-    ST --> O3
-
-    style IN fill:#1a1a2e,stroke:#2a2a3e,color:#f0f0f5
-    style CORE fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
-    style OUT fill:#16213e,stroke:#2a2a3e,color:#f0f0f5
-    style S1 fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
-    style S2 fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
-    style S3 fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
-    style E fill:#e91e63,stroke:none,color:#f0f0f5
-    style T fill:#e91e63,stroke:none,color:#f0f0f5
-    style SEC fill:#e91e63,stroke:none,color:#f0f0f5
-    style CO fill:#9763e1,stroke:none,color:#f0f0f5
-    style SR fill:#e91e63,stroke:none,color:#f0f0f5
-    style ST fill:#abf9cc,stroke:none,color:#0d0d14
-    style CORE_TTL fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
-    style IDX fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
-    style O1 fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
-    style O2 fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
-    style O3 fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
+    style IN fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style E fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
+    style T fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
+    style SEC fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
+    style SR fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
+    style ST fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
+    style OUT fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
 ```
 
 **Any skill directory works** - just add a `SKILL.md` file and OntoCore will compile it to a validated OWL 2 ontology module.
@@ -508,30 +402,12 @@ Skills are extracted following the **Knowledge Architecture** framework:
 
 ```mermaid
 flowchart LR
-    subgraph PROPS["OWL 2 Properties"]
-        A["dependsOn<br/>Asymmetric"]
-        B["extends<br/>Transitive"]
-        C["contradicts<br/>Symmetric"]
-        D["implements"]
-        E["exemplifies"]
-    end
+    A["dependsOn<br/>Asymmetric"] --> UC1["Dependencies"]
+    B["extends<br/>Transitive"] --> UC2["Inheritance"]
+    C["contradicts<br/>Symmetric"] --> UC3["Conflicts"]
+    D["implements"] --> UC4["Interfaces"]
+    E["exemplifies"] --> UC5["Patterns"]
 
-    subgraph USE["Use Cases"]
-        UC1["Dependencies"]
-        UC2["Inheritance"]
-        UC3["Conflicts"]
-        UC4["Interfaces"]
-        UC5["Patterns"]
-    end
-
-    A --> UC1
-    B --> UC2
-    C --> UC3
-    D --> UC4
-    E --> UC5
-
-    style PROPS fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
-    style USE fill:#1a1a2e,stroke:#2a2a3e,color:#f0f0f5
     style A fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
     style B fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
     style C fill:#ff6b6b,stroke:#2a2a3e,color:#f0f0f5
