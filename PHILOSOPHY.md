@@ -6,7 +6,10 @@ OntoClaw is not just a compiler — it's a **complete neuro-symbolic platform** 
 
 ```mermaid
 flowchart LR
-    A["OntoClaw<br/>Enterprise Agent"] --> B["OntoStore<br/>Registry"] --> C["OntoMCP<br/>Rust Server"] --> D["OntoSkills<br/>OWL 2"] --> E["OntoCore<br/>Compiler"]
+    A["OntoClaw<br/>Enterprise Agent<br/>━━━━━━━━━━<br/>Deterministic reasoning<br/>via SPARQL queries"] --> B["OntoStore<br/>Registry<br/>━━━━━━━━━━<br/>Versioned skill<br/>distribution"]
+    B --> C["OntoMCP<br/>Rust Server<br/>━━━━━━━━━━<br/>Blazing-fast<br/>in-memory graph"]
+    C --> D["OntoSkills<br/>OWL 2<br/>━━━━━━━━━━<br/>Compiled .ttl<br/>ontologies"]
+    D --> E["OntoCore<br/>Compiler<br/>━━━━━━━━━━<br/>SKILL.md → TTL<br/>+ SHACL validation"]
 
     style A fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
     style B fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
@@ -36,7 +39,7 @@ OntoCore implements a **compile-time paradigm** for skills, separating human aut
 
 ```mermaid
 flowchart LR
-    MD["Human writes<br/>SKILL.md"] -.-> NOTE["Markdown = syntactic sugar<br/>for OWL"]
+    MD["Human writes<br/>SKILL.md<br/>━━━━━━━━━━<br/>Developer-friendly<br/>natural language"] -.->|"compiles to"| NOTE["Markdown = syntactic sugar<br/>for OWL 2<br/>━━━━━━━━━━<br/>RDF/Turtle output"]
 
     style MD fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
     style NOTE fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
@@ -54,7 +57,8 @@ OntoCore extracts **everything** into the TTL:
 
 ```mermaid
 flowchart LR
-    AGENT["LLM Agent"] <--> MCP["OntoMCP<br/>(Rust)"] --> TTL[".ttl files<br/>(In-memory Graph)"]
+    AGENT["LLM Agent<br/>━━━━━━━━━━<br/>Queries skills<br/>via SPARQL"] <-->|"SELECT ?skill"| MCP["OntoMCP (Rust)<br/>━━━━━━━━━━<br/>In-memory graph<br/>blazing-fast"]
+    MCP -->|"loads"| TTL[".ttl files<br/>━━━━━━━━━━<br/>Self-contained<br/>modular ontologies"]
 
     style AGENT fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
     style MCP fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
@@ -123,8 +127,8 @@ OntoClaw is **neuro-symbolic**: it combines neural and symbolic AI paradigms.
 
 ```mermaid
 flowchart LR
-    NEURAL["Neural Layer<br/>LLM Extraction<br/>(probabilistic)"] --> SYMBOLIC["Symbolic Layer<br/>OWL 2 Ontology<br/>(deterministic)"]
-    SYMBOLIC --> QUERY["Query Layer<br/>SPARQL Engine<br/>(precise)"]
+    NEURAL["Neural Layer<br/>━━━━━━━━━━<br/>LLM Extraction<br/>Claude extracts<br/>structured knowledge<br/>(probabilistic)"] -->|"Pydantic"| SYMBOLIC["Symbolic Layer<br/>━━━━━━━━━━<br/>OWL 2 Ontology<br/>Formal semantics<br/>decidable reasoning<br/>(deterministic)"]
+    SYMBOLIC -->|"serialize"| QUERY["Query Layer<br/>━━━━━━━━━━<br/>SPARQL Engine<br/>O(1) indexed lookup<br/>precise retrieval<br/>(deterministic)"]
 
     style NEURAL fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
     style SYMBOLIC fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
@@ -160,7 +164,7 @@ OntoClaw exposes the **TBox** (terminological box) — the schema of classes and
 
 ```mermaid
 flowchart LR
-    TBOX["TBox (Schema)<br/>What properties does<br/>oc:Skill have?"] --> ABOX["ABox (Instances)<br/>Which skills resolve<br/>'create_pdf'?"]
+    TBOX["TBox (Schema)<br/>━━━━━━━━━━<br/>What properties does<br/>oc:Skill have?<br/>→ oc:resolvesIntent<br/>→ oc:dependsOn<br/>→ oc:extends"] -->|"informs"| ABOX["ABox (Instances)<br/>━━━━━━━━━━<br/>Which skills resolve<br/>'create_pdf'?<br/>→ oc:pdf-generation<br/>→ oc:docx-to-pdf"]
 
     style TBOX fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
     style ABOX fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14

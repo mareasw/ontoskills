@@ -42,10 +42,10 @@ OntoClaw is a **complete neuro-symbolic platform** for building deterministic, e
 
 ```mermaid
 flowchart LR
-    A["OntoClaw<br/>Enterprise Agent"] --> B["OntoStore<br/>Registry"]
-    B --> C["OntoMCP<br/>Rust Server"]
-    C --> D["OntoSkills<br/>OWL 2"]
-    D --> E["OntoCore<br/>Compiler"]
+    A["OntoClaw<br/>Enterprise Agent<br/>━━━━━━━━━━━━<br/>Deterministic reasoning<br/>via SPARQL queries"] --> B["OntoStore<br/>Registry<br/>━━━━━━━━━━━━<br/>Versioned skill<br/>distribution"]
+    B --> C["OntoMCP<br/>Rust Server<br/>━━━━━━━━━━━━<br/>Blazing-fast<br/>in-memory graph"]
+    C --> D["OntoSkills<br/>OWL 2<br/>━━━━━━━━━━━━<br/>Compiled .ttl<br/>ontologies"]
+    D --> E["OntoCore<br/>Compiler<br/>━━━━━━━━━━━━<br/>SKILL.md → TTL<br/>+ SHACL validation"]
 
     style A fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
     style B fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
@@ -66,8 +66,8 @@ OntoCore separates the skill lifecycle into two distinct phases:
 
 ```mermaid
 flowchart LR
-    MD["SKILL.md"] --> CORE["OntoCore"] --> TTL["ontoskill.ttl"]
-    TTL -.-> MCP["OntoMCP"] <--> AGENT["Agent"]
+    MD["SKILL.md<br/>━━━━━━━━━━<br/>Human-authored<br/>source code"] -->|"LLM extraction"| CORE["OntoCore<br/>━━━━━━━━━━<br/>Compile + validate"] -->|"SHACL pass"| TTL["ontoskill.ttl<br/>━━━━━━━━━━<br/>Executable artifact"]
+    TTL -.->|"load"| MCP["OntoMCP<br/>━━━━━━━━━━<br/>Rust SPARQL"] <-->|"query"| AGENT["Agent<br/>━━━━━━━━━━<br/>Deterministic"]
 
     style MD fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
     style CORE fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
@@ -175,11 +175,11 @@ Every skill must pass SHACL validation before being written to disk. The constit
 
 ```mermaid
 flowchart LR
-    SKILL["oc:Skill"] --> EXE["oc:ExecutableSkill"]
-    SKILL --> DEC["oc:DeclarativeSkill"]
+    SKILL["oc:Skill<br/>━━━━━━━━━━<br/>Base class"] --> EXE["oc:ExecutableSkill<br/>━━━━━━━━━━<br/>Has code to run"]
+    SKILL --> DEC["oc:DeclarativeSkill<br/>━━━━━━━━━━<br/>Knowledge only"]
 
-    EXE --> PAYLOAD["hasPayload<br/>exactly 1"]
-    DEC --> NOPAYLOAD["hasPayload<br/>forbidden"]
+    EXE --> PAYLOAD["hasPayload exactly 1<br/>━━━━━━━━━━<br/>oc:code OR oc:executionPath"]
+    DEC --> NOPAYLOAD["hasPayload forbidden<br/>━━━━━━━━━━<br/>owl:disjointWith"]
 
     style SKILL fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
     style EXE fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
@@ -320,7 +320,12 @@ ontoclaw/
 
 ```mermaid
 flowchart LR
-    IN["skills/<br/>SKILL.md"] --> E["extractor"] --> T["transformer"] --> SEC["security"] --> SR["serialization"] --> ST["storage"] --> OUT["ontoskills/<br/>ontoskill.ttl"]
+    IN["skills/SKILL.md<br/>━━━━━━━━━━<br/>Source input"] -->|"generate ID/hash"| E["extractor<br/>━━━━━━━━━━<br/>ID + SHA-256"]
+    E -->|"skill_dir"| T["transformer<br/>━━━━━━━━━━<br/>LLM tool-use"]
+    T -->|"ExtractedSkill"| SEC["security<br/>━━━━━━━━━━<br/>Regex + LLM"]
+    SEC -->|"if safe"| SR["serialization<br/>━━━━━━━━━━<br/>Pydantic → RDF"]
+    SR -->|"validate"| ST["storage<br/>━━━━━━━━━━<br/>Write + merge"]
+    ST --> OUT["ontoskills/<br/>ontoskill.ttl"]
 
     style IN fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
     style E fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
@@ -374,11 +379,11 @@ Skills are extracted following the **Knowledge Architecture** framework:
 
 ```mermaid
 flowchart LR
-    A["dependsOn<br/>Asymmetric"] --> UC1["Dependencies"]
-    B["extends<br/>Transitive"] --> UC2["Inheritance"]
-    C["contradicts<br/>Symmetric"] --> UC3["Conflicts"]
-    D["implements"] --> UC4["Interfaces"]
-    E["exemplifies"] --> UC5["Patterns"]
+    A["dependsOn<br/>━━━━━━━━━━<br/>AsymmetricProperty<br/>A needs B"] --> UC1["Prerequisites<br/>━━━━━━━━━━<br/>Install before run"]
+    B["extends<br/>━━━━━━━━━━<br/>TransitiveProperty<br/>A → B → C"] --> UC2["Inheritance<br/>━━━━━━━━━━<br/>Override behavior"]
+    C["contradicts<br/>━━━━━━━━━━<br/>SymmetricProperty<br/>A ↔ B"] --> UC3["Conflicts<br/>━━━━━━━━━━<br/>Mutually exclusive"]
+    D["implements<br/>━━━━━━━━━━<br/>Interface<br/>compliance"] --> UC4["Contracts<br/>━━━━━━━━━━<br/>Guaranteed API"]
+    E["exemplifies<br/>━━━━━━━━━━<br/>Pattern<br/>demonstration"] --> UC5["Examples<br/>━━━━━━━━━━<br/>Best practices"]
 
     style A fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
     style B fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
