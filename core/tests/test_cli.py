@@ -3,12 +3,13 @@ from click.testing import CliRunner
 
 
 def test_cli_version():
-    """Test CLI version command."""
-    from cli import cli
+    """Test CLI version command - reads from pyproject.toml."""
+    from cli import cli, __version__
     runner = CliRunner()
     result = runner.invoke(cli, ['--version'])
     assert result.exit_code == 0
-    assert "0.4.0" in result.output
+    # Version should match what's in pyproject.toml
+    assert __version__ in result.output
 
 
 def test_cli_help():

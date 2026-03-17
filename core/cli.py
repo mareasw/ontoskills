@@ -33,6 +33,13 @@ from compiler.exceptions import (
 )
 from compiler.config import SKILLS_DIR, OUTPUT_DIR
 
+# Get version from pyproject.toml (single source of truth)
+try:
+    from importlib.metadata import version
+    __version__ = version("ontocore")
+except Exception:
+    __version__ = "0.5.0"  # Fallback during development
+
 # Configure logging
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 LOG_DATE_FORMAT = "%H:%M:%S"
@@ -57,7 +64,7 @@ def setup_logging(verbose: bool, quiet: bool):
 
 
 @click.group()
-@click.version_option(version="0.4.0", prog_name="ontoclaw-compiler")
+@click.version_option(version=__version__, prog_name="ontocore")
 @click.option('-v', '--verbose', is_flag=True, help='Enable debug logging')
 @click.option('-q', '--quiet', is_flag=True, help='Suppress progress output')
 @click.pass_context
