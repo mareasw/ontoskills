@@ -35,6 +35,7 @@ from compiler.differ import compute_diff
 from compiler.drift_report import print_report, export_json
 from compiler.snapshot import save_snapshot, get_latest_snapshot
 from compiler.linter import lint_ontology, LintIssue
+from compiler.graph_export import build_graph
 from compiler.config import SKILLS_DIR, OUTPUT_DIR
 
 # Configure logging
@@ -466,6 +467,49 @@ def lint_cmd(ctx, ontology_file, fmt, errors_only):
 
     if result.has_errors:
         raise SystemExit(1)
+
+
+@cli.command('graph')
+@click.option(
+    '-o', '--ontology', 'ontology_file',
+    default=OUTPUT_DIR + '/index.ttl',
+    type=click.Path(exists=False),
+    help='Ontology file to visualise (default: ./ontoskills/index.ttl)',
+)
+@click.option(
+    '--format', 'fmt',
+    default='mermaid',
+    type=click.Choice(['mermaid', 'dot']),
+    help='Output format (default: mermaid)',
+)
+@click.option('--skill', default=None, help='Show only this skill and its direct neighbours')
+@click.option('--output', default=None, help='Write output to file instead of stdout')
+@click.pass_context
+def graph_cmd(ctx, ontology_file, fmt, skill, output):
+    """Visualise the skill dependency graph.
+
+    Exports oc:dependsOn, oc:extends, and oc:contradicts relationships as a
+    Mermaid flowchart or Graphviz DOT digraph.
+
+    \b
+    Examples:
+      ontoclaw graph                          # Mermaid to stdout
+      ontoclaw graph --format dot             # DOT to stdout
+      ontoclaw graph --skill create-pdf       # 1-hop subgraph
+      ontoclaw graph --output graph.mmd       # save to file
+    """
+    ontology_path = Path(ontology_file)
+    if not ontology_path.exists():
+        console.print(f"[red]Ontology not found: {ontology_path}[/red]")
+        raise SystemExit(1)
+
+    src = build_graph(ontology_path, fmt=fmt, skill_filter=skill)
+
+    if output:
+        Path(output).write_text(src)
+        console.print(f"[green]Graph saved to {output}[/green]")
+    else:
+        console.print(src)
 
 
 @cli.command('diff')
