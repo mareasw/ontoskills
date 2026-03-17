@@ -34,6 +34,7 @@ from compiler.exceptions import (
 from compiler.differ import compute_diff
 from compiler.drift_report import print_report, export_json
 from compiler.snapshot import save_snapshot, get_latest_snapshot
+from compiler.linter import lint_ontology, LintIssue
 from compiler.config import SKILLS_DIR, OUTPUT_DIR
 
 # Configure logging
@@ -387,6 +388,84 @@ def security_audit(ctx, input_dir, verbose, quiet):
             issues_found += 1
 
     console.print(f"\n[bold]Audit complete:[/bold] {issues_found} issue(s) found")
+
+
+@cli.command('lint')
+@click.option(
+    '-o', '--ontology', 'ontology_file',
+    default=OUTPUT_DIR + '/index.ttl',
+    type=click.Path(exists=False),
+    help='Ontology file to lint (default: ./ontoskills/index.ttl)',
+)
+@click.option(
+    '--format', 'fmt',
+    default='rich',
+    type=click.Choice(['rich', 'json']),
+    help='Output format',
+)
+@click.option('--errors-only', is_flag=True, help='Show only errors, suppress warnings and info')
+@click.pass_context
+def lint_cmd(ctx, ontology_file, fmt, errors_only):
+    """Run static analysis on the compiled ontology.
+
+    Checks for four categories of structural issues without calling the LLM:
+
+    \b
+    dead-state       A skill requiresState X but no skill yieldsState X
+    circular-dep     A dependsOn B dependsOn ... dependsOn A  [error]
+    duplicate-intent Two skills resolve the same intent string  [error]
+    orphan-skill     Skill has no dependents and unreachable required states
+    """
+    import json as json_mod
+
+    ontology_path = Path(ontology_file)
+    if not ontology_path.exists():
+        console.print(f"[red]Ontology not found: {ontology_path}[/red]")
+        raise SystemExit(1)
+
+    result = lint_ontology(ontology_path)
+
+    if errors_only:
+        result.issues = result.errors
+
+    if fmt == 'json':
+        data = [
+            {
+                'severity': i.severity,
+                'code': i.code,
+                'skill_id': i.skill_id,
+                'message': i.message,
+                'detail': i.detail,
+            }
+            for i in result.issues
+        ]
+        console.print(json_mod.dumps(data, indent=2))
+    else:
+        _ICONS = {'error': '🔴', 'warning': '⚠️ ', 'info': '🔵'}
+        if result.is_clean:
+            from rich.panel import Panel
+            from rich import box
+            console.print(Panel('[bold green]✓ No issues found — ontology is clean[/]', box=box.ROUNDED))
+        else:
+            from rich.table import Table
+            from rich import box
+            t = Table(title='Lint Results', box=box.SIMPLE_HEAVY)
+            t.add_column('Severity', width=10)
+            t.add_column('Code', width=18)
+            t.add_column('Skill', width=22)
+            t.add_column('Message')
+            for issue in result.issues:
+                icon = _ICONS.get(issue.severity, '⚪')
+                t.add_row(f'{icon} {issue.severity}', issue.code, issue.skill_id, issue.message)
+            console.print(t)
+            console.print(
+                f'\nSummary: [red]{len(result.errors)} error(s)[/] | '
+                f'[yellow]{len(result.warnings)} warning(s)[/] | '
+                f'[blue]{len([i for i in result.issues if i.severity == "info"])} info[/]'
+            )
+
+    if result.has_errors:
+        raise SystemExit(1)
 
 
 @cli.command('diff')
