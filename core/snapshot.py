@@ -1,5 +1,5 @@
 """
-Snapshot manager for OntoClaw Skill Drift Detector.
+Snapshot manager for OntoSkills Skill Drift Detector.
 
 Automatically saves a copy of the ontology after each successful compilation,
 maintaining a history of the last N snapshots to enable semantic diffing.
@@ -10,7 +10,7 @@ import hashlib
 from pathlib import Path
 from datetime import datetime
 
-SNAPSHOT_DIR = Path('.ontoclaw/snapshots')
+SNAPSHOT_DIR = Path('.ontoskills/snapshots')
 
 
 def save_snapshot(ttl_path: Path) -> Path:

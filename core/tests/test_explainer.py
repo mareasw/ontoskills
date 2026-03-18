@@ -1,9 +1,9 @@
-"""Tests for OntoClaw skill explainer."""
+"""Tests for OntoSkills skill explainer."""
 
 from compiler.explainer import explain_skill, list_skill_ids
 
 BASE = """
-@prefix oc:      <https://ontoclaw.marea.software/ontology#> .
+@prefix oc:      <https://ontoskills.sh/ontology#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 """
 

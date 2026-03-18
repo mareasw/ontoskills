@@ -411,14 +411,14 @@ def generate_index_manifest(
     # Ontology header
     base_uri = URIRef(BASE_URI.rstrip('#'))
     g.add((base_uri, RDF.type, OWL.Ontology))
-    g.add((base_uri, DCTERMS.title, Literal("OntoClaw Skill Index")))
+    g.add((base_uri, DCTERMS.title, Literal("OntoSkills Skill Index")))
     g.add((base_uri, DCTERMS.description, Literal(
         "Index manifest referencing all compiled skill modules"
     )))
     g.add((base_uri, DCTERMS.created, Literal(datetime.now().isoformat())))
 
     # Import core ontology
-    core_path = output_base / "ontoclaw-core.ttl"
+    core_path = output_base / "ontoskills-core.ttl"
     if core_path.exists():
         g.add((base_uri, OWL.imports, URIRef(f"file://{core_path}")))
 
@@ -440,7 +440,7 @@ def generate_index_manifest(
 # =============================================================================
 
 # System-generated files that should never be considered orphans
-SYSTEM_FILES = {"ontoclaw-core.ttl", "index.ttl"}
+SYSTEM_FILES = {"ontoskills-core.ttl", "index.ttl"}
 
 
 def clean_orphaned_files(

@@ -1,5 +1,5 @@
 """
-Static analysis linter for OntoClaw ontologies.
+Static analysis linter for OntoSkills ontologies.
 
 Analyses the compiled ontology (or a set of .ttl files) without calling the
 Anthropic API and reports structural issues:
@@ -22,7 +22,7 @@ from typing import Literal
 
 from rdflib import Graph, Namespace
 
-OC = Namespace("https://ontoclaw.marea.software/ontology#")
+OC = Namespace("https://ontoskills.sh/ontology#")
 
 Severity = Literal["error", "warning", "info"]
 

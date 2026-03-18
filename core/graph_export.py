@@ -1,5 +1,5 @@
 """
-State transition graph exporter for OntoClaw ontologies.
+State transition graph exporter for OntoSkills ontologies.
 
 Reads the compiled ontology and produces a visual representation of the
 skill state transition graph in Mermaid or DOT (Graphviz) format.
@@ -22,7 +22,7 @@ from pathlib import Path
 
 from rdflib import Graph, Namespace
 
-OC = Namespace("https://ontoclaw.marea.software/ontology#")
+OC = Namespace("https://ontoskills.sh/ontology#")
 
 
 def build_graph(
@@ -144,7 +144,7 @@ def _render_mermaid(nodes: set[str], edges: list[tuple[str, str, str]]) -> str:
 def _render_dot(nodes: set[str], edges: list[tuple[str, str, str]]) -> str:
     """Render as a Graphviz DOT digraph."""
     lines = [
-        "digraph OntoClaw {",
+        "digraph OntoSkills {",
         "  rankdir=TD;",
         '  node [shape=box, style=filled, fillcolor="#e8f4f8", fontname="Helvetica"];',
     ]

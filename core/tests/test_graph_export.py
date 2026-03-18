@@ -1,8 +1,8 @@
-"""Tests for OntoClaw state transition graph exporter."""
+"""Tests for OntoSkills state transition graph exporter."""
 
 from compiler.graph_export import build_graph
 
-BASE = "@prefix oc: <https://ontoclaw.marea.software/ontology#> .\n"
+BASE = "@prefix oc: <https://ontoskills.sh/ontology#> .\n"
 
 # State transition graph: SkillA yields Ready, SkillB requires Ready
 TTL = BASE + """
@@ -49,7 +49,7 @@ def test_mermaid_state_transition_arrow(tmp_path):
 def test_dot_format(tmp_path):
     """DOT output should start with 'digraph' and show state transitions."""
     out = build_graph(_write(tmp_path), fmt="dot")
-    assert out.startswith("digraph OntoClaw")
+    assert out.startswith("digraph OntoSkills")
     assert '"SkillA"' in out
     assert "Ready" in out
 

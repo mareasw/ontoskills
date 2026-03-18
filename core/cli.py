@@ -1,5 +1,5 @@
 """
-Ontoclaw Compiler CLI.
+OntoSkills Compiler CLI.
 
 Click-based command-line interface for compiling skills
 to modular OWL 2 RDF/Turtle ontology.
@@ -140,7 +140,7 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
 
     Output structure:
       ontoskills/
-      ├── ontoclaw-core.ttl
+      ├── ontoskills-core.ttl
       ├── index.ttl
       └── <mirrored paths>/
           ├── ontoskill.ttl
@@ -154,7 +154,7 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
     output_path = Path(output_dir)
 
     # Ensure core ontology exists
-    core_path = output_path / "ontoclaw-core.ttl"
+    core_path = output_path / "ontoskills-core.ttl"
     if not core_path.exists():
         logger.info("Creating core ontology...")
         create_core_ontology(core_path)
@@ -355,14 +355,14 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
 @click.option('-f', '--force', is_flag=True, help='Overwrite existing core ontology')
 @click.pass_context
 def init_core(ctx, output_dir, force):
-    """Initialize the core ontology (ontoclaw-core.ttl).
+    """Initialize the core ontology (ontoskills-core.ttl).
 
     Creates the foundational TBox with classes, properties, and predefined states.
     Safe to run multiple times - skips if file exists unless --force is used.
     """
     logger = logging.getLogger(__name__)
     output_path = Path(output_dir)
-    core_path = output_path / "ontoclaw-core.ttl"
+    core_path = output_path / "ontoskills-core.ttl"
 
     if core_path.exists() and not force:
         console.print(f"[yellow]Core ontology already exists at {core_path}[/yellow]")

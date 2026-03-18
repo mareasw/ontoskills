@@ -1,5 +1,5 @@
 """
-Report formatter for OntoClaw Skill Drift Detector.
+Report formatter for OntoSkills Skill Drift Detector.
 
 Renders a DriftReport in the terminal using Rich, or serializes it
 to JSON for CI/CD pipelines.

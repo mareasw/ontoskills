@@ -32,7 +32,7 @@ def test_init_core_command(tmp_path):
     result = runner.invoke(cli, ['init-core', '-o', str(output_dir)])
 
     assert result.exit_code == 0
-    assert (output_dir / "ontoclaw-core.ttl").exists()
+    assert (output_dir / "ontoskills-core.ttl").exists()
     assert "created core ontology" in result.output.lower()
 
 
@@ -46,7 +46,7 @@ def test_init_core_idempotent(tmp_path):
     result1 = runner.invoke(cli, ['init-core', '-o', str(output_dir)])
     assert result1.exit_code == 0
 
-    core_path = output_dir / "ontoclaw-core.ttl"
+    core_path = output_dir / "ontoskills-core.ttl"
     import hashlib
     content1 = core_path.read_text()
     hash1 = hashlib.sha256(content1.encode()).hexdigest()
@@ -141,7 +141,7 @@ def test_diff_clean(tmp_path):
     runner = CliRunner()
 
     ttl_content = """
-@prefix oc: <https://ontoclaw.marea.software/ontology#> .
+@prefix oc: <https://ontoskills.sh/ontology#> .
 oc:TestSkill a oc:Skill ;
     oc:resolvesIntent "do_thing" .
 """
@@ -167,12 +167,12 @@ def test_diff_breaking_exits_9(tmp_path):
     new_ttl = tmp_path / 'new.ttl'
 
     old_ttl.write_text("""
-@prefix oc: <https://ontoclaw.marea.software/ontology#> .
+@prefix oc: <https://ontoskills.sh/ontology#> .
 oc:TestSkill a oc:Skill ;
     oc:resolvesIntent "create_pdf" .
 """)
     new_ttl.write_text("""
-@prefix oc: <https://ontoclaw.marea.software/ontology#> .
+@prefix oc: <https://ontoskills.sh/ontology#> .
 oc:TestSkill a oc:Skill ;
     oc:resolvesIntent "generate_pdf" .
 """)
@@ -195,13 +195,13 @@ def test_diff_breaking_only_flag(tmp_path):
     new_ttl = tmp_path / 'new.ttl'
 
     old_ttl.write_text("""
-@prefix oc: <https://ontoclaw.marea.software/ontology#> .
+@prefix oc: <https://ontoskills.sh/ontology#> .
 oc:SkillA a oc:Skill ;
     oc:resolvesIntent "task_a" .
 """)
     # Only an additive change: new skill added, nothing removed
     new_ttl.write_text("""
-@prefix oc: <https://ontoclaw.marea.software/ontology#> .
+@prefix oc: <https://ontoskills.sh/ontology#> .
 oc:SkillA a oc:Skill ;
     oc:resolvesIntent "task_a" .
 oc:SkillB a oc:Skill ;
@@ -228,7 +228,7 @@ def test_diff_json_output(tmp_path):
 
     ttl_file = tmp_path / 'skills.ttl'
     ttl_file.write_text("""
-@prefix oc: <https://ontoclaw.marea.software/ontology#> .
+@prefix oc: <https://ontoskills.sh/ontology#> .
 oc:TestSkill a oc:Skill ;
     oc:resolvesIntent "do_thing" .
 """)
@@ -257,11 +257,11 @@ def test_diff_suggest_shows_migration_guidance(tmp_path):
     old_ttl = tmp_path / 'old.ttl'
     new_ttl = tmp_path / 'new.ttl'
     old_ttl.write_text("""
-@prefix oc: <https://ontoclaw.marea.software/ontology#> .
+@prefix oc: <https://ontoskills.sh/ontology#> .
 oc:SkillA a oc:Skill ; oc:resolvesIntent "old_intent" .
 """)
     new_ttl.write_text("""
-@prefix oc: <https://ontoclaw.marea.software/ontology#> .
+@prefix oc: <https://ontoskills.sh/ontology#> .
 oc:SkillA a oc:Skill ; oc:resolvesIntent "new_intent" .
 """)
 
@@ -323,7 +323,7 @@ skill:test-skill a oc:Skill ;
     output_skill_path.write_text(existing_ttl, encoding="utf-8")
 
     # Create core ontology
-    core_path = output_dir / "ontoclaw-core.ttl"
+    core_path = output_dir / "ontoskills-core.ttl"
     core_path.parent.mkdir(parents=True, exist_ok=True)
     core_path.write_text(f"@prefix oc: <{BASE_URI}> .", encoding="utf-8")
 

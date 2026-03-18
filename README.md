@@ -161,7 +161,7 @@ flowchart LR
 
 ### The Validation Gatekeeper
 
-Every skill must pass SHACL validation before being written to disk. The constitutional shapes in `specs/ontoclaw.shacl.ttl` enforce:
+Every skill must pass SHACL validation before being written to disk. The constitutional shapes in `specs/ontoskills.shacl.ttl` enforce:
 
 | Constraint | Rule | Error Message |
 |------------|------|---------------|
@@ -443,10 +443,10 @@ ontoskills/
 │       ├── main.rs          # MCP stdio server
 │       └── catalog.rs       # Ontology catalog + planner
 ├── specs/
-│   └── ontoclaw.shacl.ttl   # SHACL shapes constitution
+│   └── ontoskills.shacl.ttl   # SHACL shapes constitution
 ├── skills/                  # Input: SKILL.md definitions (source code)
 ├── ontoskills/              # Output: compiled .ttl files (artifacts)
-│   ├── ontoclaw-core.ttl    # Core ontology with states
+│   ├── ontoskills-core.ttl    # Core ontology with states
 │   ├── index.ttl            # Index of all skills
 │   └── */ontoskill.ttl      # Individual skill modules
 └── docs/                    # Documentation
