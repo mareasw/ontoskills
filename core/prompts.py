@@ -73,10 +73,11 @@ If you cannot identify at least one intent, the skill is incomplete and you shou
 
 Be thorough but concise. Focus on the essential nature of the skill.
 
-## EPISTEMIC KNOWLEDGE EXTRACTION (OPTIONAL)
+## EPISTEMIC KNOWLEDGE EXTRACTION (EXPECTED)
 
 Extract cognitive, physical, and temporal knowledge that this skill imparts to the agent.
-This is OPTIONAL but highly recommended for Level 5 autonomous agents.
+You MUST extract 2-5 knowledge nodes for any non-trivial skill covering best practices, anti-patterns, and constraints.
+ONLY leave this empty if the skill is an extremely simple, atomic operation with no strategic depth.
 
 ### 10 Dimensions of Epistemic Knowledge
 
