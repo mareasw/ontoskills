@@ -116,10 +116,14 @@ When an agent has 50+ skills, reading all SKILL.md files is impractical. With on
 |------------|-------------|
 | **LLM Extraction** | Uses Claude to extract structured knowledge from SKILL.md files |
 | **Knowledge Architecture** | Follows the "A is a B that C" definition pattern (genus + differentia) |
+| **Knowledge Nodes** | 10-dimensional epistemic taxonomy (Heuristic, AntiPattern, PreFlightCheck, etc.) |
 | **OWL 2 Serialization** | Outputs valid OWL 2 ontologies in RDF/Turtle format |
 | **SHACL Validation** | Constitutional gatekeeper ensures logical validity before write |
 | **State Machines** | Skills can define preconditions, postconditions, and failure handlers |
 | **Security Pipeline** | Defense-in-depth: regex patterns + LLM review for malicious content |
+| **Static Linting** | Detects dead states, circular deps, duplicate intents, unreachable skills |
+| **Drift Detection** | Semantic diff between ontology versions with breaking change classification |
+| **Graph Visualization** | State transition graphs in Mermaid/DOT format |
 
 ### What Gets Compiled
 
@@ -128,6 +132,7 @@ Every skill is extracted with:
 - **Identity**: `nature`, `genus`, `differentia` (Knowledge Architecture)
 - **Intents**: What user intentions this skill resolves
 - **Requirements**: Dependencies (EnvVar, Tool, Hardware, API, Knowledge)
+- **Knowledge Nodes**: Epistemic knowledge (8-12 nodes per skill)
 - **Execution Payload**: Optional code to execute (`oc:code` inline or `oc:executionPath` for external assets)
 - **State Transitions**: `requiresState`, `yieldsState`, `handlesFailure`
 - **Provenance**: `generatedBy` attestation (LLM model used)
@@ -276,6 +281,37 @@ ontoclaw list-skills
 
 # Run security audit
 ontoclaw security-audit
+
+# ─── Ontology Analysis ─────────────────────────────────
+
+# Lint compiled ontology for structural issues
+ontoclaw lint
+
+# Lint with JSON output (for CI/CD)
+ontoclaw lint --format json
+
+# Show a human-readable summary card for a skill
+ontoclaw explain pdf
+
+# Visualize skill state transitions as Mermaid graph
+ontoclaw graph
+
+# Export graph as DOT format
+ontoclaw graph --format dot --output graph.dot
+
+# Show 1-hop subgraph around a skill
+ontoclaw graph --skill pdf
+
+# ─── Drift Detection ───────────────────────────────────
+
+# Compare current ontology against previous snapshot
+ontoclaw diff
+
+# Show only breaking changes (exit code 9 if found)
+ontoclaw diff --breaking-only
+
+# Generate migration suggestions for breaking changes
+ontoclaw diff --suggest
 ```
 
 ### Command Options
@@ -363,13 +399,14 @@ Current Rust test coverage includes:
 | Code | Exception | Description |
 |------|-----------|-------------|
 | 0 | - | Success |
-| 1 | `SkillETLError` | General ETL error |
+| 1 | `SkillETLError` / `LintError` | General ETL error / Lint errors found |
 | 3 | `SecurityError` | Security threat detected |
 | 4 | `ExtractionError` | Skill extraction failed |
 | 5 | `OntologyLoadError` | Ontology file not found or invalid |
 | 6 | `SPARQLError` | Invalid SPARQL query |
 | 7 | `SkillNotFoundError` | Skill not found in ontology |
 | **8** | `OntologyValidationError` | **SHACL validation failed** |
+| **9** | `DriftDetectedError` | **Breaking changes detected by `ontoclaw diff`** |
 
 ---
 
@@ -381,16 +418,22 @@ ontoclaw/
 │   ├── cli.py               # Click CLI interface
 │   ├── config.py            # Configuration constants
 │   ├── core_ontology.py     # Namespace and TBox ontology creation
+│   ├── differ.py            # Semantic drift detector
+│   ├── drift_report.py      # Drift report formatter
 │   ├── exceptions.py        # Exception hierarchy with exit codes
+│   ├── explainer.py         # Human-readable skill summaries
 │   ├── extractor.py         # ID and hash generation
+│   ├── graph_export.py      # State transition graph exporter
+│   ├── linter.py            # Static ontology linter
 │   ├── schemas.py           # Pydantic models
 │   ├── security.py          # Defense-in-depth security
 │   ├── serialization.py     # RDF serialization with SHACL gatekeeper
+│   ├── snapshot.py          # Ontology snapshot manager
 │   ├── sparql.py            # SPARQL query engine
 │   ├── storage.py           # File I/O, merging, orphan cleanup
 │   ├── transformer.py       # LLM tool-use extraction
 │   ├── validator.py         # SHACL validation gatekeeper
-│   └── tests/               # Test suite (156 tests)
+│   └── tests/               # Test suite (170+ tests)
 ├── mcp/                     # OntoMCP — Rust MCP server
 │   ├── Cargo.toml           # Rust package manifest
 │   ├── Cargo.lock           # Dependency lockfile
@@ -451,7 +494,7 @@ cd mcp
 cargo test
 ```
 
-**Test Coverage**: 156 Python tests + Rust unit tests covering:
+**Test Coverage**: 170+ Python tests + Rust unit tests covering:
 - Pydantic model validation
 - Exception exit codes
 - ID/hash generation
@@ -461,6 +504,10 @@ cargo test
 - SPARQL query execution
 - CLI commands and options
 - **SHACL validation (5 comprehensive tests)**
+- **Drift detection and diff**
+- **Static linting (dead-state, circular-dep, duplicate-intent)**
+- **State transition graph export**
+- **Skill explainer with knowledge nodes**
 
 ---
 
@@ -470,12 +517,17 @@ Skills are extracted following the **Knowledge Architecture** framework:
 
 - **Categories of Being**: Tool, Concept, Work
 - **Genus and Differentia**: "A is a B that C" definition structure
-- **Relations as First-Class Citizens**:
-  - `depends-on` - Skill prerequisites
+- **State Transitions**: Skills connect through shared states
+  - `requiresState` - Preconditions for skill execution
+  - `yieldsState` - Outcomes after successful execution
+  - `handlesFailure` - Recoverable error states
+- **Knowledge Nodes**: Epistemic knowledge imparted by skills
+  - 10-dimensional taxonomy: Heuristic, AntiPattern, PreFlightCheck, RecoveryTactic, etc.
+  - Each node: `directiveContent`, `appliesToContext`, `hasRationale`, `severityLevel`
+- **Skill Relations**:
+  - `dependsOn` - Skill prerequisites (direct dependency)
   - `extends` - Skill inheritance
   - `contradicts` - Incompatible skills
-  - `implements` - Interface compliance
-  - `exemplifies` - Pattern demonstration
 
 ---
 
