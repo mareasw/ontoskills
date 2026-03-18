@@ -1,0 +1,85 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix oc: <http://ontoclaw.marea.software/ontology#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://ontoclaw.marea.software/ontology> owl:imports <file:///Users/marcello/Developer/Marea/ontoclaw/ontoskills/ontoclaw-core.ttl> .
+
+oc:skill_9edb0243108eb53f a oc:ExecutableSkill,
+        oc:Skill ;
+    oc:contentHash "9edb0243108eb53f09e013fbb28154fc744c3ccda4e048985627d90b036b67cc" ;
+    oc:differentia "Provides comprehensive creation, editing, analysis, and tracked changes capabilities for Word documents through OOXML manipulation" ;
+    oc:generatedBy "glm-5" ;
+    oc:handlesFailure oc:FileNotFound,
+        oc:InvalidOOXMLStructure,
+        oc:PermissionDenied,
+        oc:SchemaValidationFailed,
+        oc:XMLMalformed ;
+    oc:hasPayload oc:payload_9edb0243108eb53f ;
+    oc:hasRequirement oc:req_111f766b,
+        oc:req_1300f19f,
+        oc:req_300e9437,
+        oc:req_5c2a11c1,
+        oc:req_7cf00395,
+        oc:req_bbe906e4,
+        oc:req_c2789dcc ;
+    oc:nature "Tool" ;
+    oc:requiresState oc:FileExists,
+        oc:ToolInstalled ;
+    oc:resolvesIntent "add tracked changes",
+        "analyze word document",
+        "convert docx to images",
+        "convert docx to markdown",
+        "create word document",
+        "edit word document",
+        "extract text from docx",
+        "review document" ;
+    oc:yieldsState oc:DocumentCreated,
+        oc:DocumentModified,
+        oc:DocumentValidated,
+        oc:TextExtracted ;
+    dcterms:identifier "docx" ;
+    skos:broader "Document processor" ;
+    prov:wasDerivedFrom "/Users/marcello/Developer/Marea/ontoclaw/skills/office/public/docx" .
+
+oc:payload_9edb0243108eb53f a oc:ExecutionPayload ;
+    oc:code """# Multiple workflows available:
+# 1. Create new: Use docx-js (JavaScript)
+# 2. Edit existing: Use Document library (Python)
+# 3. Extract text: pandoc --track-changes=all file.docx -o output.md
+# 4. Unpack: python ooxml/scripts/unpack.py file.docx output_dir
+# 5. Pack: python ooxml/scripts/pack.py input_dir file.docx
+# 6. Convert: soffice --headless --convert-to pdf file.docx && pdftoppm -jpeg file.pdf page""" ;
+    oc:executor "python" ;
+    oc:timeout 30000 .
+
+oc:req_111f766b a oc:RequirementTool ;
+    oc:isOptional true ;
+    oc:requirementValue "LibreOffice" .
+
+oc:req_1300f19f a oc:RequirementTool ;
+    oc:isOptional true ;
+    oc:requirementValue "Python defusedxml" .
+
+oc:req_300e9437 a oc:RequirementKnowledge ;
+    oc:isOptional false ;
+    oc:requirementValue "OOXML structure" .
+
+oc:req_5c2a11c1 a oc:RequirementTool ;
+    oc:isOptional true ;
+    oc:requirementValue "docx (npm package)" .
+
+oc:req_7cf00395 a oc:RequirementTool ;
+    oc:isOptional true ;
+    oc:requirementValue "poppler-utils" .
+
+oc:req_bbe906e4 a oc:RequirementKnowledge ;
+    oc:isOptional false ;
+    oc:requirementValue "Word document architecture" .
+
+oc:req_c2789dcc a oc:RequirementTool ;
+    oc:isOptional true ;
+    oc:requirementValue "pandoc" .
+

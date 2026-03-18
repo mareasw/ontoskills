@@ -363,3 +363,135 @@ class TestOntologyHeader:
         assert "dcterms" in prefixes
         assert "skos" in prefixes
         assert "prov" in prefixes
+
+
+class TestKnowledgeNodeHierarchy:
+    """Tests for 10-dimensional KnowledgeNode TBox hierarchy."""
+
+    @pytest.fixture
+    def core_ontology(self, tmp_path):
+        """Fixture that creates core ontology and returns graph."""
+        output_path = tmp_path / "ontoclaw-core.ttl"
+        graph = create_core_ontology(output_path)
+        return graph
+
+    @pytest.fixture
+    def oc(self):
+        """Fixture that returns the OntoClaw namespace."""
+        return get_oc_namespace()
+
+    def test_knowledge_node_base_class_defined(self, core_ontology, oc):
+        """Test that oc:KnowledgeNode base class is defined."""
+        assert (oc.KnowledgeNode, RDF.type, OWL.Class) in core_ontology
+        assert (oc.KnowledgeNode, RDFS.label, None) in core_ontology
+
+    def test_ten_dimension_subclasses_exist(self, core_ontology, oc):
+        """Test that all 10 dimension subclasses exist."""
+        dimensions = [
+            "NormativeRule", "StrategicInsight", "ResilienceTactic",
+            "ExecutionPhysics", "Observability", "SecurityGuardrail",
+            "CognitiveBoundary", "ResourceProfile", "TrustMetric", "LifecycleHook"
+        ]
+        for dim in dimensions:
+            assert (oc[dim], RDF.type, OWL.Class) in core_ontology
+            assert (oc[dim], RDFS.subClassOf, oc.KnowledgeNode) in core_ontology
+
+    def test_concrete_types_normative_rule(self, core_ontology, oc):
+        """Test NormativeRule concrete types: Standard, AntiPattern, Constraint."""
+        assert (oc.Standard, RDF.type, OWL.Class) in core_ontology
+        assert (oc.Standard, RDFS.subClassOf, oc.NormativeRule) in core_ontology
+        assert (oc.AntiPattern, RDF.type, OWL.Class) in core_ontology
+        assert (oc.AntiPattern, RDFS.subClassOf, oc.NormativeRule) in core_ontology
+        assert (oc.Constraint, RDF.type, OWL.Class) in core_ontology
+        assert (oc.Constraint, RDFS.subClassOf, oc.NormativeRule) in core_ontology
+
+    def test_concrete_types_strategic_insight(self, core_ontology, oc):
+        """Test StrategicInsight concrete types."""
+        assert (oc.Heuristic, RDF.type, OWL.Class) in core_ontology
+        assert (oc.Heuristic, RDFS.subClassOf, oc.StrategicInsight) in core_ontology
+        assert (oc.DesignPrinciple, RDF.type, OWL.Class) in core_ontology
+        assert (oc.WorkflowStrategy, RDF.type, OWL.Class) in core_ontology
+
+    def test_concrete_types_lifecycle_hook(self, core_ontology, oc):
+        """Test LifecycleHook concrete types."""
+        assert (oc.PreFlightCheck, RDF.type, OWL.Class) in core_ontology
+        assert (oc.PostFlightValidation, RDF.type, OWL.Class) in core_ontology
+        assert (oc.RollbackProcedure, RDF.type, OWL.Class) in core_ontology
+
+
+class TestKnowledgeNodeProperties:
+    """Tests for KnowledgeNode property definitions."""
+
+    @pytest.fixture
+    def core_ontology(self, tmp_path):
+        """Fixture that creates core ontology and returns graph."""
+        output_path = tmp_path / "ontoclaw-core.ttl"
+        graph = create_core_ontology(output_path)
+        return graph
+
+    @pytest.fixture
+    def oc(self):
+        """Fixture that returns the OntoClaw namespace."""
+        return get_oc_namespace()
+
+    def test_imparts_knowledge_object_property(self, core_ontology, oc):
+        """Test oc:impartsKnowledge object property (Skill -> KnowledgeNode)."""
+        assert (oc.impartsKnowledge, RDF.type, OWL.ObjectProperty) in core_ontology
+        assert (oc.impartsKnowledge, RDFS.domain, oc.Skill) in core_ontology
+        assert (oc.impartsKnowledge, RDFS.range, oc.KnowledgeNode) in core_ontology
+
+    def test_directive_content_datatype_property(self, core_ontology, oc):
+        """Test oc:directiveContent datatype property."""
+        assert (oc.directiveContent, RDF.type, OWL.DatatypeProperty) in core_ontology
+        assert (oc.directiveContent, RDFS.domain, oc.KnowledgeNode) in core_ontology
+
+    def test_applies_to_context_datatype_property(self, core_ontology, oc):
+        """Test oc:appliesToContext datatype property."""
+        assert (oc.appliesToContext, RDF.type, OWL.DatatypeProperty) in core_ontology
+        assert (oc.appliesToContext, RDFS.domain, oc.KnowledgeNode) in core_ontology
+
+    def test_has_rationale_datatype_property(self, core_ontology, oc):
+        """Test oc:hasRationale datatype property."""
+        assert (oc.hasRationale, RDF.type, OWL.DatatypeProperty) in core_ontology
+        assert (oc.hasRationale, RDFS.domain, oc.KnowledgeNode) in core_ontology
+
+    def test_severity_level_datatype_property(self, core_ontology, oc):
+        """Test oc:severityLevel datatype property."""
+        assert (oc.severityLevel, RDF.type, OWL.DatatypeProperty) in core_ontology
+        assert (oc.severityLevel, RDFS.domain, oc.KnowledgeNode) in core_ontology
+
+
+class TestKnowledgeRBoxAxioms:
+    """Tests for RBox axioms for knowledge inheritance."""
+
+    @pytest.fixture
+    def core_ontology(self, tmp_path):
+        """Fixture that creates core ontology and returns graph."""
+        output_path = tmp_path / "ontoclaw-core.ttl"
+        graph = create_core_ontology(output_path)
+        return graph
+
+    @pytest.fixture
+    def oc(self):
+        """Fixture that returns the OntoClaw namespace."""
+        return get_oc_namespace()
+
+    def test_imparts_knowledge_asymmetric(self, core_ontology, oc):
+        """Test that impartsKnowledge is asymmetric."""
+        assert (oc.impartsKnowledge, RDF.type, OWL.AsymmetricProperty) in core_ontology
+
+    def test_imparts_knowledge_irreflexive(self, core_ontology, oc):
+        """Test that impartsKnowledge is irreflexive."""
+        assert (oc.impartsKnowledge, RDF.type, OWL.IrreflexiveProperty) in core_ontology
+
+    def test_inherits_knowledge_super_property(self, core_ontology, oc):
+        """Test that inheritsKnowledge is a super-property of impartsKnowledge."""
+        assert (oc.inheritsKnowledge, RDF.type, OWL.ObjectProperty) in core_ontology
+        assert (oc.impartsKnowledge, RDFS.subPropertyOf, oc.inheritsKnowledge) in core_ontology
+
+    def test_property_chain_axiom_exists(self, core_ontology, oc):
+        """Test that property chain axiom for knowledge inheritance exists."""
+        # The axiom is: extends o impartsKnowledge ⊑ inheritsKnowledge
+        # Check that the triple exists (the object will be a BNode for the list)
+        assert any((oc.inheritsKnowledge, OWL.propertyChainAxiom, obj) in core_ontology
+                   for obj in core_ontology.objects(oc.inheritsKnowledge, OWL.propertyChainAxiom))

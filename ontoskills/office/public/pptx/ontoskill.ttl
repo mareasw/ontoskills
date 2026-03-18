@@ -1,0 +1,87 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix oc: <http://ontoclaw.marea.software/ontology#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://ontoclaw.marea.software/ontology> owl:imports <file:///Users/marcello/Developer/Marea/ontoclaw/ontoskills/ontoclaw-core.ttl> .
+
+oc:skill_3575d60d3212dce8 a oc:DeclarativeSkill,
+        oc:Skill ;
+    oc:contentHash "3575d60d3212dce8f7277b72ac590425807b16cd7854ab8d081d2658f8ebbe02" ;
+    oc:differentia "Enables creation, editing, and analysis of PowerPoint files through HTML conversion and OOXML editing workflows" ;
+    oc:generatedBy "glm-5" ;
+    oc:handlesFailure oc:FileNotFound,
+        oc:InvalidInput,
+        oc:OverflowError,
+        oc:SchemaViolation ;
+    oc:hasRequirement oc:req_111f766b,
+        oc:req_35b52e17,
+        oc:req_4cd3bc67,
+        oc:req_54bd6ee6,
+        oc:req_63145ec4,
+        oc:req_6a8b02c8,
+        oc:req_755ee7ba,
+        oc:req_7cf00395,
+        oc:req_904a20c7,
+        oc:req_a74cdce8 ;
+    oc:nature "Tool" ;
+    oc:requiresState oc:EnvironmentReady ;
+    oc:resolvesIntent "add charts to presentation",
+        "analyze presentation",
+        "convert html to powerpoint",
+        "create presentation",
+        "create slides from template",
+        "edit presentation",
+        "extract presentation thumbnails",
+        "extract text from pptx",
+        "modify slide content",
+        "rearrange slides" ;
+    oc:yieldsState oc:PresentationAnalyzed,
+        oc:PresentationCreated,
+        oc:PresentationModified ;
+    dcterms:identifier "pptx" ;
+    skos:broader "Presentation manipulation system" ;
+    prov:wasDerivedFrom "/Users/marcello/Developer/Marea/ontoclaw/skills/office/public/pptx" .
+
+oc:req_111f766b a oc:RequirementTool ;
+    oc:isOptional true ;
+    oc:requirementValue "LibreOffice" .
+
+oc:req_35b52e17 a oc:RequirementTool ;
+    oc:isOptional false ;
+    oc:requirementValue "react-icons" .
+
+oc:req_4cd3bc67 a oc:RequirementTool ;
+    oc:isOptional false ;
+    oc:requirementValue "pptxgenjs" .
+
+oc:req_54bd6ee6 a oc:RequirementTool ;
+    oc:isOptional false ;
+    oc:requirementValue "playwright" .
+
+oc:req_63145ec4 a oc:RequirementTool ;
+    oc:isOptional false ;
+    oc:requirementValue "sharp" .
+
+oc:req_6a8b02c8 a oc:RequirementKnowledge ;
+    oc:isOptional false ;
+    oc:requirementValue "HTML to PPTX conversion" .
+
+oc:req_755ee7ba a oc:RequirementTool ;
+    oc:isOptional false ;
+    oc:requirementValue "markitdown" .
+
+oc:req_7cf00395 a oc:RequirementTool ;
+    oc:isOptional true ;
+    oc:requirementValue "poppler-utils" .
+
+oc:req_904a20c7 a oc:RequirementTool ;
+    oc:isOptional false ;
+    oc:requirementValue "defusedxml" .
+
+oc:req_a74cdce8 a oc:RequirementKnowledge ;
+    oc:isOptional false ;
+    oc:requirementValue "OOXML schema compliance" .
+

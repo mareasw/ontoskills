@@ -1,40 +1,21 @@
 # OntoClaw Philosophy
 
-## 0. The OntoClaw Ecosystem
+## 0. Neuro-Symbolic AI Agent Platform
 
-OntoClaw is not just a compiler — it's a **complete neuro-symbolic platform** for building deterministic, enterprise-grade AI agents. The ecosystem consists of four layered components:
+OntoClaw is not just a compiler — it's a **complete neuro-symbolic platform** for building deterministic, enterprise-grade AI agents. The ecosystem consists of five layered components:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         OntoClaw                                 │
-│                    (Enterprise AI Agent)                         │
-│                                                                  │
-│        Deterministic • Fast • Reliable • Production-Ready        │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        OntoStore                                 │
-│                    (Skill Registry / Store)                      │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        OntoMCP                                   │
-│                  (Rust MCP Server — Runtime)                     │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                       OntoSkills                                 │
-│               (Compiled OWL 2 Ontologies)                        │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        OntoCore                                  │
-│              (Python Compiler — Design Time)                     │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    CORE["OntoCore<br/>━━━━━━━━━━<br/>SKILL.md → .ttl<br/>LLM + SHACL"] -->|"compiles"| CENTER["OntoSkills<br/>━━━━━━━━━━<br/>OWL 2 Ontologies<br/>.ttl artifacts"]
+    CENTER -->|"loads"| MCP["OntoMCP<br/>━━━━━━━━━━<br/>Rust SPARQL<br/>in-memory graph"]
+    MCP <-->|"queries"| AGENT["OntoClaw<br/>━━━━━━━━━━<br/>Enterprise Agent<br/>deterministic"]
+    CENTER <-->|"distributes"| STORE["OntoStore<br/>━━━━━━━━━━<br/>Registry<br/>versioning"]
+
+    style CORE fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
+    style CENTER fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
+    style MCP fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
+    style AGENT fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style STORE fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
 ```
 
 ### The Vision
@@ -56,40 +37,35 @@ OntoCore implements a **compile-time paradigm** for skills, separating human aut
 
 ### Design Time (Source Code)
 
+```mermaid
+flowchart LR
+    MD["Human writes<br/>SKILL.md<br/>━━━━━━━━━━<br/>Developer-friendly<br/>natural language"] -.->|"compiles to"| NOTE["Markdown = syntactic sugar<br/>for OWL 2<br/>━━━━━━━━━━<br/>RDF/Turtle output"]
+
+    style MD fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style NOTE fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    DESIGN TIME                          │
-│                                                         │
-│   Human writes SKILL.md                                 │
-│   (Markdown = syntactic sugar for OWL)                  │
-│                                                         │
-│   Why Markdown? Because writing raw Turtle by hand      │
-│   is a terrible developer experience.                   │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
+
+Why Markdown? Because writing raw Turtle by hand is a terrible developer experience.
 
 OntoCore extracts **everything** into the TTL:
 - Intents (`oc:resolvesIntent`)
 - State transitions (`oc:requiresState`, `oc:yieldsState`, `oc:handlesFailure`)
-- **Execution payload** (`oc:hasPayload` with `oc:executor` + `oc:code`)
+- **Execution payload** (`oc:hasPayload` with `oc:executor` + `oc:code` or `oc:executionPath`)
 - Dependencies and relations (`oc:dependsOn`, `oc:extends`, `oc:contradicts`)
 
 ### Runtime (Artifact)
 
+```mermaid
+flowchart LR
+    AGENT["LLM Agent<br/>━━━━━━━━━━<br/>Queries skills<br/>via SPARQL"] <-->|"SELECT ?skill"| MCP["OntoMCP (Rust)<br/>━━━━━━━━━━<br/>In-memory graph<br/>blazing-fast"]
+    MCP -->|"loads"| TTL[".ttl files<br/>━━━━━━━━━━<br/>Self-contained<br/>modular ontologies"]
+
+    style AGENT fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style MCP fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
+    style TTL fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
 ```
-┌─────────────────────────────────────────────────────────┐
-│                      RUNTIME                            │
-│                                                         │
-│   Agent ◄──────► OntoMCP (Rust) ◄──────► .ttl files    │
-│                                                         │
-│   SKILL.md files DO NOT EXIST in the agent's context    │
-│                                                         │
-│   The .ttl files are self-contained, modular,           │
-│   pluggable ontologies. All logic lives in RDF.         │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
+
+**SKILL.md files DO NOT EXIST in the agent's context.** The .ttl files are self-contained, modular, pluggable ontologies. All logic lives in RDF.
 
 **The compiled TTL is the executable artifact. The Markdown is just source code that gets compiled away.**
 
@@ -114,7 +90,7 @@ This is the **knowledge retrieval problem** in the age of LLMs.
 
 ## 3. The Ontological Solution
 
-OntoClaw applies **Description Logics (DL)** — specifically the 𝒜𝒞ℛ𝒪ℐ𝒟 fragment underlying OWL 2 — to transform unstructured skill definitions into **formal, queryable knowledge graphs**.
+OntoClaw applies **Description Logics (DL)** — specifically the **$\mathcal{SROIQ}^{(D)}$** fragment underlying OWL 2 DL — to transform unstructured skill definitions into **formal, queryable knowledge graphs**.
 
 Key properties:
 
@@ -125,6 +101,22 @@ Key properties:
 | **Individuals (𝒪)** | Each compiled skill instance |
 | **Datatypes (𝒟)** | Literals: strings, integers, IRIs |
 
+### The $\mathcal{SROIQ}^{(D)}$ Fragment
+
+Each letter in $\mathcal{SROIQ}^{(D)}$ represents a specific expressive capability:
+
+- **$\mathcal{S}$** — Basic logic ($\mathcal{ALC}$) extended with transitive properties. Essential for OntoClaw: if skill A extends B, and B extends C, the reasoner knows A extends C.
+
+- **$\mathcal{R}$** — Complex role inclusions and disjoint properties. Allows expressing that `dependsOn` and `contradicts` are mutually exclusive.
+
+- **$\mathcal{O}$** — Nominals. The ability to define a class by enumerating its specific individuals.
+
+- **$\mathcal{I}$** — Inverse properties. Fundamental for OntoCore: if A dependsOn B, the graph database automatically deduces that B enables A without explicit declaration.
+
+- **$\mathcal{Q}$** — Qualified cardinality restrictions. What our SHACL gatekeeper enforces: e.g., an ExecutableSkill must have exactly 1 hasPayload node.
+
+- **$\mathcal{D}$** — Datatype support (strings, integers, booleans for our literals).
+
 **Decidability**: OWL 2 DL is decidable — reasoning algorithms terminate in finite time with correct answers. This contrasts with the open-ended nature of LLM reasoning.
 
 ---
@@ -133,13 +125,14 @@ Key properties:
 
 OntoClaw is **neuro-symbolic**: it combines neural and symbolic AI paradigms.
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   Neural Layer  │     │  Symbolic Layer │     │  Query Layer    │
-│                 │     │                 │     │                 │
-│  LLM Extraction │ ──► │  OWL 2 Ontology │ ──► │  SPARQL Engine  │
-│  (probabilistic)│     │  (deterministic)│     │  (precise)      │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
+```mermaid
+flowchart LR
+    NEURAL["Neural Layer<br/>━━━━━━━━━━<br/>LLM Extraction<br/>Claude extracts<br/>structured knowledge<br/>(probabilistic)"] -->|"Pydantic"| SYMBOLIC["Symbolic Layer<br/>━━━━━━━━━━<br/>OWL 2 Ontology<br/>Formal semantics<br/>decidable reasoning<br/>(deterministic)"]
+    SYMBOLIC -->|"serialize"| QUERY["Query Layer<br/>━━━━━━━━━━<br/>SPARQL Engine<br/>O(1) indexed lookup<br/>precise retrieval<br/>(deterministic)"]
+
+    style NEURAL fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
+    style SYMBOLIC fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
+    style QUERY fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
 ```
 
 - **Neural**: Claude extracts structured knowledge from natural language (OntoCore)
@@ -169,12 +162,12 @@ Before querying, an LLM needs to know: **"What can I ask?"**
 
 OntoClaw exposes the **TBox** (terminological box) — the schema of classes and properties — separately from the **ABox** (assertional box) of individual skills.
 
-```
-TBox Query: "What properties does oc:Skill have?"
-→ oc:resolvesIntent, oc:dependsOn, oc:extends, oc:nature, ...
+```mermaid
+flowchart LR
+    TBOX["TBox (Schema)<br/>━━━━━━━━━━<br/>What properties does<br/>oc:Skill have?<br/>→ oc:resolvesIntent<br/>→ oc:dependsOn<br/>→ oc:extends"] -->|"informs"| ABOX["ABox (Instances)<br/>━━━━━━━━━━<br/>Which skills resolve<br/>'create_pdf'?<br/>→ oc:pdf-generation<br/>→ oc:docx-to-pdf"]
 
-ABox Query: "Which skills resolve 'create_pdf'?"
-→ oc:pdf-generation, oc:docx-to-pdf, ...
+    style TBOX fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
+    style ABOX fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
 ```
 
 This two-stage querying prevents "blind" questions and improves precision.

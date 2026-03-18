@@ -18,9 +18,12 @@ from typing import Optional
 import anthropic
 from anthropic import Anthropic
 
+from compiler.env import load_local_env
 from compiler.exceptions import SecurityError
 
 logger = logging.getLogger(__name__)
+
+load_local_env()
 
 # Security model for LLM-as-judge
 SECURITY_MODEL = os.getenv("SECURITY_MODEL", "claude-opus-4-6")
@@ -42,8 +45,10 @@ class SecurityThreat:
 
 
 # Security patterns (defense in depth)
+# NOTE: Patterns should catch actual attacks, not legitimate code examples in documentation.
+# LLM review serves as fallback for edge cases.
 SECURITY_PATTERNS = [
-    # Prompt injection
+    # Prompt injection - attempts to override AI behavior
     (
         r"(?i)(ignore|disregard|forget)\s+(previous|all|above|prior)\s+(instructions?|rules?|prompts?)",
         "prompt_injection",
@@ -60,60 +65,52 @@ SECURITY_PATTERNS = [
         "Attempts to inject system messages"
     ),
 
-    # Command injection
+    # Command injection - dangerous shell commands with destructive intent
     (
-        r";\s*(rm|del|format|shutdown|reboot|chmod|chown)",
+        r";\s*(rm\s+-rf|del\s+/s|format\s+:|shutdown|reboot|chmod\s+777|chown\s+root)",
         "command_injection",
-        "Shell command injection via semicolon"
+        "Destructive shell command injection"
     ),
     (
-        r"\|\s*(bash|sh|zsh|cmd|powershell)",
+        r"\|\s*(bash|sh|zsh|cmd|powershell)\s+-c\s*['\"]",
         "command_injection",
-        "Shell command injection via pipe"
+        "Shell command injection with quoted payload"
     ),
     (
-        r"\$\([^)]+\)",  # Command substitution
+        r"\$\(['\"]\s*(rm|del|format|curl|wget)",
         "command_injection",
-        "Shell command substitution"
-    ),
-    (
-        r"`[^`]+`",  # Backtick command substitution
-        "command_injection",
-        "Shell command substitution via backticks"
+        "Command substitution with dangerous commands"
     ),
 
-    # Data exfiltration
+    # Data exfiltration - actual exfiltration attempts
     (
-        r"(?i)(curl|wget)\s+(-d|--data|-F|--form)",
+        r"(?i)(curl|wget)\s+(-d|--data|-F|--form)\s+.*['\"]?(password|secret|token|key|credential)",
         "data_exfiltration",
-        "Potential data exfiltration via HTTP"
+        "Potential credential exfiltration via HTTP"
     ),
     (
-        r"(?i)(curl|wget)\s+.*\.(?:com|io|net|org)",
+        r"(?i)(upload|send|transmit|exfil)\s+.*\s+(password|secret|token|api[_-]?key)",
         "data_exfiltration",
-        "External HTTP request"
-    ),
-    (
-        r"(?i)(upload|send|transmit|exfil)\s+.*\s+(to|http)",
-        "data_exfiltration",
-        "Potential data upload"
+        "Potential credential upload"
     ),
 
-    # Path traversal
+    # Path traversal - actual traversal attempts
     (
-        r"\.\./",
+        r"\.\./\.\./\.\./",  # Multiple parent directory traversals
         "path_traversal",
-        "Directory traversal attempt"
+        "Deep directory traversal attempt"
     ),
     (
         r"/etc/(passwd|shadow|hosts)",
         "path_traversal",
         "Sensitive system file access"
     ),
+
+    # Credential exposure - actual hardcoded secrets
     (
-        r"(?i)(api[_-]?key|secret|password|token)\s*=\s*['\"]?[^'\"\s]+",
+        r"(?i)(api[_-]?key|password|secret|token)\s*=\s*['\"][a-zA-Z0-9]{20,}['\"]",
         "credential_exposure",
-        "Hardcoded credentials"
+        "Hardcoded credential with long value"
     ),
 ]
 

@@ -4,6 +4,39 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+
+## [0.6.0] - 2026-03-18
+
+### Added
+
+- Added repo-local `.env` loading for the Python compiler so extraction and security checks can
+  read `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, and model overrides without manual shell exports
+- Added `.env.example` with the compiler variables needed for Anthropic-compatible providers
+
+### Changed
+
+- Updated compiler documentation with `.env`-based configuration and an example nested-skill
+  compile command
+- Updated Claude Code MCP troubleshooting guidance to call out stale background processes after
+  rebuilding the Rust server
+- Relaxed SHACL state validation to allow novel states (e.g., `oc:SpreadsheetCreated`) without
+  requiring them to be pre-defined in the core ontology - the MCP server resolves states at runtime
+- Updated README.md validation table to reflect relaxed state constraints (IRI required, not
+  necessarily `oc:State` instance)
+
+### Fixed
+
+- Fixed Rust MCP `tools/call` responses so `structuredContent` is always a record object, avoiding
+  Claude Code schema errors for tools returning arrays such as `list_skills` and
+  `find_skills_by_intent`
+- Fixed pySHACL validation bug where RDFS inference caused Literal values in dependency relations
+  to be treated as focus nodes for validation - now uses `inference='none'`
+- Fixed SHACL `sh:class oc:State` constraint that rejected novel states extracted by LLM -
+  removed class constraint, keeping only `sh:nodeKind sh:IRI`
+- Fixed skill dependency serialization to use Literal strings instead of URIRef to prevent
+  pySHACL from validating them as skill nodes
+- Fixed duplicate `skill_output_paths` entries when skills were skipped due to hash match
+
 ## [0.5.0] - 2026-03-17
 
 ### Added
@@ -57,6 +90,62 @@ Extends the Skill Drift Detector with actionable remediation for breaking change
 - **core/cli.py** — `--suggest` flag on `diff` command
 - **core/tests/test_differ.py** — 4 new suggestion tests
 - **core/tests/test_cli.py** — 1 new CLI test for `--suggest`
+#### Local MCP Server
+
+- Added a new **Rust-based local MCP server** under `mcp/`
+  - Loads compiled OntoClaw ontologies from `.ttl` files
+  - Speaks MCP over `stdio`
+  - Auto-discovers `ontoskills/` from the current directory and its parents
+  - Can also be pointed at a custom ontology root with `--ontology-root`
+
+#### MCP Tooling
+
+- Implemented MCP tools for semantic skill discovery and planning:
+  - `list_skills`
+  - `find_skills_by_intent`
+  - `get_skill`
+  - `get_skill_requirements`
+  - `get_skill_transitions`
+  - `get_skill_dependencies`
+  - `get_skill_conflicts`
+  - `find_skills_yielding_state`
+  - `find_skills_requiring_state`
+  - `check_skill_applicability`
+  - `plan_from_intent`
+  - `get_skill_payload`
+
+#### Planning Engine
+
+- Added state-aware planning inside the Rust MCP catalog:
+  - checks `requiresState` against caller-provided current states
+  - finds preparatory skills through `yieldsState`
+  - ranks candidate plans by unresolved states and step count
+  - prefers direct skills over setup-heavy alternatives when possible
+
+#### Rust Test Coverage
+
+- Added Rust unit tests for:
+  - intent lookup
+  - payload lookup
+  - planning with preparatory skills
+  - planner ranking preference for direct skills
+
+### Changed
+
+#### Documentation
+
+- Updated `README.md` to reflect that `mcp/` is now implemented
+- Added MCP usage, run commands, and verification instructions
+- Updated `mcp/README.md` with scope, tool list, auto-discovery behavior, and run instructions
+- Added `mcp/CLAUDE_CODE_GUIDE.md` with build, run, registration, verification, and troubleshooting steps for Claude Code
+
+#### MCP Compatibility
+
+- Updated the Rust MCP server to support Claude Code's current handshake behavior
+  - supports protocol version `2025-11-25`
+  - accepts line-delimited JSON requests on `stdio` in addition to framed `Content-Length` transport
+  - replies using the same wire mode used by the client
+  - exposes empty `resources/list`, `resources/templates/list`, and `prompts/list` endpoints for client compatibility
 
 ---
 
@@ -104,6 +193,80 @@ and classifies every change by its impact on agents querying the graph.
 
 - **core/tests/test_differ.py** — 5 unit tests for the differ module
 - **core/tests/test_cli.py** — 6 CLI tests for the `diff` command
+### Breaking Changes
+
+#### Output Filename Change
+
+- **`skill.ttl` → `ontoskill.ttl`** - Output skill modules are now named `ontoskill.ttl` instead of `skill.ttl`
+  - Affects all path references in code and tests
+  - Run `ontoclaw compile --force` after upgrading to regenerate modules with new naming
+
+### Changed
+
+#### Perfect Mirroring Architecture
+
+The compiler now acts as a **Semantic Bundler** - the output directory (`ontoskills/`) is a perfect, executable mirror of the input directory (`skills/`).
+
+- **Traversal logic** - Now iterates through ALL files recursively using `rglob("*")` instead of only finding directories with `SKILL.md`
+- **3-Rule File Processing**:
+  - **Rule A (Core Skills)**: `SKILL.md` → compiled via LLM → `ontoskill.ttl`
+  - **Rule B (Auxiliary Markdown)**: `*.md` → compiled via LLM → `*.ttl` (logged, pipeline pending)
+  - **Rule C (Asset Copying)**: Non-markdown files (`.py`, `.js`, `.xsd`, etc.) → direct copy via `shutil.copy2`
+
+#### Orphan Cleanup Enhanced
+
+- **`clean_orphaned_files()`** - Replaces `clean_orphaned_skills()` with comprehensive mirror sync:
+  - `ontoskill.ttl` → `SKILL.md` mapping
+  - `*.ttl` → `*.md` mapping (auxiliary markdown)
+  - Direct asset mapping (non-ttl files map to same path)
+- **`SYSTEM_FILES` safeguard** - Protects compiler-generated files from cleanup:
+  - `ontoclaw-core.ttl` - Core TBox ontology
+  - `index.ttl` - Manifest with owl:imports
+
+### Removed
+
+- **`clean_orphaned_skills()`** - Replaced by `clean_orphaned_files()` (no backward compatibility wrapper)
+- **Legacy `skill.ttl` references** - All code and tests updated to use `ontoskill.ttl`
+
+### Testing
+
+- **test_storage.py** - 8 new tests for perfect mirroring:
+  - `test_clean_orphaned_files_removes_orphan`
+  - `test_clean_orphaned_files_preserves_valid`
+  - `test_clean_orphaned_files_dry_run`
+  - `test_clean_orphaned_files_preserves_system_files`
+  - `test_clean_orphaned_files_removes_orphan_asset`
+  - `test_clean_orphaned_files_preserves_valid_asset`
+  - `test_clean_orphaned_files_auxiliary_markdown_mapping`
+  - `test_clean_orphaned_files_preserves_auxiliary_with_source`
+  - `test_system_files_constant`
+- All existing tests updated for `ontoskill.ttl` naming
+- Removed backward compatibility test
+
+### Test Summary
+
+- **156 tests** pass (3 deselected integration tests)
+
+### Added
+
+#### Core Ontology Enhancements
+
+- **`oc:executionPath`** - New DatatypeProperty for external asset paths
+  - Domain: `oc:ExecutionPayload`
+  - Supports Perfect Mirroring asset bundler architecture
+  - Enables referencing external script files (`.py`, `.cjs`, etc.) copied by the compiler
+
+- **`owl:disjointWith`** - DeclarativeSkill and ExecutableSkill are now explicitly mutually exclusive
+  - Enforces OWL 2 DL ($\mathcal{SROIQ}^{(D)}$) strictness
+  - A skill cannot be both declarative and executable
+
+#### SHACL Validation Updates
+
+- **XOR constraint** - ExecutionPayload must have either `oc:code` OR `oc:executionPath`
+  - `sh:or` constraint ensures at least one is present
+  - Inline code or external asset path (not both required)
+- **`oc:code`** - No longer strictly mandatory (minCount removed)
+- **`oc:executionPath`** - New property constraint (maxCount 1, xsd:string)
 
 ---
 

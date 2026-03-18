@@ -65,15 +65,15 @@ def serialize_skill(graph: Graph, skill: ExtractedSkill) -> None:
         graph.add((req_uri, oc.isOptional, Literal(req.optional)))
         graph.add((skill_uri, oc.hasRequirement, req_uri))
 
-    # Relations
+    # Relations - use skill IDs as literals (MCP server resolves them)
     for dep in skill.depends_on:
-        graph.add((skill_uri, oc.dependsOn, oc[f"skill_{dep}"]))
+        graph.add((skill_uri, oc.dependsOn, Literal(dep)))
 
     for ext in skill.extends:
-        graph.add((skill_uri, oc.extends, oc[f"skill_{ext}"]))
+        graph.add((skill_uri, oc.extends, Literal(ext)))
 
     for cont in skill.contradicts:
-        graph.add((skill_uri, oc.contradicts, oc[f"skill_{cont}"]))
+        graph.add((skill_uri, oc.contradicts, Literal(cont)))
 
     # State transitions (new schema feature)
     if skill.state_transitions:
@@ -118,14 +118,14 @@ def serialize_skill_to_module(
     output_base: Optional[Path] = None
 ) -> None:
     """
-    Serialize a skill to a standalone skill.ttl module file.
+    Serialize a skill to a standalone ontoskill.ttl module file.
 
     Creates a skill module that mirrors the skills directory structure:
-    - skills/xlsx/pdf/pptx/SKILL.md -> ontoskills/xlsx/pdf/pptx/skill.ttl
+    - skills/xlsx/pdf/pptx/SKILL.md -> ontoskills/xlsx/pdf/pptx/ontoskill.ttl
 
     Args:
         skill: ExtractedSkill to serialize
-        output_path: Path where skill.ttl should be written
+        output_path: Path where ontoskill.ttl should be written
         output_base: Base output directory for core ontology lookup (default: OUTPUT_DIR)
     """
     oc = get_oc_namespace()

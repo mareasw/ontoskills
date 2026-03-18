@@ -38,14 +38,14 @@ def mirror_skill_path(skill_dir: Path, output_base: Path) -> Path:
     Mirror the skills directory structure to the output directory.
 
     Mirroring rule:
-        skills/{path}/SKILL.md → ontoskills/{path}/skill.ttl
+        skills/{path}/SKILL.md → ontoskills/{path}/ontoskill.ttl
 
     Args:
         skill_dir: Path to skill directory (e.g., skills/xlsx/pdf/pptx)
         output_base: Base output directory (e.g., ontoskills/)
 
     Returns:
-        Path to output skill.ttl file (e.g., ontoskills/xlsx/pdf/pptx/skill.ttl)
+        Path to output ontoskill.ttl file (e.g., ontoskills/xlsx/pdf/pptx/ontoskill.ttl)
     """
     # Convert to absolute paths if needed
     skill_dir = skill_dir.resolve()
@@ -71,7 +71,7 @@ def mirror_skill_path(skill_dir: Path, output_base: Path) -> Path:
             relative = skill_dir.name
 
     # Mirror the path structure
-    output_path = output_base / relative / "skill.ttl"
+    output_path = output_base / relative / "ontoskill.ttl"
     return output_path
 
 
@@ -84,7 +84,7 @@ def get_output_path(skill_dir: Path, output_base: Optional[Path] = None) -> Path
         output_base: Base output directory (default: from config)
 
     Returns:
-        Path where skill.ttl should be written
+        Path where ontoskill.ttl should be written
     """
     if output_base is None:
         output_base = Path(OUTPUT_DIR).resolve()
@@ -114,10 +114,10 @@ def create_output_directory(skill_dir: Path, output_base: Optional[Path] = None)
 
 def load_skill_module(module_path: Path) -> Graph:
     """
-    Load a skill module from a skill.ttl file.
+    Load a skill module from an ontoskill.ttl file.
 
     Args:
-        module_path: Path to skill.ttl file
+        module_path: Path to ontoskill.ttl file
 
     Returns:
         RDF Graph containing the skill module
@@ -387,7 +387,7 @@ def generate_index_manifest(
     enabling SPARQL queries against the combined ontology by loading index.ttl.
 
     Args:
-        skill_paths: List of paths to skill.ttl module files
+        skill_paths: List of paths to ontoskill.ttl module files
         index_path: Path where index.ttl will be written
         output_base: Base output directory for computing relative paths
     """
@@ -439,13 +439,22 @@ def generate_index_manifest(
 # Orphan Cleanup
 # =============================================================================
 
-def clean_orphaned_skills(
+# System-generated files that should never be considered orphans
+SYSTEM_FILES = {"ontoclaw-core.ttl", "index.ttl"}
+
+
+def clean_orphaned_files(
     skills_dir: Path,
     output_dir: Path,
     dry_run: bool = False
 ) -> int:
     """
-    Remove .ttl files whose source SKILL.md no longer exists.
+    Remove output files whose source no longer exists.
+
+    Implements perfect mirror cleanup:
+    - ontoskill.ttl → SKILL.md mapping
+    - *.ttl → *.md mapping (for auxiliary markdown)
+    - Direct asset mapping (non-ttl files)
 
     Args:
         skills_dir: Path to skills/ directory
@@ -457,28 +466,46 @@ def clean_orphaned_skills(
     """
     orphans_removed = 0
 
-    # Find all skill.ttl files in output directory
-    for ttl_file in output_dir.rglob("skill.ttl"):
-        # Compute expected SKILL.md path
+    # Find all files in output directory
+    for output_file in output_dir.rglob("*"):
+        if not output_file.is_file():
+            continue
+
+        # Skip system-generated files (core ontology, index manifest)
+        if output_file.name in SYSTEM_FILES:
+            continue
+
+        # Compute relative path from output directory
         try:
-            rel_path = ttl_file.parent.relative_to(output_dir)
+            rel_path = output_file.relative_to(output_dir)
         except ValueError:
             continue
 
-        skill_md = skills_dir / rel_path / "SKILL.md"
+        # Determine expected source path based on output file type
+        if output_file.name == "ontoskill.ttl":
+            # Rule A: ontoskill.ttl maps to SKILL.md
+            source_path = skills_dir / rel_path.parent / "SKILL.md"
+        elif output_file.suffix == ".ttl":
+            # Rule B: *.ttl maps to *.md (auxiliary markdown)
+            source_path = skills_dir / rel_path.with_suffix(".md")
+        else:
+            # Rule C: Asset files map directly
+            source_path = skills_dir / rel_path
 
         # If source doesn't exist, this is an orphan
-        if not skill_md.exists():
-            logger.info(f"Orphan found: {ttl_file} (source: {skill_md} missing)")
+        if not source_path.exists():
+            logger.info(f"Orphan found: {output_file} (source: {source_path} missing)")
             if not dry_run:
-                ttl_file.unlink()
-                logger.info(f"Removed orphan: {ttl_file}")
+                output_file.unlink()
+                logger.info(f"Removed orphan: {output_file}")
             orphans_removed += 1
 
     if orphans_removed > 0:
         action = "Would remove" if dry_run else "Removed"
-        logger.info(f"{action} {orphans_removed} orphaned skill file(s)")
+        logger.info(f"{action} {orphans_removed} orphaned file(s)")
     else:
-        logger.info("No orphaned skills found")
+        logger.info("No orphaned files found")
 
     return orphans_removed
+
+
