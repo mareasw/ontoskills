@@ -98,3 +98,85 @@ def test_schemas_validation():
     assert skill.id == "test-skill"
     assert skill.generated_by == "gpt-4"
     assert skill.state_transitions.requires_state == ["oc:SystemAuthenticated"]
+
+
+# ============================================================================
+# KnowledgeNode Tests (10-Dimensional Epistemic TBox)
+# ============================================================================
+
+
+def test_knowledge_node_model():
+    """Test KnowledgeNode model with valid data."""
+    from compiler.schemas import KnowledgeNode, SeverityLevel
+
+    kn = KnowledgeNode(
+        node_type="AntiPattern",
+        directive_content="Never modify the spreadsheet without preserving formulas",
+        applies_to_context="When editing any Excel file",
+        has_rationale="Formula corruption breaks the spreadsheet's computational integrity",
+        severity_level=SeverityLevel.CRITICAL
+    )
+    assert kn.node_type == "AntiPattern"
+    assert kn.severity_level == SeverityLevel.CRITICAL
+
+
+def test_knowledge_node_without_severity():
+    """Test KnowledgeNode model without optional severity_level."""
+    from compiler.schemas import KnowledgeNode
+
+    kn = KnowledgeNode(
+        node_type="Heuristic",
+        directive_content="Use absolute paths for file operations",
+        applies_to_context="Always",
+        has_rationale="Relative paths can break when cwd changes"
+    )
+    assert kn.severity_level is None
+
+
+def test_knowledge_node_invalid_type():
+    """Test that invalid node_type raises ValidationError."""
+    from compiler.schemas import KnowledgeNode
+
+    with pytest.raises(ValidationError):
+        KnowledgeNode(
+            node_type="InvalidType",
+            directive_content="test",
+            applies_to_context="test",
+            has_rationale="test"
+        )
+
+
+def test_severity_level_enum():
+    """Test SeverityLevel enum values."""
+    from compiler.schemas import SeverityLevel
+
+    assert SeverityLevel.CRITICAL.value == "CRITICAL"
+    assert SeverityLevel.HIGH.value == "HIGH"
+    assert SeverityLevel.MEDIUM.value == "MEDIUM"
+    assert SeverityLevel.LOW.value == "LOW"
+
+
+def test_extracted_skill_with_knowledge_nodes():
+    """Test ExtractedSkill with knowledge_nodes field."""
+    from compiler.schemas import ExtractedSkill, KnowledgeNode
+
+    skill = ExtractedSkill(
+        id="test-skill",
+        hash="abc123",
+        nature="Test",
+        genus="Test",
+        differentia="test",
+        intents=["test"],
+        requirements=[],
+        generated_by="claude-opus-4-6",
+        knowledge_nodes=[
+            KnowledgeNode(
+                node_type="Standard",
+                directive_content="Always validate input",
+                applies_to_context="Before processing",
+                has_rationale="Prevents injection attacks"
+            )
+        ]
+    )
+    assert len(skill.knowledge_nodes) == 1
+    assert skill.knowledge_nodes[0].node_type == "Standard"

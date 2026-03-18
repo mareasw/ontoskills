@@ -1,4 +1,5 @@
 import json
+from enum import Enum
 from pydantic import BaseModel, field_validator, model_validator, computed_field
 from typing import Literal, Any
 
@@ -40,6 +41,52 @@ class StateTransition(BaseModel):
         return v
 
 
+class SeverityLevel(str, Enum):
+    """Severity levels for knowledge nodes."""
+    CRITICAL = "CRITICAL"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
+
+# 30 concrete knowledge node types across 10 dimensions
+KnowledgeNodeType = Literal[
+    # Dimension 1: NormativeRule
+    "Standard", "AntiPattern", "Constraint",
+    # Dimension 2: StrategicInsight
+    "Heuristic", "DesignPrinciple", "WorkflowStrategy",
+    # Dimension 3: ResilienceTactic
+    "KnownIssue", "RecoveryTactic",
+    # Dimension 4: ExecutionPhysics
+    "Idempotency", "SideEffect", "PerformanceProfile",
+    # Dimension 5: Observability
+    "SuccessIndicator", "TelemetryPattern",
+    # Dimension 6: SecurityGuardrail
+    "SecurityImplication", "DestructivePotential", "FallbackStrategy",
+    # Dimension 7: CognitiveBoundary
+    "RequiresHumanClarification", "AssumptionBoundary", "AmbiguityTolerance",
+    # Dimension 8: ResourceProfile
+    "TokenEconomy", "ComputeCost",
+    # Dimension 9: TrustMetric
+    "ExecutionDeterminism", "DataProvenance",
+    # Dimension 10: LifecycleHook
+    "PreFlightCheck", "PostFlightValidation", "RollbackProcedure",
+]
+
+
+class KnowledgeNode(BaseModel):
+    """Epistemic knowledge node extracted from a skill.
+
+    Each node captures a single piece of cognitive/physical/temporal
+    knowledge that the skill imparts to the agent.
+    """
+    node_type: KnowledgeNodeType
+    directive_content: str  # The actual rule/guideline
+    applies_to_context: str  # When this rule applies
+    has_rationale: str       # Why this rule exists
+    severity_level: SeverityLevel | None = None  # Optional priority
+
+
 class ExtractedSkill(BaseModel):
     id: str
     hash: str
@@ -55,6 +102,7 @@ class ExtractedSkill(BaseModel):
     generated_by: str = "unknown"
     execution_payload: ExecutionPayload | None = None
     provenance: str | None = None
+    knowledge_nodes: list[KnowledgeNode] = []
 
     @model_validator(mode='before')
     @classmethod
