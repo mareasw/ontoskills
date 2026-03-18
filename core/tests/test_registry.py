@@ -6,6 +6,7 @@ from pathlib import Path
 from compiler.core_ontology import create_core_ontology
 from compiler.registry import (
     add_registry_source,
+    import_source_repository,
     enabled_index_path,
     install_package_from_directory,
     install_source_package_from_directory,
@@ -275,3 +276,56 @@ oc:skill_xlsx a oc:Skill, oc:ExecutableSkill ;
     assert package.source_kind == "source"
     assert package.package_id == "skillssh.office"
     assert all(not skill.enabled for skill in package.skills)
+
+
+def test_import_source_repository_discovers_skills_and_registers_package(tmp_path):
+    from unittest.mock import patch
+
+    root = tmp_path / "ontoskills"
+    create_core_ontology(root / "ontoclaw-core.ttl")
+
+    repo_dir = tmp_path / "ui-ux-pro-max-skill"
+    (repo_dir / ".claude" / "skills" / "ui-ux-pro-max").mkdir(parents=True, exist_ok=True)
+    (repo_dir / ".claude" / "skills" / "ui-ux-pro-max" / "SKILL.md").write_text("# UI UX Pro Max", encoding="utf-8")
+    (repo_dir / "src" / "landing-page").mkdir(parents=True, exist_ok=True)
+    (repo_dir / "src" / "landing-page" / "SKILL.md").write_text("# Landing Page", encoding="utf-8")
+
+    def fake_compile(source_root, compiled_root):
+        (compiled_root / ".claude" / "skills" / "ui-ux-pro-max").mkdir(parents=True, exist_ok=True)
+        (compiled_root / "src" / "landing-page").mkdir(parents=True, exist_ok=True)
+        (compiled_root / ".claude" / "skills" / "ui-ux-pro-max" / "ontoskill.ttl").write_text(
+            """
+@prefix oc: <http://ontoclaw.marea.software/ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+oc:skill_ui_ux_pro_max a oc:Skill, oc:DeclarativeSkill ;
+    dcterms:identifier "ui-ux-pro-max" ;
+    oc:nature "Design system skill" .
+""",
+            encoding="utf-8",
+        )
+        (compiled_root / "src" / "landing-page" / "ontoskill.ttl").write_text(
+            """
+@prefix oc: <http://ontoclaw.marea.software/ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+oc:skill_landing_page a oc:Skill, oc:DeclarativeSkill ;
+    dcterms:identifier "landing-page" ;
+    oc:nature "Landing page skill" .
+""",
+            encoding="utf-8",
+        )
+
+    with patch("compiler.registry.compile_source_tree", side_effect=fake_compile):
+        package = import_source_repository(
+            str(repo_dir),
+            root=root,
+            trust_tier="community",
+        )
+
+    assert package.package_id == "source.ui-ux-pro-max-skill"
+    assert package.source_kind == "source"
+    assert sorted(skill.skill_id for skill in package.skills) == ["landing-page", "ui-ux-pro-max"]
+    assert all(not skill.enabled for skill in package.skills)
+    lock = load_registry_lock(root)
+    assert package.package_id in lock.packages

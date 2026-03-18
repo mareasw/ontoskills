@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `rebuild-index`
 - Added support for importing remote ontology packages from registry indexes via `manifest_url`
 - Added support for importing remote source packages with `source_root` and `source_files`, then compiling them locally into the ontology root
+- Added direct raw source repository import from local paths or GitHub URLs via `import-source-repo`, with automatic `SKILL.md` discovery and local compilation
 - Added a local `registry/` blueprint directory and a formal package spec in `specs/registry-package-spec.md`
 
 ### Changed

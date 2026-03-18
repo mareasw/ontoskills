@@ -82,3 +82,15 @@ The registry index is a JSON file listing installable packages.
 - exact qualified id always wins
 - short id lookup precedence is:
   - `verified > local > trusted > community`
+
+## Direct Source Repository Import
+
+Besides manifest-based source packages, OntoClaw supports direct raw repository import.
+
+Expected behavior:
+- accept a local path or GitHub URL
+- clone/copy the repository
+- discover all `SKILL.md` files
+- compile them locally
+- register the result as `source_kind = "source"`
+- keep imported skills disabled by default

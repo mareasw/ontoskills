@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 import subprocess
 import sys
@@ -101,6 +102,9 @@ class RegistryPackageEntry(BaseModel):
 
 class RegistryIndex(BaseModel):
     packages: list[RegistryPackageEntry] = Field(default_factory=list)
+
+
+IGNORED_SOURCE_DIRS = {".git", "node_modules", ".venv", "target", "dist", "build", "__pycache__"}
 
 
 def ontology_root() -> Path:
@@ -351,6 +355,82 @@ def install_source_package_from_directory(
     return package_state
 
 
+def import_source_repository(
+    repo_ref: str,
+    root: Path | None = None,
+    trust_tier: TrustTier = "community",
+    package_id: str | None = None,
+) -> InstalledPackageState:
+    base = ensure_registry_layout(root)
+
+    with TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        repo_path, source_ref = materialize_source_repository(repo_ref, tmp_dir)
+        resolved_package_id = package_id or infer_source_package_id(repo_ref, repo_path)
+        skill_entries = discover_skill_entries(repo_path)
+        if not skill_entries:
+            raise ValueError(f"No SKILL.md files found in source repository: {repo_ref}")
+
+        destination_base = official_dir(base) if trust_tier == "verified" else community_dir(base)
+        install_root = destination_base / resolved_package_id
+        if install_root.exists():
+            shutil.rmtree(install_root)
+
+        raw_root = install_root / "source"
+        compiled_root = install_root / "compiled"
+        copy_source_tree(repo_path, raw_root)
+        compiled_root.mkdir(parents=True, exist_ok=True)
+        compile_source_tree(raw_root, compiled_root)
+
+        package_state = InstalledPackageState(
+            package_id=resolved_package_id,
+            version=datetime.now(UTC).strftime("import-%Y%m%d%H%M%S"),
+            trust_tier=trust_tier,
+            source=source_ref,
+            source_kind="source",
+            installed_at=datetime.now(UTC).isoformat(),
+            install_root=str(install_root),
+            manifest_path="",
+            skills=[
+                InstalledSkillState(
+                    skill_id=skill_id,
+                    module_path=str((compiled_root / module_path).resolve()),
+                    aliases=[],
+                    enabled=False,
+                    default_enabled=False,
+                )
+                for skill_id, module_path in skill_entries
+            ],
+        )
+
+        synthetic_manifest = {
+            "package_id": package_state.package_id,
+            "version": package_state.version,
+            "trust_tier": package_state.trust_tier,
+            "source": package_state.source,
+            "source_root": "source",
+            "skills": [
+                {
+                    "id": skill.skill_id,
+                    "path": str(Path(skill.module_path).relative_to(compiled_root)),
+                    "default_enabled": False,
+                    "aliases": [],
+                }
+                for skill in package_state.skills
+            ],
+        }
+        manifest_path = install_root / "package.json"
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(json.dumps(synthetic_manifest, indent=2), encoding="utf-8")
+        package_state.manifest_path = str(manifest_path)
+
+        lock = load_registry_lock(base)
+        lock.packages[package_state.package_id] = package_state
+        save_registry_lock(lock, base)
+        rebuild_registry_indexes(base)
+        return package_state
+
+
 def compile_source_tree(source_root: Path, compiled_root: Path) -> None:
     cli_path = Path(__file__).resolve().parent / "cli.py"
     command = [
@@ -371,6 +451,75 @@ def compile_source_tree(source_root: Path, compiled_root: Path) -> None:
         raise RuntimeError(
             f"Source package compilation failed with code {result.returncode}: {result.stderr or result.stdout}"
         )
+
+
+def materialize_source_repository(repo_ref: str, tmp_dir: Path) -> tuple[Path, str]:
+    local_path = Path(repo_ref)
+    if local_path.exists():
+        return local_path.resolve(), str(local_path.resolve())
+
+    repo_dir = tmp_dir / "repo"
+    command = ["git", "clone", "--depth", "1", repo_ref, str(repo_dir)]
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to clone source repository '{repo_ref}': {result.stderr or result.stdout}")
+    return repo_dir, repo_ref
+
+
+def infer_source_package_id(repo_ref: str, repo_path: Path) -> str:
+    parsed = urlparse(repo_ref)
+    if parsed.scheme in ("http", "https") and parsed.netloc.endswith("github.com"):
+        parts = [part for part in parsed.path.strip("/").split("/") if part]
+        if len(parts) >= 2:
+            owner = slugify_identifier(parts[0])
+            repo = slugify_identifier(parts[1].removesuffix(".git"))
+            return f"github.{owner}.{repo}"
+    return f"source.{slugify_identifier(repo_path.name)}"
+
+
+def slugify_identifier(value: str) -> str:
+    normalized = []
+    for char in value.lower():
+        if char.isalnum():
+            normalized.append(char)
+        elif not normalized or normalized[-1] != "-":
+            normalized.append("-")
+    return "".join(normalized).strip("-") or "imported"
+
+
+def is_ignored_source_path(path: Path, source_root: Path) -> bool:
+    try:
+        relative = path.relative_to(source_root)
+    except ValueError:
+        return True
+    return any(part in IGNORED_SOURCE_DIRS for part in relative.parts)
+
+
+def copy_source_tree(source_root: Path, destination_root: Path) -> None:
+    for path in source_root.rglob("*"):
+        if is_ignored_source_path(path, source_root):
+            continue
+        relative = path.relative_to(source_root)
+        destination = destination_root / relative
+        if path.is_dir():
+            destination.mkdir(parents=True, exist_ok=True)
+            continue
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, destination)
+
+
+def discover_skill_entries(source_root: Path) -> list[tuple[str, Path]]:
+    skills: list[tuple[str, Path]] = []
+    for skill_file in source_root.rglob("SKILL.md"):
+        if is_ignored_source_path(skill_file, source_root):
+            continue
+        skill_dir = skill_file.parent
+        relative = skill_dir.relative_to(source_root)
+        module_path = relative / "ontoskill.ttl"
+        skill_id = slugify_identifier(skill_dir.name)
+        skills.append((skill_id, module_path))
+    skills.sort(key=lambda item: (str(item[1]), item[0]))
+    return skills
 
 
 def _best_available_skill_id(

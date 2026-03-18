@@ -12,6 +12,7 @@ The current compiler/runtime can already consume this model through:
 - `ontoclaw registry add-source`
 - `ontoclaw install`
 - `ontoclaw import-source`
+- `ontoclaw import-source-repo`
 
 ## Layout
 
@@ -54,6 +55,22 @@ Required fields:
 Runtime rule:
 - source packages are compiled locally and installed as `source_kind = "source"`
 - their skills remain disabled by default
+
+### Direct source repository import
+
+OntoClaw also supports importing a raw source repository directly from a local path or GitHub URL.
+
+Example:
+
+```bash
+ontoclaw import-source-repo https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+```
+
+The importer:
+- clones or copies the repository
+- discovers every `SKILL.md`
+- compiles the discovered skills locally
+- registers the result as a community source package
 
 ## Registry Index
 

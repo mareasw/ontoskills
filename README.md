@@ -288,6 +288,9 @@ ontoclaw install marea.office
 # Import source package from registry
 ontoclaw import-source skillssh.office
 
+# Import a raw source repository directly from a local path or GitHub URL
+ontoclaw import-source-repo https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+
 # Local package install/import
 ontoclaw install-package /path/to/package-dir
 ontoclaw import-source-package /path/to/source-package-dir
@@ -334,6 +337,7 @@ Important runtime files:
 
 - **Ontology packages** distribute compiled `.ttl` modules
 - **Source packages** distribute raw skill sources and are compiled locally during import
+- **Source repositories** can also be imported directly; OntoClaw discovers `SKILL.md` files, compiles them locally, and registers the result as a community source package
 
 ### Identity Model
 

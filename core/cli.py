@@ -30,6 +30,7 @@ from compiler.registry import (
     disable_skills,
     enabled_index_path,
     ensure_registry_layout,
+    import_source_repository,
     install_package_from_directory,
     install_source_package_from_directory,
     install_package_from_sources,
@@ -489,6 +490,24 @@ def import_source_package_cmd(ctx, package_path, trust_tier, ontology_root_arg):
     console.print(f"[green]Imported source package {package.package_id}@{package.version}[/green]")
     console.print(f"  Trust: {package.trust_tier}")
     console.print(f"  Source kind: {package.source_kind}")
+    console.print(f"  Skills: {', '.join(skill.skill_id for skill in package.skills)}")
+    console.print("  Enabled skills: (none by default)")
+
+
+@cli.command('import-source-repo')
+@click.argument('repo_ref')
+@click.option('--package-id', default=None, help='Override the inferred package id')
+@click.option('--trust-tier', type=click.Choice(['verified', 'trusted', 'community']), default='community')
+@click.option('-o', '--ontology-root', 'ontology_root_arg', default=None, type=click.Path(path_type=Path))
+@click.pass_context
+def import_source_repo_cmd(ctx, repo_ref, package_id, trust_tier, ontology_root_arg):
+    """Import a raw source repository, compile discovered skills, and register the result."""
+    setup_logging(ctx.obj.get('verbose', False), ctx.obj.get('quiet', False))
+    root = ontology_root_arg or Path(resolve_ontology_root(OUTPUT_DIR))
+    package = import_source_repository(repo_ref, root=root, trust_tier=trust_tier, package_id=package_id)
+    console.print(f"[green]Imported source repository {package.package_id}[/green]")
+    console.print(f"  Trust: {package.trust_tier}")
+    console.print(f"  Source: {package.source}")
     console.print(f"  Skills: {', '.join(skill.skill_id for skill in package.skills)}")
     console.print("  Enabled skills: (none by default)")
 
