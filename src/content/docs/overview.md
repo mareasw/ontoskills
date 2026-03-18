@@ -1,11 +1,11 @@
 ---
-title: What is OntoClaw?
+title: What is OntoSkills?
 description: Neuro-symbolic skill core for the Agentic Web
 ---
 
-**OntoClaw** is a complete neuro-symbolic platform for building deterministic, enterprise-grade AI agents. It transforms natural language skill definitions into **validated OWL 2 ontologies** — queryable knowledge graphs that enable deterministic reasoning.
+**OntoSkills** is a complete neuro-symbolic platform for building deterministic, enterprise-grade AI agents. It transforms natural language skill definitions into **validated OWL 2 ontologies** — queryable knowledge graphs that enable deterministic reasoning.
 
-## Why OntoClaw?
+## Why OntoSkills?
 
 ### The Determinism Problem
 
@@ -17,7 +17,7 @@ LLMs read skills probabilistically. Same query, different results. Long skill fi
 
 ### The Ontological Solution
 
-OntoClaw transforms skills into formal ontologies with **Description Logics (OWL 2)**:
+OntoSkills transforms skills into formal ontologies with **Description Logics (OWL 2)**:
 
 - **Deterministic queries** — SPARQL returns exact answers, every time
 - **Entailment reasoning** — Infer dependencies, conflicts, capabilities
@@ -56,15 +56,15 @@ For 100 skills: **~500KB text scan → ~1KB query**
 | **OntoSkills** | Turtle | Generated | Compiled ontology output |
 | **OntoMCP** | Rust | ✅ Ready | MCP server with 12 semantic tools |
 | **OntoStore** | TBD | 🚧 Planned | Versioned skill registry |
-| **OntoClaw** | Python/Rust | 📋 Planned | Enterprise AI agent |
+| **OntoClaw** | Python/Rust | 📋 Planned | Enterprise AI agent (future phase) |
 | **skills/** | Markdown | ✅ Ready | Input skill definitions |
 | **specs/** | Turtle | ✅ Ready | SHACL shapes constitution |
 
 ## Get Started
 
-[Get Started](/getting-started/) with OntoClaw in minutes.
+[Get Started](/getting-started/) with OntoSkills in minutes.
 
 ## Links
 
-- [GitHub Repository](https://github.com/mareasoftware/ontoclaw)
+- [GitHub Repository](https://github.com/mareasoftware/ontoskills)
 - [Roadmap](/roadmap/)

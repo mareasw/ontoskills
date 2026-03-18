@@ -66,6 +66,6 @@ The agent. OntoClaw joins the Claw family (OpenClaw, NanoClaw, ZeroClaw) as an a
 
 ## Track Progress
 
-Follow development on [GitHub](https://github.com/mareasoftware/ontoclaw).
+Follow development on [GitHub](https://github.com/mareasoftware/ontoskills).
 
-Have ideas? [Open an issue](https://github.com/mareasoftware/ontoclaw/issues).
+Have ideas? [Open an issue](https://github.com/mareasoftware/ontoskills/issues).
