@@ -77,7 +77,7 @@ flowchart LR
 
 The server loads compiled `.ttl` files from a directory:
 
-- `ontoclaw-core.ttl` — Core TBox ontology with states
+- `ontoskills-core.ttl` — Core TBox ontology with states
 - `index.ttl` — Manifest with `owl:imports`
 - `*/ontoskill.ttl` — Individual skill modules
 
@@ -87,7 +87,7 @@ The server loads compiled `.ttl` files from a directory:
 ```bash
 --ontology-root /path/to/ontoskills
 # or
-ONTOCLAW_MCP_ONTOLOGY_ROOT=/path/to/ontoskills
+ONTOSKILLS_MCP_ONTOLOGY_ROOT=/path/to/ontoskills
 ```
 
 ---
@@ -113,15 +113,15 @@ cargo run --manifest-path mcp/Cargo.toml -- --ontology-root ./ontoskills
 Register the MCP server:
 
 ```bash
-claude mcp add ontoclaw -- \
-  cargo run --manifest-path /absolute/path/to/ontoclaw/mcp/Cargo.toml
+claude mcp add ontoskills -- \
+  cargo run --manifest-path /absolute/path/to/ontoskills/mcp/Cargo.toml
 ```
 
 After registration, Claude Code can call:
 
 ```mermaid
 flowchart LR
-    CLAUDE["Claude Code"] -->|"search_skills"| TOOLS["ontoclaw MCP"]
+    CLAUDE["Claude Code"] -->|"search_skills"| TOOLS["OntoSkills MCP"]
     CLAUDE -->|"get_skill_context"| TOOLS
     CLAUDE -->|"evaluate_execution_plan"| TOOLS
     CLAUDE -->|"query_epistemic_rules"| TOOLS

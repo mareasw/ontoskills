@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <a href="#the-ontoclaw-ecosystem">Ecosystem</a> •
+  <a href="#the-ontoskills-ecosystem">Ecosystem</a> •
   <a href="#use-cases">Use Cases</a> •
   <a href="#installation">Installation</a> •
   <a href="#cli-commands">CLI</a> •
@@ -212,8 +212,8 @@ The classification is **automatic** - you don't specify it. If a skill has code 
 
 ```bash
 # Clone repository
-git clone https://github.com/marea-software/ontoclaw.git
-cd ontoclaw
+git clone https://github.com/marea-software/ontoskills.git
+cd ontoskills
 
 # Install OntoCore
 cd core
@@ -262,56 +262,56 @@ The local MCP server in [mcp/](mcp/) is a standalone Rust crate built with:
 
 ```bash
 # Initialize core ontology with predefined states
-ontoclaw init-core
+ontoskills init-core
 
 # Compile all skills to ontology
-ontoclaw compile
+ontoskills compile
 
 # Compile specific skill
-ontoclaw compile my-skill
+ontoskills compile my-skill
 
 # Compile a nested skill path
-ontoclaw compile demo/markdown-inventory
+ontoskills compile demo/markdown-inventory
 
 # Query ontology with SPARQL
-ontoclaw query "SELECT ?s WHERE { ?s a oc:Skill }"
+ontoskills query "SELECT ?s WHERE { ?s a oc:Skill }"
 
 # List all skills
-ontoclaw list-skills
+ontoskills list-skills
 
 # Run security audit
-ontoclaw security-audit
+ontoskills security-audit
 
 # ─── Ontology Analysis ─────────────────────────────────
 
 # Lint compiled ontology for structural issues
-ontoclaw lint
+ontoskills lint
 
 # Lint with JSON output (for CI/CD)
-ontoclaw lint --format json
+ontoskills lint --format json
 
 # Show a human-readable summary card for a skill
-ontoclaw explain pdf
+ontoskills explain pdf
 
 # Visualize skill state transitions as Mermaid graph
-ontoclaw graph
+ontoskills graph
 
 # Export graph as DOT format
-ontoclaw graph --format dot --output graph.dot
+ontoskills graph --format dot --output graph.dot
 
 # Show 1-hop subgraph around a skill
-ontoclaw graph --skill pdf
+ontoskills graph --skill pdf
 
 # ─── Drift Detection ───────────────────────────────────
 
 # Compare current ontology against previous snapshot
-ontoclaw diff
+ontoskills diff
 
 # Show only breaking changes (exit code 9 if found)
-ontoclaw diff --breaking-only
+ontoskills diff --breaking-only
 
 # Generate migration suggestions for breaking changes
-ontoclaw diff --suggest
+ontoskills diff --suggest
 ```
 
 ### Command Options
@@ -406,14 +406,14 @@ Current Rust test coverage includes:
 | 6 | `SPARQLError` | Invalid SPARQL query |
 | 7 | `SkillNotFoundError` | Skill not found in ontology |
 | **8** | `OntologyValidationError` | **SHACL validation failed** |
-| **9** | `DriftDetectedError` | **Breaking changes detected by `ontoclaw diff`** |
+| **9** | `DriftDetectedError` | **Breaking changes detected by `ontoskills diff`** |
 
 ---
 
 ## Project Structure
 
 ```
-ontoclaw/
+ontoskills/
 ├── core/                    # OntoCore — Python skill compiler
 │   ├── cli.py               # Click CLI interface
 │   ├── config.py            # Configuration constants

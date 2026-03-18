@@ -101,12 +101,12 @@ def enrich_extracted_skill(extracted, skill_dir: Path, input_path: Path):
 
 
 @click.group()
-@click.version_option(version=__version__, prog_name="ontocore")
+@click.version_option(version=__version__, prog_name="ontoskills")
 @click.option('-v', '--verbose', is_flag=True, help='Enable debug logging')
 @click.option('-q', '--quiet', is_flag=True, help='Suppress progress output')
 @click.pass_context
 def cli(ctx, verbose, quiet):
-    """Ontoclaw Compiler - Compile markdown skills to modular OWL 2 ontology."""
+    """OntoSkills Compiler - Compile markdown skills to modular OWL 2 ontology."""
     setup_logging(verbose, quiet)
     ctx.ensure_object(dict)
     ctx.obj['verbose'] = verbose
@@ -387,7 +387,7 @@ def query_cmd(ctx, query_string, ontology_file, output_format, verbose, quiet):
     """Execute SPARQL query against ontology.
 
     Example:
-        ontoclaw query "SELECT ?s ?n WHERE { ?s oc:nature ?n }" -f json
+        ontoskills query "SELECT ?s ?n WHERE { ?s oc:nature ?n }" -f json
     """
     setup_logging(verbose or ctx.obj.get('verbose', False), quiet or ctx.obj.get('quiet', False))
 
@@ -590,8 +590,8 @@ def explain_cmd(ctx, skill_id, ontology_file):
 
     \b
     Example:
-      ontoclaw explain create-pdf
-      ontoclaw explain create-pdf -o ./ontoskills/index.ttl
+      ontoskills explain create-pdf
+      ontoskills explain create-pdf -o ./ontoskills/index.ttl
     """
     from rich import box
     from rich.panel import Panel
@@ -707,10 +707,10 @@ def graph_cmd(ctx, ontology_file, fmt, skill, output):
 
     \b
     Examples:
-      ontoclaw graph                          # Mermaid to stdout
-      ontoclaw graph --format dot             # DOT to stdout
-      ontoclaw graph --skill create-pdf       # 1-hop subgraph
-      ontoclaw graph --output graph.mmd       # save to file
+      ontoskills graph                          # Mermaid to stdout
+      ontoskills graph --format dot             # DOT to stdout
+      ontoskills graph --skill create-pdf       # 1-hop subgraph
+      ontoskills graph --output graph.mmd       # save to file
     """
     ontology_path = Path(ontology_file)
     if not ontology_path.exists():

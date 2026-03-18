@@ -69,7 +69,7 @@ Updated the PR #5 tooling to work with the current ontology structure (knowledge
 
 ### Added
 
-#### Static Linter (`ontoclaw lint`)
+#### Static Linter (`ontoskills lint`)
 
 Analyses the compiled ontology without calling the Anthropic API.
 Catches structural issues before they reach runtime or waste API tokens.
@@ -83,7 +83,7 @@ Catches structural issues before they reach runtime or waste API tokens.
 - **core/cli.py** — `lint` command: `--ontology`, `--format` (rich/json), `--errors-only`
   - Exit code 1 when errors found (CI gate)
 
-#### Dependency Graph Visualiser (`ontoclaw graph`)
+#### Dependency Graph Visualiser (`ontoskills graph`)
 
 Exports the skill relationship graph as Mermaid or Graphviz DOT.
 
@@ -94,7 +94,7 @@ Exports the skill relationship graph as Mermaid or Graphviz DOT.
 - **core/tests/test_graph_export.py** — 7 tests
 - **core/cli.py** — `graph` command: `--ontology`, `--format` (mermaid/dot), `--skill`, `--output`
 
-#### Skill Explainer (`ontoclaw explain <skill-id>`)
+#### Skill Explainer (`ontoskills explain <skill-id>`)
 
 Renders a Rich summary card for a compiled skill without reading raw Turtle.
 
@@ -106,7 +106,7 @@ Renders a Rich summary card for a compiled skill without reading raw Turtle.
 - **core/cli.py** — `explain` command: positional `SKILL_ID`, `--ontology`
   - Prints available IDs when skill not found
 
-#### Migration Guidance (`ontoclaw diff --suggest`)
+#### Migration Guidance (`ontoskills diff --suggest`)
 
 Extends the Skill Drift Detector with actionable remediation for breaking changes.
 
@@ -181,14 +181,14 @@ Extends the Skill Drift Detector with actionable remediation for breaking change
 
 ### Added
 
-#### Skill Drift Detector (`ontoclaw diff`)
+#### Skill Drift Detector (`ontoskills diff`)
 
 Semantic diffing system that compares two versions of the compiled ontology
 and classifies every change by its impact on agents querying the graph.
 
 - **core/snapshot.py** — Snapshot manager
   - `save_snapshot(ttl_path)`: saves a timestamped, SHA-256-hashed copy of
-    `index.ttl` into `.ontoclaw/snapshots/` after every successful compile
+    `index.ttl` into `.ontoskills/snapshots/` after every successful compile
   - `get_latest_snapshot()`: returns the second-to-last snapshot (baseline
     for the next diff)
   - `_prune_snapshots(keep=10)`: keeps only the 10 most recent snapshots
@@ -227,7 +227,7 @@ and classifies every change by its impact on agents querying the graph.
 
 - **`skill.ttl` → `ontoskill.ttl`** - Output skill modules are now named `ontoskill.ttl` instead of `skill.ttl`
   - Affects all path references in code and tests
-  - Run `ontoclaw compile --force` after upgrading to regenerate modules with new naming
+  - Run `ontoskills compile --force` after upgrading to regenerate modules with new naming
 
 ### Changed
 
@@ -316,7 +316,7 @@ The monolithic `loader.py` (855 lines) has been refactored into 3 focused module
 
 - **`--force` flag** for `compile` command - Bypass hash-based caching to force recompilation of all skills
   - Useful when SHACL schemas or LLM prompts are updated
-  - Usage: `ontoclaw compile --force` or `ontoclaw compile -f`
+  - Usage: `ontoskills compile --force` or `ontoskills compile -f`
 
 #### Lifecycle Management
 
