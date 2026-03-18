@@ -22,6 +22,7 @@
   <a href="#use-cases">Use Cases</a> •
   <a href="#installation">Installation</a> •
   <a href="#cli-commands">CLI</a> •
+  <a href="#registry-and-packages">Registry</a> •
   <a href="#local-mcp-server">MCP Server</a> •
   <a href="PHILOSOPHY.md">Philosophy</a>
 </p>
@@ -276,6 +277,26 @@ ontoclaw list-skills
 
 # Run security audit
 ontoclaw security-audit
+
+# Configure registry sources
+ontoclaw registry add-source official ./registry/index.json --trust-tier verified
+ontoclaw registry list
+
+# Install ontology package from registry
+ontoclaw install marea.office
+
+# Import source package from registry
+ontoclaw import-source skillssh.office
+
+# Local package install/import
+ontoclaw install-package /path/to/package-dir
+ontoclaw import-source-package /path/to/source-package-dir
+
+# Activation and index rebuild
+ontoclaw enable marea.office xlsx
+ontoclaw disable marea.office xlsx
+ontoclaw list-installed
+ontoclaw rebuild-index
 ```
 
 ### Command Options
@@ -287,12 +308,47 @@ ontoclaw security-audit
 | `--dry-run` | Preview without saving |
 | `--skip-security` | Skip security checks (not recommended) |
 | `-f, --force` | Force recompilation (bypass hash-based cache) |
-| `--reason/--no-reason` | Apply OWL reasoning |
 | `-y, --yes` | Skip confirmation |
 | `-v, --verbose` | Debug logging |
 | `-q, --quiet` | Suppress progress |
 
 ---
+
+## Registry And Packages
+
+OntoClaw now supports a global ontology registry rooted in `ontoskills/` with:
+
+- `local/` for local compiled skills
+- `official/` for verified imported packages
+- `community/` for community imported packages
+- `system/` for lockfiles and aggregated manifests
+
+Important runtime files:
+
+- `ontoskills/system/registry.lock.json`
+- `ontoskills/system/registry.sources.json`
+- `ontoskills/system/index.installed.ttl`
+- `ontoskills/system/index.enabled.ttl`
+
+### Package Types
+
+- **Ontology packages** distribute compiled `.ttl` modules
+- **Source packages** distribute raw skill sources and are compiled locally during import
+
+### Identity Model
+
+- Canonical identity: `package_id/skill_id`
+- Short ids like `xlsx` remain valid as lookup conveniences
+- Ambiguous short ids resolve with precedence:
+  - `verified > local > trusted > community`
+
+### Blueprint
+
+The future official registry mono-repo is prototyped locally in:
+
+- [registry/README.md](registry/README.md)
+- [registry/index.json](registry/index.json)
+- [specs/registry-package-spec.md](specs/registry-package-spec.md)
 
 ## Local MCP Server
 
@@ -309,18 +365,10 @@ The server does **not** execute skill payloads. Payload execution is delegated t
 
 ### Implemented MCP Tools
 
-- `list_skills`
-- `find_skills_by_intent`
-- `get_skill`
-- `get_skill_requirements`
-- `get_skill_transitions`
-- `get_skill_dependencies`
-- `get_skill_conflicts`
-- `find_skills_yielding_state`
-- `find_skills_requiring_state`
-- `check_skill_applicability`
-- `plan_from_intent`
-- `get_skill_payload`
+- `search_skills`
+- `get_skill_context`
+- `evaluate_execution_plan`
+- `query_epistemic_rules`
 
 ### Run The MCP Server
 
@@ -352,8 +400,9 @@ cargo test
 Current Rust test coverage includes:
 
 - intent lookup
-- payload lookup
-- planning with preparatory skills
+- knowledge-aware skill context
+- enabled manifest loading
+- qualified id resolution and precedence
 - planner preference for direct skills over setup-heavy alternatives
 
 ---
