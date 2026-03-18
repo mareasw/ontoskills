@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -105,6 +106,7 @@ class RegistryIndex(BaseModel):
 
 
 IGNORED_SOURCE_DIRS = {".git", "node_modules", ".venv", "target", "dist", "build", "__pycache__"}
+SKILL_SCRIPT_PATH_RE = re.compile(r"skills/([A-Za-z0-9._-]+)/([^\s\"']+)")
 
 
 def ontology_root() -> Path:
@@ -323,6 +325,7 @@ def install_source_package_from_directory(
     shutil.copy2(manifest_path, copied_manifest)
 
     compile_source_tree(raw_root, compiled_root)
+    rewrite_compiled_payload_paths(compiled_root)
 
     skills = []
     for skill in manifest.skills:
@@ -381,6 +384,7 @@ def import_source_repository(
         copy_source_tree(repo_path, raw_root)
         compiled_root.mkdir(parents=True, exist_ok=True)
         compile_source_tree(raw_root, compiled_root)
+        rewrite_compiled_payload_paths(compiled_root)
 
         package_state = InstalledPackageState(
             package_id=resolved_package_id,
@@ -451,6 +455,30 @@ def compile_source_tree(source_root: Path, compiled_root: Path) -> None:
         raise RuntimeError(
             f"Source package compilation failed with code {result.returncode}: {result.stderr or result.stdout}"
         )
+
+
+def rewrite_compiled_payload_paths(compiled_root: Path) -> None:
+    for ttl_path in compiled_root.rglob("*.ttl"):
+        original = ttl_path.read_text(encoding="utf-8")
+        rewritten = rewrite_payload_text(original, compiled_root)
+        if rewritten != original:
+            ttl_path.write_text(rewritten, encoding="utf-8")
+
+
+def rewrite_payload_text(payload: str, compiled_root: Path) -> str:
+    def replace(match: re.Match[str]) -> str:
+        skill_id = match.group(1)
+        relative_path = Path(match.group(2))
+        for candidate in (
+            compiled_root / "src" / skill_id / relative_path,
+            compiled_root / ".claude" / "skills" / skill_id / relative_path,
+            compiled_root / skill_id / relative_path,
+        ):
+            if candidate.exists():
+                return candidate.resolve().as_posix()
+        return match.group(0)
+
+    return SKILL_SCRIPT_PATH_RE.sub(replace, payload)
 
 
 def materialize_source_repository(repo_ref: str, tmp_dir: Path) -> tuple[Path, str]:

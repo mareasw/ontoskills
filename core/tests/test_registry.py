@@ -329,3 +329,50 @@ oc:skill_landing_page a oc:Skill, oc:DeclarativeSkill ;
     assert all(not skill.enabled for skill in package.skills)
     lock = load_registry_lock(root)
     assert package.package_id in lock.packages
+
+
+def test_import_source_repository_rewrites_compiled_payload_script_paths(tmp_path):
+    from unittest.mock import patch
+
+    root = tmp_path / "ontoskills"
+    create_core_ontology(root / "ontoclaw-core.ttl")
+
+    repo_dir = tmp_path / "ui-ux-pro-max-skill"
+    (repo_dir / ".claude" / "skills" / "ui-ux-pro-max").mkdir(parents=True, exist_ok=True)
+    (repo_dir / ".claude" / "skills" / "ui-ux-pro-max" / "SKILL.md").write_text("# UI UX Pro Max", encoding="utf-8")
+
+    def fake_compile(source_root, compiled_root):
+        (compiled_root / ".claude" / "skills" / "ui-ux-pro-max").mkdir(parents=True, exist_ok=True)
+        (compiled_root / "src" / "ui-ux-pro-max" / "scripts").mkdir(parents=True, exist_ok=True)
+        (compiled_root / "src" / "ui-ux-pro-max" / "scripts" / "search.py").write_text(
+            "print('search')",
+            encoding="utf-8",
+        )
+        (compiled_root / ".claude" / "skills" / "ui-ux-pro-max" / "ontoskill.ttl").write_text(
+            """
+@prefix oc: <http://ontoclaw.marea.software/ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+oc:skill_ui_ux_pro_max a oc:Skill, oc:DeclarativeSkill ;
+    dcterms:identifier "ui-ux-pro-max" ;
+    oc:nature "Design system skill" ;
+    oc:hasPayload [
+        a oc:PythonCode ;
+        oc:code "python3 skills/ui-ux-pro-max/scripts/search.py \\"hero section\\""
+    ] .
+""",
+            encoding="utf-8",
+        )
+
+    with patch("compiler.registry.compile_source_tree", side_effect=fake_compile):
+        package = import_source_repository(
+            str(repo_dir),
+            root=root,
+            trust_tier="community",
+        )
+
+    ttl_path = Path(package.install_root) / "compiled" / ".claude" / "skills" / "ui-ux-pro-max" / "ontoskill.ttl"
+    payload = ttl_path.read_text(encoding="utf-8")
+    expected_script = (Path(package.install_root) / "compiled" / "src" / "ui-ux-pro-max" / "scripts" / "search.py").resolve().as_posix()
+    assert expected_script in payload
+    assert "skills/ui-ux-pro-max/scripts/search.py" not in payload
