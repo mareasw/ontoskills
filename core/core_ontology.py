@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from rdflib import Graph, Namespace, RDF, RDFS, OWL, Literal, URIRef
+from rdflib import Graph, Namespace, RDF, RDFS, OWL, Literal, URIRef, BNode
 from rdflib.namespace import DCTERMS, SKOS, PROV
 
 from compiler.config import BASE_URI, CORE_STATES, FAILURE_STATES, OUTPUT_DIR
@@ -27,6 +27,63 @@ logger = logging.getLogger(__name__)
 def get_oc_namespace() -> Namespace:
     """Get the OntoClaw namespace using configured BASE_URI."""
     return Namespace(BASE_URI)
+
+
+def _add_knowledge_hierarchy(g: Graph, oc: Namespace) -> None:
+    """Add the 10-dimensional knowledge hierarchy to the ontology."""
+
+    # Define hierarchy: (parent, [children])
+    DIMENSIONS = {
+        "KnowledgeNode": ["NormativeRule", "StrategicInsight", "ResilienceTactic",
+                          "ExecutionPhysics", "Observability", "SecurityGuardrail",
+                          "CognitiveBoundary", "ResourceProfile", "TrustMetric", "LifecycleHook"],
+        "NormativeRule": ["Standard", "AntiPattern", "Constraint"],
+        "StrategicInsight": ["Heuristic", "DesignPrinciple", "WorkflowStrategy"],
+        "ResilienceTactic": ["KnownIssue", "RecoveryTactic"],
+        "ExecutionPhysics": ["Idempotency", "SideEffect", "PerformanceProfile"],
+        "Observability": ["SuccessIndicator", "TelemetryPattern"],
+        "SecurityGuardrail": ["SecurityImplication", "DestructivePotential", "FallbackStrategy"],
+        "CognitiveBoundary": ["RequiresHumanClarification", "AssumptionBoundary", "AmbiguityTolerance"],
+        "ResourceProfile": ["TokenEconomy", "ComputeCost"],
+        "TrustMetric": ["ExecutionDeterminism", "DataProvenance"],
+        "LifecycleHook": ["PreFlightCheck", "PostFlightValidation", "RollbackProcedure"],
+    }
+
+    for parent_name, child_names in DIMENSIONS.items():
+        parent_uri = oc[parent_name]
+        for child_name in child_names:
+            child_uri = oc[child_name]
+            g.add((child_uri, RDF.type, OWL.Class))
+            g.add((child_uri, RDFS.subClassOf, parent_uri))
+            g.add((child_uri, RDFS.label, Literal(child_name)))
+
+
+def _add_knowledge_rbox(g: Graph, oc: Namespace) -> None:
+    """Add Role Box (RBox) axioms for epistemic properties."""
+
+    # 1. Asymmetry and Irreflexivity
+    # A skill imparts knowledge, but knowledge cannot impart a skill.
+    g.add((oc.impartsKnowledge, RDF.type, OWL.AsymmetricProperty))
+    g.add((oc.impartsKnowledge, RDF.type, OWL.IrreflexiveProperty))
+
+    # 2. Knowledge Inheritance (Property Chain)
+    # Define a super-property for inferred knowledge
+    g.add((oc.inheritsKnowledge, RDF.type, OWL.ObjectProperty))
+    g.add((oc.inheritsKnowledge, RDFS.label, Literal("inherits knowledge")))
+
+    # Base knowledge is a sub-property of inherited knowledge
+    g.add((oc.impartsKnowledge, RDFS.subPropertyOf, oc.inheritsKnowledge))
+
+    # CHAIN AXIOM: oc:extends ∘ oc:impartsKnowledge ⊑ oc:inheritsKnowledge
+    # If Skill A extends Skill B, and B imparts Knowledge X, then A inherits Knowledge X.
+    # Create RDF list for property chain: (extends, impartsKnowledge)
+    chain_head = BNode()
+    chain_second = BNode()
+    g.add((oc.inheritsKnowledge, OWL.propertyChainAxiom, chain_head))
+    g.add((chain_head, RDF.first, oc.extends))
+    g.add((chain_head, RDF.rest, chain_second))
+    g.add((chain_second, RDF.first, oc.impartsKnowledge))
+    g.add((chain_second, RDF.rest, RDF.nil))
 
 
 def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
@@ -119,6 +176,62 @@ def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
     g.add((oc.ExecutionPayload, RDFS.comment, Literal(
         "Container for executable code and execution metadata"
     )))
+
+    # ========== Knowledge Node Foundation ==========
+
+    # oc:KnowledgeNode - Base class for epistemic knowledge
+    g.add((oc.KnowledgeNode, RDF.type, OWL.Class))
+    g.add((oc.KnowledgeNode, RDFS.label, Literal("Knowledge Node")))
+    g.add((oc.KnowledgeNode, RDFS.comment, Literal(
+        "Epistemic knowledge imparted by a skill to an agent"
+    )))
+
+    # oc:impartsKnowledge (ObjectProperty) - Skill → KnowledgeNode
+    g.add((oc.impartsKnowledge, RDF.type, OWL.ObjectProperty))
+    g.add((oc.impartsKnowledge, RDFS.domain, oc.Skill))
+    g.add((oc.impartsKnowledge, RDFS.range, oc.KnowledgeNode))
+    g.add((oc.impartsKnowledge, RDFS.label, Literal("imparts knowledge")))
+    g.add((oc.impartsKnowledge, RDFS.comment, Literal(
+        "Links a skill to epistemic knowledge it imparts to the agent"
+    )))
+
+    # oc:directiveContent (DatatypeProperty)
+    g.add((oc.directiveContent, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.directiveContent, RDFS.domain, oc.KnowledgeNode))
+    g.add((oc.directiveContent, RDFS.label, Literal("directive content")))
+    g.add((oc.directiveContent, RDFS.comment, Literal(
+        "The actual rule/guideline text"
+    )))
+
+    # oc:appliesToContext (DatatypeProperty)
+    g.add((oc.appliesToContext, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.appliesToContext, RDFS.domain, oc.KnowledgeNode))
+    g.add((oc.appliesToContext, RDFS.label, Literal("applies to context")))
+    g.add((oc.appliesToContext, RDFS.comment, Literal(
+        "When this rule applies"
+    )))
+
+    # oc:hasRationale (DatatypeProperty)
+    g.add((oc.hasRationale, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.hasRationale, RDFS.domain, oc.KnowledgeNode))
+    g.add((oc.hasRationale, RDFS.label, Literal("has rationale")))
+    g.add((oc.hasRationale, RDFS.comment, Literal(
+        "Why this rule exists"
+    )))
+
+    # oc:severityLevel (DatatypeProperty)
+    g.add((oc.severityLevel, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.severityLevel, RDFS.domain, oc.KnowledgeNode))
+    g.add((oc.severityLevel, RDFS.label, Literal("severity level")))
+    g.add((oc.severityLevel, RDFS.comment, Literal(
+        "Must be one of: CRITICAL, HIGH, MEDIUM, LOW"
+    )))
+
+    # Add the 10-dimensional hierarchy
+    _add_knowledge_hierarchy(g, oc)
+
+    # Add RBox axioms for knowledge inheritance
+    _add_knowledge_rbox(g, oc)
 
     # ========== State Transition Properties ==========
 
