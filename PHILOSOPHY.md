@@ -244,28 +244,25 @@ Every compiled skill carries:
 
 ## 9. Research Foundations
 
-OntoClaw builds on decades of research in Knowledge Representation and Reasoning:
+OntoClaw builds on decades of research in Knowledge Representation, Logical Reasoning, and modern AI:
 
-### Description Logics
-- Baader, F., et al. (2003). *The Description Logic Handbook*. Cambridge University Press.
-- Horrocks, I., et al. (2006). "OWL 1.1: The Next Steps". *ISWC*.
+**Description Logics & Reasoning**
+* Baader, F., Calvanese, D., McGuinness, D., Nardi, D., & Patel-Schneider, P. (2003). *The Description Logic Handbook*. Cambridge University Press.
+* Horrocks, I., Kutz, O., & Sattler, U. (2006). "The Even More Irresistible SROIQ". *Proceedings of KR-2006*. (The mathematical foundation of OWL 2).
 
-### OWL 2 Specification
-- W3C OWL 2 Web Ontology Language (2009). [https://www.w3.org/TR/owl2-overview/](https://www.w3.org/TR/owl2-overview/)
-- Motik, B., et al. (2009). "OWL 2: The Next Generation". *Journal of Web Semantics*.
+**Ontologies & Validation (W3C)**
+* W3C OWL 2 Web Ontology Language (2009). https://www.w3.org/TR/owl2-overview/
+* Cuenca Grau, B., Horrocks, I., Motik, B., et al. (2008). "OWL 2: The next step for OWL". *Journal of Web Semantics*.
+* Knublauch, H., & Kontokostas, D. (2017). "Shapes Constraint Language (SHACL)". *W3C Recommendation*.
 
-### Knowledge Representation
-- Brachman, R., Levesque, H. (2004). *Knowledge Representation and Reasoning*. Morgan Kaufmann.
-- Sowa, J. (2000). *Knowledge Representation*. Brooks/Cole.
+**Knowledge Representation**
+* Brachman, R., Levesque, H. (2004). *Knowledge Representation and Reasoning*. Morgan Kaufmann.
+* Sowa, J. (2000). *Knowledge Representation: Logical, Philosophical, and Computational Foundations*. Brooks/Cole.
 
-### Neuro-Symbolic AI
-- d'Avila Garcez, A., Lamb, L. (2020). "Neurosymbolic AI: The 3rd Wave". *arXiv:2012.05876*.
-- Raaijmakers, S. (2023). *AI Generation: Rendering the Future*. (Neuro-symbolic chapter)
-
-### Semantic Web Technologies
-- Heath, T., Bizer, C. (2011). "Linked Data: Evolving the Web into a Global Data Space". *Synthesis Lectures on the Semantic Web*.
-- SPARQL 1.1 Query Language (2013). [https://www.w3.org/TR/sparql11-query/](https://www.w3.org/TR/sparql11-query/)
-
----
+**Neuro-Symbolic AI & Semantic Web**
+* d'Avila Garcez, A., Lamb, L. (2020). "Neurosymbolic AI: The 3rd Wave". *arXiv:2012.05876*.
+* Pan, S., et al. (2024). "Unifying Large Language Models and Knowledge Graphs: A Roadmap". *IEEE TKDE*.
+* Heath, T., Bizer, C. (2011). "Linked Data: Evolving the Web into a Global Data Space". *Synthesis Lectures on the Semantic Web*.
+* SPARQL 1.1 Query Language (2013). https://www.w3.org/TR/sparql11-query/
 
 *OntoClaw is the bridge: neural flexibility for extraction, symbolic rigor for storage, precise queries for retrieval.*
