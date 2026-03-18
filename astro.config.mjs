@@ -1,6 +1,7 @@
 import { defineConfig } from 'astro/config';
 import tailwind from '@astrojs/tailwind';
 import starlight from '@astrojs/starlight';
+import sitemap from '@astrojs/sitemap';
 
 export default defineConfig({
   prefetch: {
@@ -8,6 +9,7 @@ export default defineConfig({
     defaultStrategy: 'hover'
   },
   integrations: [
+    sitemap(),
     starlight({
       title: 'OntoClaw',
       description: 'Neuro-symbolic skill compiler for the Agentic Web',

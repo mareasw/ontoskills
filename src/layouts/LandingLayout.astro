@@ -16,6 +16,26 @@ const {
   title = 'OntoClaw - Semantic Infrastructure for the Agentic Web',
   description = 'Empower your AI agents with schema-first querying. Compile human-readable skills into modular, deterministic ontologies.'
 } = Astro.props;
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "OntoClaw",
+  "description": description,
+  "url": "https://ontoclaw.marea.software",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Any",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "author": {
+    "@type": "Organization",
+    "name": "Marea Software",
+    "url": "https://marea.software"
+  }
+};
 ---
 
 <html lang="en">
@@ -31,6 +51,7 @@ const {
     <meta name="twitter:card" content="summary_large_image" />
     <title>{title}</title>
     <ViewTransitions />
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </head>
   <body class="min-h-screen bg-bg-primary">
     <slot />
