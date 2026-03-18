@@ -162,9 +162,9 @@ Every skill must pass SHACL validation before being written to disk. The constit
 |------------|------|---------------|
 | `resolvesIntent` | Required (min 1) | "Ogni Skill deve avere almeno un resolvesIntent" |
 | `generatedBy` | Required (exactly 1) | "Ogni Skill deve avere esattamente un generatedBy" |
-| `requiresState` | Must be IRI of `oc:State` | "requiresState deve essere un URI che punta a un'istanza di oc:State" |
-| `yieldsState` | Must be IRI of `oc:State` | "yieldsState deve essere un URI..." |
-| `handlesFailure` | Must be IRI of `oc:State` | "handlesFailure deve essere un URI..." |
+| `requiresState` | Must be IRI | "requiresState deve essere un URI" |
+| `yieldsState` | Must be IRI | "yieldsState deve essere un URI" |
+| `handlesFailure` | Must be IRI | "handlesFailure deve essere un URI" |
 
 ---
 
