@@ -1,0 +1,113 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix oc: <http://ontoclaw.marea.software/ontology#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://ontoclaw.marea.software/ontology> owl:imports <file:///Users/marcello/Developer/Marea/ontoclaw/ontoskills/ontoclaw-core.ttl> .
+
+oc:skill_49a660f1e7a50a30 a oc:ExecutableSkill,
+        oc:Skill ;
+    oc:contentHash "49a660f1e7a50a30383bcd58958edca0f89ce74997e603969bced0a56fe714a6" ;
+    oc:dependsOn "oc:NetworkAvailable",
+        "oc:SystemAuthenticated" ;
+    oc:differentia "Enables PDF manipulation via Python libraries and CLI tools" ;
+    oc:generatedBy "glm-5" ;
+    oc:handlesFailure oc:CorruptedFile,
+        oc:EncryptedFile,
+        oc:FileNotFound,
+        oc:InvalidInput,
+        oc:OCRFailed,
+        oc:PermissionDenied ;
+    oc:hasPayload oc:payload_49a660f1e7a50a30 ;
+    oc:hasRequirement oc:req_060db269,
+        oc:req_2eda303f,
+        oc:req_3b2e1010,
+        oc:req_3fcf652e,
+        oc:req_70376ece,
+        oc:req_7cf00395,
+        oc:req_7ec70d19,
+        oc:req_d87817a6,
+        oc:req_f08bdea9,
+        oc:req_fd635a4a ;
+    oc:nature "Tool" ;
+    oc:requiresState oc:EnvironmentReady,
+        oc:FileExists ;
+    oc:resolvesIntent "add watermark to pdf",
+        "convert pdf to images",
+        "create pdf",
+        "extract images from pdf",
+        "extract pdf metadata",
+        "extract tables from pdf",
+        "extract text from pdf",
+        "fill pdf form",
+        "merge pdfs",
+        "ocr scanned pdf",
+        "protect pdf with password",
+        "rotate pdf pages",
+        "split pdf" ;
+    oc:yieldsState oc:ImagesExtracted,
+        oc:PDFCreated,
+        oc:PDFFormsFilled,
+        oc:PDFModified,
+        oc:TablesExtracted,
+        oc:TextExtracted ;
+    dcterms:identifier "pdf" ;
+    skos:broader "Document processor" ;
+    prov:wasDerivedFrom "/Users/marcello/Developer/Marea/ontoclaw/skills/office/public/pdf" .
+
+oc:payload_49a660f1e7a50a30 a oc:ExecutionPayload ;
+    oc:code """# PDF Processing execution framework
+# Supports: extraction, creation, merging, splitting, form filling
+import subprocess
+from pathlib import Path
+
+# Use appropriate library based on operation type
+# - pypdf for merge/split/rotate
+# - pdfplumber for text/table extraction
+# - reportlab for creation
+# - Custom scripts for form filling (see scripts/)
+""" ;
+    oc:executor "python" .
+
+oc:req_060db269 a oc:RequirementTool ;
+    oc:isOptional false ;
+    oc:requirementValue "pypdf" .
+
+oc:req_2eda303f a oc:RequirementTool ;
+    oc:isOptional true ;
+    oc:requirementValue "pdf-lib" .
+
+oc:req_3b2e1010 a oc:RequirementTool ;
+    oc:isOptional true ;
+    oc:requirementValue "pytesseract" .
+
+oc:req_3fcf652e a oc:RequirementTool ;
+    oc:isOptional false ;
+    oc:requirementValue "python3" .
+
+oc:req_70376ece a oc:RequirementTool ;
+    oc:isOptional true ;
+    oc:requirementValue "pypdfium2" .
+
+oc:req_7cf00395 a oc:RequirementTool ;
+    oc:isOptional true ;
+    oc:requirementValue "poppler-utils" .
+
+oc:req_7ec70d19 a oc:RequirementTool ;
+    oc:isOptional true ;
+    oc:requirementValue "qpdf" .
+
+oc:req_d87817a6 a oc:RequirementTool ;
+    oc:isOptional true ;
+    oc:requirementValue "pdf2image" .
+
+oc:req_f08bdea9 a oc:RequirementTool ;
+    oc:isOptional false ;
+    oc:requirementValue "pdfplumber" .
+
+oc:req_fd635a4a a oc:RequirementTool ;
+    oc:isOptional false ;
+    oc:requirementValue "reportlab" .
+
