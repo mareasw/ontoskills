@@ -80,11 +80,62 @@ This separation enables:
 
 Large Language Models are powerful but **non-deterministic**. The same prompt can yield different outputs across runs. When an agent must navigate dozens of skills, it faces:
 
+### Context and Scale
+
 - **Context rot**: Loading 50+ SKILL.md files consumes context window
 - **Hallucination risk**: Information scattered across files is easily misremembered
 - **No verifiable structure**: "Does skill A depend on skill B?" requires reading both files
 
-This is the **knowledge retrieval problem** in the age of LLMs.
+### The Small Model Problem
+
+This is where the problem becomes **critical**: smaller models (7B-14B parameters) are increasingly deployed for:
+
+- **Edge computing**: On-device inference without cloud dependency
+- **Cost reduction**: $0.001/1K tokens vs $0.015/1K tokens for frontier models
+- **Privacy**: Sensitive data never leaves the local machine
+- **Latency**: Sub-100ms response times for real-time applications
+
+**But small models cannot load 50 skill files.** Consider:
+
+| Model | Context Window | Practical Capacity |
+|-------|---------------|-------------------|
+| Claude Opus 4 | 200K tokens | ~100 skill files |
+| Claude Sonnet | 200K tokens | ~100 skill files |
+| Llama 3.1 8B | 128K tokens | ~60 skill files |
+| Mistral 7B | 32K tokens | ~15 skill files |
+| Phi-3 Mini | 4K tokens | ~2 skill files |
+
+A 7B model can barely load a **single skill ecosystem** before running out of context. And even when context fits:
+
+- **Comprehension degrades**: Small models struggle to extract structured relationships from unstructured text
+- **Reasoning breaks**: "Which skills can handle state X?" requires multi-file reasoning that small models fail at
+- **Consistency fails**: The same query about skill dependencies may return different answers across runs
+
+### The Cost Spiral
+
+For enterprises running agents at scale:
+
+| Scenario | Tokens per Query | Cost per 1M queries |
+|----------|-----------------|---------------------|
+| Load all 50 skills (cache miss) | ~250K | $3,750 (Opus) |
+| Load all 50 skills (small model) | **Impossible** | N/A |
+| SPARQL query to ontology | ~1K | $15 (Opus) / $0.50 (Haiku) |
+
+The ontology approach reduces token consumption by **250x** while enabling small model deployment.
+
+### The Consistency Gap
+
+Even large models suffer from **inconsistent skill interpretation**:
+
+- **Ambiguous language**: "This skill requires authentication" — is that a precondition or a feature?
+- **Implicit relationships**: Skill A mentions "use Skill B for validation" — is that a dependency? An extension?
+- **Scattered metadata**: Intent strings, state requirements, and execution hints are buried in prose
+
+Without formal semantics, every LLM query about skills is a **gamble on interpretation**.
+
+---
+
+This is the **knowledge retrieval problem** in the age of LLMs — and OntoClaw solves it by making skills **queryable, not readable**.
 
 ---
 
