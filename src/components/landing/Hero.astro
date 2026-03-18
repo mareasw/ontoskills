@@ -1,17 +1,11 @@
 ---
 import Button from '../ui/Button.astro';
+import GraphBackground from './GraphBackground.astro';
 ---
 
 <section class="relative overflow-hidden">
-  <!-- Banner Image Background -->
-  <div class="absolute inset-0 z-0">
-    <img
-      src="/ontoclaw-banner.png"
-      alt=""
-      class="w-full h-full object-cover opacity-30"
-    />
-    <div class="absolute inset-0 bg-gradient-to-b from-bg-primary/50 via-bg-primary/80 to-bg-primary"></div>
-  </div>
+  <!-- Animated Graph Background -->
+  <GraphBackground />
 
   <!-- Content -->
   <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32 text-center">
