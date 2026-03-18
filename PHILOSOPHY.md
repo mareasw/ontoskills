@@ -113,15 +113,34 @@ A 7B model can barely load a **single skill ecosystem** before running out of co
 
 ### The Cost Spiral
 
-For enterprises running agents at scale:
+For enterprises running agents at scale, token consumption directly impacts the bottom line:
 
-| Scenario | Tokens per Query | Cost per 1M queries |
-|----------|-----------------|---------------------|
-| Load all 50 skills (cache miss) | ~250K | $3,750 (Opus) |
-| Load all 50 skills (small model) | **Impossible** | N/A |
-| SPARQL query to ontology | ~1K | $15 (Opus) / $0.50 (Haiku) |
+| Scenario | Tokens | Cost per 1M queries (Opus 4.6) | Cost per 1M queries (Sonnet 4.6) |
+|----------|--------|-------------------------------|--------------------------------|
+| Load all 50 skills | ~300K | $2,500 | $1,500 |
+| SPARQL query to ontology | ~1.5K | $17.50 | $10.50 |
+| SPARQL query (Haiku 3) | ~1.5K | — | $0.87 |
 
-The ontology approach reduces token consumption by **250x** while enabling small model deployment.
+*Pricing: Opus 4.6 ($5/MTok input, $25/MTok output), Sonnet 4.6 ($3/MTok input, $15/MTok output), Haiku 3 ($0.25/MTok input, $1.25/MTok output)*
+
+The ontology approach reduces costs by **~150x** for Sonnet and **~170x** for Haiku.
+
+### The Retry Problem
+
+Non-deterministic reasoning creates a hidden cost multiplier: **retries**.
+
+When an LLM agent misinterprets a skill or selects the wrong one:
+
+- **Wasted tokens**: Each retry consumes the full context window again
+- **Cascading failures**: One wrong skill selection may trigger 3-5 recovery attempts
+- **User frustration**: Latency compounds with each retry
+
+With deterministic SPARQL queries:
+- Same input → same result (no interpretation variance)
+- Skill selection is **exact**, not probabilistic
+- Retry rates drop from ~30% to near-zero
+
+**Determinism isn't just about correctness — it's about cost efficiency.**
 
 ### The Consistency Gap
 
