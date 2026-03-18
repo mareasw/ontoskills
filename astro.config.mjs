@@ -11,13 +11,13 @@ export default defineConfig({
   integrations: [
     sitemap(),
     starlight({
-      title: 'OntoClaw',
+      title: 'OntoSkills',
       description: 'Neuro-symbolic skill core for the Agentic Web',
       logo: {
-        src: './src/assets/ontoclaw-logo.png',
+        src: './src/assets/ontoskills-logo.png',
         replacesTitle: false,
       },
-      favicon: '/ontoclaw-logo.png',
+      favicon: '/ontoskills-logo.png',
       disable404Route: true,
       customCss: ['./src/styles/starlight.css'],
       head: [
@@ -40,5 +40,5 @@ export default defineConfig({
     tailwind(),
   ],
   output: 'static',
-  site: 'https://ontoclaw.marea.software',
+  site: 'https://ontoskills.marea.software',
 });

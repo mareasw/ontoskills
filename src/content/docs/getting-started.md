@@ -1,9 +1,9 @@
 ---
 title: Getting Started
-description: Install and use OntoClaw to compile skills into ontologies
+description: Install and use OntoSkills to compile skills into ontologies
 ---
 
-OntoClaw is currently in **Phase 4** development. OntoCore (compiler) and OntoMCP (server) are ready. OntoStore marketplace is in progress.
+OntoSkills is currently in **Phase 4** development. OntoCore (compiler) and OntoMCP (server) are ready. OntoStore marketplace is in progress.
 
 ## Prerequisites
 
@@ -14,8 +14,8 @@ OntoClaw is currently in **Phase 4** development. OntoCore (compiler) and OntoMC
 
 ```bash
 # Clone the repository
-git clone https://github.com/mareasoftware/ontoclaw.git
-cd ontoclaw
+git clone https://github.com/mareasoftware/ontoskills.git
+cd ontoskills
 
 # Install core
 cd core
@@ -26,22 +26,22 @@ pip install -e ".[dev]"
 
 ```bash
 # Initialize core ontology with predefined states
-ontoclaw init-core
+ontoskills init-core
 
 # Compile all skills to ontology
-ontoclaw compile
+ontoskills compile
 
 # Compile specific skill
-ontoclaw compile my-skill
+ontoskills compile my-skill
 
 # Query ontology with SPARQL
-ontoclaw query "SELECT ?s WHERE { ?s a oc:Skill }"
+ontoskills query "SELECT ?s WHERE { ?s a oc:Skill }"
 
 # List all skills
-ontoclaw list-skills
+ontoskills list-skills
 
 # Run security audit
-ontoclaw security-audit
+ontoskills security-audit
 ```
 
 ## Command Options
@@ -87,11 +87,11 @@ cargo run --manifest-path mcp/Cargo.toml
 Register the MCP server with Claude Code:
 
 ```bash
-claude mcp add ontoclaw -- \
-  cargo run --manifest-path /absolute/path/to/ontoclaw/mcp/Cargo.toml
+claude mcp add ontoskills -- \
+  cargo run --manifest-path /absolute/path/to/ontoskills/mcp/Cargo.toml
 ```
 
 ## What's Next?
 
 - [Roadmap](/roadmap/) — See what's coming
-- [GitHub](https://github.com/mareasoftware/ontoclaw) — Contribute
+- [GitHub](https://github.com/mareasoftware/ontoskills) — Contribute

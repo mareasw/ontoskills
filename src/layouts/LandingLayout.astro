@@ -13,16 +13,16 @@ interface Props {
 }
 
 const {
-  title = 'OntoClaw - Semantic Infrastructure for the Agentic Web',
+  title = 'OntoSkills - Semantic Infrastructure for the Agentic Web',
   description = 'Empower your AI agents with schema-first querying. Compile human-readable skills into modular, deterministic ontologies.'
 } = Astro.props;
 
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  "name": "OntoClaw",
+  "name": "OntoSkills",
   "description": description,
-  "url": "https://ontoclaw.marea.software",
+  "url": "https://ontoskills.marea.software",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Any",
   "offers": {
@@ -43,7 +43,7 @@ const jsonLd = {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
-    <link rel="icon" type="image/png" href="/ontoclaw-logo.png" />
+    <link rel="icon" type="image/png" href="/ontoskills-logo.png" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:image" content="/og-image.png" />

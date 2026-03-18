@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://ontoclaw.marea.software/sitemap-index.xml
+Sitemap: https://ontoskills.marea.software/sitemap-index.xml

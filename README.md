@@ -1,21 +1,22 @@
-# OntoClaw Site
+# OntoSkills Site
 
-<img src="public/ontoclaw-banner.png" alt="OntoClaw - MCP Server for AI Agents" width="100%">
+<img src="public/ontoskills-banner.png" alt="OntoSkills - MCP Server for AI Agents" width="100%">
 
 > **MCP server for deterministic AI agents with ontoskills** — Official website and documentation
 
 ## Overview
 
-This repository contains the source code for the OntoClaw website, a hybrid marketing landing page and documentation site built with modern web technologies.
+This repository contains the source code for the OntoSkills website, a hybrid marketing landing page and documentation site built with modern web technologies.
 
-**OntoClaw** is an MCP server that exposes **ontoskills** — structured, queryable knowledge graphs that let AI agents reason deterministically. Instead of reading skill files, the LLM queries the graph and gets precise answers.
+**OntoSkills** is an MCP server that exposes **ontoskills** — structured, queryable knowledge graphs that let AI agents reason deterministically. Instead of reading skill files, the LLM queries the graph and gets precise answers.
 
 - **Phase 1:** OntoCore transforms SKILL.md → RDF/Turtle
 - **Phase 2:** OntoSkills compiled skill library
 - **Phase 3:** OntoMCP Rust server with 12 semantic tools
 - **Phase 4:** OntoStore for centralized ontoskill repository
+- **Phase 5:** OntoClaw autonomous agent (planned)
 
-🔗 **Main Project:** [github.com/mareasoftware/ontoclaw](https://github.com/mareasoftware/ontoclaw)
+🔗 **Main Project:** [github.com/mareasoftware/ontoskills](https://github.com/mareasoftware/ontoskills)
 
 ---
 
@@ -42,10 +43,10 @@ This repository contains the source code for the OntoClaw website, a hybrid mark
 ## Project Structure
 
 ```
-ontoclaw-site/
+ontoskills-site/
 ├── public/                 # Static assets
-│   ├── ontoclaw-logo.png
-│   ├── ontoclaw-banner.png
+│   ├── ontoskills-logo.png
+│   ├── ontoskills-banner.png
 │   └── og-image.png
 ├── src/
 │   ├── components/         # UI components
@@ -71,8 +72,8 @@ ontoclaw-site/
 
 ```bash
 # Clone the repository
-git clone https://github.com/marcello-russo/ontoclaw-site.git
-cd ontoclaw-site
+git clone https://github.com/mareasoftware/ontoskills-site.git
+cd ontoskills-site
 
 # Install dependencies
 npm install
@@ -127,7 +128,7 @@ The site is configured for static deployment. Build output is in `./dist/`.
 
 ## Related
 
-- **OntoClaw Project:** [github.com/mareasoftware/ontoclaw](https://github.com/mareasoftware/ontoclaw)
+- **OntoSkills Project:** [github.com/mareasoftware/ontoskills](https://github.com/mareasoftware/ontoskills)
 - **Marea Software:** [marea.software](https://marea.software)
 
 ## License
