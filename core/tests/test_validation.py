@@ -167,7 +167,9 @@ def test_literal_as_state_fails():
     serialize_skill(graph, skill)
 
     # Manually add a literal (string) as state - this should fail
-    skill_uri = oc[f"skill_{skill.hash[:16]}"]
+    from compiler.serialization import skill_uri_for_id
+
+    skill_uri = skill_uri_for_id(skill.id)
     graph.add((skill_uri, oc.yieldsState, Literal("SomeState")))  # WRONG: Literal not URI
 
     result = validate_skill_graph(graph)

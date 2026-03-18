@@ -16,9 +16,32 @@ from compiler.schemas import ExtractedSkill, Requirement, ExecutionPayload
 from compiler.exceptions import OntologyValidationError
 from compiler.config import BASE_URI, OUTPUT_DIR
 from compiler.core_ontology import get_oc_namespace
+from compiler.extractor import generate_skill_id
 from compiler.validator import validate_and_raise
 
 logger = logging.getLogger(__name__)
+
+
+def skill_uri_for_id(skill_id: str) -> URIRef:
+    """Build a stable skill URI from the canonical skill identifier."""
+    oc = get_oc_namespace()
+    return oc[f"skill_{generate_skill_id(skill_id)}"]
+
+
+def skill_uri_for_skill(skill: ExtractedSkill) -> URIRef:
+    """Build the stable URI for a skill model."""
+    return skill_uri_for_id(skill.id)
+
+
+def relation_uri_for_value(value: str) -> URIRef:
+    """Convert a skill relation value into a skill URI reference."""
+    raw = value.strip()
+    oc = get_oc_namespace()
+    if raw.startswith("http://") or raw.startswith("https://"):
+        return URIRef(raw)
+    if raw.startswith("oc:"):
+        return oc[raw.removeprefix("oc:")]
+    return skill_uri_for_id(raw)
 
 
 def serialize_skill(graph: Graph, skill: ExtractedSkill) -> None:
@@ -31,8 +54,8 @@ def serialize_skill(graph: Graph, skill: ExtractedSkill) -> None:
     """
     oc = get_oc_namespace()
 
-    # Create skill URI from hash
-    skill_uri = oc[f"skill_{skill.hash[:16]}"]
+    # Create stable skill URI from canonical id
+    skill_uri = skill_uri_for_skill(skill)
 
     # Basic properties
     graph.add((skill_uri, RDF.type, oc.Skill))
@@ -65,15 +88,15 @@ def serialize_skill(graph: Graph, skill: ExtractedSkill) -> None:
         graph.add((req_uri, oc.isOptional, Literal(req.optional)))
         graph.add((skill_uri, oc.hasRequirement, req_uri))
 
-    # Relations - use skill IDs as literals (MCP server resolves them)
+    # Relations - serialize as object properties to stable skill URIs
     for dep in skill.depends_on:
-        graph.add((skill_uri, oc.dependsOn, Literal(dep)))
+        graph.add((skill_uri, oc.dependsOn, relation_uri_for_value(dep)))
 
     for ext in skill.extends:
-        graph.add((skill_uri, oc.extends, Literal(ext)))
+        graph.add((skill_uri, oc.extends, relation_uri_for_value(ext)))
 
     for cont in skill.contradicts:
-        graph.add((skill_uri, oc.contradicts, Literal(cont)))
+        graph.add((skill_uri, oc.contradicts, relation_uri_for_value(cont)))
 
     # State transitions (new schema feature)
     if skill.state_transitions:

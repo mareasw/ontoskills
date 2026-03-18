@@ -30,7 +30,7 @@ from compiler.storage import (
     SYSTEM_FILES,
 )
 from compiler.core_ontology import get_oc_namespace, create_core_ontology
-from compiler.serialization import serialize_skill_to_module
+from compiler.serialization import serialize_skill_to_module, skill_uri_for_id
 from compiler.schemas import ExtractedSkill, Requirement, ExecutionPayload
 from compiler.exceptions import OntologyLoadError, OntologyValidationError
 from compiler.config import BASE_URI, SKILLS_DIR, OUTPUT_DIR
@@ -162,7 +162,7 @@ def test_load_skill_module(tmp_path, sample_skill):
 
     # Verify skill is present
     oc = get_oc_namespace()
-    skill_uri = oc["skill_" + sample_skill.hash[:16]]
+    skill_uri = skill_uri_for_id(sample_skill.id)
     assert (skill_uri, RDF.type, oc.Skill) in loaded_graph
 
 
@@ -338,7 +338,7 @@ def test_merge_skill_new(tmp_path, core_ontology):
 
     # Check skill was added
     oc = get_oc_namespace()
-    skill_uri = oc["skill_" + skill.hash[:16]]
+    skill_uri = skill_uri_for_id(skill.id)
     assert (skill_uri, RDF.type, oc.Skill) in merged
 
 
@@ -381,7 +381,7 @@ def test_merge_skill_update(tmp_path, core_ontology):
     merged = merge_skill(ontology_path, skill2)
     # New skill should be present
     oc = get_oc_namespace()
-    skill_uri = oc["skill_" + skill2.hash[:16]]
+    skill_uri = skill_uri_for_id(skill2.id)
     assert (skill_uri, RDF.type, oc.Skill) in merged
 
 
@@ -407,7 +407,7 @@ def test_merge_skill_force_parameter(tmp_path, core_ontology):
     # First merge
     merged1 = merge_skill(ontology_path, skill)
     oc = get_oc_namespace()
-    skill_uri = oc["skill_" + skill.hash[:16]]
+    skill_uri = skill_uri_for_id(skill.id)
     assert (skill_uri, RDF.type, oc.Skill) in merged1
 
     # Save the state
@@ -451,7 +451,7 @@ def test_merge_skill_unchanged_skips(tmp_path, core_ontology):
 
     # Graph should still have the skill but it was skipped
     oc = get_oc_namespace()
-    skill_uri = oc["skill_" + skill.hash[:16]]
+    skill_uri = skill_uri_for_id(skill.id)
     assert (skill_uri, RDF.type, oc.Skill) in merged2
 
 

@@ -8,7 +8,11 @@ import pytest
 from pathlib import Path
 from rdflib import Graph, RDF, RDFS, OWL, Namespace
 
-from compiler.serialization import serialize_skill, serialize_skill_to_module
+from compiler.serialization import (
+    serialize_skill,
+    serialize_skill_to_module,
+    skill_uri_for_id,
+)
 from compiler.schemas import ExtractedSkill, Requirement, ExecutionPayload, StateTransition
 from compiler.config import BASE_URI
 from compiler.core_ontology import get_oc_namespace
@@ -34,7 +38,7 @@ def test_serialize_skill_adds_triples_to_graph():
 
     # Check skill was added
     oc = get_oc_namespace()
-    skill_uri = oc["skill_" + skill.hash[:16]]
+    skill_uri = skill_uri_for_id(skill.id)
     assert (skill_uri, RDF.type, oc.Skill) in graph
 
 
@@ -64,7 +68,7 @@ def test_serialize_skill_to_module_creates_file(tmp_path):
     graph.parse(output_path, format="turtle")
 
     oc = get_oc_namespace()
-    skill_uri = oc["skill_" + skill.hash[:16]]
+    skill_uri = skill_uri_for_id(skill.id)
     assert (skill_uri, RDF.type, oc.Skill) in graph
 
 
@@ -108,7 +112,7 @@ def test_serialize_skill_to_module_with_output_base(tmp_path):
     graph = Graph()
     graph.parse(output_path, format="turtle")
 
-    skill_uri = oc["skill_" + skill.hash[:16]]
+    skill_uri = skill_uri_for_id(skill.id)
     assert (skill_uri, RDF.type, oc.Skill) in graph
 
 
@@ -137,7 +141,7 @@ def test_serialize_skill_to_module_with_execution_payload(tmp_path):
     graph.parse(output_path, format="turtle")
 
     oc = get_oc_namespace()
-    skill_uri = oc["skill_" + skill.hash[:16]]
+    skill_uri = skill_uri_for_id(skill.id)
     assert (skill_uri, RDF.type, oc.ExecutableSkill) in graph
 
 
@@ -165,7 +169,7 @@ def test_serialize_skill_to_module_with_declarative_type(tmp_path):
     graph.parse(output_path, format="turtle")
 
     oc = get_oc_namespace()
-    skill_uri = oc["skill_" + skill.hash[:16]]
+    skill_uri = skill_uri_for_id(skill.id)
     assert (skill_uri, RDF.type, oc.DeclarativeSkill) in graph
 
 
@@ -186,7 +190,7 @@ def test_serialize_skill_adds_executable_type():
         execution_payload=ExecutionPayload(executor="python", code="test")
     )
     serialize_skill(g, skill)
-    skill_uri = oc[f"skill_{skill.hash[:16]}"]
+    skill_uri = skill_uri_for_id(skill.id)
     assert (skill_uri, RDF.type, oc.ExecutableSkill) in g
 
 
@@ -206,7 +210,7 @@ def test_serialize_skill_adds_declarative_type():
         generated_by="claude-opus-4-6"
     )
     serialize_skill(g, skill)
-    skill_uri = oc[f"skill_{skill.hash[:16]}"]
+    skill_uri = skill_uri_for_id(skill.id)
     assert (skill_uri, RDF.type, oc.DeclarativeSkill) in g
 
 
@@ -277,9 +281,37 @@ def test_serialize_skill_with_state_transitions():
     )
 
     serialize_skill(g, skill)
-    skill_uri = oc[f"skill_{skill.hash[:16]}"]
+    skill_uri = skill_uri_for_id(skill.id)
 
     # Verify state transitions were serialized
     assert (skill_uri, oc.requiresState, oc.SystemAuthenticated) in g
     assert (skill_uri, oc.yieldsState, oc.DocumentCreated) in g
     assert (skill_uri, oc.handlesFailure, oc.PermissionDenied) in g
+
+
+def test_serialize_skill_relations_use_skill_uris():
+    """Skill relations should be serialized as object properties, not literals."""
+    oc = get_oc_namespace()
+    g = Graph()
+
+    skill = ExtractedSkill(
+        id="office",
+        hash="officehash123",
+        nature="Meta office skill",
+        genus="Test",
+        differentia="routes to document skills",
+        intents=["route office tasks"],
+        requirements=[],
+        depends_on=["docx", "xlsx"],
+        extends=["toolkit"],
+        contradicts=["legacy-office"],
+        generated_by="claude-opus-4-6",
+    )
+
+    serialize_skill(g, skill)
+    skill_uri = skill_uri_for_id(skill.id)
+
+    assert (skill_uri, oc.dependsOn, skill_uri_for_id("docx")) in g
+    assert (skill_uri, oc.dependsOn, skill_uri_for_id("xlsx")) in g
+    assert (skill_uri, oc.extends, skill_uri_for_id("toolkit")) in g
+    assert (skill_uri, oc.contradicts, skill_uri_for_id("legacy-office")) in g

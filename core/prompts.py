@@ -22,6 +22,17 @@ and extract their essential structure using the Knowledge Architecture framework
 - implements: Realizes abstraction
 - exemplifies: Instance of pattern
 
+When you emit `depends_on`, `extends`, or `contradicts`, ALWAYS use canonical skill ids only
+(e.g. `office`, `docx`, `pptx`, `xlsx`, `pdf`), never prose labels, never file paths, never URIs.
+
+Use `extends` only for genuine specialization/inheritance:
+- Child skill builds on a broader parent skill and should inherit its epistemic rules
+- Example: a file-format-specific skill extending a meta-skill like `office`
+
+Use `depends_on` only for execution prerequisites between skills:
+- Skill A requires Skill B to be executed first or made available
+- Do NOT use `depends_on` to express grouping, taxonomy, or routing
+
 ### Essential vs Accidental
 Essential: Remove it → becomes something else
 Accidental: Could be different without changing identity

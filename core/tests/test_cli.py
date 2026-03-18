@@ -205,3 +205,76 @@ skill:test-skill a oc:Skill ;
         assert result_with_force.exit_code == 0
         # tool_use_loop SHOULD have been called with --force
         assert mock_tool_use_loop.call_count == 1
+
+
+def test_infer_parent_skill_id_from_nested_skill_path(tmp_path):
+    """Nested skills should inherit from the nearest ancestor skill directory."""
+    from cli import infer_parent_skill_id
+
+    input_dir = tmp_path / "skills"
+    (input_dir / "office" / "SKILL.md").parent.mkdir(parents=True)
+    (input_dir / "office" / "SKILL.md").write_text("# Office", encoding="utf-8")
+    (input_dir / "office" / "public" / "xlsx").mkdir(parents=True)
+
+    parent_skill_id = infer_parent_skill_id(
+        input_dir / "office" / "public" / "xlsx",
+        input_dir,
+    )
+
+    assert parent_skill_id == "office"
+
+
+def test_enrich_extracted_skill_adds_parent_to_extends(tmp_path):
+    """Compiler should deterministically add parent inheritance for nested skills."""
+    from cli import enrich_extracted_skill
+    from compiler.schemas import ExtractedSkill, Requirement
+
+    input_dir = tmp_path / "skills"
+    (input_dir / "office" / "SKILL.md").parent.mkdir(parents=True)
+    (input_dir / "office" / "SKILL.md").write_text("# Office", encoding="utf-8")
+    skill_dir = input_dir / "office" / "public" / "xlsx"
+    skill_dir.mkdir(parents=True)
+
+    extracted = ExtractedSkill(
+        id="xlsx",
+        hash="hash",
+        nature="Tool",
+        genus="Spreadsheet processor",
+        differentia="that edits spreadsheets",
+        intents=["edit spreadsheet"],
+        requirements=[Requirement(type="Tool", value="python")],
+        extends=[],
+    )
+
+    enrich_extracted_skill(extracted, skill_dir, input_dir)
+
+    assert extracted.extends == ["office"]
+
+
+def test_enrich_extracted_skill_removes_parent_from_depends_on(tmp_path):
+    """A parent inheritance relation should not also remain as a dependency."""
+    from cli import enrich_extracted_skill
+    from compiler.schemas import ExtractedSkill, Requirement
+
+    input_dir = tmp_path / "skills"
+    (input_dir / "office" / "SKILL.md").parent.mkdir(parents=True)
+    (input_dir / "office" / "SKILL.md").write_text("# Office", encoding="utf-8")
+    skill_dir = input_dir / "office" / "public" / "pptx"
+    skill_dir.mkdir(parents=True)
+
+    extracted = ExtractedSkill(
+        id="pptx",
+        hash="hash",
+        nature="Tool",
+        genus="Presentation tool",
+        differentia="that edits presentations",
+        intents=["edit presentation"],
+        requirements=[Requirement(type="Tool", value="python")],
+        depends_on=["office", "pandoc"],
+        extends=[],
+    )
+
+    enrich_extracted_skill(extracted, skill_dir, input_dir)
+
+    assert extracted.extends == ["office"]
+    assert extracted.depends_on == ["pandoc"]

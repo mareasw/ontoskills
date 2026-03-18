@@ -63,6 +63,37 @@ def setup_logging(verbose: bool, quiet: bool):
     )
 
 
+def infer_parent_skill_id(skill_dir: Path, input_path: Path) -> str | None:
+    """Infer the nearest parent skill from the directory structure.
+
+    A nested skill inherits from the closest ancestor directory that contains
+    its own `SKILL.md`. This makes inheritance deterministic and avoids relying
+    on the extractor to rediscover obvious filesystem relationships.
+    """
+    current = skill_dir.parent
+    input_root = input_path.resolve()
+
+    while current != input_root and current != current.parent:
+        if (current / "SKILL.md").exists():
+            return generate_skill_id(current.name)
+        current = current.parent
+
+    return None
+
+
+def enrich_extracted_skill(extracted, skill_dir: Path, input_path: Path):
+    """Apply deterministic compiler-side enrichments to extracted skills."""
+    parent_skill_id = infer_parent_skill_id(skill_dir, input_path)
+    if parent_skill_id and parent_skill_id != extracted.id and parent_skill_id not in extracted.extends:
+        extracted.extends.append(parent_skill_id)
+    if extracted.extends:
+        extracted.depends_on = [
+            dependency for dependency in extracted.depends_on
+            if dependency not in extracted.extends
+        ]
+    return extracted
+
+
 @click.group()
 @click.version_option(version=__version__, prog_name="ontocore")
 @click.option('-v', '--verbose', is_flag=True, help='Enable debug logging')
@@ -214,6 +245,7 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
         # LLM extraction
         try:
             extracted = tool_use_loop(skill_dir, skill_hash, skill_id)
+            extracted = enrich_extracted_skill(extracted, skill_dir, input_path)
             compiled_skills.append(extracted)
             skill_output_paths.append(output_skill_path)
 

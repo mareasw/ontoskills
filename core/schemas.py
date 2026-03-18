@@ -104,6 +104,28 @@ class ExtractedSkill(BaseModel):
     provenance: str | None = None
     knowledge_nodes: list[KnowledgeNode] = []
 
+    @field_validator('depends_on', 'extends', 'contradicts')
+    @classmethod
+    def validate_skill_relation_ids(cls, values: list[str]) -> list[str]:
+        """Validate relation targets as canonical skill ids or explicit URIs."""
+        import re
+
+        pattern = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
+        normalized = []
+        for value in values:
+            candidate = value.strip()
+            if not candidate:
+                raise ValueError("Skill relation identifiers cannot be empty")
+            if candidate.startswith(("http://", "https://", "oc:")):
+                normalized.append(candidate)
+                continue
+            if not pattern.match(candidate):
+                raise ValueError(
+                    f"Invalid skill relation '{value}'. Use canonical skill ids like 'office' or 'docx-review'."
+                )
+            normalized.append(candidate)
+        return normalized
+
     @model_validator(mode='before')
     @classmethod
     def parse_and_clean_nested_data(cls, data: Any) -> Any:
