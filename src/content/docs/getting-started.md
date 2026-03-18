@@ -3,7 +3,7 @@ title: Getting Started
 description: Install and use OntoClaw to compile skills into ontologies
 ---
 
-OntoClaw is currently in **Phase 2** development. The compiler is ready, MCP server is in progress.
+OntoClaw is currently in **Phase 4** development. OntoCore (compiler) and OntoMCP (server) are ready. OntoStore marketplace is in progress.
 
 ## Prerequisites
 
@@ -17,8 +17,8 @@ OntoClaw is currently in **Phase 2** development. The compiler is ready, MCP ser
 git clone https://github.com/mareasoftware/ontoclaw.git
 cd ontoclaw
 
-# Install compiler
-cd compiler
+# Install core
+cd core
 pip install -e ".[dev]"
 ```
 
@@ -56,28 +56,39 @@ ontoclaw security-audit
 | `--reason/--no-reason` | Apply OWL reasoning |
 | `-v, --verbose` | Debug logging |
 
-## MCP Server (Phase 2)
+## MCP Server (Phase 3 — Ready)
 
-The MCP server will expose ontologies via the Model Context Protocol:
+OntoMCP exposes ontologies via the Model Context Protocol. Built in Rust for sub-millisecond SPARQL queries.
 
 ```bash
-# Coming soon
-ontoclaw-mcp --ontologies ./ontoskills/
+# Run the MCP server
+cargo run --manifest-path mcp/Cargo.toml
 ```
 
-### Claude Desktop Integration
+### Available MCP Tools
 
-Once available, add to your Claude Desktop config:
+| Tool | Purpose |
+|------|---------|
+| `list_skills` | List all available skills |
+| `find_skills_by_intent` | Find skills matching a user intent |
+| `get_skill` | Get full skill details by ID |
+| `get_skill_requirements` | Get skill dependencies |
+| `get_skill_transitions` | Get state transitions (requires/yields/handles) |
+| `get_skill_dependencies` | Get skills this one depends on |
+| `get_skill_conflicts` | Get skills that contradict this one |
+| `find_skills_yielding_state` | Find skills that produce a state |
+| `find_skills_requiring_state` | Find skills that need a state |
+| `check_skill_applicability` | Check if skill can run |
+| `plan_from_intent` | Generate execution plan from intent |
+| `get_skill_payload` | Get execution code for a skill |
 
-```json
-{
-  "mcpServers": {
-    "ontoclaw": {
-      "command": "ontoclaw-mcp",
-      "args": ["--ontologies", "/path/to/ontoskills"]
-    }
-  }
-}
+### Claude Code Integration
+
+Register the MCP server with Claude Code:
+
+```bash
+claude mcp add ontoclaw -- \
+  cargo run --manifest-path /absolute/path/to/ontoclaw/mcp/Cargo.toml
 ```
 
 ## What's Next?

@@ -10,9 +10,10 @@ This repository contains the source code for the OntoClaw website, a hybrid mark
 
 **OntoClaw** is an MCP server that exposes **ontoskills** — structured, queryable knowledge graphs that let AI agents reason deterministically. Instead of reading skill files, the LLM queries the graph and gets precise answers.
 
-- **Phase 1:** Compiler transforms SKILL.md → RDF/Turtle
-- **Phase 2:** MCP server exposes ontoskills via Model Context Protocol
-- **Phase 3:** OntoStore for centralized ontoskill repository
+- **Phase 1:** OntoCore transforms SKILL.md → RDF/Turtle
+- **Phase 2:** OntoSkills compiled skill library
+- **Phase 3:** OntoMCP Rust server with 12 semantic tools
+- **Phase 4:** OntoStore for centralized ontoskill repository
 
 🔗 **Main Project:** [github.com/mareasoftware/ontoclaw](https://github.com/mareasoftware/ontoclaw)
 

@@ -12,7 +12,7 @@ export default defineConfig({
     sitemap(),
     starlight({
       title: 'OntoClaw',
-      description: 'Neuro-symbolic skill compiler for the Agentic Web',
+      description: 'Neuro-symbolic skill core for the Agentic Web',
       logo: {
         src: './src/assets/ontoclaw-logo.png',
         replacesTitle: false,

@@ -1,6 +1,6 @@
 ---
 title: Roadmap
-description: From compiler to autonomous agent — the OntoClaw ecosystem
+description: From core to autonomous agent — the OntoClaw ecosystem
 ---
 
 > This roadmap evolves with the project.
@@ -9,13 +9,13 @@ description: From compiler to autonomous agent — the OntoClaw ecosystem
 
 **Status:** Complete
 
-The foundation. OntoCore is our neuro-symbolic compiler that transforms natural language skill definitions into validated OWL 2 DL ontologies.
+The foundation. OntoCore is our neuro-symbolic core that transforms natural language skill definitions into validated OWL 2 DL ontologies.
 
 - [x] Natural language parsing with Claude
 - [x] OWL 2 DL serialization (RDF/Turtle)
 - [x] SHACL validation gatekeeper
 - [x] Security audit pipeline
-- [x] 150+ tests
+- [x] 156+ tests
 
 ## Phase 2: OntoSkills ✅
 
@@ -32,13 +32,13 @@ The knowledge base. OntoSkills are the compiled, validated skills published from
 
 **Status:** Complete
 
-The interface. OntoMCP exposes OntoSkills via the Model Context Protocol, giving any MCP-compatible agent instant access to structured knowledge.
+The interface. OntoMCP exposes OntoSkills via the Model Context Protocol, giving any MCP-compatible agent instant access to structured knowledge with sub-millisecond SPARQL queries.
 
 - [x] Rust MCP server with stdio transport
 - [x] Oxigraph in-memory graph store
-- [x] SPARQL query interface
-- [x] Runtime ABox updates
-- [x] Claude Desktop integration
+- [x] SPARQL 1.1 query interface
+- [x] 12 semantic tools (list_skills, find_by_intent, plan_from_intent, etc.)
+- [x] Claude Code integration
 
 ## Phase 4: OntoStore 🔨
 
