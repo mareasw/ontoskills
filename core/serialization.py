@@ -111,6 +111,23 @@ def serialize_skill(graph: Graph, skill: ExtractedSkill) -> None:
     if skill.provenance:
         graph.add((skill_uri, PROV.wasDerivedFrom, Literal(skill.provenance)))
 
+    # Knowledge nodes (epistemic knowledge)
+    for i, kn in enumerate(skill.knowledge_nodes):
+        kn_hash = hashlib.sha256(f"{kn.node_type}:{kn.directive_content}".encode()).hexdigest()[:8]
+        kn_uri = oc[f"kn_{kn_hash}"]
+
+        # Add the knowledge node type as class
+        graph.add((kn_uri, RDF.type, oc[kn.node_type]))
+        graph.add((kn_uri, oc.directiveContent, Literal(kn.directive_content)))
+        graph.add((kn_uri, oc.appliesToContext, Literal(kn.applies_to_context)))
+        graph.add((kn_uri, oc.hasRationale, Literal(kn.has_rationale)))
+
+        if kn.severity_level:
+            graph.add((kn_uri, oc.severityLevel, Literal(kn.severity_level.value)))
+
+        # Link skill to knowledge node
+        graph.add((skill_uri, oc.impartsKnowledge, kn_uri))
+
 
 def serialize_skill_to_module(
     skill: ExtractedSkill,
