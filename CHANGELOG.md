@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Added repo-local `.env` loading for the Python compiler so extraction and security checks can
+  read `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, and model overrides without manual shell exports
+- Added `.env.example` with the compiler variables needed for Anthropic-compatible providers
+
+### Changed
+
+- Updated compiler documentation with `.env`-based configuration and an example nested-skill
+  compile command
+- Updated Claude Code MCP troubleshooting guidance to call out stale background processes after
+  rebuilding the Rust server
+
+### Fixed
+
+- Fixed Rust MCP `tools/call` responses so `structuredContent` is always a record object, avoiding
+  Claude Code schema errors for tools returning arrays such as `list_skills` and
+  `find_skills_by_intent`
+
 ## [0.5.0] - 2026-03-17
 
 ### Added
