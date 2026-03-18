@@ -31,6 +31,12 @@ from compiler.exceptions import (
     SPARQLError,
     SkillNotFoundError,
 )
+from compiler.differ import compute_diff
+from compiler.drift_report import print_report, export_json, print_suggestions
+from compiler.snapshot import save_snapshot, get_latest_snapshot
+from compiler.linter import lint_ontology, LintIssue
+from compiler.graph_export import build_graph
+from compiler.explainer import explain_skill, list_skill_ids
 from compiler.config import SKILLS_DIR, OUTPUT_DIR
 
 # Get version from pyproject.toml (single source of truth)
@@ -337,6 +343,11 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
     else:
         console.print(f"\n[yellow]No changes made[/yellow]")
 
+    index_ttl = output_path / "index.ttl"
+    if index_ttl.exists():
+        snap = save_snapshot(index_ttl)
+        console.print(f"[dim]Snapshot saved to {snap}[/dim]")
+
 
 @cli.command('init-core')
 @click.option('-o', '--output', 'output_dir', default=OUTPUT_DIR,
@@ -485,6 +496,236 @@ def security_audit(ctx, input_dir, verbose, quiet):
             issues_found += 1
 
     console.print(f"\n[bold]Audit complete:[/bold] {issues_found} issue(s) found")
+
+
+@cli.command('lint')
+@click.option(
+    '-o', '--ontology', 'ontology_file',
+    default=OUTPUT_DIR + '/index.ttl',
+    type=click.Path(exists=False),
+    help='Ontology file to lint (default: ./ontoskills/index.ttl)',
+)
+@click.option(
+    '--format', 'fmt',
+    default='rich',
+    type=click.Choice(['rich', 'json']),
+    help='Output format',
+)
+@click.option('--errors-only', is_flag=True, help='Show only errors, suppress warnings and info')
+@click.pass_context
+def lint_cmd(ctx, ontology_file, fmt, errors_only):
+    """Run static analysis on the compiled ontology.
+
+    Checks for four categories of structural issues without calling the LLM:
+
+    \b
+    dead-state       A skill requiresState X but no skill yieldsState X
+    circular-dep     A dependsOn B dependsOn ... dependsOn A  [error]
+    duplicate-intent Two skills resolve the same intent string  [error]
+    orphan-skill     Skill has no dependents and unreachable required states
+    """
+    import json as json_mod
+
+    ontology_path = Path(ontology_file)
+    if not ontology_path.exists():
+        console.print(f"[red]Ontology not found: {ontology_path}[/red]")
+        raise SystemExit(1)
+
+    result = lint_ontology(ontology_path)
+
+    if errors_only:
+        result.issues = result.errors
+
+    if fmt == 'json':
+        data = [
+            {
+                'severity': i.severity,
+                'code': i.code,
+                'skill_id': i.skill_id,
+                'message': i.message,
+                'detail': i.detail,
+            }
+            for i in result.issues
+        ]
+        console.print(json_mod.dumps(data, indent=2))
+    else:
+        _ICONS = {'error': '🔴', 'warning': '⚠️ ', 'info': '🔵'}
+        if result.is_clean:
+            from rich.panel import Panel
+            from rich import box
+            console.print(Panel('[bold green]✓ No issues found — ontology is clean[/]', box=box.ROUNDED))
+        else:
+            from rich.table import Table
+            from rich import box
+            t = Table(title='Lint Results', box=box.SIMPLE_HEAVY)
+            t.add_column('Severity', width=10)
+            t.add_column('Code', width=18)
+            t.add_column('Skill', width=22)
+            t.add_column('Message')
+            for issue in result.issues:
+                icon = _ICONS.get(issue.severity, '⚪')
+                t.add_row(f'{icon} {issue.severity}', issue.code, issue.skill_id, issue.message)
+            console.print(t)
+            console.print(
+                f'\nSummary: [red]{len(result.errors)} error(s)[/] | '
+                f'[yellow]{len(result.warnings)} warning(s)[/] | '
+                f'[blue]{len([i for i in result.issues if i.severity == "info"])} info[/]'
+            )
+
+    if result.has_errors:
+        raise SystemExit(1)
+
+
+@cli.command('explain')
+@click.argument('skill_id')
+@click.option(
+    '-o', '--ontology', 'ontology_file',
+    default=OUTPUT_DIR + '/index.ttl',
+    type=click.Path(exists=False),
+    help='Ontology file to read from (default: ./ontoskills/index.ttl)',
+)
+@click.pass_context
+def explain_cmd(ctx, skill_id, ontology_file):
+    """Show a human-readable summary card for a compiled skill.
+
+    \b
+    Example:
+      ontoclaw explain create-pdf
+      ontoclaw explain create-pdf -o ./ontoskills/index.ttl
+    """
+    from rich import box
+    from rich.panel import Panel
+    from rich.table import Table
+
+    ontology_path = Path(ontology_file)
+    if not ontology_path.exists():
+        console.print(f"[red]Ontology not found: {ontology_path}[/red]")
+        available = list_skill_ids(ontology_path) if ontology_path.exists() else []
+        if available:
+            console.print(f"[dim]Available skills: {', '.join(available)}[/dim]")
+        raise SystemExit(1)
+
+    summary = explain_skill(ontology_path, skill_id)
+
+    if summary is None:
+        console.print(f"[red]Skill '{skill_id}' not found in {ontology_path}[/red]")
+        available = list_skill_ids(ontology_path)
+        if available:
+            console.print(f"[dim]Available skills: {', '.join(available)}[/dim]")
+        raise SystemExit(1)
+
+    def _row(label, values):
+        return f"[bold]{label}[/bold]", ", ".join(values) if values else "[dim]—[/dim]"
+
+    t = Table(box=box.SIMPLE, show_header=False, padding=(0, 1))
+    t.add_column(style="cyan", width=18)
+    t.add_column()
+
+    t.add_row("Type",     f"[green]{summary.skill_type}[/green]")
+    t.add_row("Nature",   summary.nature or "[dim]—[/dim]")
+    t.add_row(*_row("Intents",         summary.intents))
+    t.add_row(*_row("Requires state",  summary.requires_states))
+    t.add_row(*_row("Yields state",    summary.yields_states))
+    t.add_row(*_row("Handles failure", summary.handles_failures))
+    t.add_row(*_row("Depends on",      summary.depends_on))
+    t.add_row(*_row("Extends",         summary.extends))
+    t.add_row(*_row("Contradicts",     summary.contradicts))
+    if summary.executor:
+        t.add_row("Executor",  f"[yellow]{summary.executor}[/yellow]")
+    if summary.content_hash:
+        t.add_row("Hash",      f"[dim]{summary.content_hash}[/dim]")
+    if summary.generated_by:
+        t.add_row("Generated by", f"[dim]{summary.generated_by}[/dim]")
+
+    console.print(Panel(t, title=f"[bold]{skill_id}[/bold]", box=box.ROUNDED))
+
+
+@cli.command('graph')
+@click.option(
+    '-o', '--ontology', 'ontology_file',
+    default=OUTPUT_DIR + '/index.ttl',
+    type=click.Path(exists=False),
+    help='Ontology file to visualise (default: ./ontoskills/index.ttl)',
+)
+@click.option(
+    '--format', 'fmt',
+    default='mermaid',
+    type=click.Choice(['mermaid', 'dot']),
+    help='Output format (default: mermaid)',
+)
+@click.option('--skill', default=None, help='Show only this skill and its direct neighbours')
+@click.option('--output', default=None, help='Write output to file instead of stdout')
+@click.pass_context
+def graph_cmd(ctx, ontology_file, fmt, skill, output):
+    """Visualise the skill dependency graph.
+
+    Exports oc:dependsOn, oc:extends, and oc:contradicts relationships as a
+    Mermaid flowchart or Graphviz DOT digraph.
+
+    \b
+    Examples:
+      ontoclaw graph                          # Mermaid to stdout
+      ontoclaw graph --format dot             # DOT to stdout
+      ontoclaw graph --skill create-pdf       # 1-hop subgraph
+      ontoclaw graph --output graph.mmd       # save to file
+    """
+    ontology_path = Path(ontology_file)
+    if not ontology_path.exists():
+        console.print(f"[red]Ontology not found: {ontology_path}[/red]")
+        raise SystemExit(1)
+
+    src = build_graph(ontology_path, fmt=fmt, skill_filter=skill)
+
+    if output:
+        Path(output).write_text(src)
+        console.print(f"[green]Graph saved to {output}[/green]")
+    else:
+        console.print(src)
+
+
+@cli.command('diff')
+@click.option('--skill', default=None, help='Analyse only this specific skill')
+@click.option('--from', 'from_path', default=None, help='Previous .ttl snapshot path')
+@click.option('--to', 'to_path', default=None, help='Current .ttl ontology path')
+@click.option('--breaking-only', is_flag=True, help='Show only breaking changes (exit code 9 if found)')
+@click.option(
+    '--format', 'fmt',
+    default='rich',
+    type=click.Choice(['rich', 'json', 'md']),
+    help='Output format',
+)
+@click.option('--output', default=None, help='Output file path for JSON/MD format')
+@click.option('--suggest', is_flag=True, help='Show migration guidance for each breaking change')
+def diff_cmd(skill, from_path, to_path, breaking_only, fmt, output, suggest):
+    """Detect semantic drift between ontology versions.
+
+    Compares the current ontology against a previous snapshot and reports
+    changes classified by impact: breaking, additive, or cosmetic.
+
+    Exit code 9 if breaking changes are detected (useful for CI/CD pipelines).
+    """
+    if not to_path:
+        to_path = './ontoskills/index.ttl'
+    if not from_path:
+        snap = get_latest_snapshot()
+        if not snap:
+            raise click.ClickException(
+                'No snapshot found. Run compile first to create a snapshot.'
+            )
+        from_path = str(snap)
+
+    report = compute_diff(from_path, to_path)
+
+    if fmt == 'json':
+        out = output or 'drift-report.json'
+        export_json(report, out)
+    else:
+        print_report(report, breaking_only=breaking_only)
+        if suggest and report.has_breaking:
+            print_suggestions(report.suggestions())
+
+    if report.has_breaking:
+        raise SystemExit(9)
 
 
 def main():
