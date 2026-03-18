@@ -198,3 +198,51 @@ def test_skill_with_payload_is_executable():
     serialize_skill(graph, skill)
     result = validate_skill_graph(graph)
     assert result.conforms is True  # It's a valid ExecutableSkill
+
+
+# ============================================================================
+# KnowledgeNode SHACL VALIDATION TESTS
+# ============================================================================
+
+
+def test_knowledge_node_validation_missing_required():
+    """Test that KnowledgeNode without required properties fails SHACL."""
+    from compiler.validator import validate_skill_graph
+    from rdflib import Graph, RDF, Literal, Namespace
+    from compiler.config import BASE_URI
+
+    g = Graph()
+    oc = Namespace(BASE_URI)
+
+    # Create a KnowledgeNode without required properties
+    kn_uri = oc["kn_test123"]
+    g.add((kn_uri, RDF.type, oc.KnowledgeNode))
+
+    # Should fail validation
+    result = validate_skill_graph(g)
+    assert not result.conforms
+    assert "directiveContent" in result.results_text or "appliesToContext" in result.results_text
+
+
+    assert "hasRationale" in result.results_text
+
+
+def test_knowledge_node_validation_with_all_required():
+    """Test that KnowledgeNode with all required properties passes."""
+    from compiler.validator import validate_skill_graph
+    from rdflib import Graph, RDF, Literal, Namespace
+    from compiler.config import BASE_URI
+
+    g = Graph()
+    oc = Namespace(BASE_URI)
+
+    # Create a valid KnowledgeNode
+    kn_uri = oc["kn_test456"]
+    g.add((kn_uri, RDF.type, oc.AntiPattern))
+    g.add((kn_uri, oc.directiveContent, Literal("Never do X")))
+    g.add((kn_uri, oc.appliesToContext, Literal("Always")))
+    g.add((kn_uri, oc.hasRationale, Literal("Because Y")))
+
+    # Should pass validation
+    result = validate_skill_graph(g)
+    assert result.conforms

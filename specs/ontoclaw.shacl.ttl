@@ -64,6 +64,12 @@ oc:SkillShape
         sh:nodeKind sh:IRI ;
         sh:message "handlesFailure deve essere un URI" ;
     ] ;
+
+    # impartsKnowledge allows KnowledgeNode (typing only, no constraint)
+    sh:property [
+        sh:path oc:impartsKnowledge ;
+        sh:class oc:KnowledgeNode ;
+    ] ;
     .
 
 # ============================================================================
@@ -180,5 +186,68 @@ oc:StateShape
         sh:maxCount 1 ;
         sh:message "Ogni State dovrebbe avere un rdfs:label" ;
         sh:severity sh:Warning ;
+    ] ;
+    .
+
+# ============================================================================
+# KNOWLEDGE NODE SHAPE
+# Validates epistemic knowledge nodes - STRICT
+# ============================================================================
+
+oc:KnowledgeNodeShape
+    a sh:NodeShape ;
+    sh:targetClass oc:KnowledgeNode ;
+    rdfs:label "Knowledge Node Shape" ;
+    rdfs:comment "Strict constraints for epistemic knowledge nodes" ;
+
+    sh:property [
+        sh:path oc:directiveContent ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Ogni KnowledgeNode deve avere esattamente un directiveContent" ;
+    ] ;
+
+    sh:property [
+        sh:path oc:appliesToContext ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Ogni KnowledgeNode deve avere esattamente un appliesToContext" ;
+    ] ;
+
+    sh:property [
+        sh:path oc:hasRationale ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Ogni KnowledgeNode deve avere esattamente un hasRationale (spiegazione del perché)" ;
+    ] ;
+
+    sh:property [
+        sh:path oc:severityLevel ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:in ("CRITICAL" "HIGH" "MEDIUM" "LOW") ;
+        sh:message "Se presente, severityLevel deve essere CRITICAL, HIGH, MEDIUM o LOW" ;
+    ] ;
+    .
+
+# ============================================================================
+# SKILL KNOWLEDGE WARNING SHAPE
+# Warns if skill has no epistemic knowledge - SEPARATE FROM MAIN VALIDATION
+# ============================================================================
+
+oc:SkillKnowledgeWarningShape
+    a sh:NodeShape ;
+    sh:targetClass oc:Skill ;
+    rdfs:label "Skill Knowledge Warning Shape" ;
+    rdfs:comment "Recommends that skills impart epistemic knowledge" ;
+
+    sh:property [
+        sh:path oc:impartsKnowledge ;
+        sh:minCount 1 ;
+        sh:severity sh:Warning ;
+        sh:message "ATTENZIONE: Questa Skill non fornisce nodi di conoscenza epistemica (impartsKnowledge). Considera l'aggiunta di Standard, AntiPattern o Heuristics nel file SKILL.md." ;
     ] ;
     .
