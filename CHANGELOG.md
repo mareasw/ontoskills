@@ -18,12 +18,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   compile command
 - Updated Claude Code MCP troubleshooting guidance to call out stale background processes after
   rebuilding the Rust server
+- Relaxed SHACL state validation to allow novel states (e.g., `oc:SpreadsheetCreated`) without
+  requiring them to be pre-defined in the core ontology - the MCP server resolves states at runtime
+- Updated README.md validation table to reflect relaxed state constraints (IRI required, not
+  necessarily `oc:State` instance)
 
 ### Fixed
 
 - Fixed Rust MCP `tools/call` responses so `structuredContent` is always a record object, avoiding
   Claude Code schema errors for tools returning arrays such as `list_skills` and
   `find_skills_by_intent`
+- Fixed pySHACL validation bug where RDFS inference caused Literal values in dependency relations
+  to be treated as focus nodes for validation - now uses `inference='none'`
+- Fixed SHACL `sh:class oc:State` constraint that rejected novel states extracted by LLM -
+  removed class constraint, keeping only `sh:nodeKind sh:IRI`
+- Fixed skill dependency serialization to use Literal strings instead of URIRef to prevent
+  pySHACL from validating them as skill nodes
+- Fixed duplicate `skill_output_paths` entries when skills were skipped due to hash match
 
 ## [0.5.0] - 2026-03-17
 
