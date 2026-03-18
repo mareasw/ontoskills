@@ -1,6 +1,6 @@
 # OntoClaw Philosophy
 
-## 0. OntoClaw: Neuro-Symbolic AI Agent Platform
+## 0. Neuro-Symbolic AI Agent Platform
 
 OntoClaw is not just a compiler — it's a **complete neuro-symbolic platform** for building deterministic, enterprise-grade AI agents. The ecosystem consists of five layered components:
 
