@@ -98,3 +98,31 @@ oc:CreateDoc a oc:Skill ;
     # so it might still be flagged for the dead state
     dead_states = [i for i in result.issues if i.code == "dead-state"]
     assert len(dead_states) >= 1 or len(unreachable) == 0
+
+
+def test_circular_dep_detected(tmp_path):
+    """A → B → A cycle should be flagged as an error."""
+    path = _write(tmp_path, """
+oc:SkillA a oc:Skill ;
+    oc:resolvesIntent "do_a" ;
+    oc:dependsOn oc:SkillB .
+
+oc:SkillB a oc:Skill ;
+    oc:resolvesIntent "do_b" ;
+    oc:dependsOn oc:SkillA .
+""")
+    result = lint_ontology(path)
+    assert result.has_errors
+    assert any(i.code == "circular-dep" for i in result.issues)
+
+
+def test_circular_dep_three_nodes(tmp_path):
+    """A → B → C → A cycle should be detected."""
+    path = _write(tmp_path, """
+oc:A a oc:Skill ; oc:resolvesIntent "a" ; oc:dependsOn oc:B .
+oc:B a oc:Skill ; oc:resolvesIntent "b" ; oc:dependsOn oc:C .
+oc:C a oc:Skill ; oc:resolvesIntent "c" ; oc:dependsOn oc:A .
+""")
+    result = lint_ontology(path)
+    assert result.has_errors
+    assert any(i.code == "circular-dep" for i in result.issues)

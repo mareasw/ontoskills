@@ -5,6 +5,7 @@ Analyses the compiled ontology (or a set of .ttl files) without calling the
 Anthropic API and reports structural issues:
 
   - dead_states      : a skill requiresState X but no skill yieldsState X
+  - circular_deps    : A dependsOn B dependsOn ... dependsOn A
   - duplicate_intents: two different skills resolve the same intent string
   - unreachable_skills: skill with requiresState but no skill yields those states
                         and the skill has no entry-point intents
@@ -71,6 +72,7 @@ def lint_ontology(ttl_path: str | Path) -> LintResult:
 
     result = LintResult()
     result.issues += _check_dead_states(g)
+    result.issues += _check_circular_deps(g)
     result.issues += _check_duplicate_intents(g)
     result.issues += _check_unreachable_skills(g)
     return result
@@ -123,10 +125,50 @@ def _check_dead_states(g: Graph) -> list[LintIssue]:
 
 def _check_circular_deps(g: Graph) -> list[LintIssue]:
     """
-    Deprecated: oc:dependsOn is not used in current skills.
-    Returns empty list for backwards compatibility.
+    Detect circular dependency chains via oc:dependsOn.
+
+    Uses DFS with a recursion stack. Reports each skill that is part of a cycle.
     """
-    return []
+    # Build adjacency: skill_id → set of skill_ids it depends on
+    adj: dict[str, set[str]] = {}
+    for s, o in g.subject_objects(OC.dependsOn):
+        sid = _local(s)
+        oid = _local(o)
+        adj.setdefault(sid, set()).add(oid)
+
+    visited:   set[str] = set()
+    rec_stack: set[str] = set()
+    cycles:    set[str] = set()
+
+    def dfs(node: str) -> bool:
+        visited.add(node)
+        rec_stack.add(node)
+        for neighbour in adj.get(node, set()):
+            if neighbour not in visited:
+                if dfs(neighbour):
+                    cycles.add(node)
+                    return True
+            elif neighbour in rec_stack:
+                cycles.add(node)
+                cycles.add(neighbour)
+                return True
+        rec_stack.discard(node)
+        return False
+
+    for skill in list(adj.keys()):
+        if skill not in visited:
+            dfs(skill)
+
+    return [
+        LintIssue(
+            severity="error",
+            code="circular-dep",
+            skill_id=sid,
+            message=f"Circular dependency detected involving '{sid}'",
+            detail="Resolve the cycle in oc:dependsOn before deploying.",
+        )
+        for sid in sorted(cycles)
+    ]
 
 
 def _check_duplicate_intents(g: Graph) -> list[LintIssue]:

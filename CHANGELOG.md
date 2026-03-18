@@ -24,9 +24,8 @@ Updated the PR #5 tooling to work with the current ontology structure (knowledge
   - Updated SPARQL queries in suggestions to use correct properties
 
 - **core/linter.py** — Updated checks:
-  - Removed `circular-dep` check (`oc:dependsOn` not used in current skills)
   - Replaced `orphan-skill` with `unreachable-state` check (skills with unreachable required states)
-  - Kept: `dead-state`, `duplicate-intent` (still valid)
+  - Kept: `dead-state`, `circular-dep`, `duplicate-intent` (still valid)
 
 - **core/graph_export.py** — Changed from dependency graph to state transition graph:
   - Edges now show: Skill A `yieldsState` X → Skill B `requiresState` X
