@@ -1,0 +1,57 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix oc: <http://ontoclaw.marea.software/ontology#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://ontoclaw.marea.software/ontology> owl:imports <file:///Users/marcello/Developer/Marea/ontoclaw/ontoskills/ontoclaw-core.ttl> .
+
+oc:skill_d65bf5d2c4408c43 a oc:DeclarativeSkill,
+        oc:Skill ;
+    oc:contentHash "d65bf5d2c4408c4305cb5dbeb1d9fc8f83bd44f6a39277321505f900c7b6d07e" ;
+    oc:dependsOn "docx",
+        "pdf",
+        "pptx",
+        "xlsx" ;
+    oc:differentia "orchestrates multiple Office document manipulation sub-skills without direct execution" ;
+    oc:generatedBy "glm-5" ;
+    oc:handlesFailure oc:DocumentCreationFailed,
+        oc:SubSkillNotAvailable ;
+    oc:hasRequirement oc:req_049869f8,
+        oc:req_7595bfbf,
+        oc:req_7c919d84,
+        oc:req_9de86cf5 ;
+    oc:nature "Work" ;
+    oc:requiresState oc:SubSkillsAvailable ;
+    oc:resolvesIntent "analyze office documents",
+        "automate document workflows",
+        "create office documents",
+        "create presentations",
+        "create spreadsheets",
+        "create word documents",
+        "edit office documents",
+        "manipulate pdfs" ;
+    oc:yieldsState oc:OfficeDocumentsAnalyzed,
+        oc:OfficeDocumentsCreated,
+        oc:OfficeDocumentsEdited ;
+    dcterms:identifier "office" ;
+    skos:broader "meta-skill" ;
+    prov:wasDerivedFrom "/Users/marcello/Developer/Marea/ontoclaw/skills/office" .
+
+oc:req_049869f8 a oc:RequirementTool ;
+    oc:isOptional false ;
+    oc:requirementValue "pdf sub-skill" .
+
+oc:req_7595bfbf a oc:RequirementTool ;
+    oc:isOptional false ;
+    oc:requirementValue "xlsx sub-skill" .
+
+oc:req_7c919d84 a oc:RequirementTool ;
+    oc:isOptional false ;
+    oc:requirementValue "pptx sub-skill" .
+
+oc:req_9de86cf5 a oc:RequirementTool ;
+    oc:isOptional false ;
+    oc:requirementValue "docx sub-skill" .
+
