@@ -1,9 +1,9 @@
-"""Tests for OntoClaw static linter."""
+"""Tests for OntoSkills static linter."""
 
 import pytest
 from compiler.linter import lint_ontology
 
-BASE = "@prefix oc: <https://ontoclaw.marea.software/ontology#> .\n"
+BASE = "@prefix oc: <https://ontoskills.sh/ontology#> .\n"
 
 
 def _write(tmp_path, content: str):

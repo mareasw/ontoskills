@@ -82,15 +82,15 @@ The server resolves ontology input in this order:
 Recommended command from the repository root:
 
 ```bash
-claude mcp add --scope local ontoclaw \
+claude mcp add --scope local ontoskills \
   /absolute/path/to/ontoskills/mcp/target/debug/ontoskills-mcp \
-  -- --ontology-root /absolute/path/to/ontoclaw/ontoskills
+  -- --ontology-root /absolute/path/to/ontoskills/ontoskills
 ```
 
 If you want to rely on auto-discovery:
 
 ```bash
-claude mcp add --scope local ontoclaw \
+claude mcp add --scope local ontoskills \
   /absolute/path/to/ontoskills/mcp/target/debug/ontoskills-mcp
 ```
 
@@ -104,7 +104,7 @@ Notes:
 Check one server:
 
 ```bash
-claude mcp get ontoclaw
+claude mcp get ontoskills
 ```
 
 Expected output includes:
@@ -122,7 +122,7 @@ claude mcp list
 You should see something like:
 
 ```text
-ontoclaw: /absolute/path/to/ontoskills/mcp/target/debug/ontoskills-mcp ... ✓ Connected
+ontoskills: /absolute/path/to/ontoskills/mcp/target/debug/ontoskills-mcp ... ✓ Connected
 ```
 
 ## Remove Or Replace The Server
@@ -130,7 +130,7 @@ ontoclaw: /absolute/path/to/ontoskills/mcp/target/debug/ontoskills-mcp ... ✓ C
 Remove it:
 
 ```bash
-claude mcp remove -s local ontoclaw
+claude mcp remove -s local ontoskills
 ```
 
 Re-add it with a different ontology root if needed.

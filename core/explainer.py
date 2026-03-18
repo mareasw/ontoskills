@@ -1,5 +1,5 @@
 """
-Human-readable skill explainer for OntoClaw ontologies.
+Human-readable skill explainer for OntoSkills ontologies.
 
 Reads a compiled skill from its .ttl file (or from the index) and renders
 a structured summary card showing every relevant property — intents, states,
@@ -18,7 +18,7 @@ from pathlib import Path
 from rdflib import Graph, Namespace, RDF
 from rdflib.namespace import DCTERMS
 
-OC = Namespace("https://ontoclaw.marea.software/ontology#")
+OC = Namespace("https://ontoskills.sh/ontology#")
 
 
 @dataclass

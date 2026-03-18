@@ -248,7 +248,7 @@ The compiler now acts as a **Semantic Bundler** - the output directory (`ontoski
   - `*.ttl` → `*.md` mapping (auxiliary markdown)
   - Direct asset mapping (non-ttl files map to same path)
 - **`SYSTEM_FILES` safeguard** - Protects compiler-generated files from cleanup:
-  - `ontoclaw-core.ttl` - Core TBox ontology
+  - `ontoskills-core.ttl` - Core TBox ontology
   - `index.ttl` - Manifest with owl:imports
 
 ### Removed
@@ -361,12 +361,12 @@ A constitutional validation layer that ensures every skill ontology is logically
 
 - **validator.py** - SHACL validation module
   - `ValidationResult` NamedTuple with `conforms`, `results_text`, `results_graph`
-  - `load_shacl_shapes()` - Loads constitutional shapes from `specs/ontoclaw.shacl.ttl`
+  - `load_shacl_shapes()` - Loads constitutional shapes from `specs/ontoskills.shacl.ttl`
   - `load_core_ontology()` - Loads TBox for `sh:class` validation (critical for state validation)
   - `validate_skill_graph()` - Validates RDF graph against SHACL shapes with RDFS inference
   - `validate_and_raise()` - Raises `OntologyValidationError` on failure
 
-- **specs/ontoclaw.shacl.ttl** - Constitutional SHACL shapes
+- **specs/ontoskills.shacl.ttl** - Constitutional SHACL shapes
   - `oc:SkillShape` - Base constraints for all skills
     - `resolvesIntent` minCount 1 (required)
     - `generatedBy` exactly 1 (required attestation)
