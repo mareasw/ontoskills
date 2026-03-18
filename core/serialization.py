@@ -65,19 +65,15 @@ def serialize_skill(graph: Graph, skill: ExtractedSkill) -> None:
         graph.add((req_uri, oc.isOptional, Literal(req.optional)))
         graph.add((skill_uri, oc.hasRequirement, req_uri))
 
-    # Relations - reference by ID only, not creating new skill nodes
+    # Relations - use skill IDs as literals (MCP server resolves them)
     for dep in skill.depends_on:
-        # Create a simple reference to the skill ID
-        dep_uri = URIRef(BASE_URI + f"skills/{dep}#skill_{dep}")
-        graph.add((skill_uri, oc.dependsOn, dep_uri))
+        graph.add((skill_uri, oc.dependsOn, Literal(dep)))
 
     for ext in skill.extends:
-        ext_uri = URIRef(BASE_URI + f"skills/{ext}#skill_{ext}")
-        graph.add((skill_uri, oc.extends, ext_uri))
+        graph.add((skill_uri, oc.extends, Literal(ext)))
 
     for cont in skill.contradicts:
-        cont_uri = URIRef(BASE_URI + f"skills/{cont}#skill_{cont}")
-        graph.add((skill_uri, oc.contradicts, cont_uri))
+        graph.add((skill_uri, oc.contradicts, Literal(cont)))
 
     # State transitions (new schema feature)
     if skill.state_transitions:

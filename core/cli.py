@@ -193,7 +193,6 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
 
                 if existing_hash == skill_hash:
                     logger.info(f"Skill {skill_id} unchanged (hash match), skipping")
-                    skill_output_paths.append(output_skill_path)
                     continue
             except Exception as e:
                 logger.debug(f"Could not read existing skill: {e}")
