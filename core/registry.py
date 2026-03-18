@@ -107,6 +107,8 @@ class RegistryIndex(BaseModel):
 
 IGNORED_SOURCE_DIRS = {".git", "node_modules", ".venv", "target", "dist", "build", "__pycache__"}
 SKILL_SCRIPT_PATH_RE = re.compile(r"skills/([A-Za-z0-9._-]+)/([^\s\"']+)")
+RELATIVE_SCRIPT_PATH_RE = re.compile(r"(?<![A-Za-z0-9._/-])scripts/([^\s\"']+)")
+BROKEN_ABSOLUTE_PATH_RE = re.compile(r"~/\.claude//(?=[A-Za-z])")
 
 
 def ontology_root() -> Path:
@@ -460,25 +462,35 @@ def compile_source_tree(source_root: Path, compiled_root: Path) -> None:
 def rewrite_compiled_payload_paths(compiled_root: Path) -> None:
     for ttl_path in compiled_root.rglob("*.ttl"):
         original = ttl_path.read_text(encoding="utf-8")
-        rewritten = rewrite_payload_text(original, compiled_root)
+        rewritten = rewrite_payload_text(original, compiled_root, ttl_path)
         if rewritten != original:
             ttl_path.write_text(rewritten, encoding="utf-8")
 
 
-def rewrite_payload_text(payload: str, compiled_root: Path) -> str:
-    def replace(match: re.Match[str]) -> str:
+def rewrite_payload_text(payload: str, compiled_root: Path, ttl_path: Path) -> str:
+    def replace_skill_path(match: re.Match[str]) -> str:
         skill_id = match.group(1)
         relative_path = Path(match.group(2))
         for candidate in (
-            compiled_root / "src" / skill_id / relative_path,
             compiled_root / ".claude" / "skills" / skill_id / relative_path,
+            compiled_root / "src" / skill_id / relative_path,
             compiled_root / skill_id / relative_path,
         ):
             if candidate.exists():
                 return candidate.resolve().as_posix()
         return match.group(0)
 
-    return SKILL_SCRIPT_PATH_RE.sub(replace, payload)
+    def replace_relative_script_path(match: re.Match[str]) -> str:
+        relative_path = Path("scripts") / match.group(1)
+        candidate = ttl_path.parent / relative_path
+        if candidate.exists():
+            return candidate.resolve().as_posix()
+        return match.group(0)
+
+    rewritten = BROKEN_ABSOLUTE_PATH_RE.sub("/", payload)
+    rewritten = SKILL_SCRIPT_PATH_RE.sub(replace_skill_path, rewritten)
+    rewritten = RELATIVE_SCRIPT_PATH_RE.sub(replace_relative_script_path, rewritten)
+    return rewritten
 
 
 def materialize_source_repository(repo_ref: str, tmp_dir: Path) -> tuple[Path, str]:

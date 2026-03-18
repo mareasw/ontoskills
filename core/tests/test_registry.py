@@ -376,3 +376,76 @@ oc:skill_ui_ux_pro_max a oc:Skill, oc:DeclarativeSkill ;
     expected_script = (Path(package.install_root) / "compiled" / "src" / "ui-ux-pro-max" / "scripts" / "search.py").resolve().as_posix()
     assert expected_script in payload
     assert "skills/ui-ux-pro-max/scripts/search.py" not in payload
+
+
+def test_import_source_repository_rewrites_relative_and_broken_absolute_script_paths(tmp_path):
+    from unittest.mock import patch
+
+    root = tmp_path / "ontoskills"
+    create_core_ontology(root / "ontoclaw-core.ttl")
+
+    repo_dir = tmp_path / "design-repo"
+    (repo_dir / ".claude" / "skills" / "design-system").mkdir(parents=True, exist_ok=True)
+    (repo_dir / ".claude" / "skills" / "design-system" / "SKILL.md").write_text("# Design System", encoding="utf-8")
+    (repo_dir / ".claude" / "skills" / "design").mkdir(parents=True, exist_ok=True)
+    (repo_dir / ".claude" / "skills" / "design" / "SKILL.md").write_text("# Design", encoding="utf-8")
+
+    def fake_compile(source_root, compiled_root):
+        (compiled_root / ".claude" / "skills" / "design-system" / "scripts").mkdir(parents=True, exist_ok=True)
+        (compiled_root / ".claude" / "skills" / "design" / "scripts" / "logo").mkdir(parents=True, exist_ok=True)
+        (compiled_root / ".claude" / "skills" / "design-system" / "scripts" / "search-slides.py").write_text(
+            "print('slides')",
+            encoding="utf-8",
+        )
+        (compiled_root / ".claude" / "skills" / "design" / "scripts" / "logo" / "search.py").write_text(
+            "print('logo')",
+            encoding="utf-8",
+        )
+        (compiled_root / ".claude" / "skills" / "design-system" / "ontoskill.ttl").write_text(
+            """
+@prefix oc: <http://ontoclaw.marea.software/ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+oc:skill_design_system a oc:Skill, oc:ExecutableSkill ;
+    dcterms:identifier "design-system" ;
+    oc:hasPayload [
+        a oc:ExecutionPayload ;
+        oc:code "python scripts/search-slides.py \\"investor pitch\\""
+    ] .
+""",
+            encoding="utf-8",
+        )
+        (compiled_root / ".claude" / "skills" / "design" / "ontoskill.ttl").write_text(
+            """
+@prefix oc: <http://ontoclaw.marea.software/ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+oc:skill_design a oc:Skill, oc:ExecutableSkill ;
+    dcterms:identifier "design" ;
+    oc:hasPayload [
+        a oc:ExecutionPayload ;
+        oc:code "python ~/.claude//Users/test/skill/scripts/logo/search.py"
+    ] .
+""",
+            encoding="utf-8",
+        )
+
+    with patch("compiler.registry.compile_source_tree", side_effect=fake_compile):
+        package = import_source_repository(
+            str(repo_dir),
+            root=root,
+            trust_tier="community",
+        )
+
+    design_system_ttl = Path(package.install_root) / "compiled" / ".claude" / "skills" / "design-system" / "ontoskill.ttl"
+    design_payload = design_system_ttl.read_text(encoding="utf-8")
+    expected_relative_script = (
+        Path(package.install_root) / "compiled" / ".claude" / "skills" / "design-system" / "scripts" / "search-slides.py"
+    ).resolve().as_posix()
+    assert expected_relative_script in design_payload
+    assert "python scripts/search-slides.py" not in design_payload
+
+    design_ttl = Path(package.install_root) / "compiled" / ".claude" / "skills" / "design" / "ontoskill.ttl"
+    broken_payload = design_ttl.read_text(encoding="utf-8")
+    assert "~/.claude//Users/" not in broken_payload
+    assert "python /Users/test/skill/scripts/logo/search.py" in broken_payload
