@@ -119,28 +119,34 @@ For enterprises running agents at scale, token consumption directly impacts the 
 |----------|--------|-------------------------------|--------------------------------|
 | Load all 50 skills | ~300K | $2,500 | $1,500 |
 | SPARQL query to ontology | ~1.5K | $17.50 | $10.50 |
-| SPARQL query (Haiku 3) | ~1.5K | — | $0.87 |
 
-*Pricing: Opus 4.6 ($5/MTok input, $25/MTok output), Sonnet 4.6 ($3/MTok input, $15/MTok output), Haiku 3 ($0.25/MTok input, $1.25/MTok output)*
+*Pricing: Opus 4.6 ($5/MTok input, $25/MTok output), Sonnet 4.6 ($3/MTok input, $15/MTok output)*
 
-The ontology approach reduces costs by **~150x** for Sonnet and **~170x** for Haiku.
+The ontology approach reduces costs by **~150x** for Sonnet.
 
 ### The Retry Problem
 
-Non-deterministic reasoning creates a hidden cost multiplier: **retries**.
+Non-deterministic reasoning creates a hidden cost multiplier: **stupid retries**.
 
-When an LLM agent misinterprets a skill or selects the wrong one:
+When an LLM agent interprets skill metadata, it makes unpredictable mistakes:
 
-- **Wasted tokens**: Each retry consumes the full context window again
-- **Cascading failures**: One wrong skill selection may trigger 3-5 recovery attempts
-- **User frustration**: Latency compounds with each retry
+**Examples of wasteful retries:**
+- **Wrong tool calls**: Agent calls `list_skills` instead of `find_skills_by_intent`
+- **Scattershot approach**: Tries 3-4 different skills before finding one that works
+- **Hallucinated capabilities**: "This skill can probably handle images" — when it cannot
+- **Looping on understanding**: Re-reads skill descriptions trying to "get it"
+- **Context overflow**: Loads entire skill file just to answer "what does this require?"
 
-With deterministic SPARQL queries:
-- Same input → same result (no interpretation variance)
+Each retry consumes the full context window. With 50+ skills, this adds up fast.
+
+**With deterministic SPARQL:**
+- Same input → same result (zero interpretation variance)
 - Skill selection is **exact**, not probabilistic
-- Retry rates drop from ~30% to near-zero
+- **No "thinking" overhead** — query returns answer directly
+- **No hallucination** — the ontology is the single source of truth
+- **Predictable costs** — you know exactly how many tokens each query costs
 
-**Determinism isn't just about correctness — it's about cost efficiency.**
+**Determinism isn't just about correctness — it's about eliminating waste.**
 
 ### The Consistency Gap
 
