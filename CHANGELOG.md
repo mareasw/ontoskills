@@ -11,6 +11,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added repo-local `.env` loading for the Python compiler so extraction and security checks can
   read `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, and model overrides without manual shell exports
 - Added `.env.example` with the compiler variables needed for Anthropic-compatible providers
+- Added global ontology registry management under `ontoskills/` with:
+  - `official/`, `community/`, and `system/` subtrees
+  - `registry.lock.json` and `registry.sources.json`
+  - `index.installed.ttl` and `index.enabled.ttl`
+- Added registry/package commands to the compiler CLI:
+  - `registry add-source`
+  - `registry list`
+  - `install`
+  - `install-package`
+  - `import-source`
+  - `import-source-package`
+  - `enable`
+  - `disable`
+  - `list-installed`
+  - `rebuild-index`
+- Added support for importing remote ontology packages from registry indexes via `manifest_url`
+- Added support for importing remote source packages with `source_root` and `source_files`, then compiling them locally into the ontology root
+- Added a local `registry/` blueprint directory and a formal package spec in `specs/registry-package-spec.md`
 
 ### Changed
 
@@ -22,6 +40,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   requiring them to be pre-defined in the core ontology - the MCP server resolves states at runtime
 - Updated README.md validation table to reflect relaxed state constraints (IRI required, not
   necessarily `oc:State` instance)
+- Refactored the MCP public API from many granular tools to 4 consolidated tools:
+  - `search_skills`
+  - `get_skill_context`
+  - `evaluate_execution_plan`
+  - `query_epistemic_rules`
+- Changed the MCP runtime to prefer `ontoskills/system/index.enabled.ttl` when present, so the server exposes only enabled skills by default
+- Extended MCP responses with package-aware metadata:
+  - `qualified_id`
+  - `package_id`
+  - `trust_tier`
+  - `version`
+  - `source`
+  - `aliases`
+- Changed MCP skill resolution to accept both short ids like `xlsx` and qualified ids like `marea.office/xlsx`
+- Changed short-id conflict resolution to use precedence `verified > local > trusted > community`
+- Changed compiler relation serialization to use stable skill URI references instead of literal strings for `dependsOn`, `extends`, and `contradicts`
+- Changed compiler enrichment to infer parent inheritance deterministically from nested skill directory structure
+- Changed local/installed ontology layout so imported packages stay separated from local compiled skills while sharing the same global root
 
 ### Fixed
 
@@ -35,6 +71,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Fixed skill dependency serialization to use Literal strings instead of URIRef to prevent
   pySHACL from validating them as skill nodes
 - Fixed duplicate `skill_output_paths` entries when skills were skipped due to hash match
+- Fixed compiler-side skill inheritance so nested skills such as `xlsx`, `pdf`, `pptx`, and `docx` can inherit from parent skills like `office` after recompilation
+- Fixed imported/community ontology cleanup so registry system files and imported package trees are not deleted by local orphan cleanup
+- Fixed MCP ambiguity handling so exact qualified ids resolve deterministically and short ids pick the correct preferred skill when multiple packages export the same short id
 
 ## [0.5.0] - 2026-03-17
 

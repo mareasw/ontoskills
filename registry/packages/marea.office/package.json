@@ -1,0 +1,47 @@
+{
+  "package_id": "marea.office",
+  "version": "0.1.0",
+  "core_version": "0.5.0",
+  "trust_tier": "verified",
+  "source": "https://github.com/mareasoftware/ontostore",
+  "checksum": null,
+  "modules": [
+    "office/ontoskill.ttl",
+    "office/public/docx/ontoskill.ttl",
+    "office/public/pptx/ontoskill.ttl",
+    "office/public/xlsx/ontoskill.ttl",
+    "office/public/pdf/ontoskill.ttl"
+  ],
+  "skills": [
+    {
+      "id": "office",
+      "path": "office/ontoskill.ttl",
+      "default_enabled": false,
+      "aliases": ["office"]
+    },
+    {
+      "id": "docx",
+      "path": "office/public/docx/ontoskill.ttl",
+      "default_enabled": false,
+      "aliases": ["word", "word-doc"]
+    },
+    {
+      "id": "pptx",
+      "path": "office/public/pptx/ontoskill.ttl",
+      "default_enabled": false,
+      "aliases": ["powerpoint", "slides"]
+    },
+    {
+      "id": "xlsx",
+      "path": "office/public/xlsx/ontoskill.ttl",
+      "default_enabled": false,
+      "aliases": ["excel", "spreadsheet"]
+    },
+    {
+      "id": "pdf",
+      "path": "office/public/pdf/ontoskill.ttl",
+      "default_enabled": false,
+      "aliases": ["pdf"]
+    }
+  ]
+}
