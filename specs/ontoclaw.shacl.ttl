@@ -44,28 +44,31 @@ oc:SkillShape
         sh:message "Ogni Skill deve avere esattamente un generatedBy (modello LLM)" ;
     ] ;
 
-    # requiresState must be an IRI pointing to an oc:State instance
+    # requiresState must be an IRI (novel states are allowed - MCP server resolves them)
     sh:property [
         sh:path oc:requiresState ;
         sh:nodeKind sh:IRI ;
-        sh:class oc:State ;
-        sh:message "requiresState deve essere un URI che punta a un'istanza di oc:State" ;
+        sh:message "requiresState deve essere un URI" ;
     ] ;
 
-    # yieldsState must be an IRI pointing to an oc:State instance
+    # yieldsState must be an IRI (novel states are allowed - MCP server resolves them)
     sh:property [
         sh:path oc:yieldsState ;
         sh:nodeKind sh:IRI ;
-        sh:class oc:State ;
-        sh:message "yieldsState deve essere un URI che punta a un'istanza di oc:State" ;
+        sh:message "yieldsState deve essere un URI" ;
     ] ;
 
-    # handlesFailure must be an IRI pointing to an oc:State instance
+    # handlesFailure must be an IRI (novel states are allowed - MCP server resolves them)
     sh:property [
         sh:path oc:handlesFailure ;
         sh:nodeKind sh:IRI ;
-        sh:class oc:State ;
-        sh:message "handlesFailure deve essere un URI che punta a un'istanza di oc:State" ;
+        sh:message "handlesFailure deve essere un URI" ;
+    ] ;
+
+    # impartsKnowledge allows KnowledgeNode (typing only, no constraint)
+    sh:property [
+        sh:path oc:impartsKnowledge ;
+        sh:class oc:KnowledgeNode ;
     ] ;
     .
 
@@ -118,6 +121,19 @@ oc:ExecutionPayloadShape
     sh:targetClass oc:ExecutionPayload ;
     rdfs:label "Execution Payload Shape" ;
 
+    # XOR: must have either code (inline) OR executionPath (external file)
+    sh:or (
+        [
+            sh:path oc:code ;
+            sh:minCount 1 ;
+        ]
+        [
+            sh:path oc:executionPath ;
+            sh:minCount 1 ;
+        ]
+    ) ;
+    sh:message "Un ExecutionPayload deve contenere o oc:code (inline) o oc:executionPath (file esterno)" ;
+
     # MUST have exactly one executor
     sh:property [
         sh:path oc:executor ;
@@ -128,13 +144,20 @@ oc:ExecutionPayloadShape
         sh:message "ExecutionPayload deve avere un executor valido: shell, python, node, o claude_tool" ;
     ] ;
 
-    # MUST have exactly one code block
+    # code is optional (can use executionPath instead), max 1 if present
     sh:property [
         sh:path oc:code ;
-        sh:minCount 1 ;
         sh:maxCount 1 ;
         sh:datatype xsd:string ;
-        sh:message "ExecutionPayload deve avere esattamente un campo code" ;
+        sh:message "Se presente, code deve essere una stringa" ;
+    ] ;
+
+    # executionPath is optional (can use code instead), max 1 if present
+    sh:property [
+        sh:path oc:executionPath ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Se presente, executionPath deve essere una stringa" ;
     ] ;
 
     # timeout is optional but must be integer if present
@@ -163,5 +186,68 @@ oc:StateShape
         sh:maxCount 1 ;
         sh:message "Ogni State dovrebbe avere un rdfs:label" ;
         sh:severity sh:Warning ;
+    ] ;
+    .
+
+# ============================================================================
+# KNOWLEDGE NODE SHAPE
+# Validates epistemic knowledge nodes - STRICT
+# ============================================================================
+
+oc:KnowledgeNodeShape
+    a sh:NodeShape ;
+    sh:targetClass oc:KnowledgeNode ;
+    rdfs:label "Knowledge Node Shape" ;
+    rdfs:comment "Strict constraints for epistemic knowledge nodes" ;
+
+    sh:property [
+        sh:path oc:directiveContent ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Ogni KnowledgeNode deve avere esattamente un directiveContent" ;
+    ] ;
+
+    sh:property [
+        sh:path oc:appliesToContext ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Ogni KnowledgeNode deve avere esattamente un appliesToContext" ;
+    ] ;
+
+    sh:property [
+        sh:path oc:hasRationale ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Ogni KnowledgeNode deve avere esattamente un hasRationale (spiegazione del perché)" ;
+    ] ;
+
+    sh:property [
+        sh:path oc:severityLevel ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:in ("CRITICAL" "HIGH" "MEDIUM" "LOW") ;
+        sh:message "Se presente, severityLevel deve essere CRITICAL, HIGH, MEDIUM o LOW" ;
+    ] ;
+    .
+
+# ============================================================================
+# SKILL KNOWLEDGE WARNING SHAPE
+# Warns if skill has no epistemic knowledge - SEPARATE FROM MAIN VALIDATION
+# ============================================================================
+
+oc:SkillKnowledgeWarningShape
+    a sh:NodeShape ;
+    sh:targetClass oc:Skill ;
+    rdfs:label "Skill Knowledge Warning Shape" ;
+    rdfs:comment "Recommends that skills impart epistemic knowledge" ;
+
+    sh:property [
+        sh:path oc:impartsKnowledge ;
+        sh:minCount 1 ;
+        sh:severity sh:Warning ;
+        sh:message "ATTENZIONE: Questa Skill non fornisce nodi di conoscenza epistemica (impartsKnowledge). Considera l'aggiunta di Standard, AntiPattern o Heuristics nel file SKILL.md." ;
     ] ;
     .

@@ -42,8 +42,9 @@ def test_default_paths():
         import config
         importlib.reload(config)
 
-        assert config.SKILLS_DIR == './skills/'
-        assert config.OUTPUT_DIR == './ontoskills/'
+        # Paths are now absolute, resolved from PROJECT_ROOT
+        assert config.SKILLS_DIR.endswith('/skills')
+        assert config.OUTPUT_DIR.endswith('/ontoskills')
 
 
 def test_custom_skills_dir():
