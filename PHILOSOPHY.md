@@ -143,30 +143,18 @@ This is the **knowledge retrieval problem** in the age of LLMs — and OntoClaw 
 
 OntoClaw applies **Description Logics (DL)** — specifically the **$\mathcal{SROIQ}^{(D)}$** fragment underlying OWL 2 DL — to transform unstructured skill definitions into **formal, queryable knowledge graphs**.
 
-Key properties:
+### Why $\mathcal{SROIQ}^{(D)}$?
 
-| DL Feature | OntoClaw Mapping |
-|------------|------------------|
-| **Concepts (𝒞)** | `oc:Skill`, `oc:ExecutableSkill`, `oc:DeclarativeSkill` |
-| **Roles (ℛ)** | `oc:dependsOn`, `oc:extends`, `oc:contradicts` |
-| **Individuals (𝒪)** | Each compiled skill instance |
-| **Datatypes (𝒟)** | Literals: strings, integers, IRIs |
+Each letter represents a capability that solves a specific problem in skill modeling:
 
-### The $\mathcal{SROIQ}^{(D)}$ Fragment
-
-Each letter in $\mathcal{SROIQ}^{(D)}$ represents a specific expressive capability:
-
-- **$\mathcal{S}$** — Basic logic ($\mathcal{ALC}$) extended with transitive properties. Essential for OntoClaw: if skill A extends B, and B extends C, the reasoner knows A extends C.
-
-- **$\mathcal{R}$** — Complex role inclusions and disjoint properties. Allows expressing that `dependsOn` and `contradicts` are mutually exclusive.
-
-- **$\mathcal{O}$** — Nominals. The ability to define a class by enumerating its specific individuals.
-
-- **$\mathcal{I}$** — Inverse properties. Fundamental for OntoCore: if A dependsOn B, the graph database automatically deduces that B enables A without explicit declaration.
-
-- **$\mathcal{Q}$** — Qualified cardinality restrictions. What our SHACL gatekeeper enforces: e.g., an ExecutableSkill must have exactly 1 hasPayload node.
-
-- **$\mathcal{D}$** — Datatype support (strings, integers, booleans for our literals).
+| Feature | Capability | OntoClaw Example |
+|---------|------------|------------------|
+| **$\mathcal{S}$** | Transitive properties | `A extends B extends C` → A extends C automatically |
+| **$\mathcal{R}$** | Complex role inclusions | `dependsOn` and `contradicts` are mutually exclusive |
+| **$\mathcal{O}$** | Nominals (enumerated classes) | Define `EntryPoints = {create, import, init}` |
+| **$\mathcal{I}$** | Inverse properties | `A dependsOn B` ↔ `B enables A` (auto-derived) |
+| **$\mathcal{Q}$** | Cardinality restrictions | `ExecutableSkill` has exactly 1 `hasPayload` |
+| **$\mathcal{D}$** | Datatypes | Strings, integers, booleans for literals |
 
 **Decidability**: OWL 2 DL is decidable — reasoning algorithms terminate in finite time with correct answers. This contrasts with the open-ended nature of LLM reasoning.
 
