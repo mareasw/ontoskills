@@ -44,28 +44,25 @@ oc:SkillShape
         sh:message "Ogni Skill deve avere esattamente un generatedBy (modello LLM)" ;
     ] ;
 
-    # requiresState must be an IRI pointing to an oc:State instance
+    # requiresState must be an IRI (novel states are allowed - MCP server resolves them)
     sh:property [
         sh:path oc:requiresState ;
         sh:nodeKind sh:IRI ;
-        sh:class oc:State ;
-        sh:message "requiresState deve essere un URI che punta a un'istanza di oc:State" ;
+        sh:message "requiresState deve essere un URI" ;
     ] ;
 
-    # yieldsState must be an IRI pointing to an oc:State instance
+    # yieldsState must be an IRI (novel states are allowed - MCP server resolves them)
     sh:property [
         sh:path oc:yieldsState ;
         sh:nodeKind sh:IRI ;
-        sh:class oc:State ;
-        sh:message "yieldsState deve essere un URI che punta a un'istanza di oc:State" ;
+        sh:message "yieldsState deve essere un URI" ;
     ] ;
 
-    # handlesFailure must be an IRI pointing to an oc:State instance
+    # handlesFailure must be an IRI (novel states are allowed - MCP server resolves them)
     sh:property [
         sh:path oc:handlesFailure ;
         sh:nodeKind sh:IRI ;
-        sh:class oc:State ;
-        sh:message "handlesFailure deve essere un URI che punta a un'istanza di oc:State" ;
+        sh:message "handlesFailure deve essere un URI" ;
     ] ;
     .
 

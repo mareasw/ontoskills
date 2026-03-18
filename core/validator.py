@@ -77,11 +77,14 @@ def validate_skill_graph(skill_graph: Graph, shapes_graph: Graph | None = None) 
     ont_graph = load_core_ontology()
 
     # Run SHACL validation
+    # NOTE: We use inference='none' because pySHACL has a bug where it treats
+    # Literal values in the data graph as focus nodes when using RDFS inference.
+    # The ont_graph is still passed for sh:class validation to work.
     conforms, results_graph, results_text = validate(
         skill_graph,
         shacl_graph=shapes_graph,
         ont_graph=ont_graph,  # PASS CORE ONTOLOGY! Required for sh:class oc:State
-        inference='rdfs',  # Use RDFS inference for class hierarchies
+        inference='none',  # Don't use RDFS inference (causes Literal validation bug)
         abort_on_first=False,  # Collect all violations
         allow_warnings=True,
         meta_shacl=False,
