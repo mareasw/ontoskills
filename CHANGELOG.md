@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   read `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, and model overrides without manual shell exports
 - Added `.env.example` with the compiler variables needed for Anthropic-compatible providers
 - Added global ontology registry management under `ontoskills/` with:
-  - `official/`, `community/`, and `system/` subtrees
+  - `vendor/` and `system/` subtrees for imported compiled packages and manifests
   - `registry.lock.json` and `registry.sources.json`
   - `index.installed.ttl` and `index.enabled.ttl`
 - Added registry/package commands to the compiler CLI:
@@ -20,15 +20,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `registry list`
   - `install`
   - `install-package`
-  - `import-source`
-  - `import-source-package`
   - `enable`
   - `disable`
   - `list-installed`
   - `rebuild-index`
 - Added support for importing remote ontology packages from registry indexes via `manifest_url`
-- Added support for importing remote source packages with `source_root` and `source_files`, then compiling them locally into the ontology root
-- Added direct raw source repository import from local paths or GitHub URLs via `import-source-repo`, with automatic `SKILL.md` discovery and local compilation
+- Added direct raw source repository import from local paths or GitHub URLs via `import-source-repo`, with automatic `SKILL.md` discovery, clone/copy into `skills/vendor/`, and local compilation into `ontoskills/vendor/`
 - Added a local `registry/` blueprint directory and a formal package spec in `specs/registry-package-spec.md`
 
 ### Changed
@@ -55,10 +52,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `source`
   - `aliases`
 - Changed MCP skill resolution to accept both short ids like `xlsx` and qualified ids like `marea.office/xlsx`
-- Changed short-id conflict resolution to use precedence `verified > local > trusted > community`
+- Changed short-id conflict resolution to use precedence `local > verified > trusted > community`
 - Changed compiler relation serialization to use stable skill URI references instead of literal strings for `dependsOn`, `extends`, and `contradicts`
 - Changed compiler enrichment to infer parent inheritance deterministically from nested skill directory structure
-- Changed local/installed ontology layout so imported packages stay separated from local compiled skills while sharing the same global root
+- Changed the import layout so raw source repos land in `skills/vendor/` and compiled imported packages land in `ontoskills/vendor/`
+- Changed the enable/disable system so local compiled skills are tracked through a synthetic `local` package in the registry lock
 
 ### Fixed
 
@@ -73,7 +71,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pySHACL from validating them as skill nodes
 - Fixed duplicate `skill_output_paths` entries when skills were skipped due to hash match
 - Fixed compiler-side skill inheritance so nested skills such as `xlsx`, `pdf`, `pptx`, and `docx` can inherit from parent skills like `office` after recompilation
-- Fixed imported/community ontology cleanup so registry system files and imported package trees are not deleted by local orphan cleanup
+- Fixed imported/vendor ontology cleanup so registry system files and imported package trees are not deleted by local orphan cleanup
 - Fixed MCP ambiguity handling so exact qualified ids resolve deterministically and short ids pick the correct preferred skill when multiple packages export the same short id
 
 ## [0.5.0] - 2026-03-17
