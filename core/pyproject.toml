@@ -1,6 +1,6 @@
 [project]
 name = "ontoskills"
-version = "0.7.0"
+version = "0.7.1"
 description = "OntoSkills — Neuro-symbolic skill compiler. Compiles SKILL.md into validated OWL 2 ontologies."
 requires-python = ">=3.10"
 dependencies = [
