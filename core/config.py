@@ -1,4 +1,4 @@
-"""Configuration module for OntoClaw compiler.
+"""Configuration module for OntoSkills compiler.
 
 This module centralizes all configuration settings with environment variable support.
 Environment variables allow enterprise deployment with custom namespaces and paths.

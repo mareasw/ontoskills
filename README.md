@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="assets/ontoclaw-banner.png" alt="OntoClaw: Neuro-Symbolic Skill Compiler" width="100%">
+  <img src="assets/ontoskills-banner.png" alt="OntoSkills: Neuro-Symbolic Skill Platform" width="100%">
 </p>
 
 <h1 align="center">
   <a href="https://ontoclaw.marea.software" style="text-decoration: none; color: inherit; display: flex; align-items: center; justify-content: center; gap: 10px;">
-    <img src="assets/ontoclaw-logo.png" alt="OntoClaw Logo Inline" height="40px" style="display: block;">
-    <span>OntoClaw</span>
+    <img src="assets/ontoskills-logo.png" alt="OntoSkills Logo Inline" height="40px" style="display: block;">
+    <span>OntoSkills</span>
   </a>
 </h1>
 
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <a href="#the-ontoclaw-ecosystem">Ecosystem</a> •
+  <a href="#the-ontoskills-ecosystem">Ecosystem</a> •
   <a href="#use-cases">Use Cases</a> •
   <a href="#installation">Installation</a> •
   <a href="#cli-commands">CLI</a> •
@@ -38,15 +38,15 @@
 
 ---
 
-## OntoClaw: Neuro-Symbolic AI Agent Platform
+## OntoSkills: Neuro-Symbolic AI Agent Platform
 
-OntoClaw is a **complete neuro-symbolic platform** for building deterministic, enterprise-grade AI agents. It consists of four layered components:
+OntoSkills is a **complete neuro-symbolic platform** for building deterministic, enterprise-grade AI agents. It consists of four layered components:
 
 ```mermaid
 flowchart LR
     CORE["OntoCore<br/>━━━━━━━━━━<br/>SKILL.md → .ttl<br/>LLM + SHACL"] -->|"compiles"| CENTER["OntoSkills<br/>━━━━━━━━━━<br/>OWL 2 Ontologies<br/>.ttl artifacts"]
     CENTER -->|"loads"| MCP["OntoMCP<br/>━━━━━━━━━━<br/>Rust SPARQL<br/>in-memory graph"]
-    MCP <-->|"queries"| AGENT["OntoClaw<br/>━━━━━━━━━━<br/>Enterprise Agent<br/>deterministic"]
+    MCP <-->|"queries"| AGENT["OntoSkills Agent<br/>━━━━━━━━━━<br/>Enterprise Agent<br/>deterministic"]
     CENTER <-->|"distributes"| STORE["OntoSkillRegistry<br/>━━━━━━━━━━<br/>Registry<br/>versioning"]
 
     style CORE fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
@@ -60,7 +60,7 @@ flowchart LR
 
 ## Use Cases
 
-| Use Case | How OntoClaw Helps |
+| Use Case | How OntoSkills Helps |
 |----------|-------------------|
 | **Enterprise AI Agents** | Deterministic skill selection via SPARQL queries instead of LLM judgment |
 | **Edge Deployment** | Smaller models query large skill ecosystems without loading all files |
@@ -82,7 +82,7 @@ flowchart LR
 
 ---
 
-## Why OntoClaw? — Deterministic AI Agents
+## Why OntoSkills? — Deterministic AI Agents
 
 ### The Determinism Problem
 
@@ -91,7 +91,7 @@ LLMs are inherently **non-deterministic** — the same query can yield different
 - **Hallucinations** when information is scattered
 - **No verifiable structure** for skill relationships
 
-OntoClaw transforms this into **deterministic, queryable knowledge graphs**.
+OntoSkills transforms this into **deterministic, queryable knowledge graphs**.
 
 ### Description Logics Foundation
 
@@ -157,7 +157,7 @@ flowchart LR
 
 ### The Validation Gatekeeper
 
-Every skill must pass SHACL validation before being written to disk. The constitutional shapes in `specs/ontoclaw.shacl.ttl` enforce:
+Every skill must pass SHACL validation before being written to disk. The constitutional shapes in `specs/ontoskills.shacl.ttl` enforce:
 
 | Constraint | Rule | Error Message |
 |------------|------|---------------|
@@ -197,7 +197,7 @@ The classification is **automatic** - you don't specify it. If a skill has code 
 | **OntoCore** (`core/`) | Python | ✅ Ready | Design Time | Skill compiler to OWL 2 ontology |
 | **OntoMCP** (`mcp/`) | Rust | ✅ Ready | Runtime | MCP server for semantic skill discovery and planning |
 | **OntoSkillRegistry** | GitHub | 🚧 In Progress | Distribution | Versioned compiled skill registry |
-| **OntoClaw** | Python/Rust | 📋 Roadmap | Agent | Enterprise AI agent |
+| **OntoSkills Agent** | Python/Rust | 📋 Roadmap | Agent | Enterprise AI agent |
 | `skills/` | Markdown | ✅ Ready | Design Time | **Source code** — human-authored skill definitions |
 | `ontoskills/` | Turtle | Generated | Runtime | **Artifact** — compiled, self-contained ontologies |
 | `specs/` | Turtle | ✅ Ready | Both | SHACL shapes constitution |
@@ -208,12 +208,12 @@ The classification is **automatic** - you don't specify it. If a skill has code 
 
 ```bash
 # Runtime-only install via npm/npx
-npx ontoskill install mcp
-npx ontoskill install marea.greeting/hello
-npx ontoskill enable marea.greeting/hello
+npx ontoskills install mcp
+npx ontoskills install marea.greeting/hello
+npx ontoskills enable marea.greeting/hello
 ```
 
-OntoSkill installs everything under:
+OntoSkills installs everything under:
 
 ```text
 ~/.ontoskills/
@@ -228,15 +228,15 @@ The official compiled registry is live at:
 
 - `https://github.com/mareasoftware/OntoSkillRegistry`
 
-The default `ontoskill` workflow already points there automatically. The first public demo package is:
+The default `ontoskills` workflow already points there automatically. The first public demo package is:
 
 - `marea.greeting/hello`
 
 For compiler development from source:
 
 ```bash
-git clone https://github.com/marea-software/ontoclaw.git
-cd ontoclaw
+git clone https://github.com/mareasoftware/ontoskills.git
+cd ontoskills
 
 # Install OntoCore
 cd core
@@ -285,48 +285,48 @@ The local MCP server in [mcp/](mcp/) is a standalone Rust crate built with:
 
 ```bash
 # Initialize core ontology with predefined states
-ontoclaw init-core
+ontocore init-core
 
 # Compile all skills to ontology
-ontoclaw compile
+ontocore compile
 
 # Compile specific skill
-ontoclaw compile my-skill
+ontocore compile my-skill
 
 # Compile a nested skill path
-ontoclaw compile demo/markdown-inventory
+ontocore compile demo/markdown-inventory
 
 # Query ontology with SPARQL
-ontoclaw query "SELECT ?s WHERE { ?s a oc:Skill }"
+ontocore query "SELECT ?s WHERE { ?s a oc:Skill }"
 
 # List all skills
-ontoclaw list-skills
+ontocore list-skills
 
 # Run security audit
-ontoclaw security-audit
+ontocore security-audit
 
 # Search and install a remote compiled skill from the built-in official registry
-npx ontoskill search hello
-npx ontoskill install marea.greeting/hello
-npx ontoskill enable marea.greeting/hello
-npx ontoskill list-installed
-npx ontoskill rebuild-index
+npx ontoskills search hello
+npx ontoskills install marea.greeting/hello
+npx ontoskills enable marea.greeting/hello
+npx ontoskills list-installed
+npx ontoskills rebuild-index
 
 # Add an extra third-party registry only if needed
-npx ontoskill registry add-source acme https://example.com/index.json
-npx ontoskill registry list
+npx ontoskills registry add-source acme https://example.com/index.json
+npx ontoskills registry list
 
 # Managed component installs
-npx ontoskill install mcp
-npx ontoskill install core
-npx ontoskill update mcp
-npx ontoskill update core
+npx ontoskills install mcp
+npx ontoskills install core
+npx ontoskills update mcp
+npx ontoskills update core
 
 # Import and compile a raw source repository
-npx ontoskill import-source https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+npx ontoskills import-source https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
 
 # Full uninstall
-npx ontoskill uninstall --all
+npx ontoskills uninstall --all
 ```
 
 ### Command Options
@@ -346,7 +346,7 @@ npx ontoskill uninstall --all
 
 ## Registry And Packages
 
-OntoClaw now supports a simplified registry and import model:
+OntoSkills now supports a simplified registry and import model:
 
 - the user-facing product root is `~/.ontoskills/`
 - imported source repositories are cloned into `~/.ontoskills/skills/vendor/`
@@ -364,7 +364,7 @@ Important runtime files:
 ### Package Types
 
 - **Registry packages** distribute compiled `.ttl` modules and are published from a static GitHub repo
-- **Source repositories** are imported directly from a path or Git URL; `ontoskill` clones/copies them into `~/.ontoskills/skills/vendor/`, discovers `SKILL.md`, and compiles them into `~/.ontoskills/ontoskills/vendor/`
+- **Source repositories** are imported directly from a path or Git URL; `ontoskills` clones/copies them into `~/.ontoskills/skills/vendor/`, discovers `SKILL.md`, and compiles them into `~/.ontoskills/ontoskills/vendor/`
 
 The official registry is built in by default. `registry add-source` is only needed for additional registries maintained by other users or organizations.
 
@@ -373,9 +373,9 @@ The official registry is built in by default. `registry add-source` is only need
 For most users, the expected flow is:
 
 ```bash
-npx ontoskill search hello
-npx ontoskill install marea.greeting/hello
-npx ontoskill enable marea.greeting/hello
+npx ontoskills search hello
+npx ontoskills install marea.greeting/hello
+npx ontoskills enable marea.greeting/hello
 ```
 
 No manual registry bootstrap is required for the official registry.
@@ -399,7 +399,7 @@ The future official registry mono-repo is prototyped locally in:
 
 ## Local MCP Server
 
-OntoClaw now includes a **local Rust MCP server** under [mcp/](mcp/).
+OntoSkills now includes a **local Rust MCP server** under [mcp/](mcp/).
 
 The MCP server is intentionally focused on:
 
@@ -472,7 +472,7 @@ Current Rust test coverage includes:
 ## Project Structure
 
 ```
-ontoclaw/
+ontoskills/
 ├── core/                    # OntoCore — Python skill compiler
 │   ├── cli.py               # Click CLI interface
 │   ├── config.py            # Configuration constants
@@ -496,10 +496,10 @@ ontoclaw/
 │       ├── main.rs          # MCP stdio server
 │       └── catalog.rs       # Ontology catalog + planner
 ├── specs/
-│   └── ontoclaw.shacl.ttl   # SHACL shapes constitution
+│   └── ontoskills.shacl.ttl # SHACL shapes constitution
 ├── skills/                  # Input: SKILL.md definitions (source code)
 ├── ontoskills/              # Output: compiled .ttl files (artifacts)
-│   ├── ontoclaw-core.ttl    # Core ontology with states
+│   ├── ontoskills-core.ttl  # Core ontology with states
 │   ├── index.ttl            # Index of all skills
 │   └── */ontoskill.ttl      # Individual skill modules
 └── docs/                    # Documentation
@@ -632,7 +632,7 @@ Detected threats:
   </a>
 </p>
 
-OntoClaw is open-source software, licensed under the **[MIT License](LICENSE)**.
+OntoSkills is open-source software, licensed under the **[MIT License](LICENSE)**.
 
 | Permissions | Conditions | Limitations |
 |-------------|------------|-------------|

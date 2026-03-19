@@ -51,11 +51,11 @@ The marketplace. OntoStore is a centralized repository where teams can publish, 
 - [ ] Team collaboration features
 - [ ] Community contributions
 
-## Phase 5: OntoClaw 💡
+## Phase 5: OntoSkills Agent 💡
 
 **Status:** Planned
 
-The agent. OntoClaw joins the Claw family (OpenClaw, NanoClaw, ZeroClaw) as an autonomous agent powered by structured knowledge — reasoning with precision, not hallucination.
+The agent. The OntoSkills Agent joins the Claw family (OpenClaw, NanoClaw, ZeroClaw) as an autonomous agent powered by structured knowledge — reasoning with precision, not hallucination.
 
 - [ ] Agent architecture design
 - [ ] Multi-agent collaboration

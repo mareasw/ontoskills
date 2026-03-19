@@ -1382,7 +1382,10 @@ fn collect_skill_records_from_file(
     registry_lookup: &HashMap<String, RegistryLookupEntry>,
     skill_index: &mut Vec<SkillRecord>,
 ) -> Result<(), CatalogError> {
-    if path.file_name().and_then(|name| name.to_str()) == Some("ontoclaw-core.ttl") {
+    if matches!(
+        path.file_name().and_then(|name| name.to_str()),
+        Some("ontoskills-core.ttl" | "ontoclaw-core.ttl")
+    ) {
         return Ok(());
     }
 
