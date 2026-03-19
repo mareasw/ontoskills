@@ -1,6 +1,6 @@
 # OntoMCP
 
-Rust-based local MCP (Model Context Protocol) server for the OntoClaw ecosystem.
+Rust-based local MCP (Model Context Protocol) server for the OntoSkills ecosystem.
 
 **Status:** ✅ Ready
 
@@ -8,7 +8,7 @@ Rust-based local MCP (Model Context Protocol) server for the OntoClaw ecosystem.
 
 ## Overview
 
-OntoMCP is the **runtime layer** of OntoClaw. It loads compiled OntoSkills (`.ttl` files) into an in-memory RDF graph and provides blazing-fast SPARQL queries to AI agents via the Model Context Protocol.
+OntoMCP is the **runtime layer** of OntoSkills. It loads compiled ontologies (`.ttl` files) into an in-memory RDF graph and provides blazing-fast SPARQL queries to AI agents via the Model Context Protocol.
 
 ```mermaid
 flowchart LR
@@ -78,7 +78,7 @@ flowchart LR
 When a short id is ambiguous, runtime resolution follows:
 - `local > verified > trusted > community`
 
-Responses now include package metadata such as:
+Responses include package metadata such as:
 - `qualified_id`
 - `package_id`
 - `trust_tier`
@@ -97,7 +97,7 @@ Preferred runtime source:
 
 Fallbacks:
 
-- `ontoclaw-core.ttl` — Core TBox ontology with states
+- `ontoskills-core.ttl` — Core TBox ontology with states
 - `index.ttl` — Manifest with `owl:imports`
 - `*/ontoskill.ttl` — Individual skill modules
 
@@ -111,7 +111,7 @@ If nothing is found locally, OntoMCP falls back to:
 ```bash
 --ontology-root /path/to/ontoskills
 # or
-ONTOCLAW_MCP_ONTOLOGY_ROOT=/path/to/ontoskills
+ONTOSKILLS_MCP_ONTOLOGY_ROOT=/path/to/ontoskills
 ```
 
 ---
@@ -137,7 +137,7 @@ cargo run --manifest-path mcp/Cargo.toml -- --ontology-root ./ontoskills
 Register the MCP server:
 
 ```bash
-claude mcp add ontoclaw -- \
+claude mcp add ontoskills -- \
   ~/.ontoskills/bin/ontomcp
 ```
 
@@ -145,7 +145,7 @@ After registration, Claude Code can call:
 
 ```mermaid
 flowchart LR
-    CLAUDE["Claude Code"] -->|"search_skills"| TOOLS["ontoclaw MCP"]
+    CLAUDE["Claude Code"] -->|"search_skills"| TOOLS["ontoskills MCP"]
     CLAUDE -->|"get_skill_context"| TOOLS
     CLAUDE -->|"evaluate_execution_plan"| TOOLS
     CLAUDE -->|"query_epistemic_rules"| TOOLS
@@ -179,9 +179,8 @@ cargo test
 |-----------|----------|-------------|
 | **OntoCore** | Python | Design-time compiler |
 | **OntoMCP** | Rust | Runtime server (this) |
-| **OntoSkillRegistry** | GitHub | Compiled skill registry |
-| **OntoClaw** | Python/Rust | Enterprise AI agent (planned) |
+| **ontoskills-registry** | GitHub | Compiled skill registry |
 
 ---
 
-*Part of the [OntoClaw ecosystem](../README.md).*
+*Part of the [OntoSkills ecosystem](../README.md).*

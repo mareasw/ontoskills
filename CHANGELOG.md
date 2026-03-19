@@ -4,16 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.9.0] - 2026-03-19
+
+### Changed
+
+- **Project name**: OntoClaw → OntoSkills (consistent naming throughout)
+- **URI namespace**: `ontoclaw.marea.software` → `ontoskills.sh`
+- **Core file**: `ontoclaw-core.ttl` → `ontoskills-core.ttl`
+- **Registry**: `OntoSkillRegistry` → `ontoskills-registry`
+- **CLI**: `ontoskill` → `ontoskills`
+- **Env vars**: `ONTOCLAW_*` → `ONTOSKILLS_*`
+- **README**: Restored clean 121-line version with docs links
+- **docs/registry.md**: New file for registry documentation
+
+## [0.8.0] - 2026-03-19
 
 ### Added
 
-- Added bootstrap and publication flow for the official `OntoSkillRegistry` repository
+- Added bootstrap and publication flow for the official registry repository
 - Added a first remote demo package `marea.greeting/hello` to validate end-to-end registry installs
 
 ### Changed
 
-- Changed the `ontoskill` product workflow so the official registry is built in by default and does not need manual `registry add-source` setup
+- Changed the `ontoskills` product workflow so the official registry is built in by default and does not need manual `registry add-source` setup
 - Updated the user documentation to clarify the runtime flow:
   - `search`
   - `install`
@@ -22,11 +35,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Verified
 
-- Verified remote install and activation of `marea.greeting/hello` from the public `OntoSkillRegistry` repository
+- Verified remote install and activation of `marea.greeting/hello` from the public registry repository
 - Verified registry state generation under `~/.ontoskills/` for:
   - `registry.lock.json`
   - `index.installed.ttl`
   - `index.enabled.ttl`
+
+## [0.7.0] - 2026-03-18
+
+### Added
+
+- Documentation restructure: README reduced, docs/ expanded
+- docs/architecture.md — system design, OWL properties, security
+- docs/knowledge-extraction.md — focus on knowledge nodes
 
 ## [0.6.0] - 2026-03-18
 
