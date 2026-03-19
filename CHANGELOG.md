@@ -4,43 +4,50 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.9.0] - 2026-03-19
+
+### Changed
+
+- **Project name**: OntoClaw → OntoSkills (consistent naming throughout)
+- **URI namespace**: `ontoclaw.marea.software` → `ontoskills.sh`
+- **Core file**: `ontoclaw-core.ttl` → `ontoskills-core.ttl`
+- **Registry**: `OntoSkillRegistry` → `ontoskills-registry`
+- **CLI**: `ontoskill` → `ontoskills`
+- **Env vars**: `ONTOCLAW_*` → `ONTOSKILLS_*`
+- **README**: Restored clean 121-line version with docs links
+- **docs/registry.md**: New file for registry documentation
+
+## [0.8.0] - 2026-03-19
 
 ### Added
 
-- Added bootstrap and publication flow for the official `ontoskills-registry` repository
+- Added bootstrap and publication flow for the official registry repository
 - Added a first remote demo package `marea.greeting/hello` to validate end-to-end registry installs
-- Added a dedicated registry guide in `docs/registry.md`
-- Added a streamlined documentation layout with long-form guides under `docs/`
-- Added MCP runtime documentation in `docs/mcp.md`
-- Added client-specific MCP guides for Claude Code and Codex in `docs/mcp-claude-code.md` and `docs/mcp-codex.md`
 
 ### Changed
 
 - Changed the `ontoskills` product workflow so the official registry is built in by default and does not need manual `registry add-source` setup
-- Renamed the user-facing CLI from `ontoskill` to `ontoskills`
-- Standardized the ontology namespace and SHACL namespace on `https://ontoskills.marea.software/`
-- Updated the default registry source URL and local registry manifests to the new `mareasoftware/ontoskills-registry` repository
-- Restored the top-level `README.md` as a full project overview instead of a minimal landing-style summary
-- Moved the primary MCP setup and integration guides from `mcp/` into `docs/`, leaving compatibility pointers in the runtime folder
-- Updated the public site and Starlight navigation to expose MCP runtime, Claude Code, Codex, registry, and architecture pages coherently
 - Updated the user documentation to clarify the runtime flow:
   - `search`
   - `install`
   - `enable`
   - optional third-party registries via `registry add-source`
-- Updated the public docs to reflect the `ontoskills` CLI and the current product distribution model
 
 ### Verified
 
-- Verified remote install and activation of `marea.greeting/hello` from the public `ontoskills-registry` repository
+- Verified remote install and activation of `marea.greeting/hello` from the public registry repository
 - Verified registry state generation under `~/.ontoskills/` for:
   - `registry.lock.json`
   - `index.installed.ttl`
   - `index.enabled.ttl`
-- Verified `cargo test --manifest-path mcp/Cargo.toml`
-- Verified `python3 -m py_compile core/cli.py core/config.py core/differ.py core/explainer.py core/graph_export.py core/linter.py core/serialization.py core/storage.py core/validator.py`
-- Verified `npm run build` for the site after the docs and MCP navigation reorganization
+
+## [0.7.0] - 2026-03-18
+
+### Added
+
+- Documentation restructure: README reduced, docs/ expanded
+- docs/architecture.md — system design, OWL properties, security
+- docs/knowledge-extraction.md — focus on knowledge nodes
 
 ## [0.6.0] - 2026-03-18
 
@@ -119,7 +126,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 #### Local MCP Server
 
 - Added a new **Rust-based local MCP server** under `mcp/`
-  - Loads compiled OntoSkills ontologies from `.ttl` files
+  - Loads compiled OntoClaw ontologies from `.ttl` files
   - Speaks MCP over `stdio`
   - Auto-discovers `ontoskills/` from the current directory and its parents
   - Can also be pointed at a custom ontology root with `--ontology-root`
@@ -183,7 +190,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **`skill.ttl` → `ontoskill.ttl`** - Output skill modules are now named `ontoskill.ttl` instead of `skill.ttl`
   - Affects all path references in code and tests
-  - Run `ontocore compile --force` after upgrading to regenerate modules with new naming
+  - Run `ontoclaw compile --force` after upgrading to regenerate modules with new naming
 
 ### Changed
 
@@ -204,7 +211,7 @@ The compiler now acts as a **Semantic Bundler** - the output directory (`ontoski
   - `*.ttl` → `*.md` mapping (auxiliary markdown)
   - Direct asset mapping (non-ttl files map to same path)
 - **`SYSTEM_FILES` safeguard** - Protects compiler-generated files from cleanup:
-  - `ontoskills-core.ttl` - Core TBox ontology
+  - `ontoclaw-core.ttl` - Core TBox ontology
   - `index.ttl` - Manifest with owl:imports
 
 ### Removed
@@ -272,7 +279,7 @@ The monolithic `loader.py` (855 lines) has been refactored into 3 focused module
 
 - **`--force` flag** for `compile` command - Bypass hash-based caching to force recompilation of all skills
   - Useful when SHACL schemas or LLM prompts are updated
-  - Usage: `ontocore compile --force` or `ontocore compile -f`
+  - Usage: `ontoclaw compile --force` or `ontoclaw compile -f`
 
 #### Lifecycle Management
 
@@ -317,12 +324,12 @@ A constitutional validation layer that ensures every skill ontology is logically
 
 - **validator.py** - SHACL validation module
   - `ValidationResult` NamedTuple with `conforms`, `results_text`, `results_graph`
-  - `load_shacl_shapes()` - Loads constitutional shapes from `specs/ontoskills.shacl.ttl`
+  - `load_shacl_shapes()` - Loads constitutional shapes from `specs/ontoclaw.shacl.ttl`
   - `load_core_ontology()` - Loads TBox for `sh:class` validation (critical for state validation)
   - `validate_skill_graph()` - Validates RDF graph against SHACL shapes with RDFS inference
   - `validate_and_raise()` - Raises `OntologyValidationError` on failure
 
-- **specs/ontoskills.shacl.ttl** - Constitutional SHACL shapes
+- **specs/ontoclaw.shacl.ttl** - Constitutional SHACL shapes
   - `oc:SkillShape` - Base constraints for all skills
     - `resolvesIntent` minCount 1 (required)
     - `generatedBy` exactly 1 (required attestation)

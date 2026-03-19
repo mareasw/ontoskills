@@ -1,257 +1,122 @@
 <p align="center">
-  <img src="assets/ontoskills-banner.png" alt="OntoSkills" width="100%">
+  <img src="assets/ontoskills-banner.png" alt="OntoSkills: Neuro-Symbolic Skill Compiler" width="100%">
 </p>
 
 <h1 align="center">
-  <a href="https://ontoskills.marea.software" style="text-decoration: none; color: inherit; display: inline-flex; align-items: center; justify-content: center; gap: 10px;">
-    <img src="assets/ontoskills-logo.png" alt="OntoSkills Logo" height="40px" style="display: block;">
+  <a href="https://ontoskills.marea.software" style="text-decoration: none; color: inherit; display: flex; align-items: center; justify-content: center; gap: 10px;">
+    <img src="assets/ontoskills-logo.png" alt="OntoSkills Logo Inline" height="40px" style="display: block;">
     <span>OntoSkills</span>
   </a>
 </h1>
 
 <p align="center">
-  <strong>The deterministic skill platform for AI agents.</strong>
+  <strong>The <span style="color:#e91e63">deterministic</span> enterprise AI agent platform.</strong>
 </p>
 
 <p align="center">
-  <span style="color:#00bf63;font-weight:bold">OntoCore</span> •
-  <span style="color:#2196F3;font-weight:bold">OntoMCP</span> •
-  <span style="color:#9333EA;font-weight:bold">OntoSkills Registry</span> •
-  <span style="color:#e91e63;font-weight:bold">ontoskills CLI</span>
+  Neuro-symbolic architecture for the Agentic Web — <span style="color:#00bf63;font-weight:bold">OntoCore</span> • <span style="color:#2196F3;font-weight:bold">OntoMCP</span> • <span style="color:#9333EA;font-weight:bold">OntoStore</span>
 </p>
 
 <p align="center">
-  <a href="#ecosystem">Ecosystem</a> •
-  <a href="#use-cases">Use Cases</a> •
-  <a href="#installation">Installation</a> •
-  <a href="#cli-commands">CLI</a> •
-  <a href="#registry-and-packages">Registry</a> •
-  <a href="#local-mcp-server">MCP Server</a> •
-  <a href="#documentation">Documentation</a>
+  <a href="docs/overview.md">Overview</a> •
+  <a href="docs/getting-started.md">Getting Started</a> •
+  <a href="docs/roadmap.md">Roadmap</a> •
+  <a href="PHILOSOPHY.md">Philosophy</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.10%2B-blue?style=for-the-badge&logo=python" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/OWL%202-RDF%2FTurtle-green?style=for-the-badge&logo=w3c" alt="OWL 2 RDF/Turtle">
+  <img src="https://img.shields.io/badge/SHACL-Validation-purple?style=for-the-badge&logo=graphql" alt="SHACL Validation">
+  <a href="#license">
+    <img src="https://img.shields.io/badge/license-MIT-orange?style=for-the-badge" alt="MIT License">
+  </a>
 </p>
 
 ---
 
-## Ecosystem
+## What is OntoSkills?
 
-OntoSkills is a neuro-symbolic platform that turns `SKILL.md` sources into queryable OWL 2 ontologies, ships a local MCP runtime, and distributes compiled skills through an official registry.
+OntoSkills transforms natural language skill definitions into **validated OWL 2 ontologies** — queryable knowledge graphs that enable deterministic reasoning for AI agents.
+
+**The problem:** LLMs read skills probabilistically. Same query, different results. Long skill files burn tokens and confuse smaller models.
+
+**The solution:** Compile skills to ontologies. Query with SPARQL. Get exact answers, every time.
 
 ```mermaid
 flowchart LR
-    CORE["OntoCore<br/>SKILL.md -> ontoskill.ttl"] --> COMPILED["OntoSkills<br/>compiled ontologies"]
-    COMPILED --> MCP["OntoMCP<br/>local MCP runtime"]
-    REG["OntoSkills Registry<br/>official compiled registry"] --> CLI["ontoskills<br/>CLI"]
-    CLI --> MCP
-    CLI --> COMPILED
-    CLI --> CORE
+    CORE["OntoCore<br/>━━━━━━━━━━<br/>SKILL.md → .ttl<br/>LLM + SHACL"] -->|"compiles"| CENTER["OntoSkills<br/>━━━━━━━━━━<br/>OWL 2 Ontologies<br/>.ttl artifacts"]
+    CENTER -->|"loads"| MCP["OntoMCP<br/>━━━━━━━━━━<br/>Rust SPARQL<br/>in-memory graph"]
+    MCP <-->|"queries"| AGENT["AI Agent<br/>━━━━━━━━━━<br/>Deterministic<br/>reasoning"]
+
+    style CORE fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
+    style CENTER fill:#abf9cc,stroke:#2a2a3e,color:#0d0d14
+    style MCP fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
+    style AGENT fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
 ```
 
-### What Ships
+---
 
-| Component | Purpose |
-|-----------|---------|
-| `ontoskills` | User-facing CLI for installs, updates, registry operations, source imports, and managed local state |
-| `ontocore` | Compiler for turning `SKILL.md` sources into validated ontologies |
-| `ontomcp` | Local MCP server for semantic skill discovery, context retrieval, and planning |
-| `OntoSkills Registry` | Official compiled skill registry, built in by default |
+## Why OntoSkills?
+
+| Problem | Solution |
+|---------|----------|
+| LLMs interpret text differently each time | SPARQL returns exact answers |
+| 50+ skill files = context overflow | Query only what's needed |
+| No verifiable structure for relationships | OWL 2 formal semantics |
+| Small models can't read complex skills | Democratized intelligence via graph queries |
+
+**For 100 skills:** ~500KB text scan → ~1KB query
+
+[→ Read the full philosophy](PHILOSOPHY.md)
 
 ---
 
-## Use Cases
-
-| Use Case | How OntoSkills Helps |
-|----------|----------------------|
-| Enterprise AI agents | Deterministic skill discovery via ontology queries instead of file reading |
-| Edge and small-model deployments | Query only the relevant skill context instead of loading large prompt bundles |
-| Multi-agent systems | Shared ontology as capability graph, planning graph, and epistemic layer |
-| Auditable automation | Provenance, skill metadata, and explicit enable/disable state |
-| Skill distribution | Published compiled skills can be installed remotely from the official registry |
-
----
-
-## Why OntoSkills
-
-### The problem
-
-Raw skill files are hard to distribute, expensive to load, and ambiguous to query. As the number of skills grows, agents either read too much context or make poor decisions from incomplete context.
-
-### The approach
-
-OntoSkills turns skills into OWL 2 knowledge artifacts and serves them through a narrow runtime interface:
-
-- `OntoCore` compiles source skills
-- `OntoSkills Registry` distributes compiled skills
-- `ontoskills` manages install/update/enable/disable flows
-- `OntoMCP` exposes the enabled ontology set to MCP clients
-
-### The result
-
-- deterministic retrieval instead of fuzzy file scanning
-- package-aware provenance and versioning
-- smaller MCP tool surface
-- installable skill ecosystems instead of repo-only artifacts
-
----
-
-## Installation
-
-### Runtime-only install
+## Quick Start
 
 ```bash
-npx ontoskills install mcp
-npx ontoskills search hello
-npx ontoskills install marea.greeting/hello
-npx ontoskills enable marea.greeting/hello
-```
+# Clone and install
+git clone https://github.com/mareasoftware/ontoskills.git
+cd ontoskills/core
+pip install -e ".[dev]"
 
-### Install the compiler too
-
-```bash
-npx ontoskills install core
+# Compile skills to ontology
 ontoskills init-core
 ontoskills compile
+
+# Query the knowledge graph
+ontoskills query "SELECT ?skill WHERE { ?skill oc:resolvesIntent 'create_pdf' }"
 ```
 
-Everything is managed under:
-
-```text
-~/.ontoskills/
-  bin/
-  core/
-  ontoskills/
-  skills/
-  state/
-```
+[→ Full installation guide](docs/getting-started.md)
 
 ---
 
-## CLI Commands
+## Components
 
-### Product commands
-
-```bash
-ontoskills install mcp
-ontoskills install core
-ontoskills update mcp
-ontoskills update core
-ontoskills search hello
-ontoskills install marea.greeting/hello
-ontoskills enable marea.greeting/hello
-ontoskills disable marea.greeting/hello
-ontoskills remove marea.greeting/hello
-ontoskills rebuild-index
-ontoskills uninstall --all
-```
-
-### Compiler-oriented commands
-
-```bash
-ontoskills init-core
-ontoskills compile
-ontoskills compile my-skill
-ontoskills query "SELECT ?s WHERE { ?s a oc:Skill }"
-```
-
-### Source import
-
-```bash
-ontoskills import-source-repo https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
-```
-
-This clones the source repo into `~/.ontoskills/skills/vendor/` and compiles the results into `~/.ontoskills/ontoskills/vendor/`.
-
----
-
-## Registry And Packages
-
-### Official registry
-
-The official registry is built into the CLI and does not need manual setup.
-
-Current demo package:
-
-- `marea.greeting/hello`
-
-Registry repository:
-
-- [ontoskills-registry](https://github.com/mareasoftware/ontoskills-registry)
-
-### Third-party registries
-
-Third-party registries are opt-in:
-
-```bash
-ontoskills registry add-source acme https://example.com/index.json
-ontoskills registry list
-```
-
-### Enable/disable model
-
-- install puts a compiled skill in the local store
-- enable exposes it to OntoMCP
-- disable removes it from the enabled runtime index
-
----
-
-## Local MCP Server
-
-`OntoMCP` is the runtime that loads enabled ontologies and exposes them through MCP.
-
-The current MCP tool surface is:
-
-- `search_skills`
-- `get_skill_context`
-- `evaluate_execution_plan`
-- `query_epistemic_rules`
-
-For local development from the repository:
-
-```bash
-cargo run --manifest-path mcp/Cargo.toml -- --ontology-root ./ontoskills
-```
-
-For product install:
-
-```bash
-ontoskills install mcp
-```
-
-More in [mcp/README.md](mcp/README.md).
-
----
-
-## Repository Layout
-
-```text
-core/        compiler
-mcp/         MCP runtime
-docs/        long-form documentation
-registry/    official registry blueprint
-site/        public site
-skills/      source skills
-ontoskills/  compiled ontology artifacts
-specs/       SHACL and ontology constraints
-```
+| Component | Language | Status | Description |
+|-----------|----------|--------|-------------|
+| **OntoCore** | Python | ✅ Ready | Skill compiler to OWL 2 ontology |
+| **OntoMCP** | Rust | ✅ Ready | MCP server for semantic skill discovery |
+| **OntoStore** | TBD | 📋 Planned | Versioned skill registry |
+| `skills/` | Markdown | Input | Human-authored skill definitions |
+| `ontoskills/` | Turtle | Output | Compiled, self-contained ontologies |
 
 ---
 
 ## Documentation
 
-- [Overview](docs/overview.md)
-- [Getting Started](docs/getting-started.md)
-- [Architecture](docs/architecture.md)
-- [Knowledge Extraction](docs/knowledge-extraction.md)
-- [Registry](docs/registry.md)
-- [MCP Runtime](docs/mcp.md)
-- [MCP With Claude Code](docs/mcp-claude-code.md)
-- [MCP With Codex](docs/mcp-codex.md)
-- [Roadmap](docs/roadmap.md)
-- [MCP Guide](mcp/README.md)
-- [Claude Code MCP Guide](mcp/CLAUDE_CODE_GUIDE.md)
+- **[Overview](docs/overview.md)** — What is OntoSkills and why it matters
+- **[Getting Started](docs/getting-started.md)** — Installation and first steps
+- **[Architecture](docs/architecture.md)** — How the system works
+- **[Knowledge Extraction](docs/knowledge-extraction.md)** — Extracting value from skills
+- **[Registry & Packages](docs/registry.md)** — Package distribution and import
+- **[Roadmap](docs/roadmap.md)** — Development phases
 
 ---
 
-## Related Links
+## <a id="license"></a>License
 
-- [Official Registry Repo](https://github.com/mareasoftware/ontoskills-registry)
-- [Project Site](https://ontoskills.marea.software)
+MIT License — see [LICENSE](LICENSE) for details.
+
+*© 2026 [Marea Software](https://marea.software)*

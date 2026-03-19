@@ -399,7 +399,7 @@ def query_cmd(ctx, query_string, ontology_file, output_format, verbose, quiet):
     """Execute SPARQL query against ontology.
 
     Example:
-        ontocore query "SELECT ?s ?n WHERE { ?s oc:nature ?n }" -f json
+        ontoskills query "SELECT ?s ?n WHERE { ?s oc:nature ?n }" -f json
     """
     setup_logging(verbose or ctx.obj.get('verbose', False), quiet or ctx.obj.get('quiet', False))
 
