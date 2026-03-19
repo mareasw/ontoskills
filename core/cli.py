@@ -661,6 +661,30 @@ def security_audit(ctx, input_dir, verbose, quiet):
     console.print(f"\n[bold]Audit complete:[/bold] {issues_found} issue(s) found")
 
 
+@cli.command('export-embeddings')
+@click.option('--ontology-root', default=None, help='Ontology root directory')
+@click.option('--output-dir', default=None, help='Output directory for embeddings')
+@click.pass_context
+def export_embeddings_cmd(ctx, ontology_root: str | None, output_dir: str | None):
+    """Export embeddings for semantic intent discovery.
+
+    Creates ONNX model, tokenizer, and pre-computed intent embeddings
+    for use by the MCP server's search_intents tool.
+    """
+    setup_logging(ctx.obj.get('verbose', False), ctx.obj.get('quiet', False))
+
+    from embeddings.exporter import export_embeddings
+
+    root = Path(ontology_root) if ontology_root else resolve_ontology_root(OUTPUT_DIR)
+    out = Path(output_dir) if output_dir else (root / "system" / "embeddings")
+
+    console.print(f"[blue]Exporting embeddings from {root} to {out}[/blue]")
+
+    export_embeddings(root, out)
+
+    console.print(f"[green]Embeddings exported to {out}[/green]")
+
+
 def main():
     """Entry point with proper error handling."""
     try:

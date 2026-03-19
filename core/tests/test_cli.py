@@ -442,3 +442,38 @@ def test_enrich_extracted_skill_removes_parent_from_depends_on(tmp_path):
 
     assert extracted.extends == ["office"]
     assert extracted.depends_on == ["pandoc"]
+
+
+class TestExportEmbeddingsCLI:
+    """Tests for export-embeddings CLI command."""
+
+    @pytest.mark.integration
+    def test_export_embeddings_command(self, tmp_path):
+        """export-embeddings command creates output files."""
+        from rdflib import Graph, Namespace, Literal, RDF
+        from cli import cli
+
+        OC = Namespace("https://ontoskills.sh/ontology#")
+
+        # Create test ontology
+        g = Graph()
+        g.bind("oc", OC)
+        skill = OC["test"]
+        g.add((skill, RDF.type, OC.Skill))
+        g.add((skill, OC.resolvesIntent, Literal("test_intent")))
+
+        ontology_root = tmp_path / "ontoskills"
+        ontology_root.mkdir()
+        (ontology_root / "index.ttl").write_text(g.serialize(format="turtle"))
+
+        output_dir = tmp_path / "output"
+
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            'export-embeddings',
+            '--ontology-root', str(ontology_root),
+            '--output-dir', str(output_dir),
+        ])
+
+        assert result.exit_code == 0
+        assert (output_dir / "intents.json").exists()
