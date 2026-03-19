@@ -177,7 +177,7 @@ fn parse_ontology_root() -> PathBuf {
         return PathBuf::from(path);
     }
 
-    discover_ontology_root().unwrap_or_else(|| PathBuf::from("ontoskills"))
+    discover_ontology_root().unwrap_or_else(default_ontology_root)
 }
 
 fn discover_ontology_root() -> Option<PathBuf> {
@@ -189,7 +189,19 @@ fn discover_ontology_root() -> Option<PathBuf> {
         }
     }
 
+    let home_default = default_ontology_root();
+    if home_default.exists() {
+        return Some(home_default);
+    }
+
     None
+}
+
+fn default_ontology_root() -> PathBuf {
+    env::var_os("HOME")
+        .map(PathBuf::from)
+        .map(|home| home.join(".ontoskills").join("ontoskills"))
+        .unwrap_or_else(|| PathBuf::from("ontoskills"))
 }
 
 fn candidate_roots(start: &PathBuf) -> Vec<PathBuf> {
@@ -491,7 +503,7 @@ fn tool_definitions() -> Vec<Value> {
             json!({
                 "type": "object",
                 "properties": {
-                    "skill_id": { "type": "string" },
+                    "skill_id": { "type": "string", "description": "Short id like 'xlsx' or qualified id like 'marea.office/xlsx'." },
                     "include_inherited_knowledge": { "type": "boolean", "default": true }
                 },
                 "required": ["skill_id"]
@@ -504,7 +516,7 @@ fn tool_definitions() -> Vec<Value> {
                 "type": "object",
                 "properties": {
                     "intent": { "type": "string" },
-                    "skill_id": { "type": "string" },
+                    "skill_id": { "type": "string", "description": "Short id like 'xlsx' or qualified id like 'marea.office/xlsx'." },
                     "current_states": {
                         "type": "array",
                         "items": { "type": "string" }
@@ -519,7 +531,7 @@ fn tool_definitions() -> Vec<Value> {
             json!({
                 "type": "object",
                 "properties": {
-                    "skill_id": { "type": "string" },
+                    "skill_id": { "type": "string", "description": "Short id like 'xlsx' or qualified id like 'marea.office/xlsx'." },
                     "kind": { "type": "string" },
                     "dimension": { "type": "string" },
                     "severity_level": { "type": "string" },

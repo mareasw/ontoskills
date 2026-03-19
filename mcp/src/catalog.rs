@@ -10,25 +10,26 @@ use oxigraph::model::Term;
 use oxigraph::sparql::{QueryResults, SparqlEvaluator};
 use oxigraph::store::Store;
 use serde::Serialize;
+use serde::Deserialize;
 use walkdir::WalkDir;
 
-const DEFAULT_BASE_URI: &str = "http://ontoskills.sh/ontology#";
+const DEFAULT_BASE_URI: &str = "http://ontoclaw.marea.software/ontology#";
 const DEFAULT_LIMIT: usize = 25;
 const MAX_LIMIT: usize = 100;
 const DEFAULT_MAX_DEPTH: usize = 10;
 const MAX_SKILL_ID_LEN: usize = 64;
 
 const KNOWLEDGE_DIMENSIONS: &[&str] = &[
-    "http://ontoskills.sh/ontology#Observability",
-    "http://ontoskills.sh/ontology#ResilienceTactic",
-    "http://ontoskills.sh/ontology#ResourceProfile",
-    "http://ontoskills.sh/ontology#TrustMetric",
-    "http://ontoskills.sh/ontology#CognitiveBoundary",
-    "http://ontoskills.sh/ontology#ExecutionPhysics",
-    "http://ontoskills.sh/ontology#LifecycleHook",
-    "http://ontoskills.sh/ontology#NormativeRule",
-    "http://ontoskills.sh/ontology#SecurityGuardrail",
-    "http://ontoskills.sh/ontology#StrategicInsight",
+    "http://ontoclaw.marea.software/ontology#Observability",
+    "http://ontoclaw.marea.software/ontology#ResilienceTactic",
+    "http://ontoclaw.marea.software/ontology#ResourceProfile",
+    "http://ontoclaw.marea.software/ontology#TrustMetric",
+    "http://ontoclaw.marea.software/ontology#CognitiveBoundary",
+    "http://ontoclaw.marea.software/ontology#ExecutionPhysics",
+    "http://ontoclaw.marea.software/ontology#LifecycleHook",
+    "http://ontoclaw.marea.software/ontology#NormativeRule",
+    "http://ontoclaw.marea.software/ontology#SecurityGuardrail",
+    "http://ontoclaw.marea.software/ontology#StrategicInsight",
 ];
 
 #[derive(Debug)]
@@ -83,6 +84,11 @@ pub enum SkillType {
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillSummary {
     pub id: String,
+    pub qualified_id: String,
+    pub package_id: String,
+    pub trust_tier: String,
+    pub version: Option<String>,
+    pub source: Option<String>,
     pub skill_type: SkillType,
     pub nature: String,
     pub intents: Vec<String>,
@@ -93,6 +99,11 @@ pub struct SkillSummary {
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillSearchResult {
     pub id: String,
+    pub qualified_id: String,
+    pub package_id: String,
+    pub trust_tier: String,
+    pub version: Option<String>,
+    pub source: Option<String>,
     pub skill_type: SkillType,
     pub nature: String,
     pub intents: Vec<String>,
@@ -111,6 +122,12 @@ pub struct RequirementInfo {
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillDetails {
     pub id: String,
+    pub qualified_id: String,
+    pub package_id: String,
+    pub trust_tier: String,
+    pub version: Option<String>,
+    pub source: Option<String>,
+    pub aliases: Vec<String>,
     pub uri: String,
     pub skill_type: SkillType,
     pub nature: String,
@@ -148,6 +165,7 @@ pub struct KnowledgeNodeInfo {
     pub applies_to_context: Option<String>,
     pub severity_level: Option<String>,
     pub source_skill_id: String,
+    pub source_qualified_id: Option<String>,
     pub inherited: bool,
 }
 
@@ -215,6 +233,41 @@ pub struct EpistemicQueryParams {
 pub struct Catalog {
     store: Store,
     base_uri: String,
+    skill_index: Vec<SkillRecord>,
+}
+
+#[derive(Debug, Clone)]
+struct SkillRecord {
+    id: String,
+    qualified_id: String,
+    package_id: String,
+    trust_tier: String,
+    version: Option<String>,
+    source: Option<String>,
+    aliases: Vec<String>,
+    uri: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct RegistryLockFile {
+    packages: HashMap<String, RegistryPackageState>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct RegistryPackageState {
+    package_id: String,
+    version: String,
+    trust_tier: String,
+    source: Option<String>,
+    skills: Vec<RegistrySkillState>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct RegistrySkillState {
+    #[allow(dead_code)]
+    skill_id: String,
+    module_path: String,
+    aliases: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -255,23 +308,49 @@ impl Catalog {
 
         let store = Store::new().map_err(|err| CatalogError::Oxigraph(err.to_string()))?;
         let mut loaded_any = false;
+        let registry_lookup = load_registry_lookup(ontology_root);
+        let mut skill_index = Vec::new();
+        let enabled_manifest = ontology_root.join("system").join("index.enabled.ttl");
+        let default_manifest = ontology_root.join("index.ttl");
 
-        for entry in WalkDir::new(ontology_root) {
-            let entry = entry?;
-            if !entry.file_type().is_file() {
-                continue;
+        if enabled_manifest.exists() {
+            let mut visited = HashSet::new();
+            load_manifest_tree(
+                &store,
+                &enabled_manifest,
+                &mut visited,
+                ontology_root,
+                &registry_lookup,
+                &mut skill_index,
+            )?;
+            loaded_any = !visited.is_empty();
+        } else if default_manifest.exists() {
+            let mut visited = HashSet::new();
+            load_manifest_tree(
+                &store,
+                &default_manifest,
+                &mut visited,
+                ontology_root,
+                &registry_lookup,
+                &mut skill_index,
+            )?;
+            loaded_any = !visited.is_empty();
+        } else {
+            for entry in WalkDir::new(ontology_root) {
+                let entry = entry?;
+                if !entry.file_type().is_file() {
+                    continue;
+                }
+
+                let path = entry.path();
+                if path.extension().and_then(|ext| ext.to_str()) != Some("ttl") {
+                    continue;
+                }
+
+                load_turtle_file(&store, path)?;
+                collect_skill_records_from_file(path, ontology_root, &registry_lookup, &mut skill_index)?;
+                loaded_any = true;
             }
-
-            let path = entry.path();
-            if path.extension().and_then(|ext| ext.to_str()) != Some("ttl") {
-                continue;
-            }
-
-            let reader = BufReader::new(File::open(path)?);
-            store
-                .load_from_reader(RdfFormat::Turtle, reader)
-                .map_err(|err| CatalogError::Oxigraph(format!("{} ({})", err, path.display())))?;
-            loaded_any = true;
         }
 
         if !loaded_any {
@@ -281,9 +360,15 @@ impl Catalog {
         }
 
         let base_uri =
-            env::var("ONTOSKILLS_BASE_URI").unwrap_or_else(|_| DEFAULT_BASE_URI.to_string());
+            env::var("ONTOCLAW_BASE_URI").unwrap_or_else(|_| DEFAULT_BASE_URI.to_string());
 
-        Ok(Self { store, base_uri })
+        skill_index.sort_by(|left, right| left.qualified_id.cmp(&right.qualified_id));
+
+        Ok(Self {
+            store,
+            base_uri,
+            skill_index,
+        })
     }
 
     pub fn search_skills(
@@ -340,6 +425,11 @@ impl Catalog {
 
             results.push(SkillSearchResult {
                 id: skill.id,
+                qualified_id: skill.qualified_id,
+                package_id: skill.package_id,
+                trust_tier: skill.trust_tier,
+                version: skill.version,
+                source: skill.source,
                 skill_type: skill.skill_type,
                 nature: skill.nature,
                 intents: skill.intents,
@@ -558,23 +648,16 @@ impl Catalog {
     }
 
     pub fn list_skills(&self) -> Result<Vec<SkillSummary>, CatalogError> {
-        let query = r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
-            PREFIX dcterms: <http://purl.org/dc/terms/>
-            SELECT ?id
-            WHERE {
-                ?skill a oc:Skill ;
-                       dcterms:identifier ?id .
-            }
-            ORDER BY ?id
-        "#;
-
         let mut skills = Vec::new();
-        for row in self.select_rows(query)? {
-            let skill_id = row.required_literal("id")?;
-            let details = self.get_skill(&skill_id)?;
+        for record in &self.skill_index {
+            let details = self.get_skill(&record.qualified_id)?;
             skills.push(SkillSummary {
                 id: details.id,
+                qualified_id: details.qualified_id,
+                package_id: details.package_id,
+                trust_tier: details.trust_tier,
+                version: details.version,
+                source: details.source,
                 skill_type: details.skill_type,
                 nature: details.nature,
                 intents: details.intents,
@@ -587,28 +670,23 @@ impl Catalog {
     }
 
     pub fn find_skills_by_intent(&self, intent: &str) -> Result<Vec<SkillSummary>, CatalogError> {
-        let query = format!(
-            r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
-            PREFIX dcterms: <http://purl.org/dc/terms/>
-            SELECT DISTINCT ?id
-            WHERE {{
-                ?skill a oc:Skill ;
-                       dcterms:identifier ?id ;
-                       oc:resolvesIntent ?intent .
-                FILTER(LCASE(STR(?intent)) = LCASE({intent_literal}))
-            }}
-            ORDER BY ?id
-        "#,
-            intent_literal = sparql_string(intent)
-        );
-
         let mut skills = Vec::new();
-        for row in self.select_rows(&query)? {
-            let skill_id = row.required_literal("id")?;
-            let details = self.get_skill(&skill_id)?;
+        for record in &self.skill_index {
+            let details = self.get_skill(&record.qualified_id)?;
+            if !details
+                .intents
+                .iter()
+                .any(|candidate| eq_ignore_case(candidate, intent))
+            {
+                continue;
+            }
             skills.push(SkillSummary {
                 id: details.id,
+                qualified_id: details.qualified_id,
+                package_id: details.package_id,
+                trust_tier: details.trust_tier,
+                version: details.version,
+                source: details.source,
                 skill_type: details.skill_type,
                 nature: details.nature,
                 intents: details.intents,
@@ -616,16 +694,18 @@ impl Catalog {
                 yields_state: details.yields_state,
             });
         }
+        skills.sort_by(|left, right| left.qualified_id.cmp(&right.qualified_id));
         Ok(skills)
     }
 
     pub fn get_skill(&self, skill_id: &str) -> Result<SkillDetails, CatalogError> {
         validate_skill_id(skill_id)?;
-        let skill_uri = self.find_skill_uri(skill_id)?;
+        let record = self.resolve_skill_reference(skill_id)?;
+        let skill_uri = record.uri.clone();
 
         let type_query = format!(
             r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
+            PREFIX oc: <http://ontoclaw.marea.software/ontology#>
             SELECT ?type WHERE {{
                 <{skill_uri}> a ?type .
                 FILTER (?type IN (oc:ExecutableSkill, oc:DeclarativeSkill))
@@ -641,7 +721,7 @@ impl Catalog {
 
         let scalar_query = format!(
             r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
+            PREFIX oc: <http://ontoclaw.marea.software/ontology#>
             PREFIX dcterms: <http://purl.org/dc/terms/>
             PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
             SELECT ?nature ?genus ?differentia ?generatedBy
@@ -654,7 +734,7 @@ impl Catalog {
             }}
             LIMIT 1
         "#,
-            skill_id_literal = sparql_string(skill_id)
+            skill_id_literal = sparql_string(&record.id)
         );
         let scalar = self
             .select_rows(&scalar_query)?
@@ -663,7 +743,13 @@ impl Catalog {
             .ok_or_else(|| CatalogError::SkillNotFound(skill_id.to_string()))?;
 
         Ok(SkillDetails {
-            id: skill_id.to_string(),
+            id: record.id.clone(),
+            qualified_id: record.qualified_id.clone(),
+            package_id: record.package_id.clone(),
+            trust_tier: record.trust_tier.clone(),
+            version: record.version.clone(),
+            source: record.source.clone(),
+            aliases: record.aliases.clone(),
             uri: skill_uri.clone(),
             skill_type,
             nature: scalar.required_literal("nature")?,
@@ -683,10 +769,11 @@ impl Catalog {
 
     pub fn get_skill_payload(&self, skill_id: &str) -> Result<PayloadInfo, CatalogError> {
         validate_skill_id(skill_id)?;
-        let skill_uri = self.find_skill_uri(skill_id)?;
+        let record = self.resolve_skill_reference(skill_id)?;
+        let skill_uri = record.uri.clone();
         let query = format!(
             r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
+            PREFIX oc: <http://ontoclaw.marea.software/ontology#>
             SELECT ?executor ?code ?timeout
             WHERE {{
                 <{skill_uri}> oc:hasPayload ?payload .
@@ -701,7 +788,7 @@ impl Catalog {
         let row = self.select_rows(&query)?.into_iter().next();
         if let Some(row) = row {
             Ok(PayloadInfo {
-                skill_id: skill_id.to_string(),
+                skill_id: record.qualified_id.clone(),
                 available: true,
                 executor: row.optional_literal("executor"),
                 code: row.optional_literal("code"),
@@ -713,7 +800,7 @@ impl Catalog {
             })
         } else {
             Ok(PayloadInfo {
-                skill_id: skill_id.to_string(),
+                skill_id: record.qualified_id.clone(),
                 available: false,
                 executor: None,
                 code: None,
@@ -737,7 +824,9 @@ impl Catalog {
         include_inherited: bool,
     ) -> Result<Vec<KnowledgeNodeInfo>, CatalogError> {
         validate_skill_id(skill_id)?;
-        let skill_uri = self.find_skill_uri(skill_id)?;
+        let record = self.resolve_skill_reference(skill_id)?;
+        let skill_uri = record.uri.clone();
+        let requested_skill_id = record.id.clone();
         let source_binding = if include_inherited {
             format!(
                 r#"
@@ -766,7 +855,7 @@ impl Catalog {
 
         let query = format!(
             r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
+            PREFIX oc: <http://ontoclaw.marea.software/ontology#>
             PREFIX dcterms: <http://purl.org/dc/terms/>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
             SELECT DISTINCT ?sourceSkillId ?node ?nodeType ?nodeLabel ?directiveContent ?rationale ?appliesToContext ?severityLevel ?dimension
@@ -798,7 +887,7 @@ impl Catalog {
         for row in self.select_rows(&query)? {
             let uri = row.required_iri("node")?;
             let source_skill_id = row.required_literal("sourceSkillId")?;
-            let inherited = source_skill_id != skill_id;
+            let inherited = source_skill_id != requested_skill_id;
             let candidate = KnowledgeNodeInfo {
                 uri: uri.clone(),
                 label: row.optional_literal("nodeLabel"),
@@ -815,6 +904,7 @@ impl Catalog {
                 severity_level: row
                     .optional_literal("severityLevel")
                     .map(|value| value.to_ascii_uppercase()),
+                source_qualified_id: self.qualified_id_for(&source_skill_id),
                 source_skill_id,
                 inherited,
             };
@@ -929,26 +1019,24 @@ impl Catalog {
         relation: &str,
         state_uri: &str,
     ) -> Result<Vec<SkillSummary>, CatalogError> {
-        let query = format!(
-            r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
-            PREFIX dcterms: <http://purl.org/dc/terms/>
-            SELECT DISTINCT ?id
-            WHERE {{
-                ?skill a oc:Skill ;
-                       dcterms:identifier ?id ;
-                       {relation} <{state_uri}> .
-            }}
-            ORDER BY ?id
-        "#
-        );
-
         let mut results = Vec::new();
-        for row in self.select_rows(&query)? {
-            let skill_id = row.required_literal("id")?;
-            let details = self.get_skill(&skill_id)?;
+        for record in &self.skill_index {
+            let details = self.get_skill(&record.qualified_id)?;
+            let matches = match relation {
+                "oc:yieldsState" => details.yields_state.iter().any(|value| value == state_uri || value == &self.compact_uri(state_uri)),
+                "oc:requiresState" => details.requires_state.iter().any(|value| value == state_uri || value == &self.compact_uri(state_uri)),
+                _ => false,
+            };
+            if !matches {
+                continue;
+            }
             results.push(SkillSummary {
                 id: details.id,
+                qualified_id: details.qualified_id,
+                package_id: details.package_id,
+                trust_tier: details.trust_tier,
+                version: details.version,
+                source: details.source,
                 skill_type: details.skill_type,
                 nature: details.nature,
                 intents: details.intents,
@@ -956,6 +1044,7 @@ impl Catalog {
                 yields_state: details.yields_state,
             });
         }
+        results.sort_by(|left, right| left.qualified_id.cmp(&right.qualified_id));
         Ok(results)
     }
 
@@ -965,7 +1054,7 @@ impl Catalog {
     ) -> Result<Vec<RequirementInfo>, CatalogError> {
         let query = format!(
             r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
+            PREFIX oc: <http://ontoclaw.marea.software/ontology#>
             SELECT ?req ?type ?value ?optional
             WHERE {{
                 <{skill_uri}> oc:hasRequirement ?req .
@@ -996,7 +1085,7 @@ impl Catalog {
     ) -> Result<Vec<String>, CatalogError> {
         let query = format!(
             r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
+            PREFIX oc: <http://ontoclaw.marea.software/ontology#>
             PREFIX dcterms: <http://purl.org/dc/terms/>
             SELECT ?target ?targetId
             WHERE {{
@@ -1025,7 +1114,7 @@ impl Catalog {
     ) -> Result<Vec<String>, CatalogError> {
         let query = format!(
             r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
+            PREFIX oc: <http://ontoclaw.marea.software/ontology#>
             SELECT ?target
             WHERE {{
                 <{skill_uri}> {relation} ?target .
@@ -1048,7 +1137,7 @@ impl Catalog {
     ) -> Result<Vec<String>, CatalogError> {
         let query = format!(
             r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
+            PREFIX oc: <http://ontoclaw.marea.software/ontology#>
             SELECT ?value
             WHERE {{
                 <{skill_uri}> {predicate} ?value .
@@ -1065,25 +1154,59 @@ impl Catalog {
     }
 
     fn find_skill_uri(&self, skill_id: &str) -> Result<String, CatalogError> {
-        let query = format!(
-            r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
-            PREFIX dcterms: <http://purl.org/dc/terms/>
-            SELECT ?skill
-            WHERE {{
-                ?skill a oc:Skill ;
-                       dcterms:identifier {skill_id_literal} .
-            }}
-            LIMIT 1
-        "#,
-            skill_id_literal = sparql_string(skill_id)
-        );
+        Ok(self.resolve_skill_reference(skill_id)?.uri.clone())
+    }
 
-        self.select_rows(&query)?
+    fn resolve_skill_reference(&self, skill_ref: &str) -> Result<&SkillRecord, CatalogError> {
+        validate_skill_id(skill_ref)?;
+
+        if let Some(record) = self
+            .skill_index
+            .iter()
+            .find(|record| record.qualified_id.eq_ignore_ascii_case(skill_ref))
+        {
+            return Ok(record);
+        }
+
+        if let Some((package_id, short_id)) = skill_ref.split_once('/') {
+            if let Some(record) = self.skill_index.iter().find(|record| {
+                record.package_id.eq_ignore_ascii_case(package_id)
+                    && record.id.eq_ignore_ascii_case(short_id)
+            }) {
+                return Ok(record);
+            }
+        }
+
+        let mut candidates: Vec<&SkillRecord> = self
+            .skill_index
+            .iter()
+            .filter(|record| {
+                record.id.eq_ignore_ascii_case(skill_ref)
+                    || record
+                        .aliases
+                        .iter()
+                        .any(|alias| alias.eq_ignore_ascii_case(skill_ref))
+            })
+            .collect();
+
+        candidates.sort_by(|left, right| {
+            trust_rank(&left.trust_tier)
+                .cmp(&trust_rank(&right.trust_tier))
+                .then(left.package_id.cmp(&right.package_id))
+                .then(left.id.cmp(&right.id))
+        });
+
+        candidates
             .into_iter()
             .next()
-            .and_then(|row| row.optional_iri("skill"))
-            .ok_or_else(|| CatalogError::SkillNotFound(skill_id.to_string()))
+            .ok_or_else(|| CatalogError::SkillNotFound(skill_ref.to_string()))
+    }
+
+    fn qualified_id_for(&self, skill_id: &str) -> Option<String> {
+        self.skill_index
+            .iter()
+            .find(|record| record.id == skill_id)
+            .map(|record| record.qualified_id.clone())
     }
 
     fn select_rows(&self, query: &str) -> Result<Vec<QueryRow>, CatalogError> {
@@ -1143,6 +1266,215 @@ impl Catalog {
         } else {
             Err(CatalogError::InvalidState(value.to_string()))
         }
+    }
+}
+
+fn load_turtle_file(store: &Store, path: &Path) -> Result<(), CatalogError> {
+    let reader = BufReader::new(File::open(path)?);
+    store
+        .load_from_reader(RdfFormat::Turtle, reader)
+        .map_err(|err| CatalogError::Oxigraph(format!("{} ({})", err, path.display())))
+}
+
+fn load_manifest_tree(
+    store: &Store,
+    manifest_path: &Path,
+    visited: &mut HashSet<PathBuf>,
+    ontology_root: &Path,
+    registry_lookup: &HashMap<String, RegistryLookupEntry>,
+    skill_index: &mut Vec<SkillRecord>,
+) -> Result<(), CatalogError> {
+    let canonical = manifest_path.canonicalize()?;
+    if !visited.insert(canonical.clone()) {
+        return Ok(());
+    }
+
+    load_turtle_file(store, &canonical)?;
+    collect_skill_records_from_file(&canonical, ontology_root, registry_lookup, skill_index)?;
+
+    let content = std::fs::read_to_string(&canonical)?;
+    for imported in parse_import_paths(&content) {
+        if imported.exists() {
+            load_manifest_tree(
+                store,
+                &imported,
+                visited,
+                ontology_root,
+                registry_lookup,
+                skill_index,
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
+fn parse_import_paths(content: &str) -> Vec<PathBuf> {
+    let mut imports = Vec::new();
+    for segment in content.split("owl:imports <file://").skip(1) {
+        if let Some(raw_path) = segment.split('>').next() {
+            let normalized = if raw_path.starts_with('/') {
+                raw_path.to_string()
+            } else {
+                format!("/{}", raw_path)
+            };
+            imports.push(PathBuf::from(normalized));
+        }
+    }
+    imports
+}
+
+#[derive(Debug, Clone)]
+struct RegistryLookupEntry {
+    package_id: String,
+    trust_tier: String,
+    version: Option<String>,
+    source: Option<String>,
+    aliases: Vec<String>,
+}
+
+fn load_registry_lookup(ontology_root: &Path) -> HashMap<String, RegistryLookupEntry> {
+    let path = state_registry_lock_path(ontology_root);
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return HashMap::new();
+    };
+    let Ok(lock) = serde_json::from_str::<RegistryLockFile>(&content) else {
+        return HashMap::new();
+    };
+
+    let mut lookup = HashMap::new();
+    for package in lock.packages.into_values() {
+        for skill in package.skills {
+            let module_path = skill.module_path.clone();
+            let key = PathBuf::from(&module_path)
+                .canonicalize()
+                .unwrap_or_else(|_| PathBuf::from(&module_path))
+                .display()
+                .to_string();
+            lookup.insert(
+                key,
+                RegistryLookupEntry {
+                    package_id: package.package_id.clone(),
+                    trust_tier: package.trust_tier.clone(),
+                    version: Some(package.version.clone()),
+                    source: package.source.clone(),
+                    aliases: skill.aliases.clone(),
+                },
+            );
+        }
+    }
+    lookup
+}
+
+fn state_registry_lock_path(ontology_root: &Path) -> PathBuf {
+    if let Some(home_root) = ontology_root.parent() {
+        let state_path = home_root.join("state").join("registry.lock.json");
+        if state_path.exists() {
+            return state_path;
+        }
+    }
+    ontology_root.join("system").join("registry.lock.json")
+}
+
+fn collect_skill_records_from_file(
+    path: &Path,
+    ontology_root: &Path,
+    registry_lookup: &HashMap<String, RegistryLookupEntry>,
+    skill_index: &mut Vec<SkillRecord>,
+) -> Result<(), CatalogError> {
+    if path.file_name().and_then(|name| name.to_str()) == Some("ontoclaw-core.ttl") {
+        return Ok(());
+    }
+
+    let canonical = path.canonicalize()?;
+    let content = std::fs::read_to_string(&canonical)?;
+    let mut last_subject_uri: Option<String> = None;
+
+    for raw_line in content.lines() {
+        let line = raw_line.trim();
+        if let Some(subject) = line.split_whitespace().next() {
+            if subject.starts_with("oc:skill_") {
+                last_subject_uri = Some(format!("{}{}", DEFAULT_BASE_URI, subject.trim_start_matches("oc:")));
+            }
+        }
+        if let Some((_, suffix)) = line.split_once("dcterms:identifier ") {
+            if let Some(skill_id) = extract_turtle_literal(suffix) {
+                let record = build_skill_record(
+                    &skill_id,
+                    last_subject_uri.clone().unwrap_or_default(),
+                    &canonical,
+                    ontology_root,
+                    registry_lookup,
+                );
+                if !skill_index
+                    .iter()
+                    .any(|existing| existing.qualified_id == record.qualified_id)
+                {
+                    skill_index.push(record);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn extract_turtle_literal(value: &str) -> Option<String> {
+    let start = value.find('"')?;
+    let rest = &value[start + 1..];
+    let end = rest.find('"')?;
+    Some(rest[..end].to_string())
+}
+
+fn build_skill_record(
+    skill_id: &str,
+    uri: String,
+    module_path: &Path,
+    ontology_root: &Path,
+    registry_lookup: &HashMap<String, RegistryLookupEntry>,
+) -> SkillRecord {
+    let canonical_key = module_path.display().to_string();
+    if let Some(entry) = registry_lookup.get(&canonical_key) {
+        return SkillRecord {
+            id: skill_id.to_string(),
+            qualified_id: format!("{}/{}", entry.package_id, skill_id),
+            package_id: entry.package_id.clone(),
+            trust_tier: entry.trust_tier.clone(),
+            version: entry.version.clone(),
+            source: entry.source.clone(),
+            aliases: entry.aliases.clone(),
+            uri,
+        };
+    }
+
+    let rel = module_path
+        .strip_prefix(ontology_root)
+        .ok()
+        .and_then(|path| path.components().next().map(|c| c.as_os_str().to_string_lossy().to_string()));
+    let trust_tier = match rel.as_deref() {
+        Some("vendor") => "verified",
+        _ => "local",
+    }
+    .to_string();
+    let package_id = if let Ok(relative) = module_path.strip_prefix(ontology_root.join("vendor")) {
+        relative
+            .components()
+            .next()
+            .map(|c| c.as_os_str().to_string_lossy().to_string())
+            .unwrap_or_else(|| "local".to_string())
+    } else {
+        "local".to_string()
+    };
+
+    SkillRecord {
+        id: skill_id.to_string(),
+        qualified_id: format!("{}/{}", package_id, skill_id),
+        package_id,
+        trust_tier,
+        version: None,
+        source: None,
+        aliases: vec![],
+        uri,
     }
 }
 
@@ -1304,13 +1636,23 @@ fn validate_skill_id(skill_id: &str) -> Result<(), CatalogError> {
     }
     if !skill_id
         .bytes()
-        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'/' | b'.' | b'_'))
     {
         return Err(CatalogError::InvalidInput(
-            "skill_id must match ^[A-Za-z0-9-]+$".to_string(),
+            "skill_id must match ^[A-Za-z0-9._/-]+$".to_string(),
         ));
     }
     Ok(())
+}
+
+fn trust_rank(trust_tier: &str) -> usize {
+    match trust_tier {
+        "local" => 0,
+        "verified" => 1,
+        "trusted" => 2,
+        "community" => 3,
+        _ => 4,
+    }
 }
 
 fn sorted_vec<I>(iter: I) -> Vec<String>
@@ -1491,6 +1833,138 @@ oc:skill_setup a oc:Skill, oc:ExecutableSkill ;
         fs::write(root.join("index.ttl"), ttl).unwrap();
     }
 
+    fn write_enabled_registry(root: &Path) {
+        fs::create_dir_all(root.join("system")).unwrap();
+        fs::write(
+            root.join("enabled.ttl"),
+            format!(
+                r#"
+@prefix oc: <{base}> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+oc:skill_enabled a oc:Skill, oc:DeclarativeSkill ;
+    dcterms:identifier "enabled-skill" ;
+    oc:nature "Enabled" .
+"#,
+                base = DEFAULT_BASE_URI
+            ),
+        )
+        .unwrap();
+        fs::write(
+            root.join("disabled.ttl"),
+            format!(
+                r#"
+@prefix oc: <{base}> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+oc:skill_disabled a oc:Skill, oc:DeclarativeSkill ;
+    dcterms:identifier "disabled-skill" ;
+    oc:nature "Disabled" .
+"#,
+                base = DEFAULT_BASE_URI
+            ),
+        )
+        .unwrap();
+        fs::write(
+            root.join("system").join("index.enabled.ttl"),
+            format!(
+                r#"
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+
+<http://ontoclaw.marea.software/ontology> owl:imports <file://{enabled}> .
+"#,
+                enabled = root.join("enabled.ttl").display()
+            ),
+        )
+        .unwrap();
+    }
+
+    fn write_ambiguous_registry(root: &Path) {
+        fs::create_dir_all(root.join("system")).unwrap();
+        fs::create_dir_all(root.join("vendor").join("marea.office").join("skills")).unwrap();
+        fs::create_dir_all(root.join("xlsx")).unwrap();
+        fs::write(
+            root.join("vendor").join("marea.office").join("skills").join("xlsx.ttl"),
+            format!(
+                r#"
+@prefix oc: <{base}> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+oc:skill_xlsx_verified a oc:Skill, oc:ExecutableSkill ;
+    dcterms:identifier "xlsx" ;
+    oc:nature "Verified spreadsheet" .
+"#,
+                base = DEFAULT_BASE_URI
+            ),
+        )
+        .unwrap();
+        fs::write(
+            root.join("xlsx").join("ontoskill.ttl"),
+            format!(
+                r#"
+@prefix oc: <{base}> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+oc:skill_xlsx_local a oc:Skill, oc:ExecutableSkill ;
+    dcterms:identifier "xlsx" ;
+    oc:nature "Local spreadsheet" .
+"#,
+                base = DEFAULT_BASE_URI
+            ),
+        )
+        .unwrap();
+        fs::write(
+            root.join("system").join("registry.lock.json"),
+            r#"{
+  "packages": {
+    "marea.office": {
+      "package_id": "marea.office",
+      "version": "1.0.0",
+      "trust_tier": "verified",
+      "source": "https://example.invalid/marea.office",
+      "skills": [
+        {
+          "skill_id": "xlsx",
+          "module_path": "__MODULE__",
+          "aliases": ["excel"]
+        }
+      ]
+    }
+  }
+}"#
+            .replace(
+                "__MODULE__",
+                &root
+                    .join("vendor")
+                    .join("marea.office")
+                    .join("skills")
+                    .join("xlsx.ttl")
+                    .display()
+                    .to_string(),
+            ),
+        )
+        .unwrap();
+        fs::write(
+            root.join("system").join("index.enabled.ttl"),
+            format!(
+                r#"
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+
+<http://ontoclaw.marea.software/ontology> owl:imports <file://{verified}> ;
+    owl:imports <file://{local}> .
+"#,
+                verified = root
+                    .join("vendor")
+                    .join("marea.office")
+                    .join("skills")
+                    .join("xlsx.ttl")
+                    .display(),
+                local = root.join("xlsx").join("ontoskill.ttl").display(),
+            ),
+        )
+        .unwrap();
+    }
+
     #[test]
     fn skill_context_includes_knowledge_nodes() {
         let dir = tempdir().unwrap();
@@ -1577,5 +2051,32 @@ oc:skill_setup a oc:Skill, oc:ExecutableSkill ;
         assert_eq!(evaluation.recommended_skill.as_deref(), Some("direct-pdf"));
         assert!(evaluation.applicable);
         assert_eq!(evaluation.plan_steps.len(), 1);
+    }
+
+    #[test]
+    fn catalog_prefers_enabled_index_manifest_when_present() {
+        let dir = tempdir().unwrap();
+        write_enabled_registry(dir.path());
+
+        let catalog = Catalog::load(dir.path()).unwrap();
+        let skills = catalog.list_skills().unwrap();
+
+        assert_eq!(skills.len(), 1);
+        assert_eq!(skills[0].id, "enabled-skill");
+    }
+
+    #[test]
+    fn catalog_resolves_short_id_with_local_precedence_and_exact_qualified_id() {
+        let dir = tempdir().unwrap();
+        write_ambiguous_registry(dir.path());
+
+        let catalog = Catalog::load(dir.path()).unwrap();
+        let preferred = catalog.get_skill("xlsx").unwrap();
+        let imported = catalog.get_skill("marea.office/xlsx").unwrap();
+
+        assert_eq!(preferred.qualified_id, "local/xlsx");
+        assert_eq!(preferred.trust_tier, "local");
+        assert_eq!(imported.qualified_id, "marea.office/xlsx");
+        assert_eq!(imported.trust_tier, "verified");
     }
 }

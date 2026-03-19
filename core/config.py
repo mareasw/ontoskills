@@ -1,4 +1,4 @@
-"""Configuration module for OntoSkills compiler.
+"""Configuration module for OntoClaw compiler.
 
 This module centralizes all configuration settings with environment variable support.
 Environment variables allow enterprise deployment with custom namespaces and paths.
@@ -16,11 +16,39 @@ load_local_env()
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
 # Base URI for the ontology (can be customized via environment)
-BASE_URI = os.getenv('ONTOSKILLS_BASE_URI', 'http://ontoskills.sh/ontology#')
+BASE_URI = os.getenv(
+    'ONTOCLAW_BASE_URI',
+    os.getenv('ONTOSKILLS_BASE_URI', 'http://ontoclaw.marea.software/ontology#')
+)
 
 # Directory paths (relative to project root by default)
-SKILLS_DIR = os.getenv('ONTOSKILLS_SKILLS_DIR', str(PROJECT_ROOT / 'skills'))
-OUTPUT_DIR = os.getenv('ONTOSKILLS_OUTPUT_DIR', str(PROJECT_ROOT / 'ontoskills'))
+SKILLS_DIR = os.getenv(
+    'ONTOCLAW_SKILLS_DIR',
+    os.getenv('ONTOSKILLS_SKILLS_DIR', str(PROJECT_ROOT / 'skills'))
+)
+ONTOLOGY_ROOT = os.getenv(
+    'ONTOCLAW_ONTOLOGY_ROOT',
+    os.getenv('ONTOSKILLS_OUTPUT_DIR', str(PROJECT_ROOT / 'ontoskills'))
+)
+OUTPUT_DIR = os.getenv(
+    'ONTOCLAW_OUTPUT_DIR',
+    os.getenv('ONTOSKILLS_OUTPUT_DIR', ONTOLOGY_ROOT)
+)
+ONTOLOGY_SYSTEM_DIR = str(Path(ONTOLOGY_ROOT) / 'system')
+SKILLS_VENDOR_DIR = str(Path(SKILLS_DIR) / 'vendor')
+ONTOLOGY_VENDOR_DIR = str(Path(ONTOLOGY_ROOT) / 'vendor')
+
+
+def resolve_ontology_root(path: str | Path) -> Path:
+    """Resolve the ontology root from a direct root path or one of its subtrees."""
+    candidate = Path(path).resolve()
+    configured_root = Path(ONTOLOGY_ROOT).resolve()
+    if configured_root == candidate or configured_root in candidate.parents:
+        return configured_root
+    for parent in (candidate, *candidate.parents):
+        if parent.name == 'ontoskills':
+            return parent
+    return candidate
 
 # Anthropic API model configurations
 ANTHROPIC_MODEL = os.getenv('ANTHROPIC_MODEL', 'claude-opus-4-6')

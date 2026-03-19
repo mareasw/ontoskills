@@ -1,0 +1,21 @@
+{
+  "package_id": "marea.greeting",
+  "version": "0.1.0",
+  "core_version": "0.5.0",
+  "trust_tier": "verified",
+  "source": "https://github.com/mareasoftware/OntoSkillRegistry",
+  "description": "Minimal greeting demo skill",
+  "checksum": null,
+  "modules": [
+    "hello/ontoskill.ttl"
+  ],
+  "skills": [
+    {
+      "id": "hello",
+      "path": "hello/ontoskill.ttl",
+      "default_enabled": false,
+      "aliases": ["greeting", "ciao"],
+      "description": "Simple greeting skill"
+    }
+  ]
+}

@@ -4,54 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-
-## [0.8.0] - 2026-03-19
+## [Unreleased]
 
 ### Added
 
-- **Website** (`site/`) — Astro + Starlight documentation site
-  - Landing page with animated graph background
-  - Documentation powered by Starlight
-  - Responsive design, dark theme
-  - docs/ symlinked from root for single source of truth
+- Added bootstrap and publication flow for the official `OntoSkillRegistry` repository
+- Added a first remote demo package `marea.greeting/hello` to validate end-to-end registry installs
 
 ### Changed
 
-- **Documentation restructure** — docs/ is now the source of truth
-  - README.md reduced from 600 → ~100 lines (pitch + links)
-  - docs/overview.md expanded with more depth
-  - docs/architecture.md new — system design, OWL properties, security
-  - docs/knowledge-extraction.md new — focus on extracting knowledge from skills
-  - docs/roadmap.md updated naming (OntoClaw → OntoSkills)
-  - site/README.md reduced to tech stack only
+- Changed the `ontoskill` product workflow so the official registry is built in by default and does not need manual `registry add-source` setup
+- Updated the user documentation to clarify the runtime flow:
+  - `search`
+  - `install`
+  - `enable`
+  - optional third-party registries via `registry add-source`
 
-## [0.7.0] - 2026-03-18
+### Verified
 
-### Changed
-
-#### CLI Tooling Updates for Knowledge Nodes
-
-Updated the PR #5 tooling to work with the current ontology structure (knowledge_nodes and requirements):
-
-- **core/explainer.py** — Updated `SkillSummary` to extract:
-  - `knowledge_nodes`: list of `KnowledgeNodeSummary` (node_type, directive_content, applies_to_context, has_rationale, severity_level)
-  - `requirements`: list of `RequirementSummary` (requirement_value, is_optional)
-  - Removed: `depends_on`, `extends`, `contradicts` (not used in current skills)
-
-- **core/differ.py** — Updated drift detection:
-  - Fixed `_diff_requirements()` to use `oc:hasRequirement` instead of `oc:requires`
-  - Added `_diff_knowledge_nodes()` to track `oc:impartsKnowledge` changes (cosmetic)
-  - Updated SPARQL queries in suggestions to use correct properties
-
-- **core/linter.py** — Updated checks:
-  - Replaced `orphan-skill` with `unreachable-state` check (skills with unreachable required states)
-  - Kept: `dead-state`, `circular-dep`, `duplicate-intent` (still valid)
-
-- **core/graph_export.py** — Changed from dependency graph to state transition graph:
-  - Edges now show: Skill A `yieldsState` X → Skill B `requiresState` X
-  - Visualizes actual execution flow between skills
-
-- **core/tests/** — Updated all test files for the new functionality
+- Verified remote install and activation of `marea.greeting/hello` from the public `OntoSkillRegistry` repository
+- Verified registry state generation under `~/.ontoskills/` for:
+  - `registry.lock.json`
+  - `index.installed.ttl`
+  - `index.enabled.ttl`
 
 ## [0.6.0] - 2026-03-18
 
@@ -60,6 +35,22 @@ Updated the PR #5 tooling to work with the current ontology structure (knowledge
 - Added repo-local `.env` loading for the Python compiler so extraction and security checks can
   read `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, and model overrides without manual shell exports
 - Added `.env.example` with the compiler variables needed for Anthropic-compatible providers
+- Added global ontology registry management under `ontoskills/` with:
+  - `vendor/` and `system/` subtrees for imported compiled packages and manifests
+  - `registry.lock.json` and `registry.sources.json`
+  - `index.installed.ttl` and `index.enabled.ttl`
+- Added registry/package commands to the compiler CLI:
+  - `registry add-source`
+  - `registry list`
+  - `install`
+  - `install-package`
+  - `enable`
+  - `disable`
+  - `list-installed`
+  - `rebuild-index`
+- Added support for importing remote ontology packages from registry indexes via `manifest_url`
+- Added direct raw source repository import from local paths or GitHub URLs via `import-source-repo`, with automatic `SKILL.md` discovery, clone/copy into `skills/vendor/`, and local compilation into `ontoskills/vendor/`
+- Added a local `registry/` blueprint directory and a formal package spec in `specs/registry-package-spec.md`
 
 ### Changed
 
@@ -71,6 +62,25 @@ Updated the PR #5 tooling to work with the current ontology structure (knowledge
   requiring them to be pre-defined in the core ontology - the MCP server resolves states at runtime
 - Updated README.md validation table to reflect relaxed state constraints (IRI required, not
   necessarily `oc:State` instance)
+- Refactored the MCP public API from many granular tools to 4 consolidated tools:
+  - `search_skills`
+  - `get_skill_context`
+  - `evaluate_execution_plan`
+  - `query_epistemic_rules`
+- Changed the MCP runtime to prefer the enabled index manifest when present, including the user-home layout under `~/.ontoskills/ontoskills/index.enabled.ttl`
+- Extended MCP responses with package-aware metadata:
+  - `qualified_id`
+  - `package_id`
+  - `trust_tier`
+  - `version`
+  - `source`
+  - `aliases`
+- Changed MCP skill resolution to accept both short ids like `xlsx` and qualified ids like `marea.office/xlsx`
+- Changed short-id conflict resolution to use precedence `local > verified > trusted > community`
+- Changed compiler relation serialization to use stable skill URI references instead of literal strings for `dependsOn`, `extends`, and `contradicts`
+- Changed compiler enrichment to infer parent inheritance deterministically from nested skill directory structure
+- Changed the import layout so raw source repos land in `skills/vendor/` and compiled imported packages land in `ontoskills/vendor/`
+- Changed the enable/disable system so local compiled skills are tracked through a synthetic `local` package in the registry lock
 
 ### Fixed
 
@@ -84,64 +94,18 @@ Updated the PR #5 tooling to work with the current ontology structure (knowledge
 - Fixed skill dependency serialization to use Literal strings instead of URIRef to prevent
   pySHACL from validating them as skill nodes
 - Fixed duplicate `skill_output_paths` entries when skills were skipped due to hash match
+- Fixed compiler-side skill inheritance so nested skills such as `xlsx`, `pdf`, `pptx`, and `docx` can inherit from parent skills like `office` after recompilation
+- Fixed imported/vendor ontology cleanup so registry system files and imported package trees are not deleted by local orphan cleanup
+- Fixed MCP ambiguity handling so exact qualified ids resolve deterministically and short ids pick the correct preferred skill when multiple packages export the same short id
 
 ## [0.5.0] - 2026-03-17
 
 ### Added
 
-#### Static Linter (`ontoskills lint`)
-
-Analyses the compiled ontology without calling the Anthropic API.
-Catches structural issues before they reach runtime or waste API tokens.
-
-- **core/linter.py** — `lint_ontology(ttl_path) → LintResult`
-  - `dead-state` (warning): skill requiresState X but no skill yieldsState X
-  - `circular-dep` (error): cycle detected in oc:dependsOn graph via DFS
-  - `duplicate-intent` (error): two skills resolve the same intent string
-  - `orphan-skill` (info): isolated skill with no dependents and unreachable states
-- **core/tests/test_linter.py** — 6 tests
-- **core/cli.py** — `lint` command: `--ontology`, `--format` (rich/json), `--errors-only`
-  - Exit code 1 when errors found (CI gate)
-
-#### Dependency Graph Visualiser (`ontoskills graph`)
-
-Exports the skill relationship graph as Mermaid or Graphviz DOT.
-
-- **core/graph_export.py** — `build_graph(ttl_path, fmt, skill_filter) → str`
-  - Covers oc:dependsOn (solid arrow), oc:extends (dashed), oc:contradicts (bidirectional)
-  - Deduplicates symmetric contradicts edges
-  - Optional 1-hop `skill_filter` for subgraph output
-- **core/tests/test_graph_export.py** — 7 tests
-- **core/cli.py** — `graph` command: `--ontology`, `--format` (mermaid/dot), `--skill`, `--output`
-
-#### Skill Explainer (`ontoskills explain <skill-id>`)
-
-Renders a Rich summary card for a compiled skill without reading raw Turtle.
-
-- **core/explainer.py** — `explain_skill(ttl_path, skill_id) → SkillSummary | None`
-  - Extracts: intents, requiresState, yieldsState, handlesFailure, dependsOn,
-    extends, contradicts, executor (from payload node), contentHash, generatedBy
-  - `list_skill_ids(ttl_path)` — lists all available skill IDs for autocomplete/error hints
-- **core/tests/test_explainer.py** — 9 tests
-- **core/cli.py** — `explain` command: positional `SKILL_ID`, `--ontology`
-  - Prints available IDs when skill not found
-
-#### Migration Guidance (`ontoskills diff --suggest`)
-
-Extends the Skill Drift Detector with actionable remediation for breaking changes.
-
-- **core/differ.py** — `MigrationSuggestion` dataclass + `DriftReport.suggestions()`
-  - `skill-removed`: SPARQL to find agents with oc:dependsOn pointing to removed skill
-  - `intent-renamed`: SPARQL to find callers of the old intent string
-  - `requirement-added`: SPARQL to find skills with the new oc:requires relationship
-- **core/drift_report.py** — `print_suggestions()` Rich-formatted output
-- **core/cli.py** — `--suggest` flag on `diff` command
-- **core/tests/test_differ.py** — 4 new suggestion tests
-- **core/tests/test_cli.py** — 1 new CLI test for `--suggest`
 #### Local MCP Server
 
 - Added a new **Rust-based local MCP server** under `mcp/`
-  - Loads compiled OntoSkills ontologies from `.ttl` files
+  - Loads compiled OntoClaw ontologies from `.ttl` files
   - Speaks MCP over `stdio`
   - Auto-discovers `ontoskills/` from the current directory and its parents
   - Can also be pointed at a custom ontology root with `--ontology-root`
@@ -199,55 +163,13 @@ Extends the Skill Drift Detector with actionable remediation for breaking change
 
 ## [0.4.0] - 2026-03-17
 
-### Added
-
-#### Skill Drift Detector (`ontoskills diff`)
-
-Semantic diffing system that compares two versions of the compiled ontology
-and classifies every change by its impact on agents querying the graph.
-
-- **core/snapshot.py** — Snapshot manager
-  - `save_snapshot(ttl_path)`: saves a timestamped, SHA-256-hashed copy of
-    `index.ttl` into `.ontoskills/snapshots/` after every successful compile
-  - `get_latest_snapshot()`: returns the second-to-last snapshot (baseline
-    for the next diff)
-  - `_prune_snapshots(keep=10)`: keeps only the 10 most recent snapshots
-
-- **core/differ.py** — Semantic diff engine
-  - `SkillChange` dataclass: `skill_id`, `change_type` (breaking / additive /
-    cosmetic), `category`, `description`, `old_value`, `new_value`
-  - `DriftReport` dataclass: aggregates changes with `has_breaking` and
-    `is_clean` properties
-  - `compute_diff(old_ttl, new_ttl)`: loads two RDF graphs and diffs them
-    across four semantic axes — intents, requiresState/yieldsState, oc:requires,
-    and skill presence
-  - Removed intent → breaking; added intent → additive
-  - Added oc:requires → breaking; removed oc:requires → additive
-  - Removed skill entirely → breaking; new skill → additive
-
-- **core/drift_report.py** — Report formatter
-  - `print_report()`: Rich-formatted terminal output with colour-coded panels
-    and summary table
-  - `export_json()`: serialises `DriftReport` to JSON for CI/CD pipelines
-
-- **core/cli.py** — `diff` command and compile hook
-  - New `diff` command with options: `--from`, `--to`, `--breaking-only`,
-    `--format` (rich/json/md), `--output`
-  - Exit code 9 on breaking changes (pipeline gate)
-  - `save_snapshot()` hook added to `compile`: every successful compile
-    automatically creates a snapshot
-
-- **core/exceptions.py** — `DriftDetectedError(SkillETLError)`, exit code 9
-
-- **core/tests/test_differ.py** — 5 unit tests for the differ module
-- **core/tests/test_cli.py** — 6 CLI tests for the `diff` command
 ### Breaking Changes
 
 #### Output Filename Change
 
 - **`skill.ttl` → `ontoskill.ttl`** - Output skill modules are now named `ontoskill.ttl` instead of `skill.ttl`
   - Affects all path references in code and tests
-  - Run `ontoskills compile --force` after upgrading to regenerate modules with new naming
+  - Run `ontoclaw compile --force` after upgrading to regenerate modules with new naming
 
 ### Changed
 
@@ -268,7 +190,7 @@ The compiler now acts as a **Semantic Bundler** - the output directory (`ontoski
   - `*.ttl` → `*.md` mapping (auxiliary markdown)
   - Direct asset mapping (non-ttl files map to same path)
 - **`SYSTEM_FILES` safeguard** - Protects compiler-generated files from cleanup:
-  - `ontoskills-core.ttl` - Core TBox ontology
+  - `ontoclaw-core.ttl` - Core TBox ontology
   - `index.ttl` - Manifest with owl:imports
 
 ### Removed
@@ -336,7 +258,7 @@ The monolithic `loader.py` (855 lines) has been refactored into 3 focused module
 
 - **`--force` flag** for `compile` command - Bypass hash-based caching to force recompilation of all skills
   - Useful when SHACL schemas or LLM prompts are updated
-  - Usage: `ontoskills compile --force` or `ontoskills compile -f`
+  - Usage: `ontoclaw compile --force` or `ontoclaw compile -f`
 
 #### Lifecycle Management
 
@@ -381,12 +303,12 @@ A constitutional validation layer that ensures every skill ontology is logically
 
 - **validator.py** - SHACL validation module
   - `ValidationResult` NamedTuple with `conforms`, `results_text`, `results_graph`
-  - `load_shacl_shapes()` - Loads constitutional shapes from `specs/ontoskills.shacl.ttl`
+  - `load_shacl_shapes()` - Loads constitutional shapes from `specs/ontoclaw.shacl.ttl`
   - `load_core_ontology()` - Loads TBox for `sh:class` validation (critical for state validation)
   - `validate_skill_graph()` - Validates RDF graph against SHACL shapes with RDFS inference
   - `validate_and_raise()` - Raises `OntologyValidationError` on failure
 
-- **specs/ontoskills.shacl.ttl** - Constitutional SHACL shapes
+- **specs/ontoclaw.shacl.ttl** - Constitutional SHACL shapes
   - `oc:SkillShape` - Base constraints for all skills
     - `resolvesIntent` minCount 1 (required)
     - `generatedBy` exactly 1 (required attestation)

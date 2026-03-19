@@ -1,5 +1,5 @@
 """
-OntoSkills Compiler CLI.
+Ontoclaw Compiler CLI.
 
 Click-based command-line interface for compiling skills
 to modular OWL 2 RDF/Turtle ontology.
@@ -24,6 +24,19 @@ from compiler.storage import (
     generate_index_manifest,
     clean_orphaned_files,
 )
+from compiler.registry import (
+    add_registry_source,
+    enable_skills,
+    disable_skills,
+    ensure_registry_layout,
+    enabled_index_path,
+    import_source_repository,
+    install_package_from_directory,
+    install_package_from_sources,
+    list_installed_packages,
+    list_registry_sources,
+    rebuild_registry_indexes,
+)
 from compiler.sparql import execute_sparql, format_results
 from compiler.exceptions import (
     SkillETLError,
@@ -37,7 +50,7 @@ from compiler.snapshot import save_snapshot, get_latest_snapshot
 from compiler.linter import lint_ontology, LintIssue
 from compiler.graph_export import build_graph
 from compiler.explainer import explain_skill, list_skill_ids
-from compiler.config import SKILLS_DIR, OUTPUT_DIR
+from compiler.config import SKILLS_DIR, OUTPUT_DIR, resolve_ontology_root
 
 # Get version from pyproject.toml (single source of truth)
 try:
@@ -101,12 +114,12 @@ def enrich_extracted_skill(extracted, skill_dir: Path, input_path: Path):
 
 
 @click.group()
-@click.version_option(version=__version__, prog_name="ontoskills")
+@click.version_option(version=__version__, prog_name="ontocore")
 @click.option('-v', '--verbose', is_flag=True, help='Enable debug logging')
 @click.option('-q', '--quiet', is_flag=True, help='Suppress progress output')
 @click.pass_context
 def cli(ctx, verbose, quiet):
-    """OntoSkills Compiler - Compile markdown skills to modular OWL 2 ontology."""
+    """Ontoclaw Compiler - Compile markdown skills to modular OWL 2 ontology."""
     setup_logging(verbose, quiet)
     ctx.ensure_object(dict)
     ctx.obj['verbose'] = verbose
@@ -140,7 +153,7 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
 
     Output structure:
       ontoskills/
-      ├── ontoskills-core.ttl
+      ├── ontoclaw-core.ttl
       ├── index.ttl
       └── <mirrored paths>/
           ├── ontoskill.ttl
@@ -152,9 +165,11 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
 
     input_path = Path(input_dir)
     output_path = Path(output_dir)
+    ontology_root = resolve_ontology_root(output_path)
+    ensure_registry_layout(ontology_root)
 
     # Ensure core ontology exists
-    core_path = output_path / "ontoskills-core.ttl"
+    core_path = ontology_root / "ontoclaw-core.ttl"
     if not core_path.exists():
         logger.info("Creating core ontology...")
         create_core_ontology(core_path)
@@ -326,8 +341,9 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
     all_skill_paths = list(output_path.rglob("ontoskill.ttl"))
 
     # Generate index manifest
-    index_path = output_path / "index.ttl"
-    generate_index_manifest(all_skill_paths, index_path, output_path)
+    index_path = ontology_root / "index.ttl"
+    generate_index_manifest(all_skill_paths, index_path, ontology_root)
+    rebuild_registry_indexes(ontology_root)
 
     # Summary output
     summary_parts = []
@@ -340,13 +356,9 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
 
     if summary_parts:
         console.print(f"\n[green]Processed {', '.join(summary_parts)} to {output_path}[/green]")
+        console.print(f"[green]Enabled index updated at {enabled_index_path(ontology_root)}[/green]")
     else:
         console.print(f"\n[yellow]No changes made[/yellow]")
-
-    index_ttl = output_path / "index.ttl"
-    if index_ttl.exists():
-        snap = save_snapshot(index_ttl)
-        console.print(f"[dim]Snapshot saved to {snap}[/dim]")
 
 
 @cli.command('init-core')
@@ -355,14 +367,14 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
 @click.option('-f', '--force', is_flag=True, help='Overwrite existing core ontology')
 @click.pass_context
 def init_core(ctx, output_dir, force):
-    """Initialize the core ontology (ontoskills-core.ttl).
+    """Initialize the core ontology (ontoclaw-core.ttl).
 
     Creates the foundational TBox with classes, properties, and predefined states.
     Safe to run multiple times - skips if file exists unless --force is used.
     """
     logger = logging.getLogger(__name__)
     output_path = Path(output_dir)
-    core_path = output_path / "ontoskills-core.ttl"
+    core_path = output_path / "ontoclaw-core.ttl"
 
     if core_path.exists() and not force:
         console.print(f"[yellow]Core ontology already exists at {core_path}[/yellow]")
@@ -375,7 +387,7 @@ def init_core(ctx, output_dir, force):
 
 @cli.command('query')
 @click.argument('query_string')
-@click.option('-o', '--ontology', 'ontology_file', default=OUTPUT_DIR + "/index.ttl",
+@click.option('-o', '--ontology', 'ontology_file', default=str(enabled_index_path(Path(resolve_ontology_root(OUTPUT_DIR)))),
               type=click.Path(exists=False), help='Ontology file or directory')
 @click.option('-f', '--format', 'output_format',
               type=click.Choice(['table', 'json', 'turtle']), default='table',
@@ -387,7 +399,7 @@ def query_cmd(ctx, query_string, ontology_file, output_format, verbose, quiet):
     """Execute SPARQL query against ontology.
 
     Example:
-        ontoskills query "SELECT ?s ?n WHERE { ?s oc:nature ?n }" -f json
+        ontoclaw query "SELECT ?s ?n WHERE { ?s oc:nature ?n }" -f json
     """
     setup_logging(verbose or ctx.obj.get('verbose', False), quiet or ctx.obj.get('quiet', False))
 
@@ -412,7 +424,7 @@ def query_cmd(ctx, query_string, ontology_file, output_format, verbose, quiet):
 
 
 @cli.command('list-skills')
-@click.option('-o', '--ontology', 'ontology_file', default=OUTPUT_DIR + "/index.ttl",
+@click.option('-o', '--ontology', 'ontology_file', default=str(enabled_index_path(Path(resolve_ontology_root(OUTPUT_DIR)))),
               type=click.Path(exists=False), help='Ontology file or directory')
 @click.option('-v', '--verbose', is_flag=True, help='Enable debug logging')
 @click.option('-q', '--quiet', is_flag=True, help='Suppress progress output')
@@ -452,6 +464,157 @@ def list_skills(ctx, ontology_file, verbose, quiet):
 
     except SPARQLError as e:
         console.print(f"[red]Query error: {e}[/red]")
+
+
+@cli.command('install-package')
+@click.argument('package_path', type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.option('--trust-tier', type=click.Choice(['verified', 'trusted', 'community']), default=None)
+@click.option('-o', '--ontology-root', 'ontology_root_arg', default=None, type=click.Path(path_type=Path))
+@click.pass_context
+def install_package_cmd(ctx, package_path, trust_tier, ontology_root_arg):
+    """Install a package manifest from a local directory into the global ontology root."""
+    setup_logging(ctx.obj.get('verbose', False), ctx.obj.get('quiet', False))
+    root = ontology_root_arg or Path(resolve_ontology_root(OUTPUT_DIR))
+    package = install_package_from_directory(package_path, root=root, trust_tier=trust_tier)
+    console.print(f"[green]Installed package {package.package_id}@{package.version}[/green]")
+    console.print(f"  Trust: {package.trust_tier}")
+    console.print(f"  Skills: {', '.join(skill.skill_id for skill in package.skills)}")
+    console.print(f"  Root: {package.install_root}")
+
+
+@cli.command('import-source-repo')
+@click.argument('repo_ref')
+@click.option('--package-id', default=None, help='Override the inferred package id')
+@click.option('--trust-tier', type=click.Choice(['verified', 'trusted', 'community']), default='community')
+@click.option('-o', '--ontology-root', 'ontology_root_arg', default=None, type=click.Path(path_type=Path))
+@click.pass_context
+def import_source_repo_cmd(ctx, repo_ref, package_id, trust_tier, ontology_root_arg):
+    """Clone/copy a source skill repository into skills/vendor and compile it into ontoskills/vendor."""
+    setup_logging(ctx.obj.get('verbose', False), ctx.obj.get('quiet', False))
+    root = ontology_root_arg or Path(resolve_ontology_root(OUTPUT_DIR))
+    package = import_source_repository(repo_ref, root=root, trust_tier=trust_tier, package_id=package_id)
+    console.print(f"[green]Imported source repository {package.package_id}[/green]")
+    console.print(f"  Trust: {package.trust_tier}")
+    console.print(f"  Source: {package.source}")
+    console.print(f"  Skills: {', '.join(skill.skill_id for skill in package.skills)}")
+    console.print("  Enabled skills: (none by default)")
+
+
+@cli.group('registry')
+def registry_group():
+    """Manage external registry sources."""
+
+
+@registry_group.command('add-source')
+@click.argument('name')
+@click.argument('index_url')
+@click.option('--trust-tier', type=click.Choice(['verified', 'trusted', 'community']), default='community')
+@click.option('-o', '--ontology-root', 'ontology_root_arg', default=None, type=click.Path(path_type=Path))
+@click.pass_context
+def registry_add_source_cmd(ctx, name, index_url, trust_tier, ontology_root_arg):
+    """Add or replace a configured registry source for compiled ontology packages."""
+    setup_logging(ctx.obj.get('verbose', False), ctx.obj.get('quiet', False))
+    root = ontology_root_arg or Path(resolve_ontology_root(OUTPUT_DIR))
+    sources = add_registry_source(name, index_url, root=root, trust_tier=trust_tier, source_kind="ontology")
+    console.print(f"[green]Configured registry source {name}[/green]")
+    console.print(f"  Index: {index_url}")
+    console.print(f"  Total sources: {len(sources.sources)}")
+
+
+@registry_group.command('list')
+@click.option('-o', '--ontology-root', 'ontology_root_arg', default=None, type=click.Path(path_type=Path))
+@click.pass_context
+def registry_list_cmd(ctx, ontology_root_arg):
+    """List configured registry sources."""
+    setup_logging(ctx.obj.get('verbose', False), ctx.obj.get('quiet', False))
+    root = ontology_root_arg or Path(resolve_ontology_root(OUTPUT_DIR))
+    sources = list_registry_sources(root=root)
+    if not sources.sources:
+        console.print("[yellow]No registry sources configured[/yellow]")
+        return
+
+    for source in sources.sources:
+        console.print(f"\n[bold]{source.name}[/bold] [{source.trust_tier}]")
+        console.print(f"  index: {source.index_url}")
+
+
+@cli.command('install')
+@click.argument('package_id')
+@click.option('-o', '--ontology-root', 'ontology_root_arg', default=None, type=click.Path(path_type=Path))
+@click.pass_context
+def install_cmd(ctx, package_id, ontology_root_arg):
+    """Install a compiled ontology package by id from configured registry sources."""
+    setup_logging(ctx.obj.get('verbose', False), ctx.obj.get('quiet', False))
+    root = ontology_root_arg or Path(resolve_ontology_root(OUTPUT_DIR))
+    package = install_package_from_sources(package_id, root=root)
+    console.print(f"[green]Installed package {package.package_id}@{package.version}[/green]")
+    console.print(f"  Trust: {package.trust_tier}")
+    console.print(f"  Skills: {', '.join(skill.skill_id for skill in package.skills)}")
+
+
+@cli.command('enable')
+@click.argument('package_id')
+@click.argument('skill_ids', nargs=-1)
+@click.option('-o', '--ontology-root', 'ontology_root_arg', default=None, type=click.Path(path_type=Path))
+@click.pass_context
+def enable_cmd(ctx, package_id, skill_ids, ontology_root_arg):
+    """Enable all skills in a package or selected skills only."""
+    setup_logging(ctx.obj.get('verbose', False), ctx.obj.get('quiet', False))
+    root = ontology_root_arg or Path(resolve_ontology_root(OUTPUT_DIR))
+    package = enable_skills(package_id, list(skill_ids) or None, root=root)
+    enabled = [skill.skill_id for skill in package.skills if skill.enabled]
+    console.print(f"[green]Enabled package {package.package_id}[/green]")
+    console.print(f"  Enabled skills: {', '.join(enabled) if enabled else '(none)'}")
+    console.print(f"  Index: {enabled_index_path(root)}")
+
+
+@cli.command('disable')
+@click.argument('package_id')
+@click.argument('skill_ids', nargs=-1)
+@click.option('-o', '--ontology-root', 'ontology_root_arg', default=None, type=click.Path(path_type=Path))
+@click.pass_context
+def disable_cmd(ctx, package_id, skill_ids, ontology_root_arg):
+    """Disable all skills in a package or selected skills only."""
+    setup_logging(ctx.obj.get('verbose', False), ctx.obj.get('quiet', False))
+    root = ontology_root_arg or Path(resolve_ontology_root(OUTPUT_DIR))
+    package = disable_skills(package_id, list(skill_ids) or None, root=root)
+    enabled = [skill.skill_id for skill in package.skills if skill.enabled]
+    console.print(f"[green]Disabled package {package.package_id}[/green]")
+    console.print(f"  Still enabled: {', '.join(enabled) if enabled else '(none)'}")
+    console.print(f"  Index: {enabled_index_path(root)}")
+
+
+@cli.command('list-installed')
+@click.option('-o', '--ontology-root', 'ontology_root_arg', default=None, type=click.Path(path_type=Path))
+@click.pass_context
+def list_installed_cmd(ctx, ontology_root_arg):
+    """List installed ontology packages and enabled skills."""
+    setup_logging(ctx.obj.get('verbose', False), ctx.obj.get('quiet', False))
+    root = ontology_root_arg or Path(resolve_ontology_root(OUTPUT_DIR))
+    lock = list_installed_packages(root=root)
+    if not lock.packages:
+        console.print("[yellow]No installed packages[/yellow]")
+        return
+
+    for package in lock.packages.values():
+        console.print(f"\n[bold]{package.package_id}[/bold] {package.version} [{package.trust_tier}]")
+        enabled = [skill.skill_id for skill in package.skills if skill.enabled]
+        disabled = [skill.skill_id for skill in package.skills if not skill.enabled]
+        console.print(f"  enabled: {', '.join(enabled) if enabled else '(none)'}")
+        console.print(f"  disabled: {', '.join(disabled) if disabled else '(none)'}")
+
+
+@cli.command('rebuild-index')
+@click.option('-o', '--ontology-root', 'ontology_root_arg', default=None, type=click.Path(path_type=Path))
+@click.pass_context
+def rebuild_index_cmd(ctx, ontology_root_arg):
+    """Rebuild installed/enabled indices for the global ontology root."""
+    setup_logging(ctx.obj.get('verbose', False), ctx.obj.get('quiet', False))
+    root = ontology_root_arg or Path(resolve_ontology_root(OUTPUT_DIR))
+    installed, enabled = rebuild_registry_indexes(root=root)
+    console.print(f"[green]Rebuilt indices[/green]")
+    console.print(f"  installed: {installed}")
+    console.print(f"  enabled: {enabled}")
 
 
 @cli.command('security-audit')
@@ -496,279 +659,6 @@ def security_audit(ctx, input_dir, verbose, quiet):
             issues_found += 1
 
     console.print(f"\n[bold]Audit complete:[/bold] {issues_found} issue(s) found")
-
-
-@cli.command('lint')
-@click.option(
-    '-o', '--ontology', 'ontology_file',
-    default=OUTPUT_DIR + '/index.ttl',
-    type=click.Path(exists=False),
-    help='Ontology file to lint (default: ./ontoskills/index.ttl)',
-)
-@click.option(
-    '--format', 'fmt',
-    default='rich',
-    type=click.Choice(['rich', 'json']),
-    help='Output format',
-)
-@click.option('--errors-only', is_flag=True, help='Show only errors, suppress warnings and info')
-@click.pass_context
-def lint_cmd(ctx, ontology_file, fmt, errors_only):
-    """Run static analysis on the compiled ontology.
-
-    Checks for four categories of structural issues without calling the LLM:
-
-    \b
-    dead-state       A skill requiresState X but no skill yieldsState X
-    circular-dep     A dependsOn B dependsOn ... dependsOn A  [error]
-    duplicate-intent Two skills resolve the same intent string  [error]
-    orphan-skill     Skill has no dependents and unreachable required states
-    """
-    import json as json_mod
-
-    ontology_path = Path(ontology_file)
-    if not ontology_path.exists():
-        console.print(f"[red]Ontology not found: {ontology_path}[/red]")
-        raise SystemExit(1)
-
-    result = lint_ontology(ontology_path)
-
-    if errors_only:
-        result.issues = result.errors
-
-    if fmt == 'json':
-        data = [
-            {
-                'severity': i.severity,
-                'code': i.code,
-                'skill_id': i.skill_id,
-                'message': i.message,
-                'detail': i.detail,
-            }
-            for i in result.issues
-        ]
-        console.print(json_mod.dumps(data, indent=2))
-    else:
-        _ICONS = {'error': '🔴', 'warning': '⚠️ ', 'info': '🔵'}
-        if result.is_clean:
-            from rich.panel import Panel
-            from rich import box
-            console.print(Panel('[bold green]✓ No issues found — ontology is clean[/]', box=box.ROUNDED))
-        else:
-            from rich.table import Table
-            from rich import box
-            t = Table(title='Lint Results', box=box.SIMPLE_HEAVY)
-            t.add_column('Severity', width=10)
-            t.add_column('Code', width=18)
-            t.add_column('Skill', width=22)
-            t.add_column('Message')
-            for issue in result.issues:
-                icon = _ICONS.get(issue.severity, '⚪')
-                t.add_row(f'{icon} {issue.severity}', issue.code, issue.skill_id, issue.message)
-            console.print(t)
-            console.print(
-                f'\nSummary: [red]{len(result.errors)} error(s)[/] | '
-                f'[yellow]{len(result.warnings)} warning(s)[/] | '
-                f'[blue]{len([i for i in result.issues if i.severity == "info"])} info[/]'
-            )
-
-    if result.has_errors:
-        raise SystemExit(1)
-
-
-@cli.command('explain')
-@click.argument('skill_id')
-@click.option(
-    '-o', '--ontology', 'ontology_file',
-    default=OUTPUT_DIR + '/index.ttl',
-    type=click.Path(exists=False),
-    help='Ontology file to read from (default: ./ontoskills/index.ttl)',
-)
-@click.pass_context
-def explain_cmd(ctx, skill_id, ontology_file):
-    """Show a human-readable summary card for a compiled skill.
-
-    \b
-    Example:
-      ontoskills explain create-pdf
-      ontoskills explain create-pdf -o ./ontoskills/index.ttl
-    """
-    from rich import box
-    from rich.panel import Panel
-    from rich.table import Table
-
-    ontology_path = Path(ontology_file)
-    if not ontology_path.exists():
-        console.print(f"[red]Ontology not found: {ontology_path}[/red]")
-        available = list_skill_ids(ontology_path) if ontology_path.exists() else []
-        if available:
-            console.print(f"[dim]Available skills: {', '.join(available)}[/dim]")
-        raise SystemExit(1)
-
-    summary = explain_skill(ontology_path, skill_id)
-
-    if summary is None:
-        console.print(f"[red]Skill '{skill_id}' not found in {ontology_path}[/red]")
-        available = list_skill_ids(ontology_path)
-        if available:
-            console.print(f"[dim]Available skills: {', '.join(available)}[/dim]")
-        raise SystemExit(1)
-
-    def _row(label, values):
-        return f"[bold]{label}[/bold]", ", ".join(values) if values else "[dim]—[/dim]"
-
-    t = Table(box=box.SIMPLE, show_header=False, padding=(0, 1))
-    t.add_column(style="cyan", width=18)
-    t.add_column()
-
-    t.add_row("Type",     f"[green]{summary.skill_type}[/green]")
-    t.add_row("Nature",   summary.nature or "[dim]—[/dim]")
-    t.add_row(*_row("Intents",         summary.intents))
-    t.add_row(*_row("Requires state",  summary.requires_states))
-    t.add_row(*_row("Yields state",    summary.yields_states))
-    t.add_row(*_row("Handles failure", summary.handles_failures))
-
-    # Show requirements
-    if summary.requirements:
-        req_strs = []
-        for req in summary.requirements:
-            opt_marker = " (optional)" if req.is_optional else ""
-            req_strs.append(f"{req.requirement_value}{opt_marker}")
-        t.add_row(*_row("Requirements", req_strs))
-
-    # Show knowledge nodes summary
-    if summary.knowledge_nodes:
-        kn_types = {}
-        for kn in summary.knowledge_nodes:
-            kn_types[kn.node_type] = kn_types.get(kn.node_type, 0) + 1
-        kn_strs = [f"{t} ({c})" for t, c in sorted(kn_types.items())]
-        t.add_row(*_row("Knowledge", kn_strs))
-
-    if summary.executor:
-        t.add_row("Executor",  f"[yellow]{summary.executor}[/yellow]")
-    if summary.content_hash:
-        t.add_row("Hash",      f"[dim]{summary.content_hash}[/dim]")
-    if summary.generated_by:
-        t.add_row("Generated by", f"[dim]{summary.generated_by}[/dim]")
-
-    console.print(Panel(t, title=f"[bold]{skill_id}[/bold]", box=box.ROUNDED))
-
-    # Print knowledge nodes in detail if present
-    if summary.knowledge_nodes:
-        kn_table = Table(title="Knowledge Nodes", box=box.SIMPLE)
-        kn_table.add_column("Type", style="cyan", width=16)
-        kn_table.add_column("Directive", width=50)
-        kn_table.add_column("Severity", width=8)
-
-        for kn in summary.knowledge_nodes:
-            severity = kn.severity_level or "—"
-            severity_style = {
-                "CRITICAL": "red",
-                "HIGH": "yellow",
-                "MEDIUM": "blue",
-                "LOW": "dim",
-            }.get(severity, "dim")
-
-            # Truncate directive for display
-            directive = kn.directive_content[:80] + "..." if len(kn.directive_content) > 80 else kn.directive_content
-
-            kn_table.add_row(
-                kn.node_type,
-                directive,
-                f"[{severity_style}]{severity}[/{severity_style}]"
-            )
-
-        console.print()
-        console.print(kn_table)
-
-
-@cli.command('graph')
-@click.option(
-    '-o', '--ontology', 'ontology_file',
-    default=OUTPUT_DIR + '/index.ttl',
-    type=click.Path(exists=False),
-    help='Ontology file to visualise (default: ./ontoskills/index.ttl)',
-)
-@click.option(
-    '--format', 'fmt',
-    default='mermaid',
-    type=click.Choice(['mermaid', 'dot']),
-    help='Output format (default: mermaid)',
-)
-@click.option('--skill', default=None, help='Show only this skill and its direct neighbours')
-@click.option('--output', default=None, help='Write output to file instead of stdout')
-@click.pass_context
-def graph_cmd(ctx, ontology_file, fmt, skill, output):
-    """Visualise the skill state transition graph.
-
-    Shows how skills connect through shared states:
-    - An edge from Skill A to Skill B means A yieldsState X and B requiresState X
-    - This visualizes the execution flow: A must complete before B can run
-
-    \b
-    Examples:
-      ontoskills graph                          # Mermaid to stdout
-      ontoskills graph --format dot             # DOT to stdout
-      ontoskills graph --skill create-pdf       # 1-hop subgraph
-      ontoskills graph --output graph.mmd       # save to file
-    """
-    ontology_path = Path(ontology_file)
-    if not ontology_path.exists():
-        console.print(f"[red]Ontology not found: {ontology_path}[/red]")
-        raise SystemExit(1)
-
-    src = build_graph(ontology_path, fmt=fmt, skill_filter=skill)
-
-    if output:
-        Path(output).write_text(src)
-        console.print(f"[green]Graph saved to {output}[/green]")
-    else:
-        console.print(src)
-
-
-@cli.command('diff')
-@click.option('--skill', default=None, help='Analyse only this specific skill')
-@click.option('--from', 'from_path', default=None, help='Previous .ttl snapshot path')
-@click.option('--to', 'to_path', default=None, help='Current .ttl ontology path')
-@click.option('--breaking-only', is_flag=True, help='Show only breaking changes (exit code 9 if found)')
-@click.option(
-    '--format', 'fmt',
-    default='rich',
-    type=click.Choice(['rich', 'json', 'md']),
-    help='Output format',
-)
-@click.option('--output', default=None, help='Output file path for JSON/MD format')
-@click.option('--suggest', is_flag=True, help='Show migration guidance for each breaking change')
-def diff_cmd(skill, from_path, to_path, breaking_only, fmt, output, suggest):
-    """Detect semantic drift between ontology versions.
-
-    Compares the current ontology against a previous snapshot and reports
-    changes classified by impact: breaking, additive, or cosmetic.
-
-    Exit code 9 if breaking changes are detected (useful for CI/CD pipelines).
-    """
-    if not to_path:
-        to_path = './ontoskills/index.ttl'
-    if not from_path:
-        snap = get_latest_snapshot()
-        if not snap:
-            raise click.ClickException(
-                'No snapshot found. Run compile first to create a snapshot.'
-            )
-        from_path = str(snap)
-
-    report = compute_diff(from_path, to_path)
-
-    if fmt == 'json':
-        out = output or 'drift-report.json'
-        export_json(report, out)
-    else:
-        print_report(report, breaking_only=breaking_only)
-        if suggest and report.has_breaking:
-            print_suggestions(report.suggestions())
-
-    if report.has_breaking:
-        raise SystemExit(9)
 
 
 def main():

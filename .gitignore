@@ -153,6 +153,7 @@ venv.bak/
 .ropeproject
 
 # mkdocs documentation
+/site
 
 # mypy
 .mypy_cache/
@@ -210,4 +211,6 @@ __marimo__/
 .planning/
 docs/superpowers/
 skills/
-ontoskills/docs/superpowers/
+ontoskills/
+node_modules/
+node_modules/
