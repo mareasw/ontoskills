@@ -1,7 +1,7 @@
 # specs/ontoskills.shacl.ttl
 
 @prefix sh: <http://www.w3.org/ns/shacl#> .
-@prefix oc: <https://ontoskills.marea.software/ontology#> .
+@prefix oc: <https://ontoskills.sh/ontology#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
@@ -11,7 +11,7 @@
 # ONTOLOGY HEADER
 # ============================================================================
 
-<https://ontoskills.marea.software/shacl>
+<http://ontoskills.sh/shacl>
     a owl:Ontology ;
     rdfs:label "OntoSkills SHACL Shapes" ;
     rdfs:comment "Constitutional constraints for OntoSkills skill ontology" ;

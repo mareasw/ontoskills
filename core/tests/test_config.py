@@ -16,7 +16,7 @@ def test_default_base_uri():
         import config
         importlib.reload(config)
 
-        assert config.BASE_URI == 'https://ontoskills.marea.software/ontology#'
+        assert config.BASE_URI == 'https://ontoskills.sh/ontology#'
 
 
 def test_custom_base_uri():

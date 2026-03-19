@@ -13,23 +13,23 @@ use serde::Serialize;
 use serde::Deserialize;
 use walkdir::WalkDir;
 
-const DEFAULT_BASE_URI: &str = "http://ontoskills.sh/ontology#";
+const DEFAULT_BASE_URI: &str = "https://ontoskills.sh/ontology#";
 const DEFAULT_LIMIT: usize = 25;
 const MAX_LIMIT: usize = 100;
 const DEFAULT_MAX_DEPTH: usize = 10;
 const MAX_SKILL_ID_LEN: usize = 64;
 
 const KNOWLEDGE_DIMENSIONS: &[&str] = &[
-    "http://ontoskills.sh/ontology#Observability",
-    "http://ontoskills.sh/ontology#ResilienceTactic",
-    "http://ontoskills.sh/ontology#ResourceProfile",
-    "http://ontoskills.sh/ontology#TrustMetric",
-    "http://ontoskills.sh/ontology#CognitiveBoundary",
-    "http://ontoskills.sh/ontology#ExecutionPhysics",
-    "http://ontoskills.sh/ontology#LifecycleHook",
-    "http://ontoskills.sh/ontology#NormativeRule",
-    "http://ontoskills.sh/ontology#SecurityGuardrail",
-    "http://ontoskills.sh/ontology#StrategicInsight",
+    "https://ontoskills.sh/ontology#Observability",
+    "https://ontoskills.sh/ontology#ResilienceTactic",
+    "https://ontoskills.sh/ontology#ResourceProfile",
+    "https://ontoskills.sh/ontology#TrustMetric",
+    "https://ontoskills.sh/ontology#CognitiveBoundary",
+    "https://ontoskills.sh/ontology#ExecutionPhysics",
+    "https://ontoskills.sh/ontology#LifecycleHook",
+    "https://ontoskills.sh/ontology#NormativeRule",
+    "https://ontoskills.sh/ontology#SecurityGuardrail",
+    "https://ontoskills.sh/ontology#StrategicInsight",
 ];
 
 #[derive(Debug)]
@@ -705,7 +705,7 @@ impl Catalog {
 
         let type_query = format!(
             r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
+            PREFIX oc: <https://ontoskills.sh/ontology#>
             SELECT ?type WHERE {{
                 <{skill_uri}> a ?type .
                 FILTER (?type IN (oc:ExecutableSkill, oc:DeclarativeSkill))
@@ -721,7 +721,7 @@ impl Catalog {
 
         let scalar_query = format!(
             r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
+            PREFIX oc: <https://ontoskills.sh/ontology#>
             PREFIX dcterms: <http://purl.org/dc/terms/>
             PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
             SELECT ?nature ?genus ?differentia ?generatedBy
@@ -773,7 +773,7 @@ impl Catalog {
         let skill_uri = record.uri.clone();
         let query = format!(
             r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
+            PREFIX oc: <https://ontoskills.sh/ontology#>
             SELECT ?executor ?code ?timeout
             WHERE {{
                 <{skill_uri}> oc:hasPayload ?payload .
@@ -855,7 +855,7 @@ impl Catalog {
 
         let query = format!(
             r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
+            PREFIX oc: <https://ontoskills.sh/ontology#>
             PREFIX dcterms: <http://purl.org/dc/terms/>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
             SELECT DISTINCT ?sourceSkillId ?node ?nodeType ?nodeLabel ?directiveContent ?rationale ?appliesToContext ?severityLevel ?dimension
@@ -1054,7 +1054,7 @@ impl Catalog {
     ) -> Result<Vec<RequirementInfo>, CatalogError> {
         let query = format!(
             r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
+            PREFIX oc: <https://ontoskills.sh/ontology#>
             SELECT ?req ?type ?value ?optional
             WHERE {{
                 <{skill_uri}> oc:hasRequirement ?req .
@@ -1085,7 +1085,7 @@ impl Catalog {
     ) -> Result<Vec<String>, CatalogError> {
         let query = format!(
             r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
+            PREFIX oc: <https://ontoskills.sh/ontology#>
             PREFIX dcterms: <http://purl.org/dc/terms/>
             SELECT ?target ?targetId
             WHERE {{
@@ -1114,7 +1114,7 @@ impl Catalog {
     ) -> Result<Vec<String>, CatalogError> {
         let query = format!(
             r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
+            PREFIX oc: <https://ontoskills.sh/ontology#>
             SELECT ?target
             WHERE {{
                 <{skill_uri}> {relation} ?target .
@@ -1137,7 +1137,7 @@ impl Catalog {
     ) -> Result<Vec<String>, CatalogError> {
         let query = format!(
             r#"
-            PREFIX oc: <http://ontoskills.sh/ontology#>
+            PREFIX oc: <https://ontoskills.sh/ontology#>
             SELECT ?value
             WHERE {{
                 <{skill_uri}> {predicate} ?value .
