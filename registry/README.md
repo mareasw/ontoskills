@@ -1,64 +1,84 @@
 # OntoSkillRegistry Blueprint
 
-This directory is the local blueprint for the official OntoSkillRegistry repo.
+This directory mirrors the structure of the official `OntoSkillRegistry` repository.
 
-It defines:
-- the registry index format
-- the package manifest format
-- the folder layout for official verified packages
+Use it as:
+- the source layout to publish in the registry repo
+- the reference for package manifests
+- the canonical example for compiled OntoSkill distribution
 
-The current compiler/runtime can already consume this model through:
-- `ontoskill registry add-source`
-- `ontoskill install`
-- `ontoskill import-source`
+The official registry is built into `ontoskill` by default. Users should not have to add it manually.
 
-## Layout
+`registry add-source` is only for additional registries maintained by third parties.
+
+## User Workflow
+
+For a normal end user, the registry flow is:
+
+```bash
+npx ontoskill search hello
+npx ontoskill install marea.greeting/hello
+npx ontoskill enable marea.greeting/hello
+```
+
+For a third-party registry:
+
+```bash
+npx ontoskill registry add-source acme https://example.com/index.json
+npx ontoskill search spreadsheet
+```
+
+For a raw source repository:
+
+```bash
+npx ontoskill import-source https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+```
+
+That source import flow:
+- clones or copies the repository into `~/.ontoskills/skills/vendor/<slug>`
+- discovers every `SKILL.md`
+- compiles the discovered skills locally
+- writes compiled output into `~/.ontoskills/ontoskills/vendor/<package_id>`
+- leaves imported skills disabled until explicitly enabled
+
+## Registry Repo Layout
 
 ```text
 registry/
   README.md
   index.json
   packages/
-    marea.office/
-      package.json
     marea.greeting/
       package.json
+      hello/
+        ontoskill.ttl
+    marea.office/
+      package.json
+      office/
+        ontoskill.ttl
+        public/
+          docx/ontoskill.ttl
+          pdf/ontoskill.ttl
+          pptx/ontoskill.ttl
+          xlsx/ontoskill.ttl
 ```
 
-## Package Kind
+## Package Model
 
-### Compiled ontology package
+Compiled registry packages contain prebuilt `.ttl` artifacts.
 
-Contains already compiled `.ttl` artifacts.
-
-Required fields:
+Required manifest fields:
 - `package_id`
 - `version`
 - `trust_tier`
 - `modules`
 - `skills`
 
-### Direct source repository import
-
-OntoClaw also supports importing a raw source repository directly from a local path or GitHub URL.
-
-Example:
-
-```bash
-ontoclaw import-source-repo https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
-```
-
-The importer:
-- clones or copies the repository
-- discovers every `SKILL.md`
-- compiles the discovered skills locally
-- stores the source under `skills/vendor/<slug>`
-- stores the compiled output under `ontoskills/vendor/<package_id>`
-- keeps imported skills disabled by default
+Each exported skill should be installable and activatable independently.
 
 ## Registry Index
 
-The registry index is a JSON document listing installable packages.
+The registry index is a static JSON file listing installable packages.
 
 ```json
 {
@@ -72,12 +92,7 @@ The registry index is a JSON document listing installable packages.
 }
 ```
 
-## Trust Tiers
-
-- `verified`
-- `trusted`
-- `community`
-- `local`
+This means the registry can be published as a plain GitHub repository plus raw file URLs. No custom backend is required for v1.
 
 ## Resolution Rules
 

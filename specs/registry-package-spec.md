@@ -1,6 +1,6 @@
 # Registry Package Spec
 
-This document defines the current compiled package format consumed by the OntoClaw registry pipeline.
+This document defines the current compiled package format consumed by the OntoSkill registry pipeline.
 
 ## Common Fields
 
@@ -70,7 +70,7 @@ The registry index is a JSON file listing installable packages.
 
 ## Direct Source Repository Import
 
-OntoClaw supports direct raw repository import outside the compiled registry.
+`ontoskill` supports direct raw repository import outside the compiled registry.
 
 Expected behavior:
 - accept a local path or GitHub URL

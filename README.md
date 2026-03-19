@@ -209,7 +209,6 @@ The classification is **automatic** - you don't specify it. If a skill has code 
 ```bash
 # Runtime-only install via npm/npx
 npx ontoskill install mcp
-npx ontoskill registry add-source official https://raw.githubusercontent.com/mareasoftware/OntoSkillRegistry/main/index.json
 npx ontoskill install marea.greeting/hello
 npx ontoskill enable marea.greeting/hello
 ```
@@ -298,16 +297,16 @@ ontoclaw list-skills
 # Run security audit
 ontoclaw security-audit
 
-# Configure registry sources
-npx ontoskill registry add-source official https://raw.githubusercontent.com/mareasoftware/OntoSkillRegistry/main/index.json
-npx ontoskill registry list
-
-# Search and install a remote compiled skill
+# Search and install a remote compiled skill from the built-in official registry
 npx ontoskill search hello
 npx ontoskill install marea.greeting/hello
 npx ontoskill enable marea.greeting/hello
 npx ontoskill list-installed
 npx ontoskill rebuild-index
+
+# Add an extra third-party registry only if needed
+npx ontoskill registry add-source acme https://example.com/index.json
+npx ontoskill registry list
 
 # Managed component installs
 npx ontoskill install mcp
@@ -359,7 +358,19 @@ Important runtime files:
 - **Registry packages** distribute compiled `.ttl` modules and are published from a static GitHub repo
 - **Source repositories** are imported directly from a path or Git URL; `ontoskill` clones/copies them into `~/.ontoskills/skills/vendor/`, discovers `SKILL.md`, and compiles them into `~/.ontoskills/ontoskills/vendor/`
 
-The official registry is built in by default. `registry add-source` is meant for additional registries maintained by other users or organizations.
+The official registry is built in by default. `registry add-source` is only needed for additional registries maintained by other users or organizations.
+
+### End-User Registry Flow
+
+For most users, the expected flow is:
+
+```bash
+npx ontoskill search hello
+npx ontoskill install marea.greeting/hello
+npx ontoskill enable marea.greeting/hello
+```
+
+No manual registry bootstrap is required for the official registry.
 
 ### Identity Model
 
