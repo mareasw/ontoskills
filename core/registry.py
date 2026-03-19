@@ -801,8 +801,9 @@ def install_package_from_sources(
 ) -> InstalledPackageState:
     source, package = resolve_package_from_sources(package_id, root=root)
     effective_trust = package.trust_tier or source.trust_tier
+    manifest_ref = _resolve_child_ref(source.index_url, package.manifest_url)
     return install_package_from_manifest_ref(
-        package.manifest_url,
+        manifest_ref,
         root=root,
         trust_tier=effective_trust,
         source_kind=package.source_kind or source.source_kind,

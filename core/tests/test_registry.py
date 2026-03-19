@@ -128,6 +128,64 @@ def test_registry_source_install_from_file_index(tmp_path):
     assert lock.packages["marea.office"].trust_tier == "verified"
 
 
+def test_registry_source_install_resolves_relative_manifest_url(tmp_path):
+    root = tmp_path / "ontoskills"
+    create_core_ontology(root / "ontoclaw-core.ttl")
+
+    registry_dir = tmp_path / "registry"
+    package_dir = registry_dir / "packages" / "marea.greeting"
+    package_dir.mkdir(parents=True, exist_ok=True)
+    (package_dir / "hello").mkdir(parents=True, exist_ok=True)
+    (package_dir / "hello" / "ontoskill.ttl").write_text(
+        """
+@prefix oc: <http://ontoclaw.marea.software/ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+oc:skill_hello a oc:Skill, oc:DeclarativeSkill ;
+    dcterms:identifier "hello" ;
+    oc:nature "Greeting" .
+""",
+        encoding="utf-8",
+    )
+    (package_dir / "package.json").write_text(
+        json.dumps(
+            {
+                "package_id": "marea.greeting",
+                "version": "0.1.0",
+                "trust_tier": "verified",
+                "modules": ["hello/ontoskill.ttl"],
+                "skills": [
+                    {"id": "hello", "path": "hello/ontoskill.ttl", "default_enabled": False},
+                ],
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    (registry_dir / "index.json").write_text(
+        json.dumps(
+            {
+                "packages": [
+                    {
+                        "package_id": "marea.greeting",
+                        "manifest_url": "./packages/marea.greeting/package.json",
+                        "trust_tier": "verified",
+                        "source_kind": "ontology",
+                    }
+                ]
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    add_registry_source("official", (registry_dir / "index.json").resolve().as_uri(), root=root, trust_tier="verified")
+    package = install_package_from_sources("marea.greeting", root=root)
+
+    assert package.package_id == "marea.greeting"
+    assert package.skills[0].skill_id == "hello"
+
+
 def test_import_source_package_compiles_and_stays_disabled(tmp_path):
     from unittest.mock import patch
 
