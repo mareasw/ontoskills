@@ -1,7 +1,8 @@
 [project]
 name = "ontoskills"
-version = "0.7.1"
+version = "0.7.2"
 description = "OntoSkills — Neuro-symbolic skill compiler. Compiles SKILL.md into validated OWL 2 ontologies."
+readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "click>=8.1.0",
