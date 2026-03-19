@@ -10,6 +10,11 @@ oxigraph = "0.5"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 walkdir = "2"
+# Embeddings support
+ort = { version = "2.0", features = ["load-dynamic"] }
+tokenizers = "0.19"
+ndarray = "0.15"
+anyhow = "1.0"
 
 [dev-dependencies]
 tempfile = "3"
