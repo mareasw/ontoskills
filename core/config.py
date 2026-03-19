@@ -18,7 +18,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 # Base URI for the ontology (can be customized via environment)
 BASE_URI = os.getenv(
     'ONTOSKILLS_BASE_URI',
-    'http://ontoskills.sh/ontology#'
+    'https://ontoskills.sh/ontology#'
 )
 
 # Directory paths (relative to project root by default)
