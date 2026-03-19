@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Changed the `ontoskill` product workflow so the official registry is built in by default and does not need manual `registry add-source` setup
+- Changed the `ontoskills` product workflow so the official registry is built in by default and does not need manual `registry add-source` setup
 - Updated the user documentation to clarify the runtime flow:
   - `search`
   - `install`
@@ -105,7 +105,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 #### Local MCP Server
 
 - Added a new **Rust-based local MCP server** under `mcp/`
-  - Loads compiled OntoClaw ontologies from `.ttl` files
+  - Loads compiled OntoSkills ontologies from `.ttl` files
   - Speaks MCP over `stdio`
   - Auto-discovers `ontoskills/` from the current directory and its parents
   - Can also be pointed at a custom ontology root with `--ontology-root`
@@ -169,7 +169,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **`skill.ttl` → `ontoskill.ttl`** - Output skill modules are now named `ontoskill.ttl` instead of `skill.ttl`
   - Affects all path references in code and tests
-  - Run `ontoclaw compile --force` after upgrading to regenerate modules with new naming
+  - Run `ontocore compile --force` after upgrading to regenerate modules with new naming
 
 ### Changed
 
@@ -190,7 +190,7 @@ The compiler now acts as a **Semantic Bundler** - the output directory (`ontoski
   - `*.ttl` → `*.md` mapping (auxiliary markdown)
   - Direct asset mapping (non-ttl files map to same path)
 - **`SYSTEM_FILES` safeguard** - Protects compiler-generated files from cleanup:
-  - `ontoclaw-core.ttl` - Core TBox ontology
+  - `ontoskills-core.ttl` - Core TBox ontology
   - `index.ttl` - Manifest with owl:imports
 
 ### Removed
@@ -258,7 +258,7 @@ The monolithic `loader.py` (855 lines) has been refactored into 3 focused module
 
 - **`--force` flag** for `compile` command - Bypass hash-based caching to force recompilation of all skills
   - Useful when SHACL schemas or LLM prompts are updated
-  - Usage: `ontoclaw compile --force` or `ontoclaw compile -f`
+  - Usage: `ontocore compile --force` or `ontocore compile -f`
 
 #### Lifecycle Management
 
@@ -303,12 +303,12 @@ A constitutional validation layer that ensures every skill ontology is logically
 
 - **validator.py** - SHACL validation module
   - `ValidationResult` NamedTuple with `conforms`, `results_text`, `results_graph`
-  - `load_shacl_shapes()` - Loads constitutional shapes from `specs/ontoclaw.shacl.ttl`
+  - `load_shacl_shapes()` - Loads constitutional shapes from `specs/ontoskills.shacl.ttl`
   - `load_core_ontology()` - Loads TBox for `sh:class` validation (critical for state validation)
   - `validate_skill_graph()` - Validates RDF graph against SHACL shapes with RDFS inference
   - `validate_and_raise()` - Raises `OntologyValidationError` on failure
 
-- **specs/ontoclaw.shacl.ttl** - Constitutional SHACL shapes
+- **specs/ontoskills.shacl.ttl** - Constitutional SHACL shapes
   - `oc:SkillShape` - Base constraints for all skills
     - `resolvesIntent` minCount 1 (required)
     - `generatedBy` exactly 1 (required attestation)
