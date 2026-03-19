@@ -1,0 +1,56 @@
+name: Release OntoMCP
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            asset: ontomcp-linux-x64
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            asset: ontomcp-linux-arm64
+          - os: macos-14
+            target: aarch64-apple-darwin
+            asset: ontomcp-darwin-arm64
+          - os: macos-13
+            target: x86_64-apple-darwin
+            asset: ontomcp-darwin-x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --manifest-path mcp/Cargo.toml --target ${{ matrix.target }}
+
+      - name: Package
+        run: |
+          mkdir -p dist/${{ matrix.asset }}
+          cp mcp/target/${{ matrix.target }}/release/ontoclaw-mcp dist/${{ matrix.asset }}/ontomcp
+          cp ontoskills/ontoclaw-core.ttl dist/${{ matrix.asset }}/ontoclaw-core.ttl
+          tar -czf dist/${{ matrix.asset }}.tar.gz -C dist/${{ matrix.asset }} .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: dist/${{ matrix.asset }}.tar.gz
+
+      - name: Upload release asset
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ matrix.asset }}.tar.gz

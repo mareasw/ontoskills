@@ -4,6 +4,7 @@
   "core_version": "0.5.0",
   "trust_tier": "verified",
   "source": "https://github.com/mareasoftware/ontostore",
+  "description": "Office document skills compiled for OntoMCP",
   "checksum": null,
   "modules": [
     "office/ontoskill.ttl",
@@ -17,31 +18,40 @@
       "id": "office",
       "path": "office/ontoskill.ttl",
       "default_enabled": false,
-      "aliases": ["office"]
+      "aliases": ["office"],
+      "description": "Base office semantics and shared knowledge"
     },
     {
       "id": "docx",
       "path": "office/public/docx/ontoskill.ttl",
       "default_enabled": false,
-      "aliases": ["word", "word-doc"]
+      "aliases": ["word", "word-doc"],
+      "description": "Word document skill",
+      "depends_on_skills": ["office"]
     },
     {
       "id": "pptx",
       "path": "office/public/pptx/ontoskill.ttl",
       "default_enabled": false,
-      "aliases": ["powerpoint", "slides"]
+      "aliases": ["powerpoint", "slides"],
+      "description": "Presentation skill",
+      "depends_on_skills": ["office"]
     },
     {
       "id": "xlsx",
       "path": "office/public/xlsx/ontoskill.ttl",
       "default_enabled": false,
-      "aliases": ["excel", "spreadsheet"]
+      "aliases": ["excel", "spreadsheet"],
+      "description": "Spreadsheet skill",
+      "depends_on_skills": ["office"]
     },
     {
       "id": "pdf",
       "path": "office/public/pdf/ontoskill.ttl",
       "default_enabled": false,
-      "aliases": ["pdf"]
+      "aliases": ["pdf"],
+      "description": "PDF handling skill",
+      "depends_on_skills": ["office"]
     }
   ]
 }

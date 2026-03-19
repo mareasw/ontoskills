@@ -8,9 +8,9 @@ It defines:
 - the folder layout for official verified packages
 
 The current compiler/runtime can already consume this model through:
-- `ontoclaw registry add-source`
-- `ontoclaw install`
-- `ontoclaw import-source-repo`
+- `ontoskill registry add-source`
+- `ontoskill install`
+- `ontoskill import-source`
 
 ## Layout
 
