@@ -43,7 +43,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `get_skill_context`
   - `evaluate_execution_plan`
   - `query_epistemic_rules`
-- Changed the MCP runtime to prefer `ontoskills/system/index.enabled.ttl` when present, so the server exposes only enabled skills by default
+- Changed the MCP runtime to prefer the enabled index manifest when present, including the user-home layout under `~/.ontoskills/ontoskills/index.enabled.ttl`
 - Extended MCP responses with package-aware metadata:
   - `qualified_id`
   - `package_id`

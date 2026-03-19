@@ -207,7 +207,27 @@ The classification is **automatic** - you don't specify it. If a skill has code 
 ## Installation
 
 ```bash
-# Clone repository
+# Runtime-only install via npm/npx
+npx ontoskill install mcp
+npx ontoskill registry add-source official https://raw.githubusercontent.com/mareasoftware/ontostore/main/index.json
+npx ontoskill install marea.greeting/hello
+npx ontoskill enable marea.greeting/hello
+```
+
+OntoSkill installs everything under:
+
+```text
+~/.ontoskills/
+  bin/
+  ontoskills/
+  skills/
+  state/
+  core/
+```
+
+For compiler development from source:
+
+```bash
 git clone https://github.com/marea-software/ontoclaw.git
 cd ontoclaw
 
@@ -279,23 +299,27 @@ ontoclaw list-skills
 ontoclaw security-audit
 
 # Configure registry sources
-ontoclaw registry add-source official ./registry/index.json --trust-tier verified
-ontoclaw registry list
+npx ontoskill registry add-source official https://raw.githubusercontent.com/mareasoftware/ontostore/main/index.json
+npx ontoskill registry list
 
-# Install compiled ontology package from registry
-ontoclaw install marea.office
+# Search and install a remote compiled skill
+npx ontoskill search hello
+npx ontoskill install marea.greeting/hello
+npx ontoskill enable marea.greeting/hello
+npx ontoskill list-installed
+npx ontoskill rebuild-index
 
-# Import a raw source repository directly from a local path or GitHub URL
-ontoclaw import-source-repo https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+# Managed component installs
+npx ontoskill install mcp
+npx ontoskill install core
+npx ontoskill update mcp
+npx ontoskill update core
 
-# Install a local compiled package directory
-ontoclaw install-package /path/to/package-dir
+# Import and compile a raw source repository
+npx ontoskill import-source https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
 
-# Activation and index rebuild
-ontoclaw enable marea.office xlsx
-ontoclaw disable marea.office xlsx
-ontoclaw list-installed
-ontoclaw rebuild-index
+# Full uninstall
+npx ontoskill uninstall --all
 ```
 
 ### Command Options
@@ -317,22 +341,23 @@ ontoclaw rebuild-index
 
 OntoClaw now supports a simplified registry and import model:
 
-- source skills live in `skills/`
-- imported source repositories are cloned into `skills/vendor/`
-- compiled imported packages live in `ontoskills/vendor/`
-- `ontoskills/system/` stores lockfiles and aggregated manifests
+- the user-facing product root is `~/.ontoskills/`
+- imported source repositories are cloned into `~/.ontoskills/skills/vendor/`
+- compiled imported packages live in `~/.ontoskills/ontoskills/vendor/`
+- runtime state lives in `~/.ontoskills/state/`
 
 Important runtime files:
 
-- `ontoskills/system/registry.lock.json`
-- `ontoskills/system/registry.sources.json`
-- `ontoskills/system/index.installed.ttl`
-- `ontoskills/system/index.enabled.ttl`
+- `~/.ontoskills/state/registry.lock.json`
+- `~/.ontoskills/state/registry.sources.json`
+- `~/.ontoskills/state/release.lock.json`
+- `~/.ontoskills/ontoskills/index.installed.ttl`
+- `~/.ontoskills/ontoskills/index.enabled.ttl`
 
 ### Package Types
 
-- **Registry packages** distribute compiled `.ttl` modules
-- **Source repositories** are imported directly from a path or Git URL; OntoClaw clones/copies them into `skills/vendor/`, discovers `SKILL.md`, and compiles them into `ontoskills/vendor/`
+- **Registry packages** distribute compiled `.ttl` modules and are published from a static GitHub repo
+- **Source repositories** are imported directly from a path or Git URL; `ontoskill` clones/copies them into `~/.ontoskills/skills/vendor/`, discovers `SKILL.md`, and compiles them into `~/.ontoskills/ontoskills/vendor/`
 
 ### Identity Model
 

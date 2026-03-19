@@ -1334,7 +1334,7 @@ struct RegistryLookupEntry {
 }
 
 fn load_registry_lookup(ontology_root: &Path) -> HashMap<String, RegistryLookupEntry> {
-    let path = ontology_root.join("system").join("registry.lock.json");
+    let path = state_registry_lock_path(ontology_root);
     let Ok(content) = std::fs::read_to_string(path) else {
         return HashMap::new();
     };
@@ -1364,6 +1364,16 @@ fn load_registry_lookup(ontology_root: &Path) -> HashMap<String, RegistryLookupE
         }
     }
     lookup
+}
+
+fn state_registry_lock_path(ontology_root: &Path) -> PathBuf {
+    if let Some(home_root) = ontology_root.parent() {
+        let state_path = home_root.join("state").join("registry.lock.json");
+        if state_path.exists() {
+            return state_path;
+        }
+    }
+    ontology_root.join("system").join("registry.lock.json")
 }
 
 fn collect_skill_records_from_file(
@@ -1442,7 +1452,7 @@ fn build_skill_record(
         .ok()
         .and_then(|path| path.components().next().map(|c| c.as_os_str().to_string_lossy().to_string()));
     let trust_tier = match rel.as_deref() {
-        Some("vendor") => "community",
+        Some("vendor") => "verified",
         _ => "local",
     }
     .to_string();

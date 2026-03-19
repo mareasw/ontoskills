@@ -1,0 +1,17 @@
+{
+  "name": "ontoskill",
+  "version": "0.1.0",
+  "description": "User-facing CLI for installing OntoMCP, OntoCore, and remote OntoSkills",
+  "license": "MIT",
+  "bin": {
+    "ontoskill": "bin/ontoskill.js"
+  },
+  "files": [
+    "bin/ontoskill.js",
+    "README.md"
+  ],
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  }
+}
