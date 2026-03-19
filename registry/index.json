@@ -7,6 +7,12 @@
       "source_kind": "ontology"
     },
     {
+      "package_id": "marea.greeting",
+      "manifest_url": "./packages/marea.greeting/package.json",
+      "trust_tier": "verified",
+      "source_kind": "ontology"
+    },
+    {
       "package_id": "skillssh.office",
       "manifest_url": "./packages/skillssh.office/package.json",
       "trust_tier": "community",
