@@ -215,9 +215,9 @@ oc:SkillB a oc:Skill ;
         '--breaking-only',
     ])
 
-    # No breaking changes, so exit 0 and no breaking section
+    # No breaking changes, so exit 0 and summary shows 0 breaking
     assert result.exit_code == 0
-    assert 'breaking' not in result.output.lower() or 'no drift' in result.output.lower()
+    assert '0 breaking' in result.output.lower()
 
 
 def test_diff_json_output(tmp_path):
