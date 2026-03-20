@@ -79,6 +79,12 @@ The server resolves ontology input in this order:
 
 ## Register In Claude Code
 
+Install the MCP server with the product CLI first:
+
+```bash
+ontoskills install mcp
+```
+
 Recommended command from the repository root:
 
 ```bash
@@ -139,18 +145,10 @@ Re-add it with a different ontology root if needed.
 
 Once connected, Claude Code can call tools exposed by OntoSkills, including:
 
-- `list_skills`
-- `find_skills_by_intent`
-- `get_skill`
-- `get_skill_requirements`
-- `get_skill_transitions`
-- `get_skill_dependencies`
-- `get_skill_conflicts`
-- `find_skills_yielding_state`
-- `find_skills_requiring_state`
-- `check_skill_applicability`
-- `plan_from_intent`
-- `get_skill_payload`
+- `search_skills`
+- `get_skill_context`
+- `evaluate_execution_plan`
+- `query_epistemic_rules`
 
 ## Important Behavior
 

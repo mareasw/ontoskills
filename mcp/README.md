@@ -111,7 +111,7 @@ If nothing is found locally, OntoMCP falls back to:
 ```bash
 --ontology-root /path/to/ontoskills
 # or
-ONTOCLAW_MCP_ONTOLOGY_ROOT=/path/to/ontoskills
+ONTOSKILLS_MCP_ONTOLOGY_ROOT=/path/to/ontoskills
 ```
 
 ---
@@ -133,6 +133,12 @@ cargo run --manifest-path mcp/Cargo.toml -- --ontology-root ./ontoskills
 ---
 
 ## Claude Code Integration
+
+Install the MCP server with the product CLI:
+
+```bash
+ontoskills install mcp
+```
 
 Register the MCP server:
 

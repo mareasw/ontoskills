@@ -1,6 +1,6 @@
-# OntoSkillRegistry Blueprint
+# OntoSkills Registry Blueprint
 
-This directory mirrors the structure of the official `OntoSkillRegistry` repository.
+This directory mirrors the structure of the official registry repository.
 
 Use it as:
 - the source layout to publish in the registry repo

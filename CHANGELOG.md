@@ -16,6 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Changed the `ontoskills` product workflow so the official registry is built in by default and does not need manual `registry add-source` setup
+- Renamed the user-facing CLI from `ontoskill` to `ontoskills`
+- Standardized the ontology namespace and SHACL namespace on `https://ontoskills.marea.software/`
 - Updated the user documentation to clarify the runtime flow:
   - `search`
   - `install`
