@@ -73,12 +73,21 @@ def test_custom_output_dir():
 
 def test_default_anthropic_model():
     """Verify default ANTHROPIC_MODEL when env var not set."""
+    # Must patch load_local_env BEFORE config module is loaded
+    # and remove env var to test the hardcoded default
+    import sys
+
+    # Remove cached modules to force fresh import
+    for mod in list(sys.modules.keys()):
+        if mod.startswith('config') or mod.startswith('compiler'):
+            del sys.modules[mod]
+
     with patch.dict(os.environ, {}, clear=False):
         os.environ.pop('ANTHROPIC_MODEL', None)
 
-        import importlib
-        import config
-        importlib.reload(config)
+        # Patch before any import happens
+        with patch('compiler.env.load_local_env'):
+            import config
 
         assert config.ANTHROPIC_MODEL == 'claude-opus-4-6'
 
@@ -97,12 +106,21 @@ def test_custom_anthropic_model():
 
 def test_default_security_model():
     """Verify default SECURITY_MODEL when env var not set."""
+    # Must patch load_local_env BEFORE config module is loaded
+    # and remove env var to test the hardcoded default
+    import sys
+
+    # Remove cached modules to force fresh import
+    for mod in list(sys.modules.keys()):
+        if mod.startswith('config') or mod.startswith('compiler'):
+            del sys.modules[mod]
+
     with patch.dict(os.environ, {}, clear=False):
         os.environ.pop('SECURITY_MODEL', None)
 
-        import importlib
-        import config
-        importlib.reload(config)
+        # Patch before any import happens
+        with patch('compiler.env.load_local_env'):
+            import config
 
         assert config.SECURITY_MODEL == 'claude-opus-4-6'
 

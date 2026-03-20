@@ -92,6 +92,18 @@ impl EmbeddingEngine {
             );
         }
 
+        // Warn about additional inputs that will use defaults (e.g., token_type_ids)
+        let optional_inputs: Vec<&String> = input_names
+            .iter()
+            .filter(|n| !["input_ids", "attention_mask"].contains(&n.as_str()))
+            .collect();
+        if !optional_inputs.is_empty() {
+            eprintln!(
+                "Warning: Model has additional inputs {:?} that will receive default values (zeros)",
+                optional_inputs
+            );
+        }
+
         // Load tokenizer
         let tokenizer_path = embeddings_path(embeddings_dir, "tokenizer.json");
         if !tokenizer_path.exists() {
@@ -122,7 +134,8 @@ impl EmbeddingEngine {
                     dimension
                 );
             }
-            let emb = Array1::from_vec(entry.embedding);
+            // Normalize embedding for cosine similarity (in case intents.json wasn't normalized)
+            let emb = normalize_embedding(&Array1::from_vec(entry.embedding));
             intents.push((entry.intent, emb, entry.skills));
         }
 
@@ -179,15 +192,48 @@ impl EmbeddingEngine {
         let attention_mask_idx = self.find_input_index("attention_mask")
             .ok_or_else(|| anyhow::anyhow!("Model missing 'attention_mask' input"))?;
 
-        // Run inference with named inputs (using correct indices)
-        let outputs = self
-            .session
-            .run(ort::inputs![
-                &self.input_names[input_ids_idx] => input_ids_tensor,
-                &self.input_names[attention_mask_idx] => attention_mask_tensor,
-            ])
-            .map_err(|e| anyhow::anyhow!("ONNX inference failed: {}", e))?;
+        // Check if model requires token_type_ids (common for BERT-like models)
+        let has_token_type_ids = self.input_names.iter().any(|n| n == "token_type_ids");
 
+        if has_token_type_ids {
+            // Create zeros tensor for token_type_ids (single sequence, all tokens are type 0)
+            let token_type_ids_array: Array2<i64> = Array2::zeros((1, seq_len));
+            let token_type_ids_tensor = TensorRef::from_array_view(&token_type_ids_array)
+                .map_err(|e| anyhow::anyhow!("Failed to create token_type_ids tensor: {}", e))?;
+            let token_type_ids_idx = self.find_input_index("token_type_ids")
+                .ok_or_else(|| anyhow::anyhow!("Model missing 'token_type_ids' input"))?;
+
+            // Run inference with token_type_ids
+            let outputs = self
+                .session
+                .run(ort::inputs![
+                    &self.input_names[input_ids_idx] => input_ids_tensor,
+                    &self.input_names[attention_mask_idx] => attention_mask_tensor,
+                    &self.input_names[token_type_ids_idx] => token_type_ids_tensor,
+                ])
+                .map_err(|e| anyhow::anyhow!("ONNX inference failed: {}", e))?;
+
+            Self::extract_embedding_from_outputs(self.dimension, outputs, attention_mask)
+        } else {
+            // Run inference with just input_ids and attention_mask
+            let outputs = self
+                .session
+                .run(ort::inputs![
+                    &self.input_names[input_ids_idx] => input_ids_tensor,
+                    &self.input_names[attention_mask_idx] => attention_mask_tensor,
+                ])
+                .map_err(|e| anyhow::anyhow!("ONNX inference failed: {}", e))?;
+
+            Self::extract_embedding_from_outputs(self.dimension, outputs, attention_mask)
+        }
+    }
+
+    /// Extract embedding from ONNX outputs.
+    fn extract_embedding_from_outputs(
+        dimension: usize,
+        outputs: ort::session::SessionOutputs,
+        attention_mask: &[i64],
+    ) -> Result<Array1<f32>> {
         // Extract embedding from first output
         let output = &outputs[0];
 
@@ -200,17 +246,25 @@ impl EmbeddingEngine {
         match shape.len() {
             // 2D output [batch, hidden_dim] - already pooled (e.g., some sentence-transformers exports)
             2 => {
-                let _batch = shape[0] as usize;
+                let batch = shape[0] as usize;
                 let hidden = shape[1] as usize;
 
-                if hidden != self.dimension {
+                if hidden != dimension {
                     anyhow::bail!(
                         "Model output dimension {} does not match expected embedding dimension {}",
-                        hidden, self.dimension
+                        hidden, dimension
                     );
                 }
 
-                // Reshape to 1D (take first batch)
+                // Validate batch size is 1 (we only process single queries)
+                if batch != 1 {
+                    anyhow::bail!(
+                        "Expected batch size 1 but got {}. This engine only supports single-query inference.",
+                        batch
+                    );
+                }
+
+                // Reshape to 1D (take first/only batch)
                 let embedding = Array1::from_vec(data.to_vec());
 
                 // Normalize for cosine similarity
@@ -227,7 +281,7 @@ impl EmbeddingEngine {
                     ndarray::ArrayBase::from_shape_vec((batch, seq, hidden), data.to_vec())?;
 
                 // Mean pooling: average over sequence dimension
-                let embedding = mean_pool_embedding(&tensor_3d, attention_mask, self.dimension)?;
+                let embedding = mean_pool_embedding(&tensor_3d, attention_mask, dimension)?;
 
                 // Normalize for cosine similarity
                 Ok(normalize_embedding(&embedding))
