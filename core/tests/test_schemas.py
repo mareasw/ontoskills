@@ -369,3 +369,31 @@ def test_knowledge_node_filtering_mixed_types():
         node_types = {kn.node_type for kn in skill.knowledge_nodes}
         assert "Standard" in node_types
         assert "AntiPattern" in node_types
+
+
+def test_knowledge_node_filtering_unsupported_types():
+    """Test that unsupported types (not dict, str, or KnowledgeNode) are discarded with warning."""
+    from compiler.schemas import ExtractedSkill
+    import warnings
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+
+        skill = ExtractedSkill(
+            id="test",
+            hash="abc",
+            nature="Test",
+            genus="Test",
+            differentia="test",
+            intents=["test"],
+            requirements=[],
+            generated_by="test",
+            knowledge_nodes=[123, None, ["list"]]  # int, None, list - all unsupported
+        )
+
+        # All should have been filtered out
+        assert len(skill.knowledge_nodes) == 0
+        # Should have raised warnings for each unsupported type
+        assert len(w) == 3
+        warning_messages = [str(warning.message) for warning in w]
+        assert any("unsupported type" in msg.lower() for msg in warning_messages)

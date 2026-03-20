@@ -150,7 +150,7 @@ class ExtractedSkill(BaseModel):
             # - Keep already constructed KnowledgeNode objects
             # - Parse string elements as JSON, then validate as dicts
             # - For dicts, require all fields with non-empty values
-            # - Log warning when discarding incomplete/invalid nodes
+            # - Emit warning via warnings.warn() when discarding incomplete/invalid nodes
             if 'knowledge_nodes' in data and isinstance(data['knowledge_nodes'], list):
                 required_fields = {'node_type', 'directive_content', 'applies_to_context', 'has_rationale'}
                 filtered_nodes = []
@@ -176,7 +176,7 @@ class ExtractedSkill(BaseModel):
                                 )
                         except json.JSONDecodeError:
                             warnings.warn(
-                                f"Knowledge node at index {i} is not valid JSON, discarding. Value: {node[:50]}..."
+                                f"Knowledge node at index {i} is not valid JSON, discarding. Length: {len(node)} characters."
                             )
                     elif isinstance(node, dict):
                         # Check if dict has all required fields with non-empty values
@@ -188,6 +188,10 @@ class ExtractedSkill(BaseModel):
                                 f"Missing or empty fields: {required_fields - set(k for k in required_fields if node.get(k))}"
                             )
                     # Skip other types (not KnowledgeNode, str, or dict)
+                    else:
+                        warnings.warn(
+                            f"Knowledge node at index {i} has unsupported type {type(node).__name__}, discarding."
+                        )
                 data['knowledge_nodes'] = filtered_nodes
 
         return data
