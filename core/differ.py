@@ -10,7 +10,7 @@ from typing import Literal
 
 from rdflib import Graph, Namespace, URIRef
 
-OC = Namespace('https://ontoskills.marea.software/ontology#')
+OC = Namespace('https://ontoskills.sh/ontology#')
 
 ChangeType = Literal['breaking', 'additive', 'cosmetic']
 

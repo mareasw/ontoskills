@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from rdflib import Graph, Namespace, Literal, RDF
 
-from embeddings.exporter import extract_intents_from_ontology, export_embeddings, MODEL_NAME, EMBEDDING_DIM
+from compiler.embeddings.exporter import extract_intents_from_ontology, export_embeddings, MODEL_NAME, EMBEDDING_DIM
 
 
 OC = Namespace("https://ontoskills.sh/ontology#")

@@ -11,7 +11,7 @@
 # ONTOLOGY HEADER
 # ============================================================================
 
-<http://ontoskills.sh/shacl>
+<https://ontoskills.sh/shacl>
     a owl:Ontology ;
     rdfs:label "OntoSkills SHACL Shapes" ;
     rdfs:comment "Constitutional constraints for OntoSkills skill ontology" ;

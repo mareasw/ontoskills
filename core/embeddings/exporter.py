@@ -117,13 +117,22 @@ def export_embeddings(
 
     if not unique_intents:
         print("No intents found in ontology")
+        intents_data = {
+            "model": MODEL_NAME,
+            "dimension": EMBEDDING_DIM,
+            "intents": [],
+        }
+        intents_path = output_dir / "intents.json"
+        with open(intents_path, "w") as f:
+            json.dump(intents_data, f)
+        print(f"Exported empty intent embeddings to {intents_path}")
         return
 
-    # Compute embeddings
+    # Compute embeddings (normalize for cosine similarity)
     intent_strings = [item["intent"] for item in unique_intents]
     print(f"Computing embeddings for {len(intent_strings)} intents...")
 
-    embeddings = model.encode(intent_strings, convert_to_numpy=True)
+    embeddings = model.encode(intent_strings, convert_to_numpy=True, normalize_embeddings=True)
 
     # Build output
     intents_data = {
