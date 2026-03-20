@@ -673,7 +673,14 @@ def export_embeddings_cmd(ctx, ontology_root: str | None, output_dir: str | None
     """
     setup_logging(ctx.obj.get('verbose', False), ctx.obj.get('quiet', False))
 
-    from compiler.embeddings.exporter import export_embeddings
+    try:
+        from compiler.embeddings.exporter import export_embeddings
+    except ImportError as e:
+        missing = str(e).split(": ")[-1].strip() if ": " in str(e) else "embeddings dependencies"
+        console.print(f"[red]Error: Missing {missing}[/red]")
+        console.print("[yellow]Install embeddings support with:[/yellow]")
+        console.print("  pip install ontoskills[embeddings]")
+        raise SystemExit(1)
 
     root = Path(ontology_root) if ontology_root else resolve_ontology_root(OUTPUT_DIR)
     out = Path(output_dir) if output_dir else (root / "system" / "embeddings")

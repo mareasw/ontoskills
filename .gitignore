@@ -217,3 +217,9 @@ node_modules/
 
 # ONNX test fixtures (large files)
 mcp/tests/fixtures/
+
+# Compiled ontology files (regenerate with: ontoskills compile)
+ontoskills/*/
+ontoskills/*.ttl
+ontoskills/system/
+!ontoskills/ontoskills-core.ttl

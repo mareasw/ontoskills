@@ -21,12 +21,6 @@ dependencies = [
     "rich>=13.0.0",
     "owlrl>=1.0.0",
     "pyshacl>=0.25.0",
-    # Embeddings support (required for semantic intent discovery)
-    "sentence-transformers>=2.2.0",
-    "transformers>=4.30.0",
-    "optimum>=1.12.0",
-    "onnx>=1.15.0",
-    "onnxruntime>=1.16.0",
 ]
 
 [project.optional-dependencies]
@@ -36,6 +30,14 @@ dev = [
     "pytest-timeout>=2.2.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
+]
+embeddings = [
+    # Required for semantic intent discovery (ontoskills export-embeddings)
+    "sentence-transformers>=2.2.0",
+    "transformers>=4.30.0",
+    "optimum>=1.12.0",
+    "onnx>=1.15.0",
+    "onnxruntime>=1.16.0",
 ]
 
 [project.scripts]
