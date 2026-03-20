@@ -33,7 +33,7 @@ site/
 ├── public/              # Static assets
 ├── src/
 │   ├── components/      # Landing-page UI
-│   ├── content/         # Starlight docs source
+│   ├── content/         # Starlight docs source (symlink to ../../docs)
 │   ├── layouts/         # Page layouts
 │   └── styles/          # Global styles
 └── astro.config.mjs     # Astro configuration
