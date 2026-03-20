@@ -187,3 +187,14 @@ def test_build_sub_skill_context_prompt():
     assert "setup" in context
     assert "dependsOn" in context or "depends_on" in context.lower()
 
+
+def test_tool_use_loop_signature_accepts_parent_context():
+    """Verify tool_use_loop accepts parent_context parameter."""
+    import inspect
+    from compiler.transformer import tool_use_loop
+
+    sig = inspect.signature(tool_use_loop)
+    params = list(sig.parameters.keys())
+
+    assert "parent_context" in params or "parent_skill_id" in params
+
