@@ -97,7 +97,7 @@ Every skill is extracted with:
 | **ontoskills** | CLI | ✅ Ready | User-facing installer and manager |
 | **OntoCore** | Python | ✅ Ready | Skill compiler for `SKILL.md` sources |
 | **OntoMCP** | Rust | ✅ Ready | MCP server with 4 consolidated semantic tools |
-| **OntoSkillRegistry** | GitHub repo | ✅ Ready | Official compiled skill registry |
+| **OntoSkills Registry** | GitHub repo | ✅ Ready | Official compiled skill registry |
 | `skills/` | Markdown | Input | Human-authored source skills |
 | `ontoskills/` | Turtle | Output | Compiled ontology artifacts |
 | `specs/` | Turtle | Constitution | SHACL shapes for validation |
@@ -129,5 +129,5 @@ Every skill is extracted with:
 ## Links
 
 - [GitHub Repository](https://github.com/mareasoftware/ontoskills)
-- [Official Registry](https://github.com/mareasoftware/OntoSkillRegistry)
+- [Official Registry](https://github.com/mareasoftware/ontoskills-registry)
 - [Philosophy](https://github.com/mareasoftware/ontoskills/blob/main/PHILOSOPHY.md)

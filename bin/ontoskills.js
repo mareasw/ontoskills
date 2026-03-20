@@ -31,7 +31,7 @@ const DEFAULT_REPOSITORY =
 const DEFAULT_REGISTRY_URL =
   process.env.ONTOSKILLS_REGISTRY_URL ||
   process.env.ONTOSKILL_REGISTRY_URL ||
-  "https://raw.githubusercontent.com/mareasoftware/OntoSkillRegistry/main/index.json";
+  "https://raw.githubusercontent.com/mareasoftware/ontoskills-registry/main/index.json";
 
 function log(message) {
   process.stdout.write(`${message}\n`);

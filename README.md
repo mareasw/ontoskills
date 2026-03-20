@@ -16,7 +16,7 @@
 <p align="center">
   <span style="color:#00bf63;font-weight:bold">OntoCore</span> •
   <span style="color:#2196F3;font-weight:bold">OntoMCP</span> •
-  <span style="color:#9333EA;font-weight:bold">OntoSkillRegistry</span> •
+  <span style="color:#9333EA;font-weight:bold">OntoSkills Registry</span> •
   <span style="color:#e91e63;font-weight:bold">ontoskills CLI</span>
 </p>
 
@@ -40,7 +40,7 @@ OntoSkills is a neuro-symbolic platform that turns `SKILL.md` sources into query
 flowchart LR
     CORE["OntoCore<br/>SKILL.md -> ontoskill.ttl"] --> COMPILED["OntoSkills<br/>compiled ontologies"]
     COMPILED --> MCP["OntoMCP<br/>local MCP runtime"]
-    REG["OntoSkillRegistry<br/>official compiled registry"] --> CLI["ontoskills<br/>CLI"]
+    REG["OntoSkills Registry<br/>official compiled registry"] --> CLI["ontoskills<br/>CLI"]
     CLI --> MCP
     CLI --> COMPILED
     CLI --> CORE
@@ -53,7 +53,7 @@ flowchart LR
 | `ontoskills` | User-facing CLI for installs, updates, registry operations, source imports, and managed local state |
 | `ontocore` | Compiler for turning `SKILL.md` sources into validated ontologies |
 | `ontomcp` | Local MCP server for semantic skill discovery, context retrieval, and planning |
-| `OntoSkillRegistry` | Official compiled skill registry, built in by default |
+| `OntoSkills Registry` | Official compiled skill registry, built in by default |
 
 ---
 
@@ -80,7 +80,7 @@ Raw skill files are hard to distribute, expensive to load, and ambiguous to quer
 OntoSkills turns skills into OWL 2 knowledge artifacts and serves them through a narrow runtime interface:
 
 - `OntoCore` compiles source skills
-- `OntoSkillRegistry` distributes compiled skills
+- `OntoSkills Registry` distributes compiled skills
 - `ontoskills` manages install/update/enable/disable flows
 - `OntoMCP` exposes the enabled ontology set to MCP clients
 
@@ -174,7 +174,7 @@ Current demo package:
 
 Registry repository:
 
-- [OntoSkillRegistry](https://github.com/mareasoftware/OntoSkillRegistry)
+- [ontoskills-registry](https://github.com/mareasoftware/ontoskills-registry)
 
 ### Third-party registries
 
@@ -253,5 +253,5 @@ specs/       SHACL and ontology constraints
 
 ## Related Links
 
-- [Official Registry Repo](https://github.com/mareasoftware/OntoSkillRegistry)
+- [Official Registry Repo](https://github.com/mareasoftware/ontoskills-registry)
 - [Project Site](https://ontoskills.marea.software)

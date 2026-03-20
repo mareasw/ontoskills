@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Added bootstrap and publication flow for the official `OntoSkillRegistry` repository
+- Added bootstrap and publication flow for the official `ontoskills-registry` repository
 - Added a first remote demo package `marea.greeting/hello` to validate end-to-end registry installs
 - Added a dedicated registry guide in `docs/registry.md`
 - Added a streamlined documentation layout with long-form guides under `docs/`
@@ -27,7 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Verified
 
-- Verified remote install and activation of `marea.greeting/hello` from the public `OntoSkillRegistry` repository
+- Verified remote install and activation of `marea.greeting/hello` from the public `ontoskills-registry` repository
 - Verified registry state generation under `~/.ontoskills/` for:
   - `registry.lock.json`
   - `index.installed.ttl`
