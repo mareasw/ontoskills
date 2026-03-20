@@ -182,7 +182,8 @@ def serialize_skill(
 def serialize_skill_to_module(
     skill: ExtractedSkill,
     output_path: Path,
-    output_base: Optional[Path] = None
+    output_base: Optional[Path] = None,
+    extends_parent: str | None = None
 ) -> None:
     """
     Serialize a skill to a standalone ontoskill.ttl module file.
@@ -194,6 +195,8 @@ def serialize_skill_to_module(
         skill: ExtractedSkill to serialize
         output_path: Path where ontoskill.ttl should be written
         output_base: Base output directory for core ontology lookup (default: OUTPUT_DIR)
+        extends_parent: Optional parent skill ID to inject as extends relationship
+                       (used for sub-skills to ensure deterministic extends)
     """
     oc = get_oc_namespace()
     g = Graph()
@@ -217,8 +220,8 @@ def serialize_skill_to_module(
     if core_ontology_path.exists():
         g.add((URIRef(BASE_URI.rstrip('#')), OWL.imports, URIRef(f"file://{core_ontology_path}")))
 
-    # Serialize the skill
-    serialize_skill(g, skill)
+    # Serialize the skill with optional extends injection
+    serialize_skill(g, skill, extends_parent=extends_parent)
 
     # VALIDATE BEFORE WRITE
     try:

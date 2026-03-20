@@ -364,3 +364,36 @@ def test_serialize_skill_with_extends_injection():
     extends_values = list(graph.objects(skill_uri, oc.extends))
     assert len(extends_values) == 1
     assert "brainstorming" in str(extends_values[0])
+
+
+def test_serialize_skill_to_module_with_extends(tmp_path):
+    """Test module serialization with extends injection."""
+    from compiler.serialization import serialize_skill_to_module
+    from compiler.schemas import ExtractedSkill
+
+    sub_skill = ExtractedSkill(
+        id="obra/superpowers/brainstorming/planning",
+        hash="abc123",
+        nature="Planning sub-skill",
+        genus="Methodology",
+        differentia="for brainstorming phases",
+        intents=["plan_ideas"],
+        requirements=[],
+        depends_on=[],
+        extends=[],
+        contradicts=[],
+        knowledge_nodes=[],
+        generated_by="claude-opus-4-6"
+    )
+
+    output_path = tmp_path / "output" / "brainstorming" / "planning.ttl"
+    serialize_skill_to_module(
+        sub_skill,
+        output_path,
+        extends_parent="obra/superpowers/brainstorming"
+    )
+
+    # Verify file exists and contains extends
+    content = output_path.read_text()
+    assert "oc:extends" in content
+    assert "brainstorming" in content
