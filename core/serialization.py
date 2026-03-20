@@ -56,13 +56,19 @@ def relation_uri_for_value(value: str) -> URIRef:
     return skill_uri_for_id(raw)
 
 
-def serialize_skill(graph: Graph, skill: ExtractedSkill) -> None:
+def serialize_skill(
+    graph: Graph,
+    skill: ExtractedSkill,
+    extends_parent: str | None = None
+) -> None:
     """
     Serialize a skill to RDF triples in the graph.
 
     Args:
         graph: RDF graph to add triples to
         skill: ExtractedSkill to serialize
+        extends_parent: Optional parent skill ID to inject as extends relationship
+                       (used for sub-skills to ensure deterministic extends)
     """
     oc = get_oc_namespace()
 
@@ -104,8 +110,17 @@ def serialize_skill(graph: Graph, skill: ExtractedSkill) -> None:
     for dep in skill.depends_on:
         graph.add((skill_uri, oc.dependsOn, relation_uri_for_value(dep)))
 
+    # Inject deterministic extends if provided (sub-skills)
+    if extends_parent:
+        parent_uri = skill_uri_for_id(extends_parent)
+        graph.add((skill_uri, oc.extends, parent_uri))
+
+    # Also include any LLM-extracted extends (for non-sub-skill cases)
     for ext in skill.extends:
-        graph.add((skill_uri, oc.extends, relation_uri_for_value(ext)))
+        ext_uri = relation_uri_for_value(ext)
+        # Avoid duplicate if already injected
+        if not extends_parent or str(ext_uri) != str(skill_uri_for_id(extends_parent)):
+            graph.add((skill_uri, oc.extends, ext_uri))
 
     for cont in skill.contradicts:
         graph.add((skill_uri, oc.contradicts, relation_uri_for_value(cont)))

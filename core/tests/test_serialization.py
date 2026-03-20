@@ -327,3 +327,40 @@ def test_skill_uri_for_qualified_id():
 
     # URI should contain the full qualified path with slashes preserved
     assert "obra/superpowers/brainstorming/planning" in uri_str
+
+
+def test_serialize_skill_with_extends_injection():
+    """Test that extends is injected for sub-skills."""
+    from compiler.serialization import serialize_skill
+    from compiler.schemas import ExtractedSkill
+    from rdflib import Graph
+
+    # Create a minimal sub-skill
+    sub_skill = ExtractedSkill(
+        id="obra/superpowers/brainstorming/planning",
+        hash="abc123",
+        nature="A planning sub-skill",
+        genus="Methodology",
+        differentia="for brainstorming",
+        intents=["plan_ideas"],
+        requirements=[],
+        depends_on=[],
+        extends=[],  # Empty - will be injected
+        contradicts=[],
+        knowledge_nodes=[]
+    )
+
+    graph = Graph()
+    serialize_skill(graph, sub_skill, extends_parent="obra/superpowers/brainstorming")
+
+    # Verify extends triple was added
+    from rdflib.namespace import RDF
+    from compiler.core_ontology import get_oc_namespace
+
+    oc = get_oc_namespace()
+    skill_uri = oc["obra/superpowers/brainstorming/planning"]
+
+    # Check that extends relationship exists
+    extends_values = list(graph.objects(skill_uri, oc.extends))
+    assert len(extends_values) == 1
+    assert "brainstorming" in str(extends_values[0])
