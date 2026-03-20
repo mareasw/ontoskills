@@ -3,7 +3,7 @@
 </h1>
 
 <p align="center">
-  <strong>The neuro-symbolic compiler for the <a href="https://ontoskills.marea.software">OntoSkills</a> platform.</strong>
+  <strong>The neuro-symbolic compiler for the <a href="https://ontoskills.sh">OntoSkills</a> platform.</strong>
 </p>
 
 <p align="center">

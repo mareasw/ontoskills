@@ -454,12 +454,15 @@ class TestExportEmbeddingsCLI:
         from cli import cli
 
         OC = Namespace("https://ontoskills.sh/ontology#")
+        DCTERMS = Namespace("http://purl.org/dc/terms/")
 
-        # Create test ontology
+        # Create test ontology using production format with dcterms:identifier
         g = Graph()
         g.bind("oc", OC)
-        skill = OC["test"]
+        g.bind("dcterms", DCTERMS)
+        skill = OC["skill_test"]
         g.add((skill, RDF.type, OC.Skill))
+        g.add((skill, DCTERMS.identifier, Literal("test")))  # Production format
         g.add((skill, OC.resolvesIntent, Literal("test_intent")))
 
         ontology_root = tmp_path / "ontoskills"

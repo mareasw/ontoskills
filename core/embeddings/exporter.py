@@ -8,12 +8,16 @@ from rdflib import Graph, Namespace
 
 
 OC = Namespace("https://ontoskills.sh/ontology#")
+DCTERMS = Namespace("http://purl.org/dc/terms/")
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 EMBEDDING_DIM = 384
 
 
 def extract_intents_from_ontology(ontology_path: Path) -> list[dict[str, Any]]:
     """Extract all intents and source their associated skills from ontology.
+
+    Uses dcterms:identifier for skill IDs (production format) rather than
+    URI fragments, ensuring compatibility with compiled ontologies.
 
     Args:
         ontology_path: Path to Turtle ontology file.
@@ -24,18 +28,26 @@ def extract_intents_from_ontology(ontology_path: Path) -> list[dict[str, Any]]:
     g = Graph()
     g.parse(ontology_path, format="turtle")
 
+    # Use dcterms:identifier for skill IDs (production format)
+    # Falls back to URI fragment if identifier is missing
     query = """
     PREFIX oc: <https://ontoskills.sh/ontology#>
+    PREFIX dcterms: <http://purl.org/dc/terms/>
 
-    SELECT ?skill ?intent
+    SELECT ?skill ?intent ?skillId
     WHERE {
         ?skill oc:resolvesIntent ?intent .
+        OPTIONAL { ?skill dcterms:identifier ?skillId }
     }
     """
 
     intent_to_skills: dict[str, list[str]] = {}
     for row in g.query(query):
-        skill_id = str(row.skill).split("#")[-1].split("/")[-1]
+        # Use dcterms:identifier if available, otherwise fall back to URI fragment
+        if row.skillId:
+            skill_id = str(row.skillId)
+        else:
+            skill_id = str(row.skill).split("#")[-1].split("/")[-1]
         intent = str(row.intent)
 
         if intent not in intent_to_skills:
@@ -58,31 +70,27 @@ def export_embeddings(
     Args:
         ontology_root: Root directory containing ontology TTL files.
         output_dir: Directory to write embedding artifacts.
+
+    Raises:
+        ImportError: If optimum is not available (required for ONNX export).
     """
     from sentence_transformers import SentenceTransformer
     from transformers import AutoTokenizer
+    from optimum.exporters.onnx import main_export
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Load model and export to ONNX
+    # 1. Load model and export to ONNX (required - no fallback)
     print(f"Loading model: {MODEL_NAME}")
     model = SentenceTransformer(MODEL_NAME)
 
-    # Export ONNX using optimum
-    try:
-        from optimum.onnxruntime import ORTModelForFeatureExtraction
-        from optimum.exporters.onnx import main_export
-
-        main_export(
-            MODEL_NAME,
-            output=output_dir,
-            task="feature-extraction",
-        )
-        print(f"Exported ONNX model to {output_dir}")
-    except ImportError:
-        # Fallback: export via sentence-transformers
-        model.save(str(output_dir / "model"))
-        print(f"Exported model to {output_dir / 'model'}")
+    print("Exporting ONNX model...")
+    main_export(
+        MODEL_NAME,
+        output=output_dir,
+        task="feature-extraction",
+    )
+    print(f"Exported ONNX model to {output_dir}")
 
     # 2. Export tokenizer
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)

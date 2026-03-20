@@ -141,7 +141,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 #### Local MCP Server
 
 - Added a new **Rust-based local MCP server** under `mcp/`
-  - Loads compiled OntoClaw ontologies from `.ttl` files
+  - Loads compiled OntoSkills ontologies from `.ttl` files
   - Speaks MCP over `stdio`
   - Auto-discovers `ontoskills/` from the current directory and its parents
   - Can also be pointed at a custom ontology root with `--ontology-root`

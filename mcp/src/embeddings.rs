@@ -4,7 +4,7 @@
 //! and perform semantic search via cosine similarity.
 
 use anyhow::Result;
-use ndarray::{s, Array1, Array2};
+use ndarray::{Array1, Array2};
 use ort::session::Session;
 use ort::value::TensorRef;
 use serde::{Deserialize, Serialize};
@@ -106,14 +106,21 @@ impl EmbeddingEngine {
             serde_json::from_str(&std::fs::read_to_string(&intents_path)?)?;
 
         let dimension = intents_file.dimension;
-        let intents: Vec<(String, Array1<f32>, Vec<String>)> = intents_file
-            .intents
-            .into_iter()
-            .map(|entry| {
-                let emb = Array1::from_vec(entry.embedding);
-                (entry.intent, emb, entry.skills)
-            })
-            .collect();
+        let mut intents: Vec<(String, Array1<f32>, Vec<String>)> = Vec::new();
+
+        for entry in intents_file.intents {
+            // Validate embedding dimension matches expected
+            if entry.embedding.len() != dimension {
+                anyhow::bail!(
+                    "Intent '{}' has embedding dimension {} but expected {}",
+                    entry.intent,
+                    entry.embedding.len(),
+                    dimension
+                );
+            }
+            let emb = Array1::from_vec(entry.embedding);
+            intents.push((entry.intent, emb, entry.skills));
+        }
 
         Ok(Self {
             session,
@@ -259,11 +266,21 @@ fn mean_pool_embedding(
     // tensor shape: [batch, seq_len, hidden_dim]
     let (_, seq_len, hidden_dim) = (tensor.shape()[0], tensor.shape()[1], tensor.shape()[2]);
 
+    // Validate dimension matches expected
+    if hidden_dim != dimension {
+        anyhow::bail!(
+            "Model output dimension {} does not match expected embedding dimension {}",
+            hidden_dim,
+            dimension
+        );
+    }
+
     let mut summed = Array1::zeros(hidden_dim);
     let mut count = 0.0f32;
 
     for i in 0..seq_len {
-        if attention_mask.get(i).copied().unwrap_or(1) == 1 {
+        // Default to 0 (exclude) if attention_mask is missing - padded tokens should be excluded
+        if attention_mask.get(i).copied().unwrap_or(0) == 1 {
             for j in 0..hidden_dim {
                 summed[j] += tensor[[0, i, j]];
             }
@@ -275,18 +292,7 @@ fn mean_pool_embedding(
         summed.mapv_inplace(|x| x / count);
     }
 
-    // Resize to expected dimension if needed
-    if hidden_dim != dimension {
-        // Truncate or pad to match expected dimension
-        let mut result = Array1::zeros(dimension);
-        let copy_len = hidden_dim.min(dimension);
-        result
-            .slice_mut(s![..copy_len])
-            .assign(&summed.slice(s![..copy_len]));
-        Ok(result)
-    } else {
-        Ok(summed)
-    }
+    Ok(summed)
 }
 
 /// L2 normalize embedding for cosine similarity.
