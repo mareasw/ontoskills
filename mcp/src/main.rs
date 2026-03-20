@@ -1,13 +1,18 @@
 mod catalog;
+mod embeddings;
+mod schema;
 
 use std::env;
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use catalog::{
     Catalog, CatalogError, EpistemicQueryParams, EvaluateExecutionPlanParams, SearchSkillsParams,
     SkillType,
 };
+use embeddings::{EmbeddingEngine, IntentMatch};
+use schema::get_schema_resource;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -34,6 +39,26 @@ enum WireMode {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ontology_root = parse_ontology_root();
     let catalog = Catalog::load(&ontology_root)?;
+
+    // Load embedding engine (optional - may not exist)
+    let embeddings_dir = ontology_root.join("system").join("embeddings");
+    let embedding_engine: Option<Arc<EmbeddingEngine>> =
+        if embeddings_dir.exists() {
+            match EmbeddingEngine::load(&embeddings_dir) {
+                Ok(engine) => {
+                    eprintln!("[ontoskills-mcp] Loaded embedding engine with {} intents",
+                        if engine.has_intents() { "some" } else { "no" });
+                    Some(Arc::new(engine))
+                }
+                Err(e) => {
+                    eprintln!("[ontoskills-mcp] Warning: Failed to load embeddings: {}", e);
+                    None
+                }
+            }
+        } else {
+            eprintln!("[ontoskills-mcp] No embeddings found at {:?}", embeddings_dir);
+            None
+        };
 
     let stdin = io::stdin();
     let stdout = io::stdout();
@@ -118,11 +143,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "resources/list" => {
                 ensure_initialized(&mut writer, wire_mode, &request, initialized)?;
+                let mut resources = vec![];
+                if embedding_engine.is_some() {
+                    resources.push(json!({
+                        "uri": "ontology://schema",
+                        "name": "Ontology Schema",
+                        "description": "Compact schema for querying the ontology",
+                        "mimeType": "application/json"
+                    }));
+                }
                 respond_ok(
                     &mut writer,
                     wire_mode,
                     request.id,
-                    json!({ "resources": [] }),
+                    json!({ "resources": resources }),
                 )?;
             }
             "resources/templates/list" => {
@@ -138,9 +172,51 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ensure_initialized(&mut writer, wire_mode, &request, initialized)?;
                 respond_ok(&mut writer, wire_mode, request.id, json!({ "prompts": [] }))?;
             }
+            "resources/read" => {
+                ensure_initialized(&mut writer, wire_mode, &request, initialized)?;
+                let uri = request.params
+                    .as_ref()
+                    .and_then(|p| p.get("uri"))
+                    .and_then(|u| u.as_str())
+                    .ok_or_else(|| "Missing uri parameter".to_string());
+
+                let uri = match uri {
+                    Ok(u) => u,
+                    Err(e) => {
+                        respond_error(&mut writer, wire_mode, request.id, -32602, &e)?;
+                        continue;
+                    }
+                };
+
+                match uri {
+                    "ontology://schema" => {
+                        respond_ok(
+                            &mut writer,
+                            wire_mode,
+                            request.id,
+                            json!({
+                                "contents": [{
+                                    "uri": uri,
+                                    "mimeType": "application/json",
+                                    "text": serde_json::to_string(&get_schema_resource()).unwrap()
+                                }]
+                            }),
+                        )?;
+                    }
+                    _ => {
+                        respond_error(
+                            &mut writer,
+                            wire_mode,
+                            request.id,
+                            -32602,
+                            &format!("Unknown resource: {}", uri),
+                        )?;
+                    }
+                }
+            }
             "tools/call" => {
                 ensure_initialized(&mut writer, wire_mode, &request, initialized)?;
-                let result = handle_tool_call(&catalog, request.params.unwrap_or(Value::Null));
+                let result = handle_tool_call(&catalog, embedding_engine.as_ref(), request.params.unwrap_or(Value::Null));
                 match result {
                     Ok(result) => respond_ok(&mut writer, wire_mode, request.id, result)?,
                     Err(err) => respond_error(&mut writer, wire_mode, request.id, -32602, &err)?,
@@ -237,7 +313,11 @@ fn ensure_initialized(
     Err("Server not initialized".into())
 }
 
-fn handle_tool_call(catalog: &Catalog, params: Value) -> Result<Value, String> {
+fn handle_tool_call(
+    catalog: &Catalog,
+    embedding_engine: Option<&Arc<EmbeddingEngine>>,
+    params: Value,
+) -> Result<Value, String> {
     let tool_name = params
         .get("name")
         .and_then(Value::as_str)
@@ -257,6 +337,32 @@ fn handle_tool_call(catalog: &Catalog, params: Value) -> Result<Value, String> {
                 limit: optional_usize(&arguments, "limit").unwrap_or(25),
             };
             json!(catalog.search_skills(params).map_err(public_error)?)
+        }
+        "search_intents" => {
+            let engine = embedding_engine
+                .ok_or_else(|| "Embeddings not available. Run 'ontoskills export-embeddings' first.".to_string())?;
+
+            let query = arguments
+                .get("query")
+                .and_then(Value::as_str)
+                .ok_or_else(|| "query required".to_string())?;
+            let top_k = arguments
+                .get("top_k")
+                .and_then(Value::as_u64)
+                .unwrap_or(5) as usize;
+
+            let matches = engine
+                .search(query, top_k)
+                .map_err(|e| format!("Search failed: {}", e))?;
+
+            json!({
+                "query": query,
+                "matches": matches.iter().map(|m| json!({
+                    "intent": m.intent,
+                    "score": m.score,
+                    "skills": m.skills
+                })).collect::<Vec<_>>()
+            })
         }
         "get_skill_context" => {
             let skill_id = required_string(&arguments, "skill_id")?;
@@ -495,6 +601,25 @@ fn tool_definitions() -> Vec<Value> {
                     "skill_type": { "type": "string", "enum": ["executable", "declarative"] },
                     "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
                 }
+            }),
+        ),
+        tool(
+            "search_intents",
+            "Search for intents semantically matching a natural language query. Returns top matches with similarity scores.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Natural language query (e.g., 'create a pdf document')"
+                    },
+                    "top_k": {
+                        "type": "integer",
+                        "description": "Number of results to return",
+                        "default": 5
+                    }
+                },
+                "required": ["query"]
             }),
         ),
         tool(

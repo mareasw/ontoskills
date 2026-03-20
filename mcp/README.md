@@ -67,9 +67,60 @@ flowchart LR
 | Tool | Purpose |
 |------|---------|
 | `search_skills` | Discover skills with optional filters for intent, required state, yielded state, and type |
+| `search_intents` | **(Optional)** Semantic search for intents via embeddings — returns matching intents with similarity scores |
 | `get_skill_context` | Return the complete execution context for a skill, including payload and knowledge nodes |
 | `evaluate_execution_plan` | Evaluate applicability and generate a plan for a target intent or skill |
 | `query_epistemic_rules` | Query normalized knowledge nodes across the ontology with guided filters |
+
+---
+
+## Semantic Intent Discovery
+
+When embeddings are exported via `ontoskills export-embeddings`, the MCP server provides:
+
+### MCP Tool: `search_intents`
+
+```json
+{
+  "name": "search_intents",
+  "arguments": {
+    "query": "create a pdf document",
+    "top_k": 5
+  }
+}
+```
+
+Returns matching intents with similarity scores:
+```json
+{
+  "query": "create a pdf document",
+  "matches": [
+    {"intent": "create_pdf", "score": 0.92, "skills": ["pdf"]},
+    {"intent": "export_document", "score": 0.78, "skills": ["pdf", "document-export"]}
+  ]
+}
+```
+
+### MCP Resource: `ontology://schema`
+
+A compact (~2KB) JSON schema describing available classes, properties, and example queries.
+
+```
+1. Agent reads ontology://schema → Knows all properties and conventions
+2. User: "I need to create a PDF"
+3. Agent calls: search_intents("create a pdf", top_k: 3)
+4. Agent queries: SELECT ?skill WHERE { ?skill oc:resolvesIntent "create_pdf" }
+5. Agent calls: get_skill_context("pdf")
+```
+
+### Performance Targets
+
+| Metric | Target |
+|--------|--------|
+| Schema resource size | < 4KB |
+| search_intents latency | < 50ms |
+| ONNX model size | < 50MB |
+| Memory footprint | < 100MB |
 
 `skill_id` fields accept:
 - short ids like `xlsx`
