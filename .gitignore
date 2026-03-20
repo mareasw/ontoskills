@@ -214,3 +214,6 @@ skills/
 ontoskills/
 node_modules/
 node_modules/
+
+# ONNX test fixtures (large files)
+mcp/tests/fixtures/
