@@ -92,15 +92,22 @@ impl EmbeddingEngine {
             );
         }
 
-        // Warn about additional inputs that will use defaults (e.g., token_type_ids)
-        let optional_inputs: Vec<&String> = input_names
+        // Warn about token_type_ids (supported with zeros) and fail on other extra inputs
+        let has_token_type_ids = input_names.iter().any(|n| n == "token_type_ids");
+        let unsupported_inputs: Vec<&String> = input_names
             .iter()
-            .filter(|n| !["input_ids", "attention_mask"].contains(&n.as_str()))
+            .filter(|n| !["input_ids", "attention_mask", "token_type_ids"].contains(&n.as_str()))
             .collect();
-        if !optional_inputs.is_empty() {
+
+        if has_token_type_ids {
             eprintln!(
-                "Warning: Model has additional inputs {:?} that will receive default values (zeros)",
-                optional_inputs
+                "Warning: Model requires 'token_type_ids' - will use zeros (single sequence)"
+            );
+        }
+        if !unsupported_inputs.is_empty() {
+            anyhow::bail!(
+                "Model has unsupported inputs {:?}. Only 'input_ids', 'attention_mask', and 'token_type_ids' are supported.",
+                unsupported_inputs
             );
         }
 
