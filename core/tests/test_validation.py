@@ -240,6 +240,8 @@ def test_knowledge_node_validation_with_all_required():
 
     # Create a valid KnowledgeNode
     kn_uri = oc["kn_test456"]
+    # Type as both KnowledgeNode and AntiPattern so KnowledgeNodeShape applies
+    g.add((kn_uri, RDF.type, oc.KnowledgeNode))
     g.add((kn_uri, RDF.type, oc.AntiPattern))
     g.add((kn_uri, oc.directiveContent, Literal("Never do X")))
     g.add((kn_uri, oc.appliesToContext, Literal("Always")))

@@ -49,7 +49,7 @@ class SeverityLevel(str, Enum):
     LOW = "LOW"
 
 
-# 30 concrete knowledge node types across 10 dimensions
+# 26 concrete knowledge node types across 10 dimensions
 KnowledgeNodeType = Literal[
     # Dimension 1: NormativeRule
     "Standard", "AntiPattern", "Constraint",
