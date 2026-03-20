@@ -97,3 +97,22 @@ def resolve_package_id(skill_dir: Path) -> str:
         current = current.parent
 
     return "local"
+
+
+def compute_sub_skill_hash(md_file: Path) -> str:
+    """
+    Compute a content hash for a single markdown file.
+
+    The hash is INDEPENDENT of the parent skill - only the file's
+    content is hashed. This enables efficient caching since inheritance
+    is resolved at runtime by the Reasoner/MCP.
+
+    Args:
+        md_file: Path to the .md file
+
+    Returns:
+        SHA-256 hexdigest string
+    """
+    hasher = hashlib.sha256()
+    hasher.update(md_file.read_bytes())
+    return hasher.hexdigest()

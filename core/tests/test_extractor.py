@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from compiler.extractor import generate_skill_id, generate_qualified_skill_id, compute_skill_hash, generate_sub_skill_id
+from compiler.extractor import generate_skill_id, generate_qualified_skill_id, compute_skill_hash, generate_sub_skill_id, compute_sub_skill_hash
 
 
 def test_generate_skill_id():
@@ -71,3 +71,27 @@ def test_resolve_package_id_with_toml_manifest(tmp_path):
 
     result = resolve_package_id(skill_dir)
     assert result == "obra/superpowers"
+
+
+def test_compute_sub_skill_hash(tmp_path):
+    md_file = tmp_path / "planning.md"
+    md_file.write_text("# Planning Sub-Skill\n\nContent here")
+
+    hash_val = compute_sub_skill_hash(md_file)
+    assert isinstance(hash_val, str)
+    assert len(hash_val) == 64
+
+
+def test_compute_sub_skill_hash_independence(tmp_path):
+    """Hash is independent of parent - only file content matters."""
+    md_file = tmp_path / "test.md"
+    md_file.write_text("same content")
+
+    hash1 = compute_sub_skill_hash(md_file)
+
+    # Same content, same hash
+    md_file2 = tmp_path / "test2.md"
+    md_file2.write_text("same content")
+    hash2 = compute_sub_skill_hash(md_file2)
+
+    assert hash1 == hash2
