@@ -1,33 +1,51 @@
 ---
 import Button from '../ui/Button.astro';
-import GraphBackground from './GraphBackground.astro';
+import CommandSnippet from '../ui/CommandSnippet.astro';
 ---
 
-<section class="relative overflow-hidden">
-  <!-- Animated Graph Background -->
-  <GraphBackground />
+<section class="border-b border-white/10">
+  <div class="section-shell py-16 sm:py-20 lg:py-24">
+    <div class="max-w-4xl">
+      <div class="mb-4 font-mono text-xs uppercase tracking-[0.28em] text-text-muted">
+        The OntoSkills directory
+      </div>
 
-  <!-- Content -->
-  <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32 text-center">
-    <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
-      <span class="text-text-primary">Skills become</span>
-      <br />
-      <span class="gradient-text">registry-backed knowledge</span>
-    </h1>
+      <h1 class="max-w-4xl text-5xl font-semibold leading-[0.98] tracking-[-0.05em] text-text-primary sm:text-6xl lg:text-7xl">
+        Install skills, enable them locally, and query them through MCP.
+      </h1>
 
-    <p class="text-lg sm:text-xl text-text-muted max-w-2xl mx-auto mb-8">
-      <span class="text-accent-cyan font-medium">OntoSkills</span> connects the official registry, the <code class="text-accent-aqua">ontoskills</code> CLI,
-      the <code class="text-accent-aqua">ontomcp</code> runtime, and the optional <code class="text-accent-aqua">ontocore</code> compiler.
-      Install, enable, and query deterministic skills instead of scraping files by hand.
-    </p>
+      <p class="mt-6 max-w-2xl text-lg leading-8 text-text-secondary">
+        OntoSkills is a minimal product surface for deterministic agent skills: one CLI, one local runtime, one
+        official registry, one optional compiler when you need custom source skills.
+      </p>
 
-    <div class="flex flex-col sm:flex-row gap-4 justify-center">
-      <Button href="/overview/" size="lg">
-        Get Started
-      </Button>
-      <Button href="https://github.com/mareasoftware/OntoSkillRegistry" variant="secondary" size="lg">
-        Browse Registry
-      </Button>
+      <div class="mt-8 max-w-3xl">
+        <CommandSnippet command="npx ontoskills install mcp" label="Try it now" />
+      </div>
+
+      <div class="mt-8 flex flex-col gap-4 sm:flex-row">
+        <Button href="/getting-started/" size="lg">
+          Install now
+        </Button>
+        <Button href="/explore/" variant="secondary" size="lg">
+          Browse skills
+        </Button>
+      </div>
+
+      <div class="mt-10 grid gap-4 border-t border-white/10 pt-6 sm:grid-cols-3">
+        <div>
+          <div class="font-mono text-xs uppercase tracking-[0.22em] text-text-muted">CLI</div>
+          <p class="mt-2 text-sm leading-6 text-text-secondary">`ontoskills` installs components, pulls registry skills, and manages local state.</p>
+        </div>
+        <div>
+          <div class="font-mono text-xs uppercase tracking-[0.22em] text-text-muted">Runtime</div>
+          <p class="mt-2 text-sm leading-6 text-text-secondary">`ontomcp` exposes enabled ontologies through a compact, package-aware tool surface.</p>
+        </div>
+        <div>
+          <div class="font-mono text-xs uppercase tracking-[0.22em] text-text-muted">Compiler</div>
+          <p class="mt-2 text-sm leading-6 text-text-secondary">`ontocore` remains optional for teams that author or import raw `SKILL.md` sources.</p>
+        </div>
+      </div>
     </div>
   </div>
 </section>
