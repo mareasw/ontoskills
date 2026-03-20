@@ -119,8 +119,8 @@ def export_embeddings(
         intent_map[intent].extend(item["skills"])
 
     unique_intents = [
-        {"intent": intent, "skills": list(set(skills))}
-        for intent, skills in intent_map.items()
+        {"intent": intent, "skills": sorted(set(skills))}
+        for intent, skills in sorted(intent_map.items())
     ]
 
     if not unique_intents:
