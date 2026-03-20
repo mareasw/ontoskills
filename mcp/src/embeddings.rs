@@ -81,34 +81,28 @@ impl EmbeddingEngine {
             .map(|i| i.name().to_string())
             .collect();
 
-        // Validate required inputs exist (by name, not position)
-        let has_input_ids = input_names.iter().any(|n| n == "input_ids");
-        let has_attention_mask = input_names.iter().any(|n| n == "attention_mask");
-
-        if !has_input_ids || !has_attention_mask {
-            anyhow::bail!(
-                "Model requires 'input_ids' and 'attention_mask' inputs, found: {:?}",
-                input_names
-            );
-        }
-
-        // Warn about token_type_ids (supported with zeros) and fail on other extra inputs
-        let has_token_type_ids = input_names.iter().any(|n| n == "token_type_ids");
-        let unsupported_inputs: Vec<&String> = input_names
-            .iter()
-            .filter(|n| !["input_ids", "attention_mask", "token_type_ids"].contains(&n.as_str()))
-            .collect();
-
-        if has_token_type_ids {
-            eprintln!(
-                "Warning: Model requires 'token_type_ids' - will use zeros (single sequence)"
-            );
-        }
-        if !unsupported_inputs.is_empty() {
-            anyhow::bail!(
-                "Model has unsupported inputs {:?}. Only 'input_ids', 'attention_mask', and 'token_type_ids' are supported.",
-                unsupported_inputs
-            );
+        // Validate model inputs using extracted helper
+        match validate_model_inputs(&input_names) {
+            InputValidation::Valid { has_token_type_ids } => {
+                if has_token_type_ids {
+                    eprintln!(
+                        "Warning: Model requires 'token_type_ids' - will use zeros (single sequence)"
+                    );
+                }
+            }
+            InputValidation::MissingRequired { missing } => {
+                anyhow::bail!(
+                    "Model requires 'input_ids' and 'attention_mask' inputs. Missing: {:?}, found: {:?}",
+                    missing,
+                    input_names
+                );
+            }
+            InputValidation::Unsupported { unsupported } => {
+                anyhow::bail!(
+                    "Model has unsupported inputs {:?}. Only 'input_ids', 'attention_mask', and 'token_type_ids' are supported.",
+                    unsupported
+                );
+            }
         }
 
         // Load tokenizer
@@ -391,9 +385,12 @@ fn mean_pool_embedding(
         }
     }
 
-    if count > 0.0 {
-        summed.mapv_inplace(|x| x / count);
+    if count == 0.0 {
+        anyhow::bail!(
+            "Attention mask contains all zeros - no valid tokens to pool. This usually indicates empty or malformed input."
+        );
     }
+    summed.mapv_inplace(|x| x / count);
 
     Ok(summed)
 }
@@ -418,6 +415,50 @@ fn embeddings_path(base: &Path, name: &str) -> std::path::PathBuf {
 
     // Fallback: look in model subdirectory (HuggingFace format)
     base.join("model").join(name)
+}
+
+/// Result of validating model input names.
+#[derive(Debug, PartialEq)]
+pub(crate) enum InputValidation {
+    /// Inputs are valid, with optional token_type_ids support
+    Valid { has_token_type_ids: bool },
+    /// Missing required inputs
+    MissingRequired { missing: Vec<String> },
+    /// Has unsupported inputs that will cause failure
+    Unsupported { unsupported: Vec<String> },
+}
+
+/// Validate model input names against supported inputs.
+/// This is a pure function for easy testing without ONNX fixtures.
+pub(crate) fn validate_model_inputs(input_names: &[String]) -> InputValidation {
+    let has_input_ids = input_names.iter().any(|n| n == "input_ids");
+    let has_attention_mask = input_names.iter().any(|n| n == "attention_mask");
+    let has_token_type_ids = input_names.iter().any(|n| n == "token_type_ids");
+
+    // Check for missing required inputs
+    let mut missing = Vec::new();
+    if !has_input_ids {
+        missing.push("input_ids".to_string());
+    }
+    if !has_attention_mask {
+        missing.push("attention_mask".to_string());
+    }
+    if !missing.is_empty() {
+        return InputValidation::MissingRequired { missing };
+    }
+
+    // Check for unsupported inputs
+    let unsupported: Vec<String> = input_names
+        .iter()
+        .filter(|n| !["input_ids", "attention_mask", "token_type_ids"].contains(&n.as_str()))
+        .cloned()
+        .collect();
+
+    if !unsupported.is_empty() {
+        return InputValidation::Unsupported { unsupported };
+    }
+
+    InputValidation::Valid { has_token_type_ids }
 }
 
 #[cfg(test)]
@@ -452,5 +493,82 @@ mod tests {
         let normalized = normalize_embedding(&emb);
         let norm: f32 = normalized.iter().map(|x| x * x).sum::<f32>().sqrt();
         assert!((norm - 1.0).abs() < 0.001);
+    }
+
+    // Tests for input validation (addresses Copilot review comment)
+    #[test]
+    fn test_validate_inputs_valid_minimal() {
+        let inputs = vec!["input_ids".to_string(), "attention_mask".to_string()];
+        let result = validate_model_inputs(&inputs);
+        assert_eq!(result, InputValidation::Valid { has_token_type_ids: false });
+    }
+
+    #[test]
+    fn test_validate_inputs_valid_with_token_type_ids() {
+        let inputs = vec![
+            "input_ids".to_string(),
+            "attention_mask".to_string(),
+            "token_type_ids".to_string(),
+        ];
+        let result = validate_model_inputs(&inputs);
+        assert_eq!(result, InputValidation::Valid { has_token_type_ids: true });
+    }
+
+    #[test]
+    fn test_validate_inputs_missing_input_ids() {
+        let inputs = vec!["attention_mask".to_string()];
+        let result = validate_model_inputs(&inputs);
+        assert_eq!(result, InputValidation::MissingRequired {
+            missing: vec!["input_ids".to_string()]
+        });
+    }
+
+    #[test]
+    fn test_validate_inputs_missing_attention_mask() {
+        let inputs = vec!["input_ids".to_string()];
+        let result = validate_model_inputs(&inputs);
+        assert_eq!(result, InputValidation::MissingRequired {
+            missing: vec!["attention_mask".to_string()]
+        });
+    }
+
+    #[test]
+    fn test_validate_inputs_missing_both_required() {
+        let inputs: Vec<String> = vec![];
+        let result = validate_model_inputs(&inputs);
+        assert_eq!(result, InputValidation::MissingRequired {
+            missing: vec!["input_ids".to_string(), "attention_mask".to_string()]
+        });
+    }
+
+    #[test]
+    fn test_validate_inputs_unsupported_position_ids() {
+        let inputs = vec![
+            "input_ids".to_string(),
+            "attention_mask".to_string(),
+            "position_ids".to_string(),
+        ];
+        let result = validate_model_inputs(&inputs);
+        assert_eq!(result, InputValidation::Unsupported {
+            unsupported: vec!["position_ids".to_string()]
+        });
+    }
+
+    #[test]
+    fn test_validate_inputs_unsupported_multiple() {
+        let inputs = vec![
+            "input_ids".to_string(),
+            "attention_mask".to_string(),
+            "position_ids".to_string(),
+            "token_type_embeddings".to_string(),
+        ];
+        let result = validate_model_inputs(&inputs);
+        match result {
+            InputValidation::Unsupported { unsupported } => {
+                assert!(unsupported.contains(&"position_ids".to_string()));
+                assert!(unsupported.contains(&"token_type_embeddings".to_string()));
+            }
+            _ => panic!("Expected Unsupported variant"),
+        }
     }
 }

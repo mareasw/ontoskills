@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import Any
 
 from rdflib import Graph, Namespace
+from rich.console import Console
+
+console = Console()
 
 
 OC = Namespace("https://ontoskills.sh/ontology#")
@@ -81,21 +84,21 @@ def export_embeddings(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Load model and export to ONNX (required - no fallback)
-    print(f"Loading model: {MODEL_NAME}")
+    console.print(f"[blue]Loading model:[/] {MODEL_NAME}")
     model = SentenceTransformer(MODEL_NAME)
 
-    print("Exporting ONNX model...")
+    console.print("[yellow]Exporting ONNX model...")
     main_export(
         MODEL_NAME,
         output=output_dir,
         task="feature-extraction",
     )
-    print(f"Exported ONNX model to {output_dir}")
+    console.print(f"[green]Exported ONNX model to[/] {output_dir}")
 
     # 2. Export tokenizer
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
     tokenizer.save_pretrained(str(output_dir))
-    print(f"Exported tokenizer to {output_dir}")
+    console.print(f"[green]Exported tokenizer to[/] {output_dir}")
 
     # 3. Extract and embed intents
     # Always scan all .ttl files to capture skills (index.ttl only has owl:imports)
@@ -117,7 +120,7 @@ def export_embeddings(
     ]
 
     if not unique_intents:
-        print("No intents found in ontology")
+        console.print("[yellow]No intents found in ontology")
         intents_data = {
             "model": MODEL_NAME,
             "dimension": EMBEDDING_DIM,
@@ -126,12 +129,12 @@ def export_embeddings(
         intents_path = output_dir / "intents.json"
         with open(intents_path, "w") as f:
             json.dump(intents_data, f)
-        print(f"Exported empty intent embeddings to {intents_path}")
+        console.print(f"[green]Exported empty intent embeddings to[/] {intents_path}")
         return
 
     # Compute embeddings (normalize for cosine similarity)
     intent_strings = [item["intent"] for item in unique_intents]
-    print(f"Computing embeddings for {len(intent_strings)} intents...")
+    console.print(f"[blue]Computing embeddings for[/] {len(intent_strings)} [blue]intents...")
 
     embeddings = model.encode(intent_strings, convert_to_numpy=True, normalize_embeddings=True)
 
@@ -153,4 +156,4 @@ def export_embeddings(
     with open(intents_path, "w") as f:
         json.dump(intents_data, f)
 
-    print(f"Exported {len(unique_intents)} intent embeddings to {intents_path}")
+    console.print(f"[green]Exported[/] {len(unique_intents)} [green]intent embeddings to[/] {intents_path}")
