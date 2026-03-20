@@ -1,4 +1,5 @@
 import json
+import warnings
 from enum import Enum
 from pydantic import BaseModel, field_validator, model_validator, computed_field
 from typing import Literal, Any
@@ -146,19 +147,47 @@ class ExtractedSkill(BaseModel):
                     pass
 
             # Filter out incomplete knowledge_nodes (LLM sometimes returns partial nodes)
-            # Only filter when nodes are dicts; leave KnowledgeNode objects as-is
+            # - Keep already constructed KnowledgeNode objects
+            # - Parse string elements as JSON, then validate as dicts
+            # - For dicts, require all fields with non-empty values
+            # - Log warning when discarding incomplete/invalid nodes
             if 'knowledge_nodes' in data and isinstance(data['knowledge_nodes'], list):
                 required_fields = {'node_type', 'directive_content', 'applies_to_context', 'has_rationale'}
                 filtered_nodes = []
-                for node in data['knowledge_nodes']:
+                for i, node in enumerate(data['knowledge_nodes']):
                     if isinstance(node, KnowledgeNode):
                         # Already a valid KnowledgeNode object, keep it
                         filtered_nodes.append(node)
+                    elif isinstance(node, str):
+                        # Try to parse string as JSON
+                        try:
+                            parsed = json.loads(node)
+                            if isinstance(parsed, dict):
+                                if required_fields.issubset(parsed.keys()) and all(parsed.get(f) for f in required_fields):
+                                    filtered_nodes.append(parsed)
+                                else:
+                                    warnings.warn(
+                                        f"Knowledge node at index {i} (parsed from string) is incomplete, discarding. "
+                                        f"Missing or empty fields: {required_fields - set(k for k in required_fields if parsed.get(k))}"
+                                    )
+                            else:
+                                warnings.warn(
+                                    f"Knowledge node at index {i} (parsed from string) is not a dict, discarding. Got: {type(parsed).__name__}"
+                                )
+                        except json.JSONDecodeError:
+                            warnings.warn(
+                                f"Knowledge node at index {i} is not valid JSON, discarding. Value: {node[:50]}..."
+                            )
                     elif isinstance(node, dict):
                         # Check if dict has all required fields with non-empty values
                         if required_fields.issubset(node.keys()) and all(node.get(f) for f in required_fields):
                             filtered_nodes.append(node)
-                    # Skip invalid/incomplete nodes
+                        else:
+                            warnings.warn(
+                                f"Knowledge node at index {i} is incomplete, discarding. "
+                                f"Missing or empty fields: {required_fields - set(k for k in required_fields if node.get(k))}"
+                            )
+                    # Skip other types (not KnowledgeNode, str, or dict)
                 data['knowledge_nodes'] = filtered_nodes
 
         return data
