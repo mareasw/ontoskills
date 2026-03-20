@@ -1,103 +1,138 @@
 ---
-title: Registry & Packages
-description: Package distribution and import for OntoSkills
+title: Registry
+description: Official registry, third-party registries, and package lifecycle in OntoSkills
 ---
 
-## Overview
+# Registry
 
-OntoSkills supports a simplified registry and import model:
+OntoSkills uses a simple distribution model:
 
-- User-facing product root: `~/.ontoskills/`
-- Imported source repositories: `~/.ontoskills/skills/vendor/`
-- Compiled imported packages: `~/.ontoskills/ontoskills/vendor/`
-- Runtime state: `~/.ontoskills/state/`
+- the official registry is built in by default
+- third-party registries can be added explicitly
+- raw source repositories are imported separately and compiled locally
 
-## Important Files
+The user-facing CLI is `ontoskills`.
 
-| File | Purpose |
-|------|---------|
-| `~/.ontoskills/state/registry.lock.json` | Installed packages manifest |
-| `~/.ontoskills/state/registry.sources.json` | Configured registry sources |
-| `~/.ontoskills/ontoskills/index.installed.ttl` | All installed skills |
-| `~/.ontoskills/ontoskills/index.enabled.ttl` | Enabled skills (runtime) |
+For a live searchable view of the official registry, use the dedicated marketplace page:
 
-## Package Types
+- [Open the live marketplace](/explore/)
 
-| Type | Description |
-|------|-------------|
-| **Registry packages** | Compiled `.ttl` modules from GitHub repo |
-| **Source repositories** | Raw `SKILL.md` files, compiled locally |
+## Registry Types
 
-## CLI Commands
+### Official Registry
+
+The official registry ships with the product. It does not need `registry add-source`.
+
+Use it when you want published packages maintained by the OntoSkills project:
 
 ```bash
-# Search the official registry
-ontoskills search hello
+npx ontoskills search hello
+npx ontoskills install marea.greeting/hello
+npx ontoskills enable marea.greeting/hello
+```
 
-# Install a package
-ontoskills install marea.greeting/hello
+### Third-Party Registries
 
-# Enable for runtime
-ontoskills enable marea.greeting/hello
+Third-party registries are opt-in. Add them when another team or community maintains a separate catalog:
 
-# List installed packages
-ontoskills list-installed
-
-# Rebuild indexes after manual changes
-ontoskills rebuild-index
-
-# Add third-party registry (optional)
+```bash
 ontoskills registry add-source acme https://example.com/index.json
 ontoskills registry list
 ```
 
-## End-User Flow
+These sources are discoverable by `ontoskills search` and can be installed like the official registry, but they are not built in.
 
-For most users, the expected flow is:
+### Raw Source Imports
+
+Raw source repositories contain `SKILL.md` files and are compiled locally.
 
 ```bash
-ontoskills search hello
-ontoskills install marea.greeting/hello
-ontoskills enable marea.greeting/hello
+ontoskills import-source-repo https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
 ```
 
-No manual registry setup is required — the official registry is built-in.
+Source imports are cloned into `~/.ontoskills/skills/vendor/` and compiled outputs are written to `~/.ontoskills/ontoskills/vendor/`.
 
-## Official Registry
+## Skill Lifecycle
 
-The official compiled skill registry is at:
-- `https://github.com/mareasoftware/ontoskills-registry`
+### Install
 
-First demo package:
-- `marea.greeting/hello`
-
-## Managed Installs
+Install compiled packages from a registry:
 
 ```bash
-# Install MCP server
-ontoskills install mcp
+ontoskills install marea.greeting/hello
+```
 
-# Install core compiler
-ontoskills install core
+### Enable and Disable
 
-# Update components
+Enable or disable installed skills:
+
+```bash
+ontoskills enable marea.greeting/hello
+ontoskills disable marea.greeting/hello
+```
+
+Enabled skills are the ones exposed to OntoMCP.
+
+### Update
+
+Update installed components explicitly:
+
+```bash
 ontoskills update mcp
 ontoskills update core
+ontoskills update marea.greeting/hello
 ```
 
-## Import Source Repositories
+### Rebuild Index
+
+Rebuild the local registry state and enabled index:
 
 ```bash
-# Import and compile a raw source repo
-ontoskills import-source https://github.com/user/skill-repo
+ontoskills rebuild-index
 ```
 
-## Identity Model
+### Remove
 
-| Format | Description |
-|-------|-------------|
-| Canonical | `package_id/skill_id` (e.g., `marea.office/xlsx`) |
-| Short ID | Just `xlsx` (resolves via precedence) |
+Remove a package or skill:
 
-Resolution precedence:
-1. `local` > `verified` > `trusted` > `community`
+```bash
+ontoskills remove marea.greeting/hello
+```
+
+### Uninstall Everything
+
+Remove the entire managed user home:
+
+```bash
+ontoskills uninstall --all
+```
+
+This removes the whole `~/.ontoskills/` tree, including installed binaries, compiled ontologies, locks, caches, and any managed compiler install.
+
+## Local Layout
+
+The managed home is organized like this:
+
+```text
+~/.ontoskills/
+  bin/
+  core/
+  ontoskills/
+  skills/
+  state/
+```
+
+- `bin/` stores managed binaries such as `ontomcp`
+- `core/` stores the managed compiler install, if present
+- `ontoskills/` stores compiled ontology artifacts
+- `skills/` stores imported source repositories
+- `state/` stores lockfiles, registry configuration, and cache metadata
+
+## Practical Rules
+
+- `install mcp` installs the runtime
+- `install core` installs the compiler
+- `install <qualified-skill-id>` installs a compiled package from a registry
+- `import-source-repo <repo>` clones and compiles a raw source repository
+- `enable` and `disable` control what OntoMCP sees
+- the official registry is built in, so it should not be added manually
