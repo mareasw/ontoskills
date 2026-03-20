@@ -27,6 +27,44 @@ load_local_env()
 # Configuration
 COMPLETION_TOOL = "extract_skill"
 
+
+def build_sub_skill_context_prompt(
+    filename: str,
+    parent_skill_id: str,
+    sibling_names: list[str] | None = None
+) -> str:
+    """
+    Build the context augmentation prompt for sub-skill extraction.
+
+    Args:
+        filename: The markdown filename being extracted (e.g., "planning.md")
+        parent_skill_id: The Qualified ID of the parent skill
+        sibling_names: List of sibling sub-skill filenames for dependsOn inference
+
+    Returns:
+        Context string to append to system prompt
+    """
+    sibling_list = ""
+    if sibling_names:
+        # Convert filenames to skill IDs for reference
+        sibling_ids = [Path(s).stem for s in sibling_names]
+        sibling_list = f"\n\nSibling sub-skills in this directory: {', '.join(sibling_ids)}\nUse these IDs when deriving dependsOn relationships."
+
+    return f"""
+## SUB-SKILL CONTEXT
+
+You are extracting a sub-skill from file "{filename}"
+that is part of the parent skill "{parent_skill_id}".
+
+Consider this context when:
+- Deriving dependsOn relationships with sibling sub-skills (use their simple IDs like "setup", "planning")
+- Determining appropriate intents (they may be more specific than the parent)
+- Understanding the scope of the sub-skill (it operates within the parent's epistemic perimeter)
+{sibling_list}
+
+DO NOT add an "extends" relationship - this will be injected automatically by the compiler.
+"""
+
 # Tool definitions
 TOOLS = [
     {

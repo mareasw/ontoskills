@@ -6,6 +6,7 @@ from compiler.transformer import (
     execute_tool,
     tool_use_loop,
     TOOLS,
+    build_sub_skill_context_prompt,
 )
 from compiler.config import MAX_ITERATIONS
 from compiler.schemas import ExtractedSkill, Requirement, ExecutionPayload
@@ -170,4 +171,19 @@ def test_tool_use_loop_sets_generated_by(mock_client, tmp_path):
 
     result = tool_use_loop(skill_dir, "abc123hash", "test-skill")
     assert result.generated_by == ANTHROPIC_MODEL
+
+
+def test_build_sub_skill_context_prompt():
+    """Test that context prompt includes parent and sibling info."""
+    context = build_sub_skill_context_prompt(
+        filename="planning.md",
+        parent_skill_id="obra/superpowers/brainstorming",
+        sibling_names=["review.md", "setup.md"]
+    )
+
+    assert "planning.md" in context
+    assert "obra/superpowers/brainstorming" in context
+    assert "review" in context
+    assert "setup" in context
+    assert "dependsOn" in context or "depends_on" in context.lower()
 
