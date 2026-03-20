@@ -166,7 +166,12 @@ def execute_tool(name: str, input_data: dict, skill_dir: Path) -> str:
         return json.dumps({"error": str(e)})
 
 
-def tool_use_loop(skill_dir: Path, skill_hash: str, skill_id: str) -> ExtractedSkill:
+def tool_use_loop(
+    skill_dir: Path,
+    skill_hash: str,
+    skill_id: str,
+    parent_context: dict | None = None
+) -> ExtractedSkill:
     """
     Orchestrates the tool-use conversation with Claude.
 
@@ -174,6 +179,10 @@ def tool_use_loop(skill_dir: Path, skill_hash: str, skill_id: str) -> ExtractedS
         skill_dir: Path to skill directory
         skill_hash: Pre-computed SHA-256 hash of skill files
         skill_id: Pre-computed skill ID slug
+        parent_context: Optional context for sub-skill extraction containing:
+            - filename: The markdown filename being extracted
+            - parent_skill_id: The Qualified ID of the parent skill
+            - sibling_names: List of sibling sub-skill filenames
 
     Returns:
         ExtractedSkill with structured data
@@ -181,6 +190,16 @@ def tool_use_loop(skill_dir: Path, skill_hash: str, skill_id: str) -> ExtractedS
     Raises:
         ExtractionError: If extraction fails or times out
     """
+    # Build system prompt with optional context augmentation
+    system_prompt = SYSTEM_PROMPT
+    if parent_context:
+        context_augmentation = build_sub_skill_context_prompt(
+            filename=parent_context.get("filename", "unknown.md"),
+            parent_skill_id=parent_context.get("parent_skill_id", ""),
+            sibling_names=parent_context.get("sibling_names")
+        )
+        system_prompt = SYSTEM_PROMPT + context_augmentation
+
     messages = [{
         "role": "user",
         "content": f"""Analyze the skill in this directory and extract its structure.
@@ -204,7 +223,7 @@ Use the available tools to:
                 max_tokens=8192,
                 tools=TOOLS,
                 messages=messages,
-                system=SYSTEM_PROMPT,
+                system=system_prompt,
                 timeout=EXTRACTION_TIMEOUT
             )
         except anthropic.APIError as e:
