@@ -98,17 +98,10 @@ def export_embeddings(
     print(f"Exported tokenizer to {output_dir}")
 
     # 3. Extract and embed intents
-    index_path = ontology_root / "index.enabled.ttl"
-    if not index_path.exists():
-        index_path = ontology_root / "index.ttl"
-
-    if not index_path.exists():
-        # Fallback: scan all .ttl files
-        all_intents = []
-        for ttl_file in ontology_root.rglob("*.ttl"):
-            all_intents.extend(extract_intents_from_ontology(ttl_file))
-    else:
-        all_intents = extract_intents_from_ontology(index_path)
+    # Always scan all .ttl files to capture skills (index.ttl only has owl:imports)
+    all_intents = []
+    for ttl_file in ontology_root.rglob("*.ttl"):
+        all_intents.extend(extract_intents_from_ontology(ttl_file))
 
     # Deduplicate intents
     intent_map: dict[str, list[str]] = {}
