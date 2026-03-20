@@ -180,7 +180,7 @@ async function syncLocalPackage(lock) {
 function ttlImports(importPaths) {
   const imports = importPaths.map((target) => `<file://${path.resolve(target)}>`);
   const joined = imports.join(",\n        ");
-  return `@prefix dcterms: <http://purl.org/dc/terms/> .\n@prefix owl: <http://www.w3.org/2002/07/owl#> .\n\n<http://ontoclaw.marea.software/ontology> a owl:Ontology ;\n    dcterms:created "${new Date().toISOString()}" ;\n    dcterms:description "Index manifest referencing compiled skill modules" ;\n    dcterms:title "OntoSkills Index" ;\n    owl:imports ${joined} .\n`;
+  return `@prefix dcterms: <http://purl.org/dc/terms/> .\n@prefix owl: <http://www.w3.org/2002/07/owl#> .\n\n<https://ontoskills.marea.software/ontology> a owl:Ontology ;\n    dcterms:created "${new Date().toISOString()}" ;\n    dcterms:description "Index manifest referencing compiled skill modules" ;\n    dcterms:title "OntoSkills Index" ;\n    owl:imports ${joined} .\n`;
 }
 
 async function rebuildIndexes() {
