@@ -12,6 +12,16 @@ def generate_skill_id(directory_name: str) -> str:
     return slug[:64]
 
 
+def generate_qualified_skill_id(package_id: str, skill_id: str) -> str:
+    """
+    Build a Qualified ID from package and skill components.
+
+    Format: {package_id}/{skill_id}
+    Example: obra/superpowers/brainstorming
+    """
+    return f"{package_id}/{skill_id}"
+
+
 def compute_skill_hash(skill_dir: Path) -> str:
     hasher = hashlib.sha256()
     files = sorted(
