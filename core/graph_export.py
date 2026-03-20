@@ -77,7 +77,8 @@ def _extract_graph(
     edges: list[tuple[str, str, str]] = []
 
     # Build mapping: skill URI -> display ID (prefer dcterms:identifier, fallback to URI fragment)
-    skills = list(g.subjects(OC.resolvesIntent))
+    # Deduplicate URIs (skills with multiple intents appear multiple times in g.subjects)
+    skills = list(dict.fromkeys(g.subjects(OC.resolvesIntent)))
     skill_uri_to_id: dict = {}
     for skill_uri in skills:
         display_id = g.value(skill_uri, DCTERMS.identifier)

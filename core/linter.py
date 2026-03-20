@@ -207,7 +207,8 @@ def _check_unreachable_skills(g: Graph) -> list[LintIssue]:
     - No requiresState (can run from cold start)
     - Has intents that suggest user-initiated actions (create, import, load, etc.)
     """
-    all_skill_uris = list(g.subjects(OC.resolvesIntent))
+    # Deduplicate URIs (skills with multiple intents appear multiple times in g.subjects)
+    all_skill_uris = list(dict.fromkeys(g.subjects(OC.resolvesIntent)))
 
     # All states that can be produced
     all_yielded = {str(o) for o in g.objects(predicate=OC.yieldsState)}
