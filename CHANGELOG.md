@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Added bootstrap and publication flow for the official `OntoSkillRegistry` repository
 - Added a first remote demo package `marea.greeting/hello` to validate end-to-end registry installs
+- Added a dedicated registry guide in `docs/registry.md`
+- Added a streamlined documentation layout with long-form guides under `docs/`
 
 ### Changed
 
@@ -19,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `install`
   - `enable`
   - optional third-party registries via `registry add-source`
+- Updated the public docs to reflect the `ontoskills` CLI and the current product distribution model
 
 ### Verified
 
