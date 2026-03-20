@@ -81,15 +81,19 @@ impl EmbeddingEngine {
             .map(|i| i.name().to_string())
             .collect();
 
-        if input_names.len() < 2 {
+        // Validate required inputs exist (by name, not position)
+        let has_input_ids = input_names.iter().any(|n| n == "input_ids");
+        let has_attention_mask = input_names.iter().any(|n| n == "attention_mask");
+
+        if !has_input_ids || !has_attention_mask {
             anyhow::bail!(
-                "Model expects at least 2 inputs (input_ids, attention_mask), found {}",
-                input_names.len()
+                "Model requires 'input_ids' and 'attention_mask' inputs, found: {:?}",
+                input_names
             );
         }
 
         // Load tokenizer
-        let tokenizer_path = embeddings_path(&embeddings_dir, "tokenizer.json");
+        let tokenizer_path = embeddings_path(embeddings_dir, "tokenizer.json");
         if !tokenizer_path.exists() {
             anyhow::bail!("Tokenizer not found at {:?}", tokenizer_path);
         }
@@ -148,6 +152,11 @@ impl EmbeddingEngine {
         Ok((input_ids, attention_mask))
     }
 
+    /// Find input index by name.
+    fn find_input_index(&self, name: &str) -> Option<usize> {
+        self.input_names.iter().position(|n| n == name)
+    }
+
     /// Run ONNX inference to get query embedding.
     fn infer_embedding(&mut self, input_ids: &[i64], attention_mask: &[i64]) -> Result<Array1<f32>> {
         let seq_len = input_ids.len();
@@ -164,12 +173,18 @@ impl EmbeddingEngine {
         let attention_mask_tensor = TensorRef::from_array_view(&attention_mask_array)
             .map_err(|e| anyhow::anyhow!("Failed to create attention_mask tensor: {}", e))?;
 
-        // Run inference with named inputs
+        // Find input indices by name (not position)
+        let input_ids_idx = self.find_input_index("input_ids")
+            .ok_or_else(|| anyhow::anyhow!("Model missing 'input_ids' input"))?;
+        let attention_mask_idx = self.find_input_index("attention_mask")
+            .ok_or_else(|| anyhow::anyhow!("Model missing 'attention_mask' input"))?;
+
+        // Run inference with named inputs (using correct indices)
         let outputs = self
             .session
             .run(ort::inputs![
-                &self.input_names[0] => input_ids_tensor,
-                &self.input_names[1] => attention_mask_tensor,
+                &self.input_names[input_ids_idx] => input_ids_tensor,
+                &self.input_names[attention_mask_idx] => attention_mask_tensor,
             ])
             .map_err(|e| anyhow::anyhow!("ONNX inference failed: {}", e))?;
 
@@ -181,23 +196,50 @@ impl EmbeddingEngine {
             .try_extract_tensor::<f32>()
             .map_err(|e| anyhow::anyhow!("Failed to extract tensor: {}", e))?;
 
-        // Convert to ndarray
-        // Shape is typically [batch, seq_len, hidden_dim]
-        let batch = shape[0] as usize;
-        let seq = shape[1] as usize;
-        let hidden = shape[2] as usize;
+        // Handle different output shapes
+        match shape.len() {
+            // 2D output [batch, hidden_dim] - already pooled (e.g., some sentence-transformers exports)
+            2 => {
+                let _batch = shape[0] as usize;
+                let hidden = shape[1] as usize;
 
-        // Reshape data to 3D array
-        let tensor_3d: ndarray::Array3<f32> =
-            ndarray::ArrayBase::from_shape_vec((batch, seq, hidden), data.to_vec())?;
+                if hidden != self.dimension {
+                    anyhow::bail!(
+                        "Model output dimension {} does not match expected embedding dimension {}",
+                        hidden, self.dimension
+                    );
+                }
 
-        // Mean pooling: average over sequence dimension
-        let embedding = mean_pool_embedding(&tensor_3d, attention_mask, self.dimension)?;
+                // Reshape to 1D (take first batch)
+                let embedding = Array1::from_vec(data.to_vec());
 
-        // Normalize for cosine similarity
-        let normalized = normalize_embedding(&embedding);
+                // Normalize for cosine similarity
+                Ok(normalize_embedding(&embedding))
+            }
+            // 3D output [batch, seq_len, hidden_dim] - requires mean pooling
+            3 => {
+                let batch = shape[0] as usize;
+                let seq = shape[1] as usize;
+                let hidden = shape[2] as usize;
 
-        Ok(normalized)
+                // Reshape data to 3D array
+                let tensor_3d: ndarray::Array3<f32> =
+                    ndarray::ArrayBase::from_shape_vec((batch, seq, hidden), data.to_vec())?;
+
+                // Mean pooling: average over sequence dimension
+                let embedding = mean_pool_embedding(&tensor_3d, attention_mask, self.dimension)?;
+
+                // Normalize for cosine similarity
+                Ok(normalize_embedding(&embedding))
+            }
+            // Unsupported shape
+            _ => {
+                anyhow::bail!(
+                    "Unsupported model output shape {:?}. Expected 2D [batch, hidden_dim] or 3D [batch, seq_len, hidden_dim]",
+                    shape
+                );
+            }
+        }
     }
 
     /// Compute cosine similarity between two embeddings.

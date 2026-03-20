@@ -218,6 +218,4 @@ ontoskills export-embeddings --help
 
 ## Related
 
-- [Spec Document](../docs/superpowers/specs/2026-03-19-semantic-discovery.md)
-- [Implementation Plan](../docs/superpowers/plans/2026-03-19-semantic-discovery.md)
 - [MCP Server README](../mcp/README.md)

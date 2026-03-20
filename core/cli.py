@@ -55,7 +55,7 @@ from compiler.config import SKILLS_DIR, OUTPUT_DIR, resolve_ontology_root
 # Get version from pyproject.toml (single source of truth)
 try:
     from importlib.metadata import version
-    __version__ = version("ontocore")
+    __version__ = version("ontoskills")
 except Exception:
     __version__ = "0.5.0"  # Fallback during development
 
@@ -114,7 +114,7 @@ def enrich_extracted_skill(extracted, skill_dir: Path, input_path: Path):
 
 
 @click.group()
-@click.version_option(version=__version__, prog_name="ontocore")
+@click.version_option(version=__version__, prog_name="ontoskills")
 @click.option('-v', '--verbose', is_flag=True, help='Enable debug logging')
 @click.option('-q', '--quiet', is_flag=True, help='Suppress progress output')
 @click.pass_context
