@@ -1871,7 +1871,7 @@ oc:skill_disabled a oc:Skill, oc:DeclarativeSkill ;
                 r#"
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 
-<http://ontoskills.sh/ontology> owl:imports <file://{enabled}> .
+<https://ontoskills.sh/ontology> owl:imports <file://{enabled}> .
 "#,
                 enabled = root.join("enabled.ttl").display()
             ),
@@ -1950,7 +1950,7 @@ oc:skill_xlsx_local a oc:Skill, oc:ExecutableSkill ;
                 r#"
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 
-<http://ontoskills.sh/ontology> owl:imports <file://{verified}> ;
+<https://ontoskills.sh/ontology> owl:imports <file://{verified}> ;
     owl:imports <file://{local}> .
 "#,
                 verified = root

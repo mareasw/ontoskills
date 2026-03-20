@@ -5,13 +5,12 @@ mod schema;
 use std::env;
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use catalog::{
     Catalog, CatalogError, EpistemicQueryParams, EvaluateExecutionPlanParams, SearchSkillsParams,
     SkillType,
 };
-use embeddings::{EmbeddingEngine, IntentMatch};
+use embeddings::EmbeddingEngine;
 use schema::get_schema_resource;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -42,13 +41,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Load embedding engine (optional - may not exist)
     let embeddings_dir = ontology_root.join("system").join("embeddings");
-    let embedding_engine: Option<Arc<EmbeddingEngine>> =
+    let mut embedding_engine: Option<EmbeddingEngine> =
         if embeddings_dir.exists() {
             match EmbeddingEngine::load(&embeddings_dir) {
                 Ok(engine) => {
                     eprintln!("[ontoskills-mcp] Loaded embedding engine with {} intents",
-                        if engine.has_intents() { "some" } else { "no" });
-                    Some(Arc::new(engine))
+                        engine.intent_count());
+                    Some(engine)
                 }
                 Err(e) => {
                     eprintln!("[ontoskills-mcp] Warning: Failed to load embeddings: {}", e);
@@ -143,15 +142,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "resources/list" => {
                 ensure_initialized(&mut writer, wire_mode, &request, initialized)?;
-                let mut resources = vec![];
-                if embedding_engine.is_some() {
-                    resources.push(json!({
-                        "uri": "ontology://schema",
-                        "name": "Ontology Schema",
-                        "description": "Compact schema for querying the ontology",
-                        "mimeType": "application/json"
-                    }));
-                }
+                let resources = vec![json!({
+                    "uri": "ontology://schema",
+                    "name": "Ontology Schema",
+                    "description": "Compact schema for querying the ontology",
+                    "mimeType": "application/json"
+                })];
                 respond_ok(
                     &mut writer,
                     wire_mode,
@@ -190,6 +186,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 match uri {
                     "ontology://schema" => {
+                        let schema_text = match serde_json::to_string(&get_schema_resource()) {
+                            Ok(text) => text,
+                            Err(e) => {
+                                respond_error(
+                                    &mut writer,
+                                    wire_mode,
+                                    request.id,
+                                    -32603,
+                                    &format!("Failed to serialize schema: {}", e),
+                                )?;
+                                continue;
+                            }
+                        };
                         respond_ok(
                             &mut writer,
                             wire_mode,
@@ -198,7 +207,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 "contents": [{
                                     "uri": uri,
                                     "mimeType": "application/json",
-                                    "text": serde_json::to_string(&get_schema_resource()).unwrap()
+                                    "text": schema_text
                                 }]
                             }),
                         )?;
@@ -216,7 +225,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "tools/call" => {
                 ensure_initialized(&mut writer, wire_mode, &request, initialized)?;
-                let result = handle_tool_call(&catalog, embedding_engine.as_ref(), request.params.unwrap_or(Value::Null));
+                let result = handle_tool_call(&catalog, embedding_engine.as_mut(), request.params.unwrap_or(Value::Null));
                 match result {
                     Ok(result) => respond_ok(&mut writer, wire_mode, request.id, result)?,
                     Err(err) => respond_error(&mut writer, wire_mode, request.id, -32602, &err)?,
@@ -315,7 +324,7 @@ fn ensure_initialized(
 
 fn handle_tool_call(
     catalog: &Catalog,
-    embedding_engine: Option<&Arc<EmbeddingEngine>>,
+    embedding_engine: Option<&mut EmbeddingEngine>,
     params: Value,
 ) -> Result<Value, String> {
     let tool_name = params

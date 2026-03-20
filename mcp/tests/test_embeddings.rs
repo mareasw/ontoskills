@@ -1,23 +1,8 @@
 //! Integration tests for semantic discovery.
+//!
+//! Note: MCP server integration tests are intentionally omitted because:
+//! 1. The server is long-running and cannot be tested with Command::output()
+//! 2. Proper MCP communication testing requires complex async setup
+//! 3. Core functionality is already covered by unit tests
 
-use std::path::PathBuf;
-use std::process::{Command, Stdio};
-
-/// Test that MCP server starts with embeddings support.
-#[test]
-#[ignore] // Run manually with --ignored flag
-fn test_mcp_starts_with_embeddings() {
-    let binary = PathBuf::from(env!("CARGO_BIN_EXE_ontoskills-mcp"));
-
-    let output = Command::new(&binary)
-        .arg("--ontology-root")
-        .arg("/tmp/test-ontoskills")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .expect("Failed to start MCP server");
-
-    // Server should start even without embeddings
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("ontoskills-mcp") || output.status.success());
-}
+// Placeholder for future integration tests if needed

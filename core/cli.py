@@ -673,7 +673,7 @@ def export_embeddings_cmd(ctx, ontology_root: str | None, output_dir: str | None
     """
     setup_logging(ctx.obj.get('verbose', False), ctx.obj.get('quiet', False))
 
-    from embeddings.exporter import export_embeddings
+    from compiler.embeddings.exporter import export_embeddings
 
     root = Path(ontology_root) if ontology_root else resolve_ontology_root(OUTPUT_DIR)
     out = Path(output_dir) if output_dir else (root / "system" / "embeddings")

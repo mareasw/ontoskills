@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">
-  <a href="https://ontoskills.marea.software" style="text-decoration: none; color: inherit; display: flex; align-items: center; justify-content: center; gap: 10px;">
+  <a href="https://ontoskills.sh" style="text-decoration: none; color: inherit; display: flex; align-items: center; justify-content: center; gap: 10px;">
     <img src="assets/ontoskills-logo.png" alt="OntoSkills Logo Inline" height="40px" style="display: block;">
     <span>OntoSkills</span>
   </a>

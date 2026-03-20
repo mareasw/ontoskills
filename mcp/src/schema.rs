@@ -21,11 +21,15 @@ pub fn get_schema_resource() -> Value {
             },
             "ExecutableSkill": {
                 "description": "Skill with code payload",
-                "properties": ["hasPayload", "code", "executionPath"]
+                "properties": ["hasPayload"]
             },
             "DeclarativeSkill": {
                 "description": "Knowledge-only skill",
                 "properties": []
+            },
+            "ExecutionPayload": {
+                "description": "Container for executable code",
+                "properties": ["executor", "code", "executionPath", "timeout"]
             },
             "State": {
                 "description": "System state node",

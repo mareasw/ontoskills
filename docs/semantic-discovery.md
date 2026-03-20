@@ -188,7 +188,7 @@ onnxruntime>=1.16.0
 ```toml
 ort = { version = "2.0.0-rc.12", features = ["load-dynamic"] }
 tokenizers = "0.19"
-ndarray = "0.15"
+ndarray = "0.17"
 anyhow = "1.0"
 ```
 
