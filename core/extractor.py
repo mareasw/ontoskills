@@ -1,5 +1,6 @@
 import re
 import hashlib
+import json
 from pathlib import Path
 
 
@@ -52,3 +53,47 @@ def compute_skill_hash(skill_dir: Path) -> str:
         hasher.update(str(rel_path).encode('utf-8'))
         hasher.update(file_path.read_bytes())
     return hasher.hexdigest()
+
+
+def resolve_package_id(skill_dir: Path) -> str:
+    """
+    Resolve the package ID for a skill directory.
+
+    Resolution order:
+    1. package.json in skill directory or ancestors
+    2. ontoskills.toml in skill directory or ancestors
+    3. Fall back to "local"
+
+    Args:
+        skill_dir: Path to the skill directory
+
+    Returns:
+        Package ID string (e.g., "obra/superpowers" or "local")
+    """
+    current = skill_dir.resolve()
+
+    while current != current.parent:
+        # Check for package.json
+        pkg_json = current / "package.json"
+        if pkg_json.exists():
+            try:
+                data = json.loads(pkg_json.read_text())
+                if "name" in data:
+                    return data["name"]
+            except (json.JSONDecodeError, KeyError):
+                pass
+
+        # Check for ontoskills.toml (simple parse)
+        toml_file = current / "ontoskills.toml"
+        if toml_file.exists():
+            try:
+                content = toml_file.read_text()
+                for line in content.splitlines():
+                    if line.startswith("name ="):
+                        return line.split("=", 1)[1].strip().strip('"\'')
+            except Exception:
+                pass
+
+        current = current.parent
+
+    return "local"

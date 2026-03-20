@@ -32,3 +32,42 @@ def test_generate_sub_skill_id():
 
     # Nested package
     assert generate_sub_skill_id("vendor/author", "skill", "sub.md") == "vendor/author/skill/sub"
+
+
+def test_resolve_package_id_with_manifest(tmp_path):
+    from compiler.extractor import resolve_package_id
+
+    # Create skill directory with package.json
+    skill_dir = tmp_path / "skills" / "brainstorming"
+    skill_dir.mkdir(parents=True)
+
+    package_json = tmp_path / "skills" / "package.json"
+    package_json.write_text('{"name": "obra/superpowers", "version": "1.0.0"}')
+
+    result = resolve_package_id(skill_dir)
+    assert result == "obra/superpowers"
+
+
+def test_resolve_package_id_fallback_local(tmp_path):
+    from compiler.extractor import resolve_package_id
+
+    # No manifest, should return "local"
+    skill_dir = tmp_path / "skills" / "some-skill"
+    skill_dir.mkdir(parents=True)
+
+    result = resolve_package_id(skill_dir)
+    assert result == "local"
+
+
+def test_resolve_package_id_with_toml_manifest(tmp_path):
+    from compiler.extractor import resolve_package_id
+
+    # Create skill directory with ontoskills.toml in parent
+    skill_dir = tmp_path / "skills" / "brainstorming"
+    skill_dir.mkdir(parents=True)
+
+    toml_file = tmp_path / "skills" / "ontoskills.toml"
+    toml_file.write_text('name = "obra/superpowers"\nversion = "1.0.0"')
+
+    result = resolve_package_id(skill_dir)
+    assert result == "obra/superpowers"
