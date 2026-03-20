@@ -12,7 +12,7 @@ export default defineConfig({
     sitemap(),
     starlight({
       title: 'OntoSkills',
-      description: 'Neuro-symbolic skill core for the Agentic Web',
+      description: 'Registry-backed skills, MCP runtime, and compiler for the Agentic Web',
       logo: {
         src: './src/assets/ontoskills-logo.png',
         replacesTitle: false,
