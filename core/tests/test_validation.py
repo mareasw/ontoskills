@@ -18,7 +18,7 @@ def test_validate_and_raise_raises_for_invalid():
     from compiler.validator import validate_and_raise
     from compiler.exceptions import OntologyValidationError
 
-    oc = Namespace("https://ontoskills.marea.software/ontology#")
+    oc = Namespace("https://ontoskills.sh/ontology#")
     g = Graph()
 
     # Add a skill without required properties (invalid)

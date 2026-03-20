@@ -1,8 +1,18 @@
 [project]
-name = "ontocore"
-version = "0.8.1"
-description = "OntoCore — Neuro-symbolic skill compiler. Compiles SKILL.md into validated OWL 2 ontologies."
+name = "ontoskills"
+version = "0.7.3"
+description = "OntoSkills — Neuro-symbolic skill compiler. Compiles SKILL.md into validated OWL 2 ontologies."
+readme = "README.md"
 requires-python = ">=3.10"
+license = {file = "LICENSE"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
 dependencies = [
     "click>=8.1.0",
     "pydantic>=2.0.0",
@@ -21,17 +31,24 @@ dev = [
     "ruff>=0.1.0",
     "mypy>=1.0.0",
 ]
+embeddings = [
+    # Required for semantic intent discovery (ontoskills export-embeddings)
+    "sentence-transformers>=2.2.0",
+    "transformers>=4.30.0",
+    "optimum>=1.12.0",
+    "onnx>=1.15.0",
+    "onnxruntime>=1.16.0",
+]
 
 [project.scripts]
 ontoskills = "compiler.cli:main"
-ontocore = "compiler.cli:main"
 
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["compiler"]
+packages = ["compiler", "compiler.embeddings"]
 
 [tool.setuptools.package-dir]
 compiler = "."

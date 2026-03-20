@@ -141,7 +141,7 @@ def test_diff_clean(tmp_path):
     runner = CliRunner()
 
     ttl_content = """
-@prefix oc: <https://ontoskills.marea.software/ontology#> .
+@prefix oc: <https://ontoskills.sh/ontology#> .
 oc:TestSkill a oc:Skill ;
     oc:resolvesIntent "do_thing" .
 """
@@ -167,12 +167,12 @@ def test_diff_breaking_exits_9(tmp_path):
     new_ttl = tmp_path / 'new.ttl'
 
     old_ttl.write_text("""
-@prefix oc: <https://ontoskills.marea.software/ontology#> .
+@prefix oc: <https://ontoskills.sh/ontology#> .
 oc:TestSkill a oc:Skill ;
     oc:resolvesIntent "create_pdf" .
 """)
     new_ttl.write_text("""
-@prefix oc: <https://ontoskills.marea.software/ontology#> .
+@prefix oc: <https://ontoskills.sh/ontology#> .
 oc:TestSkill a oc:Skill ;
     oc:resolvesIntent "generate_pdf" .
 """)
@@ -195,13 +195,13 @@ def test_diff_breaking_only_flag(tmp_path):
     new_ttl = tmp_path / 'new.ttl'
 
     old_ttl.write_text("""
-@prefix oc: <https://ontoskills.marea.software/ontology#> .
+@prefix oc: <https://ontoskills.sh/ontology#> .
 oc:SkillA a oc:Skill ;
     oc:resolvesIntent "task_a" .
 """)
     # Only an additive change: new skill added, nothing removed
     new_ttl.write_text("""
-@prefix oc: <https://ontoskills.marea.software/ontology#> .
+@prefix oc: <https://ontoskills.sh/ontology#> .
 oc:SkillA a oc:Skill ;
     oc:resolvesIntent "task_a" .
 oc:SkillB a oc:Skill ;
@@ -228,7 +228,7 @@ def test_diff_json_output(tmp_path):
 
     ttl_file = tmp_path / 'skills.ttl'
     ttl_file.write_text("""
-@prefix oc: <https://ontoskills.marea.software/ontology#> .
+@prefix oc: <https://ontoskills.sh/ontology#> .
 oc:TestSkill a oc:Skill ;
     oc:resolvesIntent "do_thing" .
 """)
@@ -257,11 +257,11 @@ def test_diff_suggest_shows_migration_guidance(tmp_path):
     old_ttl = tmp_path / 'old.ttl'
     new_ttl = tmp_path / 'new.ttl'
     old_ttl.write_text("""
-@prefix oc: <https://ontoskills.marea.software/ontology#> .
+@prefix oc: <https://ontoskills.sh/ontology#> .
 oc:SkillA a oc:Skill ; oc:resolvesIntent "old_intent" .
 """)
     new_ttl.write_text("""
-@prefix oc: <https://ontoskills.marea.software/ontology#> .
+@prefix oc: <https://ontoskills.sh/ontology#> .
 oc:SkillA a oc:Skill ; oc:resolvesIntent "new_intent" .
 """)
 
@@ -442,3 +442,41 @@ def test_enrich_extracted_skill_removes_parent_from_depends_on(tmp_path):
 
     assert extracted.extends == ["office"]
     assert extracted.depends_on == ["pandoc"]
+
+
+class TestExportEmbeddingsCLI:
+    """Tests for export-embeddings CLI command."""
+
+    @pytest.mark.integration
+    def test_export_embeddings_command(self, tmp_path):
+        """export-embeddings command creates output files."""
+        from rdflib import Graph, Namespace, Literal, RDF
+        from cli import cli
+
+        OC = Namespace("https://ontoskills.sh/ontology#")
+        DCTERMS = Namespace("http://purl.org/dc/terms/")
+
+        # Create test ontology using production format with dcterms:identifier
+        g = Graph()
+        g.bind("oc", OC)
+        g.bind("dcterms", DCTERMS)
+        skill = OC["skill_test"]
+        g.add((skill, RDF.type, OC.Skill))
+        g.add((skill, DCTERMS.identifier, Literal("test")))  # Production format
+        g.add((skill, OC.resolvesIntent, Literal("test_intent")))
+
+        ontology_root = tmp_path / "ontoskills"
+        ontology_root.mkdir()
+        (ontology_root / "index.ttl").write_text(g.serialize(format="turtle"))
+
+        output_dir = tmp_path / "output"
+
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            'export-embeddings',
+            '--ontology-root', str(ontology_root),
+            '--output-dir', str(output_dir),
+        ])
+
+        assert result.exit_code == 0
+        assert (output_dir / "intents.json").exists()

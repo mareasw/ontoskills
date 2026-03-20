@@ -55,7 +55,7 @@ from compiler.config import SKILLS_DIR, OUTPUT_DIR, resolve_ontology_root
 # Get version from pyproject.toml (single source of truth)
 try:
     from importlib.metadata import version
-    __version__ = version("ontocore")
+    __version__ = version("ontoskills")
 except Exception:
     __version__ = "0.5.0"  # Fallback during development
 
@@ -114,7 +114,7 @@ def enrich_extracted_skill(extracted, skill_dir: Path, input_path: Path):
 
 
 @click.group()
-@click.version_option(version=__version__, prog_name="ontocore")
+@click.version_option(version=__version__, prog_name="ontoskills")
 @click.option('-v', '--verbose', is_flag=True, help='Enable debug logging')
 @click.option('-q', '--quiet', is_flag=True, help='Suppress progress output')
 @click.pass_context
@@ -399,7 +399,7 @@ def query_cmd(ctx, query_string, ontology_file, output_format, verbose, quiet):
     """Execute SPARQL query against ontology.
 
     Example:
-        ontocore query "SELECT ?s ?n WHERE { ?s oc:nature ?n }" -f json
+        ontoskills query "SELECT ?s ?n WHERE { ?s oc:nature ?n }" -f json
     """
     setup_logging(verbose or ctx.obj.get('verbose', False), quiet or ctx.obj.get('quiet', False))
 
@@ -659,6 +659,37 @@ def security_audit(ctx, input_dir, verbose, quiet):
             issues_found += 1
 
     console.print(f"\n[bold]Audit complete:[/bold] {issues_found} issue(s) found")
+
+
+@cli.command('export-embeddings')
+@click.option('--ontology-root', default=None, help='Ontology root directory')
+@click.option('--output-dir', default=None, help='Output directory for embeddings')
+@click.pass_context
+def export_embeddings_cmd(ctx, ontology_root: str | None, output_dir: str | None):
+    """Export embeddings for semantic intent discovery.
+
+    Creates ONNX model, tokenizer, and pre-computed intent embeddings
+    for use by the MCP server's search_intents tool.
+    """
+    setup_logging(ctx.obj.get('verbose', False), ctx.obj.get('quiet', False))
+
+    try:
+        from compiler.embeddings.exporter import export_embeddings
+    except ImportError as e:
+        missing = str(e).split(": ")[-1].strip() if ": " in str(e) else "embeddings dependencies"
+        console.print(f"[red]Error: Missing {missing}[/red]")
+        console.print("[yellow]Install embeddings support with:[/yellow]")
+        console.print("  pip install ontoskills[embeddings]")
+        raise SystemExit(1)
+
+    root = Path(ontology_root) if ontology_root else resolve_ontology_root(OUTPUT_DIR)
+    out = Path(output_dir) if output_dir else (root / "system" / "embeddings")
+
+    console.print(f"[blue]Exporting embeddings from {root} to {out}[/blue]")
+
+    export_embeddings(root, out)
+
+    console.print(f"[green]Embeddings exported to {out}[/green]")
 
 
 def main():
