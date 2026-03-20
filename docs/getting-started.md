@@ -78,7 +78,7 @@ Imported source skills are stored under `~/.ontoskills/skills/vendor/` and compi
 OntoMCP exposes compiled ontologies via the Model Context Protocol.
 
 ```bash
-cargo run --manifest-path mcp/Cargo.toml
+npx ontoskills install mcp
 ```
 
 The current public tool set is:
@@ -88,14 +88,11 @@ The current public tool set is:
 - `evaluate_execution_plan`
 - `query_epistemic_rules`
 
-### Claude Code Integration
+Client-specific setup guides:
 
-Register the MCP server with Claude Code:
-
-```bash
-claude mcp add ontoskills -- \
-  cargo run --manifest-path /absolute/path/to/ontoskills/mcp/Cargo.toml
-```
+- [General MCP runtime](./mcp.md)
+- [Claude Code guide](./mcp-claude-code.md)
+- [Codex guide](./mcp-codex.md)
 
 ## What's Next?
 
