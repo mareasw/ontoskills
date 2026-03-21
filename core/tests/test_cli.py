@@ -480,3 +480,92 @@ class TestExportEmbeddingsCLI:
 
         assert result.exit_code == 0
         assert (output_dir / "intents.json").exists()
+
+
+def test_compile_rejects_orphan_sub_skills(tmp_path):
+    """Compile should fail if .md files exist without SKILL.md."""
+    from cli import cli
+    runner = CliRunner()
+
+    # Create skill directory with auxiliary .md but no SKILL.md
+    skill_dir = tmp_path / "skills" / "orphan-skill"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "planning.md").write_text("# Planning")
+    (skill_dir / "review.md").write_text("# Review")
+
+    output_dir = tmp_path / "ontoskills"
+
+    result = runner.invoke(cli, [
+        'compile', 'orphan-skill',
+        '-i', str(tmp_path / 'skills'),
+        '-o', str(output_dir)
+    ])
+
+    assert result.exit_code != 0
+    assert "no SKILL.md" in result.output.lower() or "orphan" in result.output.lower()
+
+
+def test_dry_run_does_not_write_sub_skill_modules(tmp_path):
+    """Compile --dry-run should not write sub-skill .ttl files or copy assets."""
+    from unittest.mock import patch, MagicMock
+    from cli import cli
+
+    # Create skill directory with SKILL.md, auxiliary .md, and an asset
+    skill_dir = tmp_path / "skills" / "parent-skill"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text("# Parent Skill\n\nA parent skill.", encoding="utf-8")
+    (skill_dir / "sub-module.md").write_text("# Sub Module\n\nA sub-skill.", encoding="utf-8")
+    (skill_dir / "asset.txt").write_text("Asset content", encoding="utf-8")
+
+    output_dir = tmp_path / "ontoskills"
+    output_skill_dir = output_dir / "parent-skill"
+    output_skill_dir.mkdir(parents=True)
+
+    # Create core ontology
+    core_path = output_dir / "ontoskills-core.ttl"
+    core_path.write_text("@prefix oc: <https://ontoskills.sh/ontology#> .", encoding="utf-8")
+
+    runner = CliRunner()
+
+    # Mock the LLM extraction
+    mock_extracted = MagicMock()
+    mock_extracted.id = "parent-skill"
+    mock_extracted.nature = "Test skill"
+    mock_extracted.genus = "action"
+    mock_extracted.intents = ["test"]
+    mock_extracted.state_transitions.requires_state = []
+    mock_extracted.state_transitions.yields_state = []
+
+    mock_sub_extracted = MagicMock()
+    mock_sub_extracted.id = "sub-module"
+    mock_sub_extracted.nature = "Sub skill"
+    mock_sub_extracted.genus = "action"
+    mock_sub_extracted.intents = ["sub_test"]
+    mock_sub_extracted.state_transitions.requires_state = []
+    mock_sub_extracted.state_transitions.yields_state = []
+
+    with patch('cli.tool_use_loop') as mock_tool_use_loop:
+        # First call for parent skill, second for sub-skill
+        mock_tool_use_loop.side_effect = [mock_extracted, mock_sub_extracted]
+
+        result = runner.invoke(cli, [
+            'compile',
+            '-i', str(tmp_path / "skills"),
+            '-o', str(output_dir),
+            '--dry-run'
+        ])
+
+        assert result.exit_code == 0
+        assert "dry run" in result.output.lower()
+
+        # Verify no .ttl files were created for sub-skills
+        sub_skill_ttl = output_skill_dir / "sub-module.ttl"
+        assert not sub_skill_ttl.exists(), "Sub-skill .ttl should not be created in dry-run"
+
+        # Verify asset was not copied
+        output_asset = output_skill_dir / "asset.txt"
+        assert not output_asset.exists(), "Asset should not be copied in dry-run"
+
+        # Verify main skill .ttl was not created either
+        main_skill_ttl = output_skill_dir / "ontoskill.ttl"
+        assert not main_skill_ttl.exists(), "Main skill .ttl should not be created in dry-run"

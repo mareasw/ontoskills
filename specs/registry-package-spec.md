@@ -52,8 +52,8 @@ The registry index is a JSON file listing installable packages.
 {
   "packages": [
     {
-      "package_id": "marea.office",
-      "manifest_url": "https://example.invalid/packages/marea.office/package.json",
+      "package_id": "marea/office",
+      "manifest_url": "https://example.invalid/packages/marea/office/package.json",
       "trust_tier": "verified"
     }
   ]

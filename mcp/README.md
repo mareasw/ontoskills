@@ -124,7 +124,7 @@ A compact (~2KB) JSON schema describing available classes, properties, and examp
 
 `skill_id` fields accept:
 - short ids like `xlsx`
-- qualified ids like `marea.office/xlsx`
+- qualified ids like `marea/office/xlsx`
 
 When a short id is ambiguous, runtime resolution follows:
 - `local > verified > trusted > community`

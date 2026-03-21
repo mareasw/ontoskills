@@ -223,3 +223,6 @@ ontoskills/*/
 ontoskills/*.ttl
 ontoskills/system/
 !ontoskills/ontoskills-core.ttl
+
+# Claude Code runtime artifacts
+.claude/scheduled_tasks.lock
