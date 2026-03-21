@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.1] - 2026-03-21
+
+### Added
+
+#### Sub-Skills Compilation
+
+- **Qualified IDs**: Skills now use slash-separated package IDs (`owner/repo/skill`) instead of dot-separated
+- **Sub-skill compilation pipeline**: Auxiliary `*.md` files are compiled to `*.ttl` modules with deterministic `extends` injection
+- **Orphan sub-skill validation**: Compiler validates that sub-skills have valid parent skills
+- **Dry-run behavior**: Compilation previews show what would be compiled without writing
+
+#### Semantic Search Improvements
+
+- **Adaptive cutoff**: MCP semantic search now uses an adaptive cutoff algorithm to filter low-quality results
+  - Detects score gaps to find natural relevance boundaries
+  - Falls back to threshold-based filtering when no gap is detected
+  - Improved search result quality for semantic queries
+
+### Fixed
+
+- **Package ID normalization**: `resolve_package_id()` now normalizes manifest names (handles spaces, uppercase, dots, npm scoped packages)
+- **Defensive URI slugification**: `skill_uri_for_id()` now lowercases and replaces all non-alphanumeric characters for QName compatibility
+- **Runtime base URI**: `collect_skill_records_from_file()` now uses the runtime `ONTOSKILLS_BASE_URI` instead of hard-coded `DEFAULT_BASE_URI`
+
+### Changed
+
+- **Registry artifacts**: Updated `docs/registry/examples` from dot-separated (`marea.office`) to slash-separated (`marea/office`) package IDs
+- **URI collision prevention**: Short IDs and qualified IDs are now handled separately to prevent URI collisions across packages
+
 ## [0.7.3] - 2026-03-19
 
 ### Fixed
@@ -37,7 +66,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Added bootstrap and publication flow for the official registry repository
-- Added a first remote demo package `marea.greeting/hello` to validate end-to-end registry installs
+- Added a first remote demo package `mareasw/greeting/hello` to validate end-to-end registry installs
 
 ### Changed
 
@@ -50,7 +79,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Verified
 
-- Verified remote install and activation of `marea.greeting/hello` from the public registry repository
+- Verified remote install and activation of `mareasw/greeting/hello` from the public registry repository
 - Verified registry state generation under `~/.ontoskills/` for:
   - `registry.lock.json`
   - `index.installed.ttl`

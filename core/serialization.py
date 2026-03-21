@@ -12,7 +12,7 @@ from typing import Optional
 from rdflib import Graph, Namespace, RDF, OWL, Literal, URIRef
 from rdflib.namespace import DCTERMS, SKOS, PROV
 
-from compiler.schemas import ExtractedSkill, Requirement, ExecutionPayload
+from compiler.schemas import ExtractedSkill
 from compiler.exceptions import OntologyValidationError
 from compiler.config import BASE_URI, OUTPUT_DIR, resolve_ontology_root
 from compiler.core_ontology import get_oc_namespace
@@ -22,15 +22,47 @@ from compiler.validator import validate_and_raise
 logger = logging.getLogger(__name__)
 
 
-def skill_uri_for_id(skill_id: str) -> URIRef:
-    """Build a stable skill URI from the canonical skill identifier."""
+def skill_uri_for_id(skill_id: str, qualified_id: str | None = None) -> URIRef:
+    """
+    Build a stable skill URI from identifiers.
+
+    Args:
+        skill_id: Short/local skill ID (e.g., "planning")
+        qualified_id: Optional qualified ID including package path
+                     (e.g., "marea/office/planning"). If provided, used for URI
+                     to avoid collisions across packages.
+
+    The URI is based on the qualified_id (if provided) or skill_id,
+    slugified to be QName-compatible (lowercase, alphanumeric with underscores).
+    The short skill_id is always stored in dcterms:identifier.
+    """
     oc = get_oc_namespace()
-    return oc[f"skill_{generate_skill_id(skill_id)}"]
+    # Use qualified_id for URI if provided, otherwise use skill_id
+    id_for_uri = qualified_id or skill_id
+
+    # Defensive slugification for QName compatibility:
+    # - lowercase
+    # - replace / and @ (scoped packages) with _
+    # - replace any non-alphanumeric (except _) with _
+    # - collapse consecutive underscores
+    import re
+    slug = id_for_uri.lower()
+    slug = re.sub(r'[/@]', '_', slug)  # slashes and scoped package prefix
+    slug = re.sub(r'[^a-z0-9_]', '_', slug)  # any other non-alphanumeric
+    slug = re.sub(r'_+', '_', slug)  # collapse consecutive underscores
+    slug = slug.strip('_')
+
+    return oc[f"skill_{slug}"]
 
 
-def skill_uri_for_skill(skill: ExtractedSkill) -> URIRef:
-    """Build the stable URI for a skill model."""
-    return skill_uri_for_id(skill.id)
+def skill_uri_for_skill(skill: ExtractedSkill, qualified_id: str | None = None) -> URIRef:
+    """Build the stable URI for a skill model.
+
+    Args:
+        skill: The extracted skill
+        qualified_id: Optional qualified ID for URI (prevents collisions)
+    """
+    return skill_uri_for_id(skill.id, qualified_id)
 
 
 def relation_uri_for_value(value: str) -> URIRef:
@@ -44,18 +76,27 @@ def relation_uri_for_value(value: str) -> URIRef:
     return skill_uri_for_id(raw)
 
 
-def serialize_skill(graph: Graph, skill: ExtractedSkill) -> None:
+def serialize_skill(
+    graph: Graph,
+    skill: ExtractedSkill,
+    qualified_id: str | None = None,
+    extends_parent: str | None = None,
+    extends_parent_qualified: str | None = None,
+) -> None:
     """
     Serialize a skill to RDF triples in the graph.
 
     Args:
         graph: RDF graph to add triples to
         skill: ExtractedSkill to serialize
+        qualified_id: Optional qualified ID for URI (prevents collisions across packages)
+        extends_parent: Optional parent skill short ID to inject as extends relationship
+        extends_parent_qualified: Optional parent qualified ID for extends URI
     """
     oc = get_oc_namespace()
 
-    # Create stable skill URI from canonical id
-    skill_uri = skill_uri_for_skill(skill)
+    # Create stable skill URI from qualified_id if provided, otherwise from skill.id
+    skill_uri = skill_uri_for_skill(skill, qualified_id)
 
     # Basic properties
     graph.add((skill_uri, RDF.type, oc.Skill))
@@ -92,8 +133,19 @@ def serialize_skill(graph: Graph, skill: ExtractedSkill) -> None:
     for dep in skill.depends_on:
         graph.add((skill_uri, oc.dependsOn, relation_uri_for_value(dep)))
 
+    # Inject deterministic extends if provided (sub-skills)
+    parent_uri = None
+    if extends_parent:
+        # Use qualified ID for parent URI if provided
+        parent_uri = skill_uri_for_id(extends_parent, extends_parent_qualified)
+        graph.add((skill_uri, oc.extends, parent_uri))
+
+    # Also include any LLM-extracted extends (for non-sub-skill cases)
     for ext in skill.extends:
-        graph.add((skill_uri, oc.extends, relation_uri_for_value(ext)))
+        ext_uri = relation_uri_for_value(ext)
+        # Avoid duplicate if already injected (compare against actual parent_uri)
+        if not parent_uri or str(ext_uri) != str(parent_uri):
+            graph.add((skill_uri, oc.extends, ext_uri))
 
     for cont in skill.contradicts:
         graph.add((skill_uri, oc.contradicts, relation_uri_for_value(cont)))
@@ -155,7 +207,10 @@ def serialize_skill(graph: Graph, skill: ExtractedSkill) -> None:
 def serialize_skill_to_module(
     skill: ExtractedSkill,
     output_path: Path,
-    output_base: Optional[Path] = None
+    output_base: Optional[Path] = None,
+    qualified_id: str | None = None,
+    extends_parent: str | None = None,
+    extends_parent_qualified: str | None = None,
 ) -> None:
     """
     Serialize a skill to a standalone ontoskill.ttl module file.
@@ -167,6 +222,9 @@ def serialize_skill_to_module(
         skill: ExtractedSkill to serialize
         output_path: Path where ontoskill.ttl should be written
         output_base: Base output directory for core ontology lookup (default: OUTPUT_DIR)
+        qualified_id: Optional qualified ID for URI (prevents collisions across packages)
+        extends_parent: Optional parent skill short ID to inject as extends relationship
+        extends_parent_qualified: Optional parent qualified ID for extends URI
     """
     oc = get_oc_namespace()
     g = Graph()
@@ -190,13 +248,14 @@ def serialize_skill_to_module(
     if core_ontology_path.exists():
         g.add((URIRef(BASE_URI.rstrip('#')), OWL.imports, URIRef(f"file://{core_ontology_path}")))
 
-    # Serialize the skill
-    serialize_skill(g, skill)
+    # Serialize the skill with optional extends injection
+    serialize_skill(g, skill, qualified_id=qualified_id, extends_parent=extends_parent,
+                    extends_parent_qualified=extends_parent_qualified)
 
     # VALIDATE BEFORE WRITE
     try:
         validate_and_raise(g)
-    except OntologyValidationError as e:
+    except OntologyValidationError:
         logger.critical(f"Refusing to write invalid skill to {output_path}")
         raise
 

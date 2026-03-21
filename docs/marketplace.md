@@ -16,8 +16,8 @@ It is backed by the official registry and exposed in two places:
 
 ```bash
 ontoskills search xlsx
-ontoskills install marea.office/xlsx
-ontoskills enable marea.office/xlsx
+ontoskills install marea/office/xlsx
+ontoskills enable marea/office/xlsx
 ```
 
 ## Qualified IDs
@@ -30,9 +30,9 @@ Marketplace installs use qualified ids:
 
 Examples:
 
-- `marea.greeting/hello`
-- `marea.office/xlsx`
-- `marea.office/docx`
+- `mareasw/greeting/hello`
+- `marea/office/xlsx`
+- `marea/office/docx`
 
 ## Install Flow
 
@@ -42,8 +42,8 @@ Examples:
 4. Enable it so OntoMCP exposes it.
 
 ```bash
-ontoskills install marea.greeting/hello
-ontoskills enable marea.greeting/hello
+ontoskills install mareasw/greeting/hello
+ontoskills enable mareasw/greeting/hello
 ```
 
 ## Official vs Third-Party

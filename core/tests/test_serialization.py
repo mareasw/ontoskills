@@ -6,7 +6,7 @@ Tests for serialize_skill(), serialize_skill_to_module(), and related functions.
 
 import pytest
 from pathlib import Path
-from rdflib import Graph, RDF, RDFS, OWL, Namespace
+from rdflib import Graph, RDF, OWL
 
 from compiler.serialization import (
     serialize_skill,
@@ -14,7 +14,6 @@ from compiler.serialization import (
     skill_uri_for_id,
 )
 from compiler.schemas import ExtractedSkill, Requirement, ExecutionPayload, StateTransition
-from compiler.config import BASE_URI
 from compiler.core_ontology import get_oc_namespace
 
 
@@ -315,3 +314,116 @@ def test_serialize_skill_relations_use_skill_uris():
     assert (skill_uri, oc.dependsOn, skill_uri_for_id("xlsx")) in g
     assert (skill_uri, oc.extends, skill_uri_for_id("toolkit")) in g
     assert (skill_uri, oc.contradicts, skill_uri_for_id("legacy-office")) in g
+
+
+def test_skill_uri_for_qualified_id():
+    """Test URI generation handles Qualified IDs by slugifying slashes."""
+    from compiler.serialization import skill_uri_for_id
+
+    # Qualified ID with slashes should be slugified to QName-friendly form
+    uri = skill_uri_for_id("obra/superpowers/brainstorming/planning")
+    uri_str = str(uri)
+
+    # URI should end with slugged fragment (slashes replaced with underscores)
+    assert uri_str.endswith("#skill_obra_superpowers_brainstorming_planning")
+    # Fragment should not contain slashes (the base URI https:// does, but fragment doesn't)
+    fragment = uri_str.split("#")[-1]
+    assert "/" not in fragment
+
+
+def test_skill_uri_for_id_defensive_slugification():
+    """Test that skill_uri_for_id defensively slugifies special characters."""
+    from compiler.serialization import skill_uri_for_id
+
+    # Dots should be replaced
+    uri = skill_uri_for_id("my.skill")
+    assert "#" in str(uri)
+    fragment = str(uri).split("#")[-1]
+    assert "." not in fragment
+    assert "my_skill" in fragment
+
+    # Spaces should be replaced
+    uri = skill_uri_for_id("my skill")
+    fragment = str(uri).split("#")[-1]
+    assert " " not in fragment
+
+    # Uppercase should be lowercased
+    uri = skill_uri_for_id("MySkill")
+    fragment = str(uri).split("#")[-1]
+    assert fragment == "skill_myskill"
+
+    # Mixed special chars
+    uri = skill_uri_for_id("My.Package/With Spaces")
+    fragment = str(uri).split("#")[-1]
+    for char in [" ", ".", "/", "@"]:
+        assert char not in fragment
+
+
+def test_serialize_skill_with_extends_injection():
+    """Test that extends is injected for sub-skills."""
+    from compiler.serialization import serialize_skill, skill_uri_for_id
+    from compiler.schemas import ExtractedSkill
+    from rdflib import Graph
+
+    # Create a minimal sub-skill
+    sub_skill = ExtractedSkill(
+        id="obra/superpowers/brainstorming/planning",
+        hash="abc123",
+        nature="A planning sub-skill",
+        genus="Methodology",
+        differentia="for brainstorming",
+        intents=["plan_ideas"],
+        requirements=[],
+        depends_on=[],
+        extends=[],  # Empty - will be injected
+        contradicts=[],
+        knowledge_nodes=[]
+    )
+
+    graph = Graph()
+    serialize_skill(graph, sub_skill, extends_parent="obra/superpowers/brainstorming")
+
+    # Verify extends triple was added using slugged URIs
+    skill_uri = skill_uri_for_id(sub_skill.id)
+    parent_skill_uri = skill_uri_for_id("obra/superpowers/brainstorming")
+
+    from compiler.core_ontology import get_oc_namespace
+    oc = get_oc_namespace()
+
+    # Check that extends relationship exists
+    extends_values = list(graph.objects(skill_uri, oc.extends))
+    assert len(extends_values) == 1
+    assert extends_values[0] == parent_skill_uri
+
+
+def test_serialize_skill_to_module_with_extends(tmp_path):
+    """Test module serialization with extends injection."""
+    from compiler.serialization import serialize_skill_to_module
+    from compiler.schemas import ExtractedSkill
+
+    sub_skill = ExtractedSkill(
+        id="obra/superpowers/brainstorming/planning",
+        hash="abc123",
+        nature="Planning sub-skill",
+        genus="Methodology",
+        differentia="for brainstorming phases",
+        intents=["plan_ideas"],
+        requirements=[],
+        depends_on=[],
+        extends=[],
+        contradicts=[],
+        knowledge_nodes=[],
+        generated_by="claude-opus-4-6"
+    )
+
+    output_path = tmp_path / "output" / "brainstorming" / "planning.ttl"
+    serialize_skill_to_module(
+        sub_skill,
+        output_path,
+        extends_parent="obra/superpowers/brainstorming"
+    )
+
+    # Verify file exists and contains extends
+    content = output_path.read_text()
+    assert "oc:extends" in content
+    assert "brainstorming" in content

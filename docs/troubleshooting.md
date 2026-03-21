@@ -18,7 +18,7 @@ Check:
 Most often the skill was installed but not enabled:
 
 ```bash
-ontoskills enable marea.greeting/hello
+ontoskills enable mareasw/greeting/hello
 ```
 
 If it is already enabled, rebuild the local indexes:

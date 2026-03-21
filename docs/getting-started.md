@@ -52,8 +52,8 @@ The official registry is already available to `ontoskills`. You can discover and
 
 ```bash
 npx ontoskills search hello
-npx ontoskills install marea.greeting/hello
-npx ontoskills enable marea.greeting/hello
+npx ontoskills install mareasw/greeting/hello
+npx ontoskills enable mareasw/greeting/hello
 ```
 
 ### Third-Party Registries

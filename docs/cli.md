@@ -32,15 +32,15 @@ ontoskills install core
 
 ```bash
 ontoskills search hello
-ontoskills install marea.greeting/hello
-ontoskills enable marea.greeting/hello
+ontoskills install mareasw/greeting/hello
+ontoskills enable mareasw/greeting/hello
 ```
 
 ### Manage Runtime State
 
 ```bash
-ontoskills disable marea.greeting/hello
-ontoskills remove marea.greeting/hello
+ontoskills disable mareasw/greeting/hello
+ontoskills remove mareasw/greeting/hello
 ontoskills rebuild-index
 ```
 
@@ -49,7 +49,7 @@ ontoskills rebuild-index
 ```bash
 ontoskills update mcp
 ontoskills update core
-ontoskills update marea.office/xlsx
+ontoskills update marea/office/xlsx
 ```
 
 ### Inspect and Diagnose

@@ -15,7 +15,14 @@ from rich.panel import Panel
 
 from rdflib import Graph, RDF
 
-from compiler.extractor import generate_skill_id, compute_skill_hash
+from compiler.extractor import (
+    generate_skill_id,
+    compute_skill_hash,
+    generate_qualified_skill_id,
+    generate_sub_skill_id,
+    resolve_package_id,
+    compute_sub_skill_hash,
+)
 from compiler.transformer import tool_use_loop
 from compiler.security import security_check, SecurityError
 from compiler.core_ontology import get_oc_namespace, create_core_ontology
@@ -43,13 +50,11 @@ from compiler.exceptions import (
     ExtractionError,
     SPARQLError,
     SkillNotFoundError,
+    OrphanSubSkillsError,
 )
 from compiler.differ import compute_diff
 from compiler.drift_report import print_report, export_json, print_suggestions
-from compiler.snapshot import save_snapshot, get_latest_snapshot
-from compiler.linter import lint_ontology, LintIssue
-from compiler.graph_export import build_graph
-from compiler.explainer import explain_skill, list_skill_ids
+from compiler.snapshot import get_latest_snapshot
 from compiler.config import SKILLS_DIR, OUTPUT_DIR, resolve_ontology_root
 
 # Get version from pyproject.toml (single source of truth)
@@ -215,9 +220,34 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
 
     logger.info(f"Core skills: {len(skill_md_files)}, Auxiliary md: {len(auxiliary_md_files)}, Assets: {len(asset_files)}")
 
+    # VALIDATION: Sub-skills require parent SKILL.md
+    # Group files by directory and check each
+    skill_dirs_with_auxiliary = {}
+    for md_file in auxiliary_md_files:
+        parent_dir = md_file.parent
+        if parent_dir not in skill_dirs_with_auxiliary:
+            skill_dirs_with_auxiliary[parent_dir] = []
+        skill_dirs_with_auxiliary[parent_dir].append(md_file.name)
+
+    for skill_dir, aux_files in skill_dirs_with_auxiliary.items():
+        skill_md = skill_dir / "SKILL.md"
+        if not skill_md.exists():
+            error = OrphanSubSkillsError(str(skill_dir), aux_files)
+            console.print(f"[red]{error}[/red]")
+            raise error
+
     # Process Rule A: Core Skills (SKILL.md → ontoskill.ttl)
     compiled_skills = []
     skill_output_paths = []
+
+    # Build skill_parent_map for Rule A (needed for qualified IDs)
+    skill_parent_map = {}  # skill_dir -> (parent_skill_id, package_id)
+    for skill_file in skill_md_files:
+        skill_dir = skill_file.parent
+        skill_id = generate_skill_id(skill_dir.name)
+        package_id = resolve_package_id(skill_dir)
+        qualified_parent_id = generate_qualified_skill_id(package_id, skill_id)
+        skill_parent_map[skill_dir] = (qualified_parent_id, package_id)
 
     for skill_file in skill_md_files:
         skill_dir = skill_file.parent
@@ -267,7 +297,11 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
         try:
             extracted = tool_use_loop(skill_dir, skill_hash, skill_id)
             extracted = enrich_extracted_skill(extracted, skill_dir, input_path)
-            compiled_skills.append(extracted)
+            # Keep short/local ID for parent skill (sub-skills extend to this short parent ID)
+            # Note: extracted.id remains the short skill ID (e.g., "brainstorming"), used as extends_parent
+            # Store with package_id for later serialization
+            _, package_id = skill_parent_map.get(skill_dir, (skill_id, "local"))
+            compiled_skills.append((extracted, package_id))
             skill_output_paths.append(output_skill_path)
 
             logger.info(f"Successfully extracted: {skill_id}")
@@ -276,20 +310,74 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
             continue
 
     # Process Rule B: Auxiliary Markdown (*.md → *.ttl)
-    auxiliary_compiled = []
+    # skill_parent_map already built above for Rule A
+
+    # Process auxiliary files (extraction only - serialization deferred until after dry_run check)
+    # Tuple: (extracted, output_ttl_path, qualified_id, extends_parent, extends_parent_qualified)
+    sub_skills_to_serialize = []
     for md_file in auxiliary_md_files:
+        skill_dir = md_file.parent
         rel_path = md_file.relative_to(input_path)
         output_ttl_path = output_path / rel_path.with_suffix(".ttl")
 
-        logger.info(f"Processing auxiliary markdown: {md_file.name}")
+        # Get parent context
+        parent_qualified_id, package_id = skill_parent_map.get(skill_dir, ("local/unknown", "local"))
 
-        # For now, skip auxiliary markdown compilation (can be implemented later)
-        # These would need a different extraction pipeline
-        logger.debug(f"Auxiliary markdown compilation not yet implemented: {md_file}")
-        auxiliary_compiled.append((md_file, output_ttl_path))
+        # Generate IDs: short ID from filename, qualified ID from full path
+        parent_local_id = generate_skill_id(skill_dir.name)
+        sub_skill_short_id = generate_skill_id(md_file.stem)  # Normalized/slugified
+        sub_skill_qualified_id = generate_sub_skill_id(package_id, parent_local_id, md_file.name)
+        sub_skill_hash = compute_sub_skill_hash(md_file)
 
-    # Process Rule C: Asset Files (direct copy)
-    assets_copied = 0
+        logger.info(f"Processing auxiliary markdown: {md_file.name} -> {sub_skill_short_id}")
+
+        # Check cache
+        if not force and output_ttl_path.exists():
+            existing_graph = Graph()
+            try:
+                existing_graph.parse(output_ttl_path, format="turtle")
+                oc = get_oc_namespace()
+                existing_hash = None
+                for skill_uri in existing_graph.subjects(RDF.type, oc.Skill):
+                    hash_val = existing_graph.value(skill_uri, oc.contentHash)
+                    if hash_val:
+                        existing_hash = str(hash_val)
+                        break
+
+                if existing_hash == sub_skill_hash:
+                    logger.info(f"Sub-skill {sub_skill_short_id} unchanged (hash match), skipping")
+                    continue
+            except Exception as e:
+                logger.debug(f"Could not read existing sub-skill: {e}")
+
+        # Get sibling names for context
+        sibling_names = [f.name for f in auxiliary_md_files if f.parent == skill_dir and f != md_file]
+
+        # Build parent context
+        parent_context = {
+            "filename": md_file.name,
+            "parent_skill_id": parent_qualified_id,  # Pass qualified ID for prompt context
+            "sibling_names": sibling_names
+        }
+
+        # LLM extraction with context - use SHORT ID for extracted.id
+        try:
+            extracted = tool_use_loop(skill_dir, sub_skill_hash, sub_skill_short_id, parent_context=parent_context)
+            extracted = enrich_extracted_skill(extracted, skill_dir, input_path)
+
+            # Defer serialization until after dry_run check
+            sub_skills_to_serialize.append((
+                extracted, output_ttl_path, sub_skill_qualified_id,
+                parent_local_id, parent_qualified_id
+            ))
+            logger.info(f"Successfully extracted sub-skill: {sub_skill_short_id}")
+
+        except ExtractionError as e:
+            console.print(f"[red]Extraction failed for sub-skill {sub_skill_short_id}: {e}[/red]")
+            continue
+
+    # Process Rule C: Asset Files (collect for later - copy deferred until after dry_run check)
+    assets_to_copy = []
     for asset_file in asset_files:
         rel_path = asset_file.relative_to(input_path)
         output_asset_path = output_path / rel_path
@@ -300,20 +388,13 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
                 logger.debug(f"Asset unchanged, skipping: {asset_file.name}")
                 continue
 
-        # Ensure output directory exists
-        output_asset_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Copy asset
-        import shutil
-        shutil.copy2(asset_file, output_asset_path)
-        assets_copied += 1
-        logger.debug(f"Copied asset: {asset_file.name}")
+        assets_to_copy.append((asset_file, output_asset_path))
 
     # Show summary
     if compiled_skills:
         console.print(Panel(f"[green]Compiled {len(compiled_skills)} skill(s)[/green]"))
 
-        for skill in compiled_skills:
+        for skill, _ in compiled_skills:
             console.print(f"\n[bold]{skill.id}[/bold]")
             console.print(f"  Nature: {skill.nature[:80]}...")
             console.print(f"  Genus: {skill.genus}")
@@ -333,12 +414,41 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
             console.print("[yellow]Cancelled[/yellow]")
             return
 
-    # Serialize each skill module
-    for skill, output_skill_path in zip(compiled_skills, skill_output_paths):
-        serialize_skill_to_module(skill, output_skill_path, output_path)
+    # Serialize each skill module (with qualified ID for URI)
+    for (skill, package_id), output_skill_path in zip(compiled_skills, skill_output_paths):
+        qualified_id = f"{package_id}/{skill.id}"
+        serialize_skill_to_module(
+            skill, output_skill_path, output_path,
+            qualified_id=qualified_id
+        )
 
-    # Collect all skill output paths for index (including pre-existing)
-    all_skill_paths = list(output_path.rglob("ontoskill.ttl"))
+    # Serialize sub-skill modules (after dry_run check)
+    sub_skills_serialized = 0
+    for item in sub_skills_to_serialize:
+        extracted, output_ttl_path, qualified_id, extends_parent, extends_parent_qualified = item
+        serialize_skill_to_module(
+            extracted,
+            output_ttl_path,
+            output_path,
+            qualified_id=qualified_id,
+            extends_parent=extends_parent,
+            extends_parent_qualified=extends_parent_qualified,
+        )
+        sub_skills_serialized += 1
+
+    # Copy assets (after dry_run check)
+    assets_copied = 0
+    import shutil
+    for asset_file, output_asset_path in assets_to_copy:
+        output_asset_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(asset_file, output_asset_path)
+        assets_copied += 1
+        logger.debug(f"Copied asset: {asset_file.name}")
+
+    # Collect all skill output paths for index (including sub-skills)
+    all_skill_paths = list(output_path.rglob("*.ttl"))
+    # Exclude system files
+    all_skill_paths = [p for p in all_skill_paths if p.name not in {"ontoskills-core.ttl", "index.ttl", "index.enabled.ttl", "index.installed.ttl"}]
 
     # Generate index manifest
     index_path = ontology_root / "index.ttl"
@@ -349,16 +459,16 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
     summary_parts = []
     if compiled_skills:
         summary_parts.append(f"{len(compiled_skills)} skill(s)")
+    if sub_skills_serialized > 0:
+        summary_parts.append(f"{sub_skills_serialized} sub-skill(s)")
     if assets_copied > 0:
         summary_parts.append(f"{assets_copied} asset(s)")
-    if auxiliary_md_files:
-        summary_parts.append(f"{len(auxiliary_md_files)} auxiliary md file(s)")
 
     if summary_parts:
         console.print(f"\n[green]Processed {', '.join(summary_parts)} to {output_path}[/green]")
         console.print(f"[green]Enabled index updated at {enabled_index_path(ontology_root)}[/green]")
     else:
-        console.print(f"\n[yellow]No changes made[/yellow]")
+        console.print("\n[yellow]No changes made[/yellow]")
 
 
 @cli.command('init-core')
@@ -372,7 +482,7 @@ def init_core(ctx, output_dir, force):
     Creates the foundational TBox with classes, properties, and predefined states.
     Safe to run multiple times - skips if file exists unless --force is used.
     """
-    logger = logging.getLogger(__name__)
+    _logger = logging.getLogger(__name__)  # Use underscore prefix for internal use
     output_path = Path(output_dir)
     core_path = output_path / "ontoskills-core.ttl"
 
@@ -612,7 +722,7 @@ def rebuild_index_cmd(ctx, ontology_root_arg):
     setup_logging(ctx.obj.get('verbose', False), ctx.obj.get('quiet', False))
     root = ontology_root_arg or Path(resolve_ontology_root(OUTPUT_DIR))
     installed, enabled = rebuild_registry_indexes(root=root)
-    console.print(f"[green]Rebuilt indices[/green]")
+    console.print("[green]Rebuilt indices[/green]")
     console.print(f"  installed: {installed}")
     console.print(f"  enabled: {enabled}")
 
@@ -659,6 +769,68 @@ def security_audit(ctx, input_dir, verbose, quiet):
             issues_found += 1
 
     console.print(f"\n[bold]Audit complete:[/bold] {issues_found} issue(s) found")
+
+
+@cli.command('diff')
+@click.option('--from', 'from_file', default=None, type=click.Path(exists=False),
+              help='Base ontology file (default: latest snapshot)')
+@click.option('--to', 'to_file', required=True, type=click.Path(exists=True),
+              help='New ontology file to compare against')
+@click.option('--format', 'output_format', type=click.Choice(['text', 'json']), default='text',
+              help='Output format')
+@click.option('--output', 'output_path', default=None, type=click.Path(),
+              help='Output file for JSON report')
+@click.option('--breaking-only', is_flag=True,
+              help='Show only breaking changes')
+@click.option('--suggest', is_flag=True,
+              help='Show migration suggestions for breaking changes')
+@click.option('-v', '--verbose', is_flag=True, help='Enable debug logging')
+@click.option('-q', '--quiet', is_flag=True, help='Suppress progress output')
+@click.pass_context
+def diff_cmd(ctx, from_file, to_file, output_format, output_path, breaking_only, suggest, verbose, quiet):
+    """Compare two ontology files for semantic drift.
+
+    Detects breaking, additive, and cosmetic changes between two ontology versions.
+    Exit codes:
+        0 = No breaking changes
+        9 = Breaking changes detected
+
+    Example:
+        ontoskills diff --from old.ttl --to new.ttl
+        ontoskills diff --to new.ttl --suggest
+    """
+    setup_logging(verbose or ctx.obj.get('verbose', False), quiet or ctx.obj.get('quiet', False))
+
+    # Determine base file
+    if from_file:
+        base_path = Path(from_file)
+        if not base_path.exists():
+            console.print(f"[red]Base file not found: {base_path}[/red]")
+            raise SystemExit(2)
+    else:
+        base_path = get_latest_snapshot()
+        if not base_path:
+            console.print("[red]No snapshot found. Use --from to specify a base file.[/red]")
+            raise SystemExit(2)
+
+    new_path = Path(to_file)
+
+    # Compute diff
+    report = compute_diff(str(base_path), str(new_path))
+
+    # Output
+    if output_format == 'json' and output_path:
+        export_json(report, output_path)
+    else:
+        print_report(report, breaking_only=breaking_only)
+
+        if suggest and report.has_breaking:
+            suggestions = report.suggestions()
+            print_suggestions(suggestions)
+
+    # Exit with appropriate code
+    if report.has_breaking:
+        raise SystemExit(9)
 
 
 @cli.command('export-embeddings')
