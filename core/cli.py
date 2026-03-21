@@ -300,8 +300,8 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
         try:
             extracted = tool_use_loop(skill_dir, skill_hash, skill_id)
             extracted = enrich_extracted_skill(extracted, skill_dir, input_path)
-            # Use qualified ID for consistent URI matching with sub-skills
-            extracted.id = qualified_skill_id
+            # Keep short ID for parent skill (sub-skills will extend to qualified parent)
+            # Note: extracted.id remains the short skill ID (e.g., "brainstorming")
             compiled_skills.append(extracted)
             skill_output_paths.append(output_skill_path)
 
@@ -365,7 +365,8 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
             extracted = enrich_extracted_skill(extracted, skill_dir, input_path)
 
             # Defer serialization until after dry_run check
-            sub_skills_to_serialize.append((extracted, output_ttl_path, parent_skill_id))
+            # Use short parent ID for extends relationship (matches parent's URI)
+            sub_skills_to_serialize.append((extracted, output_ttl_path, parent_local_id))
             logger.info(f"Successfully extracted sub-skill: {sub_skill_id}")
 
         except ExtractionError as e:
