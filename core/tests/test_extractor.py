@@ -1,4 +1,33 @@
-from compiler.extractor import generate_skill_id, generate_qualified_skill_id, compute_skill_hash, generate_sub_skill_id, compute_sub_skill_hash
+from compiler.extractor import generate_skill_id, generate_qualified_skill_id, compute_skill_hash, generate_sub_skill_id, compute_sub_skill_hash, normalize_package_id
+
+
+def test_normalize_package_id():
+    # Already normalized
+    assert normalize_package_id("obra/superpowers") == "obra/superpowers"
+    assert normalize_package_id("local") == "local"
+
+    # NPM scoped package
+    assert normalize_package_id("@scope/package-name") == "scope/package-name"
+
+    # Uppercase
+    assert normalize_package_id("MyCompany/MyPackage") == "mycompany/mypackage"
+
+    # Dots and special chars
+    assert normalize_package_id("my.company/my.package") == "my-company/my-package"
+    assert normalize_package_id("my_company/my_package") == "my-company/my-package"
+
+    # Spaces
+    assert normalize_package_id("My Company/My Package") == "my-company/my-package"
+
+    # Multiple slashes (nested packages)
+    assert normalize_package_id("vendor/author/pkg") == "vendor/author/pkg"
+
+    # Mixed issues
+    assert normalize_package_id("@MyScope/My.Package") == "myscope/my-package"
+
+    # Empty segments fall back to local
+    assert normalize_package_id("///") == "local"
+    assert normalize_package_id("") == "local"
 
 
 def test_generate_skill_id():

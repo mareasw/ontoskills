@@ -331,6 +331,34 @@ def test_skill_uri_for_qualified_id():
     assert "/" not in fragment
 
 
+def test_skill_uri_for_id_defensive_slugification():
+    """Test that skill_uri_for_id defensively slugifies special characters."""
+    from compiler.serialization import skill_uri_for_id
+
+    # Dots should be replaced
+    uri = skill_uri_for_id("my.skill")
+    assert "#" in str(uri)
+    fragment = str(uri).split("#")[-1]
+    assert "." not in fragment
+    assert "my_skill" in fragment
+
+    # Spaces should be replaced
+    uri = skill_uri_for_id("my skill")
+    fragment = str(uri).split("#")[-1]
+    assert " " not in fragment
+
+    # Uppercase should be lowercased
+    uri = skill_uri_for_id("MySkill")
+    fragment = str(uri).split("#")[-1]
+    assert fragment == "skill_myskill"
+
+    # Mixed special chars
+    uri = skill_uri_for_id("My.Package/With Spaces")
+    fragment = str(uri).split("#")[-1]
+    for char in [" ", ".", "/", "@"]:
+        assert char not in fragment
+
+
 def test_serialize_skill_with_extends_injection():
     """Test that extends is injected for sub-skills."""
     from compiler.serialization import serialize_skill, skill_uri_for_id

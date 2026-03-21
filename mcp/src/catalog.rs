@@ -310,6 +310,8 @@ impl Catalog {
         let mut loaded_any = false;
         let registry_lookup = load_registry_lookup(ontology_root);
         let mut skill_index = Vec::new();
+        let base_uri =
+            env::var("ONTOSKILLS_BASE_URI").unwrap_or_else(|_| DEFAULT_BASE_URI.to_string());
         let enabled_manifest = ontology_root.join("system").join("index.enabled.ttl");
         let default_manifest = ontology_root.join("index.ttl");
 
@@ -322,6 +324,7 @@ impl Catalog {
                 ontology_root,
                 &registry_lookup,
                 &mut skill_index,
+                &base_uri,
             )?;
             loaded_any = !visited.is_empty();
         } else if default_manifest.exists() {
@@ -333,6 +336,7 @@ impl Catalog {
                 ontology_root,
                 &registry_lookup,
                 &mut skill_index,
+                &base_uri,
             )?;
             loaded_any = !visited.is_empty();
         } else {
@@ -348,7 +352,7 @@ impl Catalog {
                 }
 
                 load_turtle_file(&store, path)?;
-                collect_skill_records_from_file(path, ontology_root, &registry_lookup, &mut skill_index)?;
+                collect_skill_records_from_file(path, ontology_root, &registry_lookup, &mut skill_index, &base_uri)?;
                 loaded_any = true;
             }
         }
@@ -358,9 +362,6 @@ impl Catalog {
                 ontology_root.to_path_buf(),
             ));
         }
-
-        let base_uri =
-            env::var("ONTOSKILLS_BASE_URI").unwrap_or_else(|_| DEFAULT_BASE_URI.to_string());
 
         skill_index.sort_by(|left, right| left.qualified_id.cmp(&right.qualified_id));
 
@@ -1283,6 +1284,7 @@ fn load_manifest_tree(
     ontology_root: &Path,
     registry_lookup: &HashMap<String, RegistryLookupEntry>,
     skill_index: &mut Vec<SkillRecord>,
+    base_uri: &str,
 ) -> Result<(), CatalogError> {
     let canonical = manifest_path.canonicalize()?;
     if !visited.insert(canonical.clone()) {
@@ -1290,7 +1292,7 @@ fn load_manifest_tree(
     }
 
     load_turtle_file(store, &canonical)?;
-    collect_skill_records_from_file(&canonical, ontology_root, registry_lookup, skill_index)?;
+    collect_skill_records_from_file(&canonical, ontology_root, registry_lookup, skill_index, base_uri)?;
 
     let content = std::fs::read_to_string(&canonical)?;
     for imported in parse_import_paths(&content) {
@@ -1302,6 +1304,7 @@ fn load_manifest_tree(
                 ontology_root,
                 registry_lookup,
                 skill_index,
+                base_uri,
             )?;
         }
     }
@@ -1381,6 +1384,7 @@ fn collect_skill_records_from_file(
     ontology_root: &Path,
     registry_lookup: &HashMap<String, RegistryLookupEntry>,
     skill_index: &mut Vec<SkillRecord>,
+    base_uri: &str,
 ) -> Result<(), CatalogError> {
     if path.file_name().and_then(|name| name.to_str()) == Some("ontoskills-core.ttl") {
         return Ok(());
@@ -1395,7 +1399,8 @@ fn collect_skill_records_from_file(
         if let Some(subject) = line.split_whitespace().next() {
             // Support both prefixed (oc:skill_xxx) and full IRI (<https://...#skill_xxx>)
             if subject.starts_with("oc:skill_") {
-                last_subject_uri = Some(format!("{}{}", DEFAULT_BASE_URI, subject.trim_start_matches("oc:")));
+                // Use the runtime base_uri instead of DEFAULT_BASE_URI
+                last_subject_uri = Some(format!("{}{}", base_uri, subject.trim_start_matches("oc:")));
             } else if subject.starts_with('<') && subject.contains("#skill_") {
                 // Full IRI: <https://ontoskills.sh/ontology#skill_xxx>
                 last_subject_uri = Some(subject.trim_matches(|c| c == '<' || c == '>').to_string());

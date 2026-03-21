@@ -33,14 +33,25 @@ def skill_uri_for_id(skill_id: str, qualified_id: str | None = None) -> URIRef:
                      to avoid collisions across packages.
 
     The URI is based on the qualified_id (if provided) or skill_id,
-    slugified to be QName-compatible (replaces / and @ with _).
+    slugified to be QName-compatible (lowercase, alphanumeric with underscores).
     The short skill_id is always stored in dcterms:identifier.
     """
     oc = get_oc_namespace()
     # Use qualified_id for URI if provided, otherwise use skill_id
     id_for_uri = qualified_id or skill_id
-    # Slugify: replace / and @ (scoped packages) with _ for QName compatibility
-    slug = id_for_uri.replace("/", "_").replace("@", "_")
+
+    # Defensive slugification for QName compatibility:
+    # - lowercase
+    # - replace / and @ (scoped packages) with _
+    # - replace any non-alphanumeric (except _) with _
+    # - collapse consecutive underscores
+    import re
+    slug = id_for_uri.lower()
+    slug = re.sub(r'[/@]', '_', slug)  # slashes and scoped package prefix
+    slug = re.sub(r'[^a-z0-9_]', '_', slug)  # any other non-alphanumeric
+    slug = re.sub(r'_+', '_', slug)  # collapse consecutive underscores
+    slug = slug.strip('_')
+
     return oc[f"skill_{slug}"]
 
 

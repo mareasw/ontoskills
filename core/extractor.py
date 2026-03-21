@@ -13,6 +13,40 @@ def generate_skill_id(directory_name: str) -> str:
     return slug[:64]
 
 
+def normalize_package_id(package_id: str) -> str:
+    """
+    Normalize a package ID for use in qualified IDs and URIs.
+
+    Ensures the package ID follows the expected slash-separated format
+    (e.g., "owner/repo") and normalizes each path segment to be
+    QName-compatible (lowercase, alphanumeric with dashes).
+
+    Args:
+        package_id: Raw package ID from manifest (e.g., "@scope/My.Package")
+
+    Returns:
+        Normalized package ID (e.g., "scope/my-package")
+    """
+    # Remove npm scope prefix if present (@scope/name -> scope/name)
+    normalized = package_id.lstrip("@")
+
+    # Split on slashes to handle each segment independently
+    segments = normalized.split("/")
+
+    normalized_segments = []
+    for segment in segments:
+        # Lowercase and normalize each segment
+        seg = segment.lower()
+        seg = re.sub(r'[\s_]+', '-', seg)
+        seg = re.sub(r'[^a-z0-9-]', '-', seg)
+        seg = re.sub(r'-+', '-', seg)
+        seg = seg.strip('-')
+        if seg:
+            normalized_segments.append(seg)
+
+    return "/".join(normalized_segments) if normalized_segments else "local"
+
+
 def generate_qualified_skill_id(package_id: str, skill_id: str) -> str:
     """
     Build a Qualified ID from package and skill components.
@@ -64,11 +98,14 @@ def resolve_package_id(skill_dir: Path) -> str:
     2. ontoskills.toml in skill directory or ancestors
     3. Fall back to "local"
 
+    The returned package ID is normalized to ensure QName compatibility
+    (lowercase, alphanumeric with dashes, slash-separated).
+
     Args:
         skill_dir: Path to the skill directory
 
     Returns:
-        Package ID string (e.g., "obra/superpowers" or "local")
+        Normalized package ID string (e.g., "obra/superpowers" or "local")
     """
     current = skill_dir.resolve()
 
@@ -79,7 +116,7 @@ def resolve_package_id(skill_dir: Path) -> str:
             try:
                 data = json.loads(pkg_json.read_text())
                 if "name" in data:
-                    return data["name"]
+                    return normalize_package_id(data["name"])
             except (json.JSONDecodeError, KeyError):
                 pass
 
@@ -90,7 +127,8 @@ def resolve_package_id(skill_dir: Path) -> str:
                 content = toml_file.read_text()
                 for line in content.splitlines():
                     if line.startswith("name ="):
-                        return line.split("=", 1)[1].strip().strip('"\'')
+                        raw_name = line.split("=", 1)[1].strip().strip('"\'')
+                        return normalize_package_id(raw_name)
             except Exception:
                 pass
 
