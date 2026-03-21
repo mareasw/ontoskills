@@ -27,8 +27,8 @@ Use it when you want published packages maintained by the OntoSkills project:
 
 ```bash
 npx ontoskills search hello
-npx ontoskills install marea.greeting/hello
-npx ontoskills enable marea.greeting/hello
+npx ontoskills install marea/greeting/hello
+npx ontoskills enable marea/greeting/hello
 ```
 
 ### Third-Party Registries
@@ -59,7 +59,7 @@ Source imports are cloned into `~/.ontoskills/skills/vendor/` and compiled outpu
 Install compiled packages from a registry:
 
 ```bash
-ontoskills install marea.greeting/hello
+ontoskills install marea/greeting/hello
 ```
 
 ### Enable and Disable
@@ -67,8 +67,8 @@ ontoskills install marea.greeting/hello
 Enable or disable installed skills:
 
 ```bash
-ontoskills enable marea.greeting/hello
-ontoskills disable marea.greeting/hello
+ontoskills enable marea/greeting/hello
+ontoskills disable marea/greeting/hello
 ```
 
 Enabled skills are the ones exposed to OntoMCP.
@@ -80,7 +80,7 @@ Update installed components explicitly:
 ```bash
 ontoskills update mcp
 ontoskills update core
-ontoskills update marea.greeting/hello
+ontoskills update marea/greeting/hello
 ```
 
 ### Rebuild Index
@@ -96,7 +96,7 @@ ontoskills rebuild-index
 Remove a package or skill:
 
 ```bash
-ontoskills remove marea.greeting/hello
+ontoskills remove marea/greeting/hello
 ```
 
 ### Uninstall Everything

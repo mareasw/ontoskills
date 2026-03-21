@@ -857,4 +857,8 @@ def test_system_files_constant():
     """Test that SYSTEM_FILES constant contains expected files."""
     assert "ontoskills-core.ttl" in SYSTEM_FILES
     assert "index.ttl" in SYSTEM_FILES
-    assert len(SYSTEM_FILES) == 2
+    assert "index.enabled.ttl" in SYSTEM_FILES
+    assert "index.installed.ttl" in SYSTEM_FILES
+    assert "registry.lock.json" in SYSTEM_FILES
+    assert "registry.sources.json" in SYSTEM_FILES
+    assert len(SYSTEM_FILES) == 6

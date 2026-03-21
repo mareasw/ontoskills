@@ -17,8 +17,8 @@ For a normal end user, the registry flow is:
 
 ```bash
 npx ontoskills search hello
-npx ontoskills install marea.greeting/hello
-npx ontoskills enable marea.greeting/hello
+npx ontoskills install mareasw/greeting/hello
+npx ontoskills enable mareasw/greeting/hello
 ```
 
 For a third-party registry:
@@ -48,11 +48,11 @@ registry/
   README.md
   index.json
   packages/
-    marea.greeting/
+    mareasw/greeting/
       package.json
       hello/
         ontoskill.ttl
-    marea.office/
+    mareasw/office/
       package.json
       office/
         ontoskill.ttl
@@ -84,8 +84,8 @@ The registry index is a static JSON file listing installable packages.
 {
   "packages": [
     {
-      "package_id": "marea.office",
-      "manifest_url": "https://example.invalid/packages/marea.office/package.json",
+      "package_id": "mareasw/office",
+      "manifest_url": "https://example.invalid/packages/mareasw/office/package.json",
       "trust_tier": "verified"
     }
   ]
