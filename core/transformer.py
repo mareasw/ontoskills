@@ -9,7 +9,6 @@ import json
 import os
 import logging
 from pathlib import Path
-from typing import Any
 
 import anthropic
 from anthropic import Anthropic
@@ -17,7 +16,7 @@ from anthropic import Anthropic
 from compiler.env import load_local_env
 from compiler.schemas import ExtractedSkill
 from compiler.exceptions import ExtractionError
-from compiler.config import ANTHROPIC_MODEL, MAX_ITERATIONS, EXTRACTION_TIMEOUT, CORE_STATES, FAILURE_STATES
+from compiler.config import ANTHROPIC_MODEL, MAX_ITERATIONS, EXTRACTION_TIMEOUT
 from compiler.prompts import SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -26,6 +25,44 @@ load_local_env()
 
 # Configuration
 COMPLETION_TOOL = "extract_skill"
+
+
+def build_sub_skill_context_prompt(
+    filename: str,
+    parent_skill_id: str,
+    sibling_names: list[str] | None = None
+) -> str:
+    """
+    Build the context augmentation prompt for sub-skill extraction.
+
+    Args:
+        filename: The markdown filename being extracted (e.g., "planning.md")
+        parent_skill_id: The Qualified ID of the parent skill
+        sibling_names: List of sibling sub-skill filenames for dependsOn inference
+
+    Returns:
+        Context string to append to system prompt
+    """
+    sibling_list = ""
+    if sibling_names:
+        # Convert filenames to skill IDs for reference
+        sibling_ids = [Path(s).stem for s in sibling_names]
+        sibling_list = f"\n\nSibling sub-skills in this directory: {', '.join(sibling_ids)}\nUse these IDs when deriving dependsOn relationships."
+
+    return f"""
+## SUB-SKILL CONTEXT
+
+You are extracting a sub-skill from file "{filename}"
+that is part of the parent skill "{parent_skill_id}".
+
+Consider this context when:
+- Deriving dependsOn relationships with sibling sub-skills (use their simple IDs like "setup", "planning")
+- Determining appropriate intents (they may be more specific than the parent)
+- Understanding the scope of the sub-skill (it operates within the parent's epistemic perimeter)
+{sibling_list}
+
+DO NOT add an "extends" relationship - this will be injected automatically by the compiler.
+"""
 
 # Tool definitions
 TOOLS = [
@@ -128,7 +165,12 @@ def execute_tool(name: str, input_data: dict, skill_dir: Path) -> str:
         return json.dumps({"error": str(e)})
 
 
-def tool_use_loop(skill_dir: Path, skill_hash: str, skill_id: str) -> ExtractedSkill:
+def tool_use_loop(
+    skill_dir: Path,
+    skill_hash: str,
+    skill_id: str,
+    parent_context: dict | None = None
+) -> ExtractedSkill:
     """
     Orchestrates the tool-use conversation with Claude.
 
@@ -136,6 +178,10 @@ def tool_use_loop(skill_dir: Path, skill_hash: str, skill_id: str) -> ExtractedS
         skill_dir: Path to skill directory
         skill_hash: Pre-computed SHA-256 hash of skill files
         skill_id: Pre-computed skill ID slug
+        parent_context: Optional context for sub-skill extraction containing:
+            - filename: The markdown filename being extracted
+            - parent_skill_id: The Qualified ID of the parent skill
+            - sibling_names: List of sibling sub-skill filenames
 
     Returns:
         ExtractedSkill with structured data
@@ -143,6 +189,16 @@ def tool_use_loop(skill_dir: Path, skill_hash: str, skill_id: str) -> ExtractedS
     Raises:
         ExtractionError: If extraction fails or times out
     """
+    # Build system prompt with optional context augmentation
+    system_prompt = SYSTEM_PROMPT
+    if parent_context:
+        context_augmentation = build_sub_skill_context_prompt(
+            filename=parent_context.get("filename", "unknown.md"),
+            parent_skill_id=parent_context.get("parent_skill_id", ""),
+            sibling_names=parent_context.get("sibling_names")
+        )
+        system_prompt = SYSTEM_PROMPT + context_augmentation
+
     messages = [{
         "role": "user",
         "content": f"""Analyze the skill in this directory and extract its structure.
@@ -166,7 +222,7 @@ Use the available tools to:
                 max_tokens=8192,
                 tools=TOOLS,
                 messages=messages,
-                system=SYSTEM_PROMPT,
+                system=system_prompt,
                 timeout=EXTRACTION_TIMEOUT
             )
         except anthropic.APIError as e:
@@ -174,7 +230,7 @@ Use the available tools to:
 
         # Process response blocks
         tool_results = []
-        extraction_data = None
+        _extraction_data = None  # Use underscore prefix for internal use
 
         for block in response.content:
             if block.type == "tool_use":
