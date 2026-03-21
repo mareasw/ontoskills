@@ -317,20 +317,23 @@ def test_serialize_skill_relations_use_skill_uris():
 
 
 def test_skill_uri_for_qualified_id():
-    """Test URI generation handles Qualified IDs with slashes."""
+    """Test URI generation handles Qualified IDs by slugifying slashes."""
     from compiler.serialization import skill_uri_for_id
 
-    # Qualified ID with slashes should be preserved in URI
+    # Qualified ID with slashes should be slugified to QName-friendly form
     uri = skill_uri_for_id("obra/superpowers/brainstorming/planning")
     uri_str = str(uri)
 
-    # URI should contain the full qualified path with slashes preserved
-    assert "obra/superpowers/brainstorming/planning" in uri_str
+    # URI should end with slugged fragment (slashes replaced with underscores)
+    assert uri_str.endswith("#skill_obra_superpowers_brainstorming_planning")
+    # Fragment should not contain slashes (the base URI https:// does, but fragment doesn't)
+    fragment = uri_str.split("#")[-1]
+    assert "/" not in fragment
 
 
 def test_serialize_skill_with_extends_injection():
     """Test that extends is injected for sub-skills."""
-    from compiler.serialization import serialize_skill
+    from compiler.serialization import serialize_skill, skill_uri_for_id
     from compiler.schemas import ExtractedSkill
     from rdflib import Graph
 
@@ -352,16 +355,17 @@ def test_serialize_skill_with_extends_injection():
     graph = Graph()
     serialize_skill(graph, sub_skill, extends_parent="obra/superpowers/brainstorming")
 
-    # Verify extends triple was added
-    from compiler.core_ontology import get_oc_namespace
+    # Verify extends triple was added using slugged URIs
+    skill_uri = skill_uri_for_id(sub_skill.id)
+    parent_skill_uri = skill_uri_for_id("obra/superpowers/brainstorming")
 
+    from compiler.core_ontology import get_oc_namespace
     oc = get_oc_namespace()
-    skill_uri = oc["obra/superpowers/brainstorming/planning"]
 
     # Check that extends relationship exists
     extends_values = list(graph.objects(skill_uri, oc.extends))
     assert len(extends_values) == 1
-    assert "brainstorming" in str(extends_values[0])
+    assert extends_values[0] == parent_skill_uri
 
 
 def test_serialize_skill_to_module_with_extends(tmp_path):
