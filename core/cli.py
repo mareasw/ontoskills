@@ -254,9 +254,6 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
         skill_id = generate_skill_id(skill_dir.name)
         skill_hash = compute_skill_hash(skill_dir)
 
-        # Get qualified ID for consistent parent/child URIs
-        qualified_skill_id, package_id = skill_parent_map.get(skill_dir, (skill_id, "local"))
-
         logger.info(f"Processing skill: {skill_id}")
 
         # Compute output path
