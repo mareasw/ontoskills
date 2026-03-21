@@ -48,7 +48,7 @@ oc:skill_xlsx a oc:Skill, oc:ExecutableSkill ;
     (package_dir / "package.json").write_text(
         json.dumps(
             {
-                "package_id": "marea.office",
+                "package_id": "marea/office",
                 "version": "1.0.0",
                 "trust_tier": "verified",
                 "source": "https://example.invalid/marea/office",
@@ -73,18 +73,18 @@ def test_install_enable_disable_package_rebuilds_indexes(tmp_path):
 
     package = install_package_from_directory(package_dir, root=root)
     lock = load_registry_lock(root)
-    assert "marea.office" in lock.packages
-    assert Path(package.install_root) == ontology_vendor_dir(root) / "marea.office"
+    assert "marea/office" in lock.packages
+    assert Path(package.install_root) == ontology_vendor_dir(root) / "marea/office"
     assert enabled_index_path(root).exists()
 
-    enable_skills("marea.office", ["xlsx"], root=root)
+    enable_skills("marea/office", ["xlsx"], root=root)
     lock = load_registry_lock(root)
-    enabled = {skill.skill_id for skill in lock.packages["marea.office"].skills if skill.enabled}
+    enabled = {skill.skill_id for skill in lock.packages["marea/office"].skills if skill.enabled}
     assert enabled == {"office", "xlsx"}
 
-    disable_skills("marea.office", ["office"], root=root)
+    disable_skills("marea/office", ["office"], root=root)
     lock = load_registry_lock(root)
-    enabled = {skill.skill_id for skill in lock.packages["marea.office"].skills if skill.enabled}
+    enabled = {skill.skill_id for skill in lock.packages["marea/office"].skills if skill.enabled}
     assert enabled == set()
 
     installed_index, enabled_index = rebuild_registry_indexes(root)
@@ -124,7 +124,7 @@ def test_registry_install_from_file_index_uses_relative_manifest_and_vendor_layo
     create_core_ontology(root / "ontoskills-core.ttl")
 
     registry_dir = tmp_path / "registry"
-    package_dir = registry_dir / "packages" / "marea.greeting"
+    package_dir = registry_dir / "packages" / "marea/greeting"
     package_dir.mkdir(parents=True, exist_ok=True)
     (package_dir / "hello").mkdir(parents=True, exist_ok=True)
     (package_dir / "hello" / "ontoskill.ttl").write_text(
@@ -141,7 +141,7 @@ oc:skill_hello a oc:Skill, oc:DeclarativeSkill ;
     (package_dir / "package.json").write_text(
         json.dumps(
             {
-                "package_id": "marea.greeting",
+                "package_id": "marea/greeting",
                 "version": "0.1.0",
                 "trust_tier": "verified",
                 "modules": ["hello/ontoskill.ttl"],
@@ -158,8 +158,8 @@ oc:skill_hello a oc:Skill, oc:DeclarativeSkill ;
             {
                 "packages": [
                     {
-                        "package_id": "marea.greeting",
-                        "manifest_url": "./packages/marea.greeting/package.json",
+                        "package_id": "marea/greeting",
+                        "manifest_url": "./packages/marea/greeting/package.json",
                         "trust_tier": "verified",
                         "source_kind": "ontology",
                     }
@@ -174,9 +174,9 @@ oc:skill_hello a oc:Skill, oc:DeclarativeSkill ;
     sources = load_registry_sources(root)
     assert len(sources.sources) == 1
 
-    package = install_package_from_sources("marea.greeting", root=root)
-    assert package.package_id == "marea.greeting"
-    assert Path(package.install_root) == ontology_vendor_dir(root) / "marea.greeting"
+    package = install_package_from_sources("marea/greeting", root=root)
+    assert package.package_id == "marea/greeting"
+    assert Path(package.install_root) == ontology_vendor_dir(root) / "marea/greeting"
 
 
 def test_import_source_repository_clones_to_skills_vendor_and_compiles_to_ontology_vendor(tmp_path):

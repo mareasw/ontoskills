@@ -194,6 +194,11 @@ def save_registry_lock(lock: RegistryLock, root: Path | None = None) -> None:
 
 
 def discover_local_skill_paths(root: Path | None = None) -> list[Path]:
+    """Discover all skill TTL files (including sub-skill modules).
+
+    Sub-skills are compiled as auxiliary .ttl files (e.g., planning.ttl),
+    that should be included in the discovery, not just ontoskill.ttl.
+    """
     base = ontology_root() if root is None else Path(root).resolve()
     excluded = {
         system_dir(base),
@@ -201,9 +206,14 @@ def discover_local_skill_paths(root: Path | None = None) -> list[Path]:
         base / "official",
         base / "community",
     }
+    system_files = {"ontoskills-core.ttl", "index.ttl", "index.enabled.ttl", "index.installed.ttl"}
     paths: list[Path] = []
-    for path in base.rglob("ontoskill.ttl"):
+    for path in base.rglob("*.ttl"):
+        # Skip if in excluded directories
         if any(parent == path.parent or parent in path.parents for parent in excluded):
+            continue
+        # Skip system files
+        if path.name in system_files:
             continue
         paths.append(path.resolve())
     return sorted(paths)
@@ -560,7 +570,7 @@ def infer_source_package_id(repo_ref: str, repo_path: Path) -> str:
         if len(parts) >= 2:
             owner = slugify_identifier(parts[0])
             repo = slugify_identifier(parts[1].removesuffix(".git"))
-            return f"{owner}.{repo}"
+            return f"{owner}/{repo}"
     return slugify_identifier(repo_path.name)
 
 

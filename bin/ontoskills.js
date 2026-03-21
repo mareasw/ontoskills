@@ -302,7 +302,7 @@ function defaultTrustTier(manifest, entry) {
 
 async function installSkill(qualifiedId) {
   if (!qualifiedId.includes("/")) {
-    fail("Install expects a qualified skill id like marea.office/xlsx");
+    fail("Install expects a qualified skill id like marea/office/xlsx");
   }
   const [packageId, skillId] = qualifiedId.split("/", 2);
   const matches = await findSkillInRegistry(qualifiedId);

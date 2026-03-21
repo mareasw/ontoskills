@@ -1881,10 +1881,10 @@ oc:skill_disabled a oc:Skill, oc:DeclarativeSkill ;
 
     fn write_ambiguous_registry(root: &Path) {
         fs::create_dir_all(root.join("system")).unwrap();
-        fs::create_dir_all(root.join("vendor").join("marea.office").join("skills")).unwrap();
+        fs::create_dir_all(root.join("vendor").join("marea/office").join("skills")).unwrap();
         fs::create_dir_all(root.join("xlsx")).unwrap();
         fs::write(
-            root.join("vendor").join("marea.office").join("skills").join("xlsx.ttl"),
+            root.join("vendor").join("marea/office").join("skills").join("xlsx.ttl"),
             format!(
                 r#"
 @prefix oc: <{base}> .
@@ -1917,11 +1917,11 @@ oc:skill_xlsx_local a oc:Skill, oc:ExecutableSkill ;
             root.join("system").join("registry.lock.json"),
             r#"{
   "packages": {
-    "marea.office": {
-      "package_id": "marea.office",
+    "marea/office": {
+      "package_id": "marea/office",
       "version": "1.0.0",
       "trust_tier": "verified",
-      "source": "https://example.invalid/marea.office",
+      "source": "https://example.invalid/marea/office",
       "skills": [
         {
           "skill_id": "xlsx",
@@ -1936,7 +1936,7 @@ oc:skill_xlsx_local a oc:Skill, oc:ExecutableSkill ;
                 "__MODULE__",
                 &root
                     .join("vendor")
-                    .join("marea.office")
+                    .join("marea/office")
                     .join("skills")
                     .join("xlsx.ttl")
                     .display()
@@ -1955,7 +1955,7 @@ oc:skill_xlsx_local a oc:Skill, oc:ExecutableSkill ;
 "#,
                 verified = root
                     .join("vendor")
-                    .join("marea.office")
+                    .join("marea/office")
                     .join("skills")
                     .join("xlsx.ttl")
                     .display(),
@@ -2072,11 +2072,11 @@ oc:skill_xlsx_local a oc:Skill, oc:ExecutableSkill ;
 
         let catalog = Catalog::load(dir.path()).unwrap();
         let preferred = catalog.get_skill("xlsx").unwrap();
-        let imported = catalog.get_skill("marea.office/xlsx").unwrap();
+        let imported = catalog.get_skill("marea/office/xlsx").unwrap();
 
         assert_eq!(preferred.qualified_id, "local/xlsx");
         assert_eq!(preferred.trust_tier, "local");
-        assert_eq!(imported.qualified_id, "marea.office/xlsx");
+        assert_eq!(imported.qualified_id, "marea/office/xlsx");
         assert_eq!(imported.trust_tier, "verified");
     }
 }

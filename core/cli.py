@@ -240,10 +240,22 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
     compiled_skills = []
     skill_output_paths = []
 
+    # Build skill_parent_map for Rule A (needed for qualified IDs)
+    skill_parent_map = {}  # skill_dir -> (parent_skill_id, package_id)
+    for skill_file in skill_md_files:
+        skill_dir = skill_file.parent
+        skill_id = generate_skill_id(skill_dir.name)
+        package_id = resolve_package_id(skill_dir)
+        qualified_parent_id = generate_qualified_skill_id(package_id, skill_id)
+        skill_parent_map[skill_dir] = (qualified_parent_id, package_id)
+
     for skill_file in skill_md_files:
         skill_dir = skill_file.parent
         skill_id = generate_skill_id(skill_dir.name)
         skill_hash = compute_skill_hash(skill_dir)
+
+        # Get qualified ID for consistent parent/child URIs
+        qualified_skill_id, package_id = skill_parent_map.get(skill_dir, (skill_id, "local"))
 
         logger.info(f"Processing skill: {skill_id}")
 
@@ -288,6 +300,8 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
         try:
             extracted = tool_use_loop(skill_dir, skill_hash, skill_id)
             extracted = enrich_extracted_skill(extracted, skill_dir, input_path)
+            # Use qualified ID for consistent URI matching with sub-skills
+            extracted.id = qualified_skill_id
             compiled_skills.append(extracted)
             skill_output_paths.append(output_skill_path)
 
@@ -297,17 +311,10 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
             continue
 
     # Process Rule B: Auxiliary Markdown (*.md → *.ttl)
-    # First, collect all skill directories and their parent info
-    skill_parent_map = {}  # skill_dir -> (parent_skill_id, package_id)
-    for skill_file in skill_md_files:
-        skill_dir = skill_file.parent
-        skill_id = generate_skill_id(skill_dir.name)
-        package_id = resolve_package_id(skill_dir)
-        qualified_parent_id = generate_qualified_skill_id(package_id, skill_id)
-        skill_parent_map[skill_dir] = (qualified_parent_id, package_id)
+    # skill_parent_map already built above for Rule A
 
-    # Process auxiliary files
-    sub_skills_compiled = []
+    # Process auxiliary files (extraction only - serialization deferred until after dry_run check)
+    sub_skills_to_serialize = []  # List of (extracted, output_ttl_path, parent_skill_id)
     for md_file in auxiliary_md_files:
         skill_dir = md_file.parent
         rel_path = md_file.relative_to(input_path)
@@ -357,23 +364,16 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
             extracted = tool_use_loop(skill_dir, sub_skill_hash, sub_skill_id, parent_context=parent_context)
             extracted = enrich_extracted_skill(extracted, skill_dir, input_path)
 
-            # Serialize with extends injection
-            serialize_skill_to_module(
-                extracted,
-                output_ttl_path,
-                output_path,
-                extends_parent=parent_skill_id
-            )
-
-            sub_skills_compiled.append(extracted)
-            logger.info(f"Successfully compiled sub-skill: {sub_skill_id}")
+            # Defer serialization until after dry_run check
+            sub_skills_to_serialize.append((extracted, output_ttl_path, parent_skill_id))
+            logger.info(f"Successfully extracted sub-skill: {sub_skill_id}")
 
         except ExtractionError as e:
             console.print(f"[red]Extraction failed for sub-skill {sub_skill_id}: {e}[/red]")
             continue
 
-    # Process Rule C: Asset Files (direct copy)
-    assets_copied = 0
+    # Process Rule C: Asset Files (collect for later - copy deferred until after dry_run check)
+    assets_to_copy = []
     for asset_file in asset_files:
         rel_path = asset_file.relative_to(input_path)
         output_asset_path = output_path / rel_path
@@ -384,14 +384,7 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
                 logger.debug(f"Asset unchanged, skipping: {asset_file.name}")
                 continue
 
-        # Ensure output directory exists
-        output_asset_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Copy asset
-        import shutil
-        shutil.copy2(asset_file, output_asset_path)
-        assets_copied += 1
-        logger.debug(f"Copied asset: {asset_file.name}")
+        assets_to_copy.append((asset_file, output_asset_path))
 
     # Show summary
     if compiled_skills:
@@ -421,6 +414,27 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
     for skill, output_skill_path in zip(compiled_skills, skill_output_paths):
         serialize_skill_to_module(skill, output_skill_path, output_path)
 
+    # Serialize sub-skill modules (after dry_run check)
+    sub_skills_serialized = 0
+    for item in sub_skills_to_serialize:
+        extracted, output_ttl_path, parent_skill_id = item
+        serialize_skill_to_module(
+            extracted,
+            output_ttl_path,
+            output_path,
+            extends_parent=parent_skill_id
+        )
+        sub_skills_serialized += 1
+
+    # Copy assets (after dry_run check)
+    assets_copied = 0
+    import shutil
+    for asset_file, output_asset_path in assets_to_copy:
+        output_asset_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(asset_file, output_asset_path)
+        assets_copied += 1
+        logger.debug(f"Copied asset: {asset_file.name}")
+
     # Collect all skill output paths for index (including sub-skills)
     all_skill_paths = list(output_path.rglob("*.ttl"))
     # Exclude system files
@@ -435,8 +449,8 @@ def compile(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, forc
     summary_parts = []
     if compiled_skills:
         summary_parts.append(f"{len(compiled_skills)} skill(s)")
-    if sub_skills_compiled:
-        summary_parts.append(f"{len(sub_skills_compiled)} sub-skill(s)")
+    if sub_skills_serialized > 0:
+        summary_parts.append(f"{sub_skills_serialized} sub-skill(s)")
     if assets_copied > 0:
         summary_parts.append(f"{assets_copied} asset(s)")
 
