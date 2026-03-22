@@ -40,6 +40,7 @@ export default defineConfig({
         { label: 'Skill Authoring', slug: 'authoring' },
         { label: 'Architecture', slug: 'architecture' },
         { label: 'Knowledge Extraction', slug: 'knowledge-extraction' },
+        { label: 'Semantic Discovery', slug: 'semantic-discovery' },
         { label: 'Registry', slug: 'registry' },
         { label: 'MCP Runtime', slug: 'mcp' },
         { label: 'Claude Code', slug: 'mcp-claude-code' },

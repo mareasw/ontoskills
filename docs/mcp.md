@@ -3,8 +3,6 @@ title: MCP Runtime
 description: General OntoMCP runtime guide and installation flow
 ---
 
-# OntoMCP
-
 `OntoMCP` is the runtime layer of OntoSkills. It loads compiled ontologies from your managed local home and exposes them through the Model Context Protocol over `stdio`.
 
 The standard product install is:

@@ -3,8 +3,6 @@ title: CLI
 description: End-user command surface for the OntoSkills product
 ---
 
-# OntoSkills CLI
-
 `ontoskills` is the product entrypoint. It installs and manages the runtime, compiler, registry skills, and local state under `~/.ontoskills/`.
 
 ## Quickstart

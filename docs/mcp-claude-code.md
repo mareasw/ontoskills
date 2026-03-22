@@ -3,8 +3,6 @@ title: MCP With Claude Code
 description: Register and verify OntoMCP in Claude Code
 ---
 
-# OntoMCP With Claude Code
-
 ## Install
 
 Install the runtime first:

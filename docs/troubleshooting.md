@@ -3,8 +3,6 @@ title: Troubleshooting
 description: Common issues with installs, registry access, compiler setup, and OntoMCP
 ---
 
-# Troubleshooting
-
 ## `ontoskills install mcp` fails
 
 Check:

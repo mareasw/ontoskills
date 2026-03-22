@@ -1,9 +1,9 @@
 ---
 title: Semantic Intent Discovery
+description: Find skills by natural language intent without knowing exact intent strings
 ---
 
 **Status:** ✅ Implemented
-**Spec:** `docs/superpowers/specs/2026-03-19-semantic-discovery.md`
 
 ---
 

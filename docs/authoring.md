@@ -3,8 +3,6 @@ title: Skill Authoring
 description: Write, import, and compile custom source skills
 ---
 
-# Skill Authoring
-
 OntoSkills supports two ways to work with source skills:
 
 - author a local `SKILL.md`
