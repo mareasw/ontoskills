@@ -3,8 +3,6 @@ title: MCP With Codex
 description: Configure OntoMCP for Codex-based local workflows
 ---
 
-# OntoMCP With Codex
-
 ## Install
 
 Install the runtime first:

@@ -3,8 +3,6 @@ title: Marketplace
 description: Search, install, and enable skills from the official registry
 ---
 
-# Marketplace
-
 The OntoSkills marketplace is the install surface for published, compiled skills.
 
 It is backed by the official registry and exposed in two places:

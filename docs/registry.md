@@ -3,8 +3,6 @@ title: Registry
 description: Official registry, third-party registries, and package lifecycle in OntoSkills
 ---
 
-# Registry
-
 OntoSkills uses a simple distribution model:
 
 - the official registry is built in by default
