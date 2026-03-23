@@ -1,5 +1,5 @@
 [package]
-name = "ontoskills-mcp"
+name = "ontomcp"
 version = "0.9.0"
 edition = "2024"
 description = "Local MCP server for OntoSkills ontologies"

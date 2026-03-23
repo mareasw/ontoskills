@@ -15,7 +15,7 @@ use schema::get_schema_resource;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-const SERVER_NAME: &str = "ontoskills-mcp";
+const SERVER_NAME: &str = "ontomcp";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 const DEFAULT_PROTOCOL_VERSION: &str = "2025-11-25";
 const SUPPORTED_PROTOCOLS: &[&str] = &["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
@@ -45,17 +45,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if embeddings_dir.exists() {
             match EmbeddingEngine::load(&embeddings_dir) {
                 Ok(engine) => {
-                    eprintln!("[ontoskills-mcp] Loaded embedding engine with {} intents",
+                    eprintln!("[ontomcp] Loaded embedding engine with {} intents",
                         engine.intent_count());
                     Some(engine)
                 }
                 Err(e) => {
-                    eprintln!("[ontoskills-mcp] Warning: Failed to load embeddings: {}", e);
+                    eprintln!("[ontomcp] Warning: Failed to load embeddings: {}", e);
                     None
                 }
             }
         } else {
-            eprintln!("[ontoskills-mcp] No embeddings found at {:?}", embeddings_dir);
+            eprintln!("[ontomcp] No embeddings found at {:?}", embeddings_dir);
             None
         };
 
@@ -258,6 +258,9 @@ fn parse_ontology_root() -> PathBuf {
         }
     }
 
+    if let Ok(path) = env::var("ONTOMCP_ONTOLOGY_ROOT") {
+        return PathBuf::from(path);
+    }
     if let Ok(path) = env::var("ONTOSKILLS_MCP_ONTOLOGY_ROOT") {
         return PathBuf::from(path);
     }

@@ -823,7 +823,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ontoskills-mcp"
+name = "ontomcp"
 version = "0.9.0"
 dependencies = [
  "anyhow",

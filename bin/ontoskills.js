@@ -588,10 +588,10 @@ async function installCore() {
 
 async function updateTarget(target) {
   const releases = await loadReleaseLock();
-  if (target === "mcp") {
+  if (target === "mcp" || target === "ontomcp") {
     return installMcp();
   }
-  if (target === "core") {
+  if (target === "core" || target === "ontocore") {
     return installCore();
   }
   if (target === "all") {
@@ -751,10 +751,10 @@ async function uninstallAll() {
 
 function usage() {
   log(`ontoskills commands:
-  ontoskills install mcp
-  ontoskills install core
+  ontoskills install ontomcp
+  ontoskills install ontocore
   ontoskills install <qualified-skill-id>
-  ontoskills update mcp|core|all|<qualified-skill-id>|<package-id>
+  ontoskills update ontomcp|ontocore|all|<qualified-skill-id>|<package-id>
   ontoskills registry add-source <name> <index_url>
   ontoskills registry list
   ontoskills search <query>
@@ -792,10 +792,10 @@ async function main() {
   if (command === "install") {
     const target = args[0];
     if (!target) fail("Missing install target");
-    if (target === "mcp") return installMcp();
-    if (target === "core") return installCore();
+    if (target === "mcp" || target === "ontomcp") return installMcp();
+    if (target === "core" || target === "ontocore") return installCore();
     if (target.includes("/")) return installSkill(target);
-    fail("Install target must be mcp, core, or a qualified skill id");
+    fail("Install target must be ontomcp, ontocore, or a qualified skill id");
   }
 
   if (command === "update") {

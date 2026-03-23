@@ -32,7 +32,7 @@ Fallbacks:
 You can override the ontology root with:
 
 ```bash
-ONTOSKILLS_MCP_ONTOLOGY_ROOT=/path/to/ontoskills
+ONTOMCP_ONTOLOGY_ROOT=/path/to/ontoskills
 ```
 
 or:

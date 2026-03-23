@@ -162,7 +162,7 @@ If nothing is found locally, OntoMCP falls back to:
 ```bash
 --ontology-root /path/to/ontoskills
 # or
-ONTOSKILLS_MCP_ONTOLOGY_ROOT=/path/to/ontoskills
+ONTOMCP_ONTOLOGY_ROOT=/path/to/ontoskills
 ```
 
 ---
@@ -188,7 +188,7 @@ cargo run --manifest-path mcp/Cargo.toml -- --ontology-root ./ontoskills
 Register the MCP server:
 
 ```bash
-claude mcp add ontoskills -- \
+claude mcp add ontomcp -- \
   ~/.ontoskills/bin/ontomcp
 ```
 
@@ -196,7 +196,7 @@ After registration, Claude Code can call:
 
 ```mermaid
 flowchart LR
-    CLAUDE["Claude Code"] -->|"search_skills"| TOOLS["ontoskills MCP"]
+    CLAUDE["Claude Code"] -->|"search_skills"| TOOLS["OntoMCP"]
     CLAUDE -->|"get_skill_context"| TOOLS
     CLAUDE -->|"evaluate_execution_plan"| TOOLS
     CLAUDE -->|"query_epistemic_rules"| TOOLS

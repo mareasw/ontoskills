@@ -40,7 +40,7 @@ The stable executable to register is:
 If your Codex client supports environment-based configuration, the equivalent setting is:
 
 ```bash
-ONTOSKILLS_MCP_ONTOLOGY_ROOT=~/.ontoskills/ontoskills
+ONTOMCP_ONTOLOGY_ROOT=~/.ontoskills/ontoskills
 ```
 
 ## Tools Exposed
