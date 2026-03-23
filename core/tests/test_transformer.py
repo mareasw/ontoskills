@@ -126,7 +126,7 @@ def test_tool_use_loop_success(mock_client, tmp_path):
 
 def test_system_prompt_includes_state_extraction():
     """Test that SYSTEM_PROMPT includes state transition extraction instructions."""
-    from transformer import SYSTEM_PROMPT
+    from compiler.transformer import SYSTEM_PROMPT
     assert "STATE TRANSITION EXTRACTION" in SYSTEM_PROMPT
     assert "requiresState" in SYSTEM_PROMPT
     assert "yieldsState" in SYSTEM_PROMPT
@@ -139,7 +139,7 @@ def test_system_prompt_includes_state_extraction():
 @patch("compiler.transformer.client")
 def test_tool_use_loop_sets_generated_by(mock_client, tmp_path):
     """Test that tool_use_loop sets generated_by field."""
-    from config import ANTHROPIC_MODEL
+    from compiler.config import ANTHROPIC_MODEL
 
     skill_dir = tmp_path / "test-skill"
     skill_dir.mkdir()

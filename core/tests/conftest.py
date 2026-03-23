@@ -1,10 +1,6 @@
-"""Pytest configuration for OntoSkills compiler tests."""
-import sys
-from pathlib import Path
+"""Pytest configuration for OntoSkills compiler tests.
 
-# Add parent directory to path for imports when running pytest directly
-# This is needed because pytest runs from tests/ directory
-tests_dir = Path(__file__).parent
-compiler_dir = tests_dir.parent
-if str(compiler_dir) not in sys.path:
-    sys.path.insert(0, str(compiler_dir))
+Note: Tests require the package to be installed (e.g., pip install -e .).
+The src/ layout uses setuptools package-dir mapping, so 'import compiler'
+works only after installation, not from a plain source checkout.
+"""

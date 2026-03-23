@@ -32,8 +32,8 @@ def test_real_extraction_xlsx(xlsx_skill_dir, tmp_path):
     This test actually calls the Anthropic API to extract skill metadata.
     It validates the entire extraction pipeline end-to-end.
     """
-    from extractor import generate_skill_id, compute_skill_hash
-    from transformer import tool_use_loop
+    from compiler.extractor import generate_skill_id, compute_skill_hash
+    from compiler.transformer import tool_use_loop
 
     skill_id = generate_skill_id(xlsx_skill_dir.name)
     skill_hash = compute_skill_hash(xlsx_skill_dir)
@@ -71,9 +71,9 @@ def test_real_compile_xlsx(xlsx_skill_dir, tmp_path):
 
     This tests: extraction -> serialization -> module creation -> index generation
     """
-    from extractor import generate_skill_id, compute_skill_hash
-    from transformer import tool_use_loop
-    from loader import create_core_ontology, serialize_skill_to_module, generate_index_manifest
+    from compiler.extractor import generate_skill_id, compute_skill_hash
+    from compiler.transformer import tool_use_loop
+    from compiler.loader import create_core_ontology, serialize_skill_to_module, generate_index_manifest
 
     # Setup output directory
     output_dir = tmp_path / "ontoskills"
@@ -106,7 +106,7 @@ def test_real_compile_xlsx(xlsx_skill_dir, tmp_path):
     assert index_path.exists(), "Index manifest should be created"
 
     # Verify module can be loaded
-    from loader import load_skill_module
+    from compiler.loader import load_skill_module
     graph = load_skill_module(skill_output_path)
     assert len(graph) > 0, "Module should contain triples"
 
@@ -123,7 +123,7 @@ def test_real_security_check():
 
     This tests the LLM-as-judge security review with actual API calls.
     """
-    from security import llm_security_review, check_patterns
+    from compiler.security import llm_security_review, check_patterns
 
     # Test safe content - first check patterns (no threats), then LLM
     safe_content = "This is a normal document about cooking pasta."
