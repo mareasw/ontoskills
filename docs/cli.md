@@ -47,7 +47,7 @@ ontoskills rebuild-index
 ```bash
 ontoskills update mcp
 ontoskills update core
-ontoskills update marea/office/xlsx
+ontoskills update mareasw/office/xlsx
 ```
 
 ### Inspect and Diagnose
