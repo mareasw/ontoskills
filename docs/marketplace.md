@@ -14,8 +14,8 @@ It is backed by OntoStore and exposed in two places:
 
 ```bash
 ontoskills search xlsx
-ontoskills install marea/office/xlsx
-ontoskills enable marea/office/xlsx
+ontoskills install mareasw/office/xlsx
+ontoskills enable mareasw/office/xlsx
 ```
 
 ## Qualified IDs
@@ -29,8 +29,8 @@ Marketplace installs use qualified ids:
 Examples:
 
 - `mareasw/greeting/hello`
-- `marea/office/xlsx`
-- `marea/office/docx`
+- `mareasw/office/xlsx`
+- `mareasw/office/docx`
 
 ## Install Flow
 
