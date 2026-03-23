@@ -23,7 +23,7 @@ ontoskills compile
 If a repository contains raw source skills, import and compile it locally:
 
 ```bash
-ontoskills import-source-repo https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+ontoskills import-source https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
 ```
 
 The importer:

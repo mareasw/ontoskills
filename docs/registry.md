@@ -45,7 +45,7 @@ These sources are discoverable by `ontoskills search` and can be installed like 
 Raw source repositories contain `SKILL.md` files and are compiled locally.
 
 ```bash
-ontoskills import-source-repo https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+ontoskills import-source https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
 ```
 
 Source imports are cloned into `~/.ontoskills/skills/vendor/` and compiled outputs are written to `~/.ontoskills/ontoskills/vendor/`.
@@ -131,6 +131,6 @@ The managed home is organized like this:
 - `install mcp` installs the runtime
 - `install core` installs the compiler
 - `install <qualified-skill-id>` installs a compiled package from a store
-- `import-source-repo <repo>` clones and compiles a raw source repository
+- `import-source <repo-or-path>` clones and compiles a raw source repository
 - `enable` and `disable` control what OntoMCP sees
 - OntoStore is built in, so it should not be added manually

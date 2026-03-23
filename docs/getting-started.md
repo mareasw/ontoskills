@@ -68,7 +68,7 @@ ontoskills registry list
 Raw repositories containing `SKILL.md` files can be imported and compiled locally:
 
 ```bash
-ontoskills import-source-repo https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+ontoskills import-source https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
 ```
 
 Imported source skills are stored under `~/.ontoskills/skills/vendor/` and compiled outputs land in `~/.ontoskills/ontoskills/vendor/`.
