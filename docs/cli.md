@@ -281,8 +281,8 @@ ontoskills uninstall --all
 ├── skills/                # Source skills
 │   └── vendor/            # Imported repositories
 └── state/                 # Lockfiles and metadata
-    ├── stores.json
-    └── installed.json
+    ├── registry.sources.json
+    └── registry.lock.json
 ```
 
 ---

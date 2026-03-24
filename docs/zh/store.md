@@ -139,8 +139,8 @@ ontoskills rebuild-index
 ├── skills/                 # 源技能
 │   └── vendor/             # 导入的仓库
 └── state/                  # 元数据和锁
-    ├── stores.json
-    └── installed.json
+    ├── registry.sources.json
+    └── registry.lock.json
 ```
 
 ---

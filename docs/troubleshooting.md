@@ -13,13 +13,13 @@ Check:
 
 ## Store skill does not appear in OntoMCP
 
-Most often the skill was installed but not enabled:
+Skills are enabled by default on install. If a skill is not visible, it may have been disabled:
 
 ```bash
 ontoskills enable mareasw/greeting/hello
 ```
 
-If it is already enabled, rebuild the local indexes:
+If already enabled, rebuild the local indexes:
 
 ```bash
 ontoskills rebuild-index
@@ -43,7 +43,7 @@ ontoskills init-core
 
 ## Imported source repo compiled, but the skill still is not visible
 
-Imported source skills also need enablement:
+Imported skills are enabled by default. If not visible, it may have been disabled:
 
 ```bash
 ontoskills enable <qualified-id>

@@ -15,8 +15,9 @@ OntoSkills 市场是已发布、已编译技能的安装界面。
 ```bash
 ontoskills search xlsx
 ontoskills install mareasw/office/xlsx
-ontoskills enable mareasw/office/xlsx
 ```
+
+技能安装后默认启用。
 
 ## 限定 ID
 
@@ -36,11 +37,15 @@ ontoskills enable mareasw/office/xlsx
 
 1. 搜索或浏览市场。
 2. 复制所选技能的安装命令。
-3. 在本地安装技能。
-4. 启用它以便 OntoMCP 暴露它。
+3. 在本地安装技能 — 自动启用。
 
 ```bash
 ontoskills install mareasw/greeting/hello
+```
+
+如果之前禁用了技能并想重新启用：
+
+```bash
 ontoskills enable mareasw/greeting/hello
 ```
 

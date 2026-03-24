@@ -60,17 +60,15 @@ Found 1 skill:
   mareasw/greeting/hello - Simple greeting skill
 ```
 
-Install and enable it:
+Install it (auto-enabled on install):
 
 ```bash
 ontoskills install mareasw/greeting/hello
-ontoskills enable mareasw/greeting/hello
 ```
 
 **Expected output:**
 ```
 ✓ Installed mareasw/greeting/hello
-✓ Enabled mareasw/greeting/hello
 ```
 
 ---
@@ -205,7 +203,7 @@ Add this to your shell profile (`~/.bashrc`, `~/.zshrc`) to persist.
 
 ### "No skills found"
 
-Make sure you enabled the skill after installing:
+Skills are enabled by default on install. If you previously disabled one, re-enable it:
 
 ```bash
 ontoskills enable mareasw/greeting/hello

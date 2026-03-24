@@ -18,8 +18,9 @@ For a normal end user, the registry flow is:
 ```bash
 npx ontoskills search hello
 npx ontoskills install mareasw/greeting/hello
-npx ontoskills enable mareasw/greeting/hello
 ```
+
+Skills are enabled by default on install.
 
 For a third-party registry:
 
@@ -39,7 +40,7 @@ That source import flow:
 - discovers every `SKILL.md`
 - compiles the discovered skills locally
 - writes compiled output into `~/.ontoskills/ontologies/vendor/<package_id>`
-- leaves imported skills disabled until explicitly enabled
+- enables imported skills by default
 
 ## Registry Repo Layout
 
@@ -106,4 +107,4 @@ This means the registry can be published as a plain GitHub repository plus raw f
 - install unit: package
 - activation unit: skill
 - enabling a skill auto-enables required `extends` / `dependsOn`
-- imported skills stay disabled until explicitly enabled
+- skills are enabled by default on install/import

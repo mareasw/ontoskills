@@ -15,8 +15,9 @@ It is backed by OntoStore and exposed in two places:
 ```bash
 ontoskills search xlsx
 ontoskills install mareasw/office/xlsx
-ontoskills enable mareasw/office/xlsx
 ```
+
+Skills are enabled by default on install.
 
 ## Qualified IDs
 
@@ -36,11 +37,15 @@ Examples:
 
 1. Search or browse the marketplace.
 2. Copy the install command for the chosen skill.
-3. Install the skill locally.
-4. Enable it so OntoMCP exposes it.
+3. Install the skill locally — it's enabled automatically.
 
 ```bash
 ontoskills install mareasw/greeting/hello
+```
+
+If you previously disabled a skill and want to re-enable it:
+
+```bash
 ontoskills enable mareasw/greeting/hello
 ```
 

@@ -35,7 +35,7 @@ npx ontoskills install mcp
 这将在 `~/.ontoskills/` 下创建一个托管主目录，包含：
 
 - `bin/ontomcp` — MCP 运行时
-- `ontoskills/` — 已编译的本体包
+- `ontologies/` — 已编译的本体包
 - `state/` — 锁定文件和元数据
 
 **预期输出：**
@@ -61,17 +61,15 @@ ontoskills search hello
   mareasw/greeting/hello - 简单的问候技能
 ```
 
-安装并启用它：
+安装它（安装后自动启用）：
 
 ```bash
 ontoskills install mareasw/greeting/hello
-ontoskills enable mareasw/greeting/hello
 ```
 
 **预期输出：**
 ```
 ✓ 已安装 mareasw/greeting/hello
-✓ 已启用 mareasw/greeting/hello
 ```
 
 ---
@@ -206,7 +204,7 @@ export ANTHROPIC_API_KEY="你的-key"
 
 ### "未找到技能"
 
-确保你在安装后启用了技能：
+技能安装后默认启用。如果之前禁用了，重新启用：
 
 ```bash
 ontoskills enable mareasw/greeting/hello

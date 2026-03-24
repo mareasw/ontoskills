@@ -245,8 +245,8 @@ ontoskills uninstall --all
 ├── skills/                # 源技能
 │   └── vendor/            # 导入的仓库
 └── state/                 # 锁定文件和元数据
-    ├── stores.json
-    └── installed.json
+    ├── registry.sources.json
+    └── registry.lock.json
 ```
 
 ---

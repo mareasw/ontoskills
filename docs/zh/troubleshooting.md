@@ -13,13 +13,13 @@ description: 安装、商店访问、编译器设置和 OntoMCP 的常见问题
 
 ## 商店技能未出现在 OntoMCP 中
 
-最常见的情况是技能已安装但未启用：
+技能安装后默认启用。如果技能不可见，可能是之前被禁用了：
 
 ```bash
 ontoskills enable mareasw/greeting/hello
 ```
 
-如果已经启用，重建本地索引：
+如果已启用但仍不可见，重建本地索引：
 
 ```bash
 ontoskills rebuild-index
@@ -43,7 +43,7 @@ ontoskills init-core
 
 ## 导入的源仓库已编译，但技能仍然不可见
 
-导入的源技能也需要启用：
+导入的技能默认启用。如果不可见，可能是被禁用了：
 
 ```bash
 ontoskills enable <qualified-id>

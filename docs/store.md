@@ -139,8 +139,8 @@ Regenerates `index.enabled.ttl` from all enabled skills. Run this if you manuall
 ├── skills/                 # Source skills
 │   └── vendor/             # Imported repositories
 └── state/                  # Metadata and locks
-    ├── stores.json
-    └── installed.json
+    ├── registry.sources.json
+    └── registry.lock.json
 ```
 
 ---
