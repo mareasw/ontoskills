@@ -7,13 +7,13 @@ Use it as:
 - the reference for package manifests
 - the canonical example for compiled OntoSkill distribution
 
-The official registry is built into `ontoskills` by default. Users should not have to add it manually.
+The official store is built into `ontoskills` by default. Users should not have to add it manually.
 
-`registry add-source` is only for additional registries maintained by third parties.
+`store add-source` is only for additional stores maintained by third parties.
 
 ## User Workflow
 
-For a normal end user, the registry flow is:
+For a normal end user, the store flow is:
 
 ```bash
 npx ontoskills search hello
@@ -22,10 +22,10 @@ npx ontoskills install mareasw/greeting/hello
 
 Skills are enabled by default on install.
 
-For a third-party registry:
+For a third-party store:
 
 ```bash
-npx ontoskills registry add-source acme https://example.com/index.json
+npx ontoskills store add-source acme https://example.com/index.json
 npx ontoskills search spreadsheet
 ```
 
@@ -42,7 +42,7 @@ That source import flow:
 - writes compiled output into `~/.ontoskills/ontologies/vendor/<package_id>`
 - enables imported skills by default
 
-## Registry Repo Layout
+## Store Repo Layout
 
 ```text
 registry/
@@ -66,7 +66,7 @@ registry/
 
 ## Package Model
 
-Compiled registry packages contain prebuilt `.ttl` artifacts.
+Compiled store packages contain prebuilt `.ttl` artifacts.
 
 Required manifest fields:
 - `package_id`
@@ -77,9 +77,9 @@ Required manifest fields:
 
 Each exported skill should be installable and activatable independently.
 
-## Registry Index
+## Store Index
 
-The registry index is a static JSON file listing installable packages.
+The store index is a static JSON file listing installable packages.
 
 ```json
 {
@@ -93,7 +93,7 @@ The registry index is a static JSON file listing installable packages.
 }
 ```
 
-This means the registry can be published as a plain GitHub repository plus raw file URLs. No custom backend is required for v1.
+This means the store can be published as a plain GitHub repository plus raw file URLs. No custom backend is required for v1.
 
 ## Resolution Rules
 

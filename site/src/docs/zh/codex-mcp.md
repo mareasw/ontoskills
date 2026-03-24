@@ -60,7 +60,7 @@ ONTOMCP_ONTOLOGY_ROOT=~/.ontoskills/ontologies
 npx ontoskills install core
 ```
 
-- 然后编译或导入源技能，并在期望 Codex 通过 OntoMCP 看到它们之前启用它们
+- 然后编译或导入源技能。技能默认自动启用；仅当之前被手动禁用时才需要运行 `ontoskills enable <qualified-id>`
 
 ## 实用规则
 
