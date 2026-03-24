@@ -4,6 +4,24 @@ All notable changes to ontomcp (Rust MCP Server) will be documented in this file
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.1] - 2026-03-24
+
+### Added
+
+- **Legacy path fallback** — MCP falls back to `~/.ontoskills/ontoskills/` if `~/.ontoskills/ontologies/` not found, with deprecation warning
+- **Fifth tool** — `search_intents` for intent-based discovery (optional, requires embeddings)
+
+### Changed
+
+- **Package rename** — `ontoskills-mcp` → `ontomcp`
+- **Default ontology root** — `~/.ontoskills/ontoskills/` → `~/.ontoskills/ontologies/`
+- **Store terminology** — Docs aligned with "store" (was "registry")
+- **Auto-enable behavior** — Skills enabled by default; `enable` only for re-enabling
+
+### Fixed
+
+- Path placeholder consistency in docs (`/path/to/ontology-root`)
+
 ## [0.9.0] - 2026-03-22
 
 ### Added
