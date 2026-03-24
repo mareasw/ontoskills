@@ -1,6 +1,6 @@
 ---
-title: OntoStore UI
-description: Search and install skills from the OntoStore marketplace
+title: OntoStore
+description: Search and install skills from the official OntoStore
 ---
 
 The OntoSkills marketplace is the install surface for published, compiled skills.
@@ -21,7 +21,7 @@ Skills are enabled by default on install.
 
 ## Qualified IDs
 
-Marketplace installs use qualified ids:
+OntoStore installs use qualified ids:
 
 ```text
 <package_id>/<skill_id>
@@ -35,7 +35,7 @@ Examples:
 
 ## Install Flow
 
-1. Search or browse the marketplace.
+1. Search or browse the OntoStore.
 2. Copy the install command for the chosen skill.
 3. Install the skill locally — it's enabled automatically.
 
