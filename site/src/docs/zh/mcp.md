@@ -80,7 +80,7 @@ OntoMCP 暴露 **5 个工具** 用于技能发现和推理。
   "skills": [
     {
       "id": "pdf",
-      "qualified_id": "marea/office/pdf",
+      "qualified_id": "mareasw/office/pdf",
       "nature": "创建 PDF 文档的技能",
       "intents": ["create_pdf", "export_pdf"],
       "requires_state": ["oc:ContentReady"],

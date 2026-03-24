@@ -80,7 +80,7 @@ Discover skills with optional filters.
   "skills": [
     {
       "id": "pdf",
-      "qualified_id": "marea/office/pdf",
+      "qualified_id": "mareasw/office/pdf",
       "nature": "A skill that creates PDF documents",
       "intents": ["create_pdf", "export_pdf"],
       "requires_state": ["oc:ContentReady"],

@@ -114,7 +114,6 @@ Regenerates `index.enabled.ttl` from all enabled skills. Run this if you manuall
 | `list-installed` | List all installed packages |
 | `store list` | List configured stores |
 | `store add-source <name> <url>` | Add third-party store |
-| `store remove-source <name>` | Remove third-party store |
 | `import-source <url>` | Import and compile source repo |
 | `rebuild-index` | Regenerate enabled index |
 | `uninstall --all` | Remove entire managed home |

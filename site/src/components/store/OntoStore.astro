@@ -1,5 +1,5 @@
 ---
-import { OFFICIAL_STORE_INDEX_URL, OFFICIAL_STORE_REPO_URL } from '../../data/registry';
+import { OFFICIAL_STORE_INDEX_URL, OFFICIAL_STORE_REPO_URL } from '../../data/store';
 
 interface Props {
   title?: string;
@@ -148,7 +148,7 @@ const rootId = `market-${crypto.randomUUID()}`;
     }
 
     status.textContent = query
-      ? `Results for “${search.value.trim()}”`
+      ? `Results for "${search.value.trim()}"`
       : 'Published skills from the official store.';
 
     if (!filtered.length) {

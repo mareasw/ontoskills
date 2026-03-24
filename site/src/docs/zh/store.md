@@ -114,7 +114,6 @@ ontoskills rebuild-index
 | `list-installed` | 列出所有已安装的包 |
 | `store list` | 列出已配置的商店 |
 | `store add-source <name> <url>` | 添加第三方商店 |
-| `store remove-source <name>` | 移除第三方商店 |
 | `import-source <url>` | 导入并编译源仓库 |
 | `rebuild-index` | 重新生成已启用索引 |
 | `uninstall --all` | 删除整个托管主目录 |
