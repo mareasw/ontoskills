@@ -180,7 +180,7 @@ ontoskills query "SELECT ?intent WHERE { skill:my_first_skill oc:resolvesIntent 
 | 目标 | 阅读 |
 |------|------|
 | 学习所有 CLI 命令 | [CLI 参考](/zh/cli/) |
-| 浏览可用技能 | [市场](/zh/marketplace/) |
+| 浏览可用技能 | [OntoStore 界面](/zh/ontostore-ui/) |
 | 编写自定义技能 | [技能创作](/zh/authoring/) |
 | 理解工作原理 | [架构](/zh/architecture/) |
 | 连接到你的 AI 客户端 | [MCP 设置](/zh/mcp/) |

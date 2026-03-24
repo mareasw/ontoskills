@@ -1,6 +1,6 @@
 ---
-title: Marketplace
-description: Search, install, and enable skills from OntoStore
+title: OntoStore UI
+description: Search and install skills from the OntoStore marketplace
 ---
 
 The OntoSkills marketplace is the install surface for published, compiled skills.

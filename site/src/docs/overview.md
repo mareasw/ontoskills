@@ -120,7 +120,7 @@ Every skill is extracted with:
 
 - **[Getting Started](/getting-started/)** — Install and compile your first skill
 - **[CLI](/cli/)** — Learn the managed command surface
-- **[Marketplace](/marketplace/)** — Browse installable store skills
+- **[OntoStore UI](/ontostore-ui/)** — Browse installable store skills
 - **[Compiler](/compiler/)** — Install OntoCore for custom skills
 - **[Store](/store/)** — Learn how official and third-party stores work
 - **[Architecture](/architecture/)** — Deep dive into the system design

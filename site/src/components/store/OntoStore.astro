@@ -87,7 +87,6 @@ const rootId = `market-${crypto.randomUUID()}`;
       aliases: Array.isArray(skill.aliases) ? skill.aliases : [],
       trustTier: pkg.trust_tier || 'verified',
       installCommand: `npx ontoskills install ${qualifiedId}`,
-      enableCommand: `npx ontoskills enable ${qualifiedId}`,
     };
   };
 
@@ -139,7 +138,18 @@ const rootId = `market-${crypto.randomUUID()}`;
     count.textContent = `${filtered.length} skill${filtered.length === 1 ? '' : 's'}`;
 
     if (!skills.length) {
-      status.innerHTML = `Unable to load store data. <a href="${storeRepoUrl}" target="_blank" rel="noopener" class="text-accent-cyan underline">Open the official store</a>.`;
+      status.textContent = '';
+      const text1 = document.createTextNode('Unable to load store data. ');
+      const link = document.createElement('a');
+      link.href = storeRepoUrl;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.className = 'text-accent-cyan underline';
+      link.textContent = 'Open the official store';
+      const text2 = document.createTextNode('.');
+      status.appendChild(text1);
+      status.appendChild(link);
+      status.appendChild(text2);
       grid.innerHTML = '';
       return;
     }

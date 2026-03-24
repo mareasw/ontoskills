@@ -120,7 +120,7 @@ OntoSkills 使用 **描述逻辑 (OWL 2)** 将技能转换为形式化本体：
 
 - **[快速开始](/zh/getting-started/)** — 安装并编译你的第一个技能
 - **[CLI](/zh/cli/)** — 了解托管命令界面
-- **[市场](/zh/marketplace/)** — 浏览可安装的商店技能
+- **[OntoStore 界面](/zh/ontostore-ui/)** — 浏览可安装的商店技能
 - **[编译器](/zh/compiler/)** — 安装 OntoCore 以使用自定义技能
 - **[商店](/zh/store/)** — 了解官方和第三方商店如何工作
 - **[架构](/zh/architecture/)** — 深入了解系统设计
