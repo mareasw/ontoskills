@@ -1,6 +1,6 @@
 ---
 title: 市场
-description: 从 OntoStore 搜索、安装和启用技能
+description: 从 OntoStore 搜索和安装技能
 ---
 
 OntoSkills 市场是已发布、已编译技能的安装界面。

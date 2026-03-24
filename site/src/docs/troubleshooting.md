@@ -3,8 +3,6 @@ title: Troubleshooting
 description: Common issues with installs, store access, compiler setup, and OntoMCP
 ---
 
----
-
 ## Installation Issues
 
 ### `ontoskills install mcp` fails
