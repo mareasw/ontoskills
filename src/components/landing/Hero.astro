@@ -1,5 +1,12 @@
 ---
-// Hero component
+import { type Lang, translations, defaultLang } from '../../i18n/translations';
+
+interface Props {
+  lang?: Lang;
+}
+
+const { lang = defaultLang } = Astro.props;
+const t = translations.hero[lang];
 ---
 
 <section class="hero-section">
@@ -8,18 +15,16 @@
     <div class="max-w-4xl">
       <div class="hero-badge">
         <span class="badge-dot"></span>
-        <span>OWL 2 Ontologies • Rust MCP • Deterministic Queries</span>
+        <span>{t.badge}</span>
       </div>
 
       <h1 class="hero-headline">
-        <span class="headline-line">Your agent shouldn't have to read</span>
-        <span class="headline-line headline-accent">to know what to do.</span>
+        <span class="headline-line">{t.headline.split(' ').slice(0, 5).join(' ')}</span>
+        <span class="headline-line headline-accent">{t.headline.split(' ').slice(5).join(' ')}</span>
       </h1>
 
       <p class="hero-subheadline">
-        OntoSkills transforms skill files into OWL 2 ontologies.
-        Your agent queries deterministic knowledge with SPARQL —
-        no reading, no guessing, no hallucinations.
+        {t.subheadline}
       </p>
 
       <div class="hero-cta">
@@ -29,29 +34,24 @@
       </div>
 
       <div class="hero-buttons">
-        <a href="/en/getting-started/" class="hero-btn hero-btn-primary">
-          Install now
+        <a href={`/${lang}/getting-started/`} class="hero-btn hero-btn-primary">
+          {t.secondaryCta}
         </a>
         <a href="/ontostore/" class="hero-btn hero-btn-secondary">
-          Browse OntoStore
+          {t.cta}
         </a>
       </div>
 
       <div class="hero-stats">
-        <div class="stat-item">
-          <div class="stat-value">O(1)</div>
-          <div class="stat-label">lookup</div>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <div class="stat-value">100%</div>
-          <div class="stat-label">deterministic</div>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <div class="stat-value">OWL 2 DL</div>
-          <div class="stat-label">reasoning</div>
-        </div>
+        {t.stats.map((stat, index) => (
+          <>
+            <div class="stat-item">
+              <div class="stat-value">{stat.value}</div>
+              <div class="stat-label">{stat.label}</div>
+            </div>
+            {index < t.stats.length - 1 && <div class="stat-divider"></div>}
+          </>
+        ))}
       </div>
     </div>
 
@@ -124,7 +124,7 @@
   .hero-headline {
     font-size: clamp(2.75rem, 8vw, 5rem);
     font-weight: 700;
-    line-height: 1;
+    line-height: 1.1;
     letter-spacing: -0.04em;
     margin-bottom: 24px;
     animation: fadeInUp 0.6s ease-out 0.1s both;

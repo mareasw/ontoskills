@@ -1,27 +1,31 @@
 ---
 import Button from '../ui/Button.astro';
 import CommandSnippet from '../ui/CommandSnippet.astro';
+import { type Lang, translations, defaultLang } from '../../i18n/translations';
+
+interface Props {
+  lang?: Lang;
+}
+
+const { lang = defaultLang } = Astro.props;
+const t = translations.cta[lang];
 ---
 
 <section class="py-20">
   <div class="section-shell">
     <div class="mx-auto max-w-5xl border border-white/10 px-6 py-10 text-center sm:px-10">
-      <div class="section-kicker mx-auto mb-4">Start building now</div>
       <h2 class="text-3xl sm:text-4xl font-bold text-text-primary mb-4 tracking-[-0.04em]">
-        Ready to make your agent deterministic?
+        {t.headline}
       </h2>
-      <p class="text-text-secondary mb-8 mx-auto max-w-2xl">
-        Start with the managed CLI, pull from the official store, and let OntoMCP serve deterministic skills.
-      </p>
       <div class="mx-auto mb-8 max-w-3xl">
-        <CommandSnippet command="npx ontoskills install mcp" label="Install OntoMCP" />
+        <CommandSnippet command={t.command} label="Install OntoMCP" />
       </div>
       <div class="flex flex-col sm:flex-row gap-4 justify-center">
-        <Button href="/en/getting-started/" size="lg">
-          Get Started
+        <Button href={`/${lang}/getting-started/`} size="lg">
+          {t.primaryButton}
         </Button>
         <Button href="/ontostore/" variant="secondary" size="lg">
-          Browse OntoStore
+          {t.secondaryButton}
         </Button>
       </div>
     </div>

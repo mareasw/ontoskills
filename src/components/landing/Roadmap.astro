@@ -1,42 +1,38 @@
 ---
-// Roadmap component - OntoClaw teaser
+import { type Lang, translations, defaultLang } from '../../i18n/translations';
+
+interface Props {
+  lang?: Lang;
+}
+
+const { lang = defaultLang } = Astro.props;
+const t = translations.roadmap[lang];
 ---
 
 <section class="roadmap-section py-20 border-b border-white/10">
   <div class="section-shell">
-    <div class="text-center mb-12">
-      <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight mb-4">
-        Roadmap
-      </h2>
-      <p class="text-lg text-text-secondary">
-        What's next?
-      </p>
-    </div>
-
     <div class="max-w-2xl mx-auto">
-      <div class="border border-white/10 bg-bg-elevated rounded-xl p-8 hover:border-accent-primary/30 transition-colors">
+      <div class="border border-white/10 bg-bg-elevated rounded-xl p-8 hover:border-cyan-500/30 transition-colors">
         <div class="flex items-center gap-4 mb-4">
-          <div class="w-12 h-12 rounded-lg bg-accent-primary/10 border border-accent-primary/30 flex items-center justify-center">
-            <svg class="w-6 h-6 text-accent-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2L2 7l10 5 10-5 10-5L12 2z"/>
-              <path d="M12 22V12"/>
-              <path d="M17 21.66V12a2 2 0 0 0-2-2V7.34l1.46-.92c.83-.83A3 3 0 0 0 3 3v4.34L17 21.66z"/>
+          <div class="w-12 h-12 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
+            <svg class="w-6 h-6 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+              <path d="M2 17l10 5 10-5"/>
+              <path d="M2 12l10 5 10-5"/>
             </svg>
           </div>
           <div>
-            <h3 class="text-xl font-semibold">OntoClaw</h3>
-            <p class="text-sm text-accent-cyan">The first natively ontological AI agent</p>
+            <h3 class="text-xl font-semibold">{t.title}</h3>
+            <p class="text-sm text-cyan-400">{t.subtitle}</p>
           </div>
         </div>
 
         <p class="text-text-secondary mb-4">
-          Neuro-symbolic architecture.
-          Ontological knowledge is native — no MCP bridge needed for OntoSkills.
-          The agent reasons directly on the graph.
+          {t.description}
         </p>
 
-        <div class="inline-block px-3 py-1 bg-accent-cta/10 border border-accent-cta/30 rounded-full text-sm text-accent-cta">
-          Coming soon
+        <div class="inline-block px-3 py-1 bg-orange-500/10 border border-orange-500/30 rounded-full text-sm text-orange-400">
+          {t.badge}
         </div>
       </div>
     </div>

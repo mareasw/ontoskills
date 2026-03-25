@@ -1,8 +1,8 @@
 ---
-import LandingLayout from '../layouts/LandingLayout.astro';
-import Header from '../components/landing/Header.astro';
-import Footer from '../components/landing/Footer.astro';
-import Button from '../components/ui/Button.astro';
+import LandingLayout from '../../layouts/LandingLayout.astro';
+import Header from '../../components/landing/Header.astro';
+import Footer from '../../components/landing/Footer.astro';
+import Button from '../../components/ui/Button.astro';
 
 // SVG Icons
 const documentIcon = `<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -35,65 +35,65 @@ const pipelineSteps = [
     number: 1,
     icon: documentIcon,
     title: 'SKILL.md',
-    subtitle: 'Human-authored',
-    description: 'Skills are authored in Markdown with YAML frontmatter. Developers write clear instructions, define intents, and structure content that AI agents can understand and execute.',
+    subtitle: '人工编写',
+    description: '技能使用带有 YAML 前置元数据的 Markdown 编写。开发者编写清晰的说明，定义意图，并构建 AI 代理可以理解和执行的内容结构。',
     bullets: [
-      'YAML frontmatter for metadata (name, description, intents)',
-      'Markdown body for structured instructions',
-      'Version-controlled alongside your code',
-      'Human-readable and AI-friendly format'
+      'YAML 前置元数据（名称、描述、意图）',
+      'Markdown 正文用于结构化说明',
+      '与代码一起版本控制',
+      '人类可读且 AI 友好的格式'
     ],
     code: `---
 name: tdd-workflow
-description: Test-driven development
+description: 测试驱动开发
 intents:
   - write_tests_first
 ---
 
-## Instructions
-1. Write the test first
-2. Run the test (it fails)
-3. Write minimal code
-4. Run the test (it passes)
-5. Refactor`
+## 说明
+1. 先写测试
+2. 运行测试（失败）
+3. 编写最小代码
+4. 运行测试（通过）
+5. 重构`
   },
   {
     number: 2,
     icon: gearIcon,
     title: 'OntoCore',
-    subtitle: 'The Compiler',
-    description: 'OntoCore compiles SKILL.md files into OWL 2 DL ontologies. The compiler validates structure, extracts semantic relationships, and generates machine-readable RDF triples.',
+    subtitle: '编译器',
+    description: 'OntoCore 将 SKILL.md 文件编译为 OWL 2 DL 本体。编译器验证结构，提取语义关系，并生成机器可读的 RDF 三元组。',
     bullets: [
-      'Parses and validates SKILL.md syntax',
-      'Extracts intents and semantic relationships',
-      'Generates OWL 2 DL compliant ontology',
-      'SHACL validation for data integrity'
+      '解析和验证 SKILL.md 语法',
+      '提取意图和语义关系',
+      '生成 OWL 2 DL 兼容本体',
+      'SHACL 验证数据完整性'
     ],
     code: `npx ontoskills compile
-  Parsing tdd-workflow/SKILL.md...
-  Validating structure...
-  Generating ontology...
-  Writing triples...
-  ✓ Compiled to ontoskills/tdd-workflow.ttl`
+  解析 tdd-workflow/SKILL.md...
+  验证结构...
+  生成本体...
+  写入三元组...
+  ✓ 编译到 ontoskills/tdd-workflow.ttl`
   },
   {
     number: 3,
     icon: databaseIcon,
-    title: '.ttl Files',
-    subtitle: 'The Ontology',
-    description: 'The compiled Turtle (.ttl) files contain the ontology - a formal representation of skills, intents, and their relationships using RDF triples and OWL semantics.',
+    title: '.ttl 文件',
+    subtitle: '本体',
+    description: '编译后的 Turtle (.ttl) 文件包含本体 — 使用 RDF 三元组和 OWL 语义对技能、意图及其关系的形式化表示。',
     bullets: [
-      'Standard RDF Turtle format',
-      'OWL 2 DL ontology definitions',
-      'SPARQL-queryable knowledge graph',
-      'Semantic relationships between skills'
+      '标准 RDF Turtle 格式',
+      'OWL 2 DL 本体定义',
+      'SPARQL 可查询的知识图谱',
+      '技能之间的语义关系'
     ],
     code: `@prefix oc: <https://ontoskills.dev/ns#> .
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
 oc:tdd-workflow a oc:Skill ;
   oc:name "tdd-workflow" ;
-  oc:description "Test-driven development" ;
+  oc:description "测试驱动开发" ;
   oc:resolvesIntent "write_tests_first" ;
   oc:hasStep oc:write-test, oc:run-test, oc:implement .`
   },
@@ -101,39 +101,39 @@ oc:tdd-workflow a oc:Skill ;
     number: 4,
     icon: checkCircleIcon,
     title: 'OntoMCP',
-    subtitle: 'The Runtime',
-    description: 'OntoMCP is the Rust-based MCP runtime that loads ontologies and serves skill queries to AI agents through the Model Context Protocol with sub-millisecond response times.',
+    subtitle: '运行时',
+    description: 'OntoMCP 是基于 Rust 的 MCP 运行时，它加载本体并通过模型上下文协议以亚毫秒级响应时间为 AI 代理提供技能查询服务。',
     bullets: [
-      'Native Rust performance',
-      'MCP protocol implementation',
-      'Sub-millisecond SPARQL queries',
-      'Intent-based skill discovery'
+      '原生 Rust 性能',
+      'MCP 协议实现',
+      '亚毫秒级 SPARQL 查询',
+      '基于意图的技能发现'
     ],
-    code: `# Search for skills by intent
+    code: `# 按意图搜索技能
 search_intents("create_pdf")
   → pdf-generator
   → report-exporter
 
-# Retrieve skill context
+# 获取技能上下文
 get_skill("pdf-generator")
   → { name, description, instructions }`
   }
 ];
 ---
 
-<LandingLayout title="How it Works - OntoSkills">
-  <Header />
+<LandingLayout title="工作原理 - OntoSkills" lang="zh">
+  <Header lang="zh" />
   <main>
     <!-- Hero Section -->
     <section class="pt-16 pb-12">
       <div class="section-shell">
         <div class="text-center max-w-3xl mx-auto">
-          <div class="section-kicker mx-auto mb-4">Pipeline</div>
+          <div class="section-kicker mx-auto mb-4">管道</div>
           <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold text-text-primary mb-6">
-            How it <span class="gradient-text">Works</span>
+            <span class="gradient-text">工作原理</span>
           </h1>
           <p class="text-xl text-text-secondary">
-            From SKILL.md to deterministic execution in 4 steps
+            从 SKILL.md 到确定性执行的 4 个步骤
           </p>
         </div>
       </div>
@@ -217,18 +217,18 @@ get_skill("pdf-generator")
       <div class="section-shell">
         <div class="glass-panel rounded-[2rem] p-8 sm:p-12 text-center">
           <h2 class="text-3xl sm:text-4xl font-bold text-text-primary mb-4">
-            Ready to compile your first skill?
+            准备好编译你的第一个技能了吗？
           </h2>
           <p class="text-text-secondary mb-8 max-w-xl mx-auto">
-            Get started with OntoSkills in minutes. Write your first SKILL.md, compile it to an ontology, and query it through MCP.
+            几分钟内开始使用 OntoSkills。编写你的第一个 SKILL.md，将其编译为本体，并通过 MCP 查询。
           </p>
           <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button href="/en/getting-started/" size="lg">Get Started</Button>
-            <Button href="/ontostore/" variant="secondary" size="lg">Browse OntoStore</Button>
+            <Button href="/zh/getting-started/" size="lg">开始使用</Button>
+            <Button href="/ontostore/" variant="secondary" size="lg">浏览 OntoStore</Button>
           </div>
         </div>
       </div>
     </section>
   </main>
-  <Footer />
+  <Footer lang="zh" />
 </LandingLayout>

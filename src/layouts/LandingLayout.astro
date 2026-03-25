@@ -10,11 +10,13 @@ import '../styles/global.css';
 interface Props {
   title?: string;
   description?: string;
+  lang?: string;
 }
 
 const {
   title = 'OntoSkills — Deterministic AI Skills via Rust MCP & OWL Ontologies',
-  description = 'Stop burning tokens on probabilistic skill reading. OntoSkills delivers sub-millisecond SPARQL queries through a Rust MCP runtime. Ontological, deterministic, precise.'
+  description = 'Stop burning tokens on probabilistic skill reading. OntoSkills delivers sub-millisecond SPARQL queries through a Rust MCP runtime. Ontological, deterministic, precise.',
+  lang = 'en'
 } = Astro.props;
 
 const jsonLd = {
@@ -48,7 +50,7 @@ const jsonLd = {
 };
 ---
 
-<html lang="en">
+<html lang={lang}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

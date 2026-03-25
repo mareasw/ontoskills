@@ -1,18 +1,26 @@
 ---
 import logo from '../../assets/ontoskills-logo.png';
+import { type Lang, translations, defaultLang } from '../../i18n/translations';
+
+interface Props {
+  lang?: Lang;
+}
+
+const { lang = defaultLang } = Astro.props;
+const t = translations.footer[lang];
 
 const productLinks = [
-  { label: 'OntoCore', href: '/en/ontocore/' },
+  { label: 'OntoCore', href: `/${lang}/ontocore/` },
   { label: 'OntoStore', href: '/ontostore/' },
-  { label: 'OntoMCP', href: '/en/mcp/' },
-  { label: 'Roadmap', href: '/en/roadmap/' }
+  { label: 'OntoMCP', href: `/${lang}/mcp/` },
+  { label: t.roadmap, href: `/${lang}/roadmap/` }
 ];
 
 const resourceLinks = [
-  { label: 'Documentation', href: '/en/overview/' },
-  { label: 'Getting Started', href: '/en/getting-started/' },
-  { label: 'CLI Reference', href: '/en/cli/' },
-  { label: 'Architecture', href: '/en/architecture/' }
+  { label: t.documentation, href: `/${lang}/overview/` },
+  { label: t.gettingStarted, href: `/${lang}/getting-started/` },
+  { label: t.cliReference, href: `/${lang}/cli/` },
+  { label: t.architecture, href: `/${lang}/architecture/` }
 ];
 
 const communityLinks = [
@@ -26,7 +34,7 @@ const communityLinks = [
   <div class="section-shell">
     <!-- Logo at top -->
     <div class="flex justify-center mb-10">
-      <a href="/" class="flex items-center gap-2">
+      <a href={`/${lang}/`} class="flex items-center gap-2">
         <img src={logo.src} alt="OntoSkills" class="h-6 w-auto" />
         <span class="font-semibold text-text-primary">OntoSkills</span>
       </a>
@@ -36,7 +44,7 @@ const communityLinks = [
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
       <!-- Product Column -->
       <div>
-        <h3 class="font-semibold text-text-primary mb-4">Product</h3>
+        <h3 class="font-semibold text-text-primary mb-4">{t.product}</h3>
         <nav class="flex flex-col gap-3">
           {productLinks.map((link) => (
             <a
@@ -51,7 +59,7 @@ const communityLinks = [
 
       <!-- Resources Column -->
       <div>
-        <h3 class="font-semibold text-text-primary mb-4">Resources</h3>
+        <h3 class="font-semibold text-text-primary mb-4">{t.resources}</h3>
         <nav class="flex flex-col gap-3">
           {resourceLinks.map((link) => (
             <a
@@ -66,7 +74,7 @@ const communityLinks = [
 
       <!-- Community Column -->
       <div>
-        <h3 class="font-semibold text-text-primary mb-4">Community</h3>
+        <h3 class="font-semibold text-text-primary mb-4">{t.community}</h3>
         <nav class="flex flex-col gap-3">
           {communityLinks.map((link) => (
             <a
@@ -84,7 +92,7 @@ const communityLinks = [
 
     <!-- Copyright line at bottom -->
     <div class="text-center text-text-muted text-sm">
-      © 2026 OntoSkills. Built with Astro + Starlight.
+      {t.copyright}
     </div>
   </div>
 </footer>
