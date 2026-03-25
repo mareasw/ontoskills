@@ -35,12 +35,6 @@ export default defineConfig({
           lang: 'zh-CN',
         },
       },
-      sidebar: [
-        {
-          label: 'Documentation',
-          autogenerate: { directory: '.' },
-        },
-      ],
     }),
     tailwind(),
   ],

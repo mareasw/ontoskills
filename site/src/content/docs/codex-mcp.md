@@ -1,0 +1,76 @@
+---
+title: MCP With Codex
+description: Configure OntoMCP for Codex-based local workflows
+sidebar:
+  order: 11
+---
+
+## Install
+
+Install the runtime first:
+
+```bash
+npx ontoskills install mcp
+```
+
+This installs:
+
+```text
+~/.ontoskills/bin/ontomcp
+```
+
+## Integration Model
+
+Codex-based workflows use the same MCP contract as other local clients:
+
+- launch `ontomcp` as a local `stdio` subprocess
+- point it at the managed ontology home in `~/.ontoskills/ontologies`
+- let the client call the five public tools
+
+The stable executable to register is:
+
+```text
+~/.ontoskills/bin/ontomcp
+```
+
+## Recommended Runtime Command
+
+```bash
+~/.ontoskills/bin/ontomcp --ontology-root ~/.ontoskills/ontologies
+```
+
+If your Codex client supports environment-based configuration, the equivalent setting is:
+
+```bash
+ONTOMCP_ONTOLOGY_ROOT=~/.ontoskills/ontologies
+```
+
+## Tools Exposed
+
+- `search_skills`
+- `get_skill_context`
+- `evaluate_execution_plan`
+- `query_epistemic_rules`
+- `search_intents`
+
+## Notes
+
+- The MCP server reads compiled `.ttl` ontologies, not raw `SKILL.md`
+- If you want custom skills, install the compiler too:
+
+```bash
+npx ontoskills install core
+```
+
+- Then compile or import source skills — they are auto-enabled on install for MCP access
+
+## Practical Rule
+
+Treat Codex integration as a standard local `stdio` MCP registration whose command points at:
+
+```text
+~/.ontoskills/bin/ontomcp
+```
+
+The exact UI or config file shape may vary across Codex builds, but the server command and ontology root remain the same.
+
