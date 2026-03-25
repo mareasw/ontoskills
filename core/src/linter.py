@@ -76,6 +76,7 @@ def lint_ontology(ttl_path: str | Path) -> LintResult:
     result.issues += _check_circular_deps(g)
     result.issues += _check_duplicate_intents(g)
     result.issues += _check_unreachable_skills(g)
+    result.issues += _check_workflow_cycles(g)
     return result
 
 
@@ -244,5 +245,67 @@ def _check_unreachable_skills(g: Graph) -> list[LintIssue]:
                         message=f"requiresState '{_local(state)}' is never yielded by any skill",
                         detail="This skill may be unreachable unless the state is externally provided.",
                     ))
+
+    return issues
+
+
+def _check_workflow_cycles(g: Graph) -> list[LintIssue]:
+    """
+    Detect circular dependencies in workflow steps.
+
+    A workflow step that depends on itself (directly or transitively)
+    creates an impossible execution order.
+    """
+    issues: list[LintIssue] = []
+
+    for skill_uri in g.subjects(OC.hasWorkflow):
+        # Get skill ID for reporting
+        identifier_obj = next(g.objects(skill_uri, DCTERMS.identifier), None)
+        skill_id = str(identifier_obj) if identifier_obj else _local(skill_uri)
+
+        for workflow in g.objects(skill_uri, OC.hasWorkflow):
+            # Build dependency graph: step_id -> set of dependency step_ids
+            step_deps: dict[str, set[str]] = {}
+
+            for step in g.objects(workflow, OC.hasStep):
+                step_id_obj = next(g.objects(step, OC.stepId), None)
+                if step_id_obj:
+                    step_id = str(step_id_obj)
+                    deps = {str(d) for d in g.objects(step, OC.dependsOn)}
+                    step_deps[step_id] = deps
+
+            # Detect cycles via DFS
+            visited: set[str] = set()
+            rec_stack: set[str] = set()
+
+            def dfs(node: str, path: list[str]) -> bool:
+                visited.add(node)
+                rec_stack.add(node)
+                path.append(node)
+
+                for neighbor in step_deps.get(node, set()):
+                    if neighbor not in visited:
+                        if dfs(neighbor, path):
+                            return True
+                    elif neighbor in rec_stack:
+                        # Found cycle
+                        cycle_start = path.index(neighbor) if neighbor in path else 0
+                        cycle = path[cycle_start:] + [neighbor]
+                        issues.append(LintIssue(
+                            severity="error",
+                            code="workflow-cycle",
+                            skill_id=skill_id,
+                            message=f"Circular dependency in workflow: {' -> '.join(cycle)}",
+                            detail=f"Step '{neighbor}' creates a dependency cycle.",
+                        ))
+                        return True
+
+                path.pop()
+                rec_stack.discard(node)
+                return False
+
+            for step_id in step_deps:
+                if step_id not in visited:
+                    dfs(step_id, [])
 
     return issues
