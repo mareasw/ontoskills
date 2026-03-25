@@ -4,6 +4,29 @@ All notable changes to OntoCore (Python package) will be documented in this file
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.2] - 2026-03-25
+
+### Added
+
+- **Phase 1 Loader** (`loader.py`) — Python-only preprocessing before LLM extraction:
+  - `parse_frontmatter()` — YAML parsing with Anthropic-compatible validation
+  - `scan_skill_directory()` — Directory structure enumeration with file hashes
+- **New Pydantic models** — `Frontmatter`, `FileInfo`, `DirectoryScan`, `ReferenceFile`, `ExecutableScript`, `Example`, `Workflow`, `WorkflowStep`, `CompiledSkill`
+- **Blank node serialization** — Reference files, executable scripts, workflows, examples serialized as RDF blank nodes
+- **Progressive disclosure support** — File metadata (hash, size, MIME type) for lazy loading
+
+### Changed
+
+- **SYSTEM_PROMPT** — Added extraction instructions for reference files, executable scripts, workflows, and examples
+
+### Security
+
+- **Path traversal protection** — Rejects `..` in file paths, backslashes, and absolute paths
+
+### Tests
+
+- 32 new tests for loader module (50 total new tests passing)
+
 ## [0.9.1] - 2026-03-23
 
 ### Changed
