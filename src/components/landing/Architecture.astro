@@ -3,32 +3,33 @@
 ---
 
 <section id="architecture" class="py-20">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <div class="text-center mb-12">
-      <h2 class="text-3xl sm:text-4xl font-bold text-text-primary mb-4">
+  <div class="section-shell">
+    <div class="mb-12 max-w-3xl">
+      <div class="section-kicker mb-4">System model</div>
+      <h2 class="text-3xl sm:text-4xl font-bold text-text-primary mb-4 tracking-[-0.04em]">
         <span class="gradient-text">How It Works</span>
       </h2>
-      <p class="text-text-muted max-w-2xl mx-auto">
-        From natural language to validated OWL 2 ontology in one pipeline.
+      <p class="text-text-muted max-w-2xl">
+        From store entry to enabled skill in one managed flow.
       </p>
     </div>
 
-    <div class="bg-bg-secondary border border-border rounded-xl p-6 overflow-x-auto">
-      <img src="/architecture.webp" alt="OntoCore Architecture" class="block mx-auto" style="max-height: 500px; width: auto; max-width: 100%;" />
+    <div class="border border-white/10 p-6 overflow-x-auto">
+      <img src="/architecture.webp" alt="OntoSkills architecture" class="block mx-auto" style="max-height: 500px; width: auto; max-width: 100%;" />
     </div>
 
     <div class="mt-8 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div class="p-4 bg-bg-secondary rounded-lg border border-border">
-        <h4 class="font-semibold text-accent-cyan mb-2">Neural Layer</h4>
-        <p class="text-sm text-text-muted">Claude extracts structured knowledge from natural language using tool-use.</p>
+      <div class="border border-white/10 p-5">
+        <h4 class="font-semibold text-accent-cyan mb-2">Store Layer</h4>
+        <p class="text-sm text-text-muted">The official store publishes compiled skills and metadata that the CLI can install remotely.</p>
       </div>
-      <div class="p-4 bg-bg-secondary rounded-lg border border-border">
-        <h4 class="font-semibold text-accent-purple mb-2">Symbolic Layer</h4>
-        <p class="text-sm text-text-muted">OWL 2 ontology stores knowledge with formal Description Logic semantics.</p>
+      <div class="border border-white/10 p-5">
+        <h4 class="font-semibold text-accent-blue mb-2">Runtime Layer</h4>
+        <p class="text-sm text-text-muted">OntoMCP loads enabled ontologies from the managed home directory and answers structured tool calls.</p>
       </div>
-      <div class="p-4 bg-bg-secondary rounded-lg border border-border">
-        <h4 class="font-semibold text-accent-mint mb-2">Query Layer</h4>
-        <p class="text-sm text-text-muted">SPARQL provides precise, indexed retrieval for deterministic results.</p>
+      <div class="border border-white/10 p-5">
+        <h4 class="font-semibold text-accent-mint mb-2">Compiler Layer</h4>
+        <p class="text-sm text-text-muted">OntoCore compiles custom SKILL.md sources when you need to author or extend the store locally.</p>
       </div>
     </div>
   </div>
