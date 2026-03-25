@@ -24,9 +24,9 @@ export default defineConfig({
       favicon: '/ontoskills-logo.png',
       disable404Route: true,
       customCss: ['./src/styles/starlight.css'],
-      defaultLocale: 'root',
+      defaultLocale: 'en',
       locales: {
-        root: {
+        en: {
           label: 'English',
           lang: 'en',
         },
