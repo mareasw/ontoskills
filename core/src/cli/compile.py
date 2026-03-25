@@ -182,11 +182,18 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
     compiled_skills = []
     skill_output_paths = []
 
-    # Build skill_parent_map for Rule A (needed for qualified IDs)
+    # Build skill_parent_map for Rule A using frontmatter names (not directory names)
+    # This ensures parent/child IDs remain consistent
     skill_parent_map = {}  # skill_dir -> (parent_skill_id, package_id)
     for skill_file in skill_md_files:
         skill_dir = skill_file.parent
-        skill_id = generate_skill_id(skill_dir.name)
+        try:
+            # Scan to get frontmatter name (canonical skill ID)
+            dir_scan = scan_skill_directory(skill_dir)
+            skill_id = dir_scan.skill_id  # From frontmatter.name
+        except LoaderError:
+            # Fallback to directory name if frontmatter invalid
+            skill_id = generate_skill_id(skill_dir.name)
         package_id = resolve_package_id(skill_dir)
         qualified_parent_id = generate_qualified_skill_id(package_id, skill_id)
         skill_parent_map[skill_dir] = (qualified_parent_id, package_id)
@@ -204,7 +211,8 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
         # Use Phase 1 data for IDs and hash
         skill_id = dir_scan.skill_id
         skill_hash = dir_scan.content_hash
-        package_id = resolve_package_id(skill_dir)
+        # Get package_id from pre-built map (consistent with parent map)
+        _, package_id = skill_parent_map.get(skill_dir, (skill_id, "local"))
 
         logger.info(f"Processing skill: {skill_id}")
 

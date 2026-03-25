@@ -163,35 +163,44 @@ def scan_skill_directory(skill_dir: Path, package_id: str | None = None) -> Dire
     dir_hash = hashlib.sha256()
 
     for f in sorted(skill_dir.rglob('*')):
-        # Skip hidden files and symlinks (security: prevent escape via symlink)
-        if f.is_file() and not f.name.startswith('.') and not f.is_symlink():
-            # Use as_posix() for cross-platform compatibility (always uses /)
-            rel_path = f.relative_to(skill_dir).as_posix()
+        # Skip non-files and symlinks (security: prevent escape via symlink)
+        if not f.is_file() or f.is_symlink():
+            continue
 
-            # SECURITY: Path traversal protection
-            # Reject paths containing '..' in any path component
-            if '..' in rel_path.split('/'):
-                continue
+        # Use as_posix() for cross-platform compatibility (always uses /)
+        rel_path = f.relative_to(skill_dir).as_posix()
+        parts = rel_path.split('/')
 
-            # SECURITY: Verify resolved path stays within skill_dir
-            try:
-                resolved = f.resolve()
-                resolved.relative_to(skill_dir)
-            except ValueError:
-                # Path escapes skill_dir boundary
-                continue
+        # Skip hidden files and files inside hidden directories
+        # e.g., .git/config, .vscode/settings.json
+        if any(part.startswith('.') for part in parts):
+            continue
 
-            file_hash = compute_file_hash(f)
-            files.append(FileInfo(
-                relative_path=rel_path,
-                content_hash=file_hash,
-                file_size=f.stat().st_size,
-                mime_type=mime_type_from_path(f)
-            ))
+        # Skip common transient/irrelevant directories
+        if any(part in ('__pycache__', 'node_modules', '.venv', 'venv') for part in parts):
+            continue
 
-            # Update directory hash
-            dir_hash.update(rel_path.encode())
-            dir_hash.update(file_hash.encode())
+        # SECURITY: Path traversal protection
+        if '..' in parts:
+            continue
+
+        # SECURITY: Verify resolved path stays within skill_dir
+        try:
+            resolved = f.resolve()
+            resolved.relative_to(skill_dir)
+        except ValueError:
+            continue
+
+        file_hash = compute_file_hash(f)
+        files.append(FileInfo(
+            relative_path=rel_path,
+            content_hash=file_hash,
+            file_size=f.stat().st_size,
+            mime_type=mime_type_from_path(f)
+        ))
+
+        dir_hash.update(rel_path.encode())
+        dir_hash.update(file_hash.encode())
 
     # Build file tree string for LLM context
     file_tree_lines = [f"  {f.relative_path} ({f.file_size} bytes, {f.mime_type})"

@@ -292,26 +292,25 @@ def _check_workflow_cycles(g: Graph) -> list[LintIssue]:
                 rec_stack.add(node)
                 path.append(node)
 
-                for neighbor in step_deps.get(node, set()):
-                    if neighbor not in visited:
-                        if dfs(neighbor, path):
-                            return True
-                    elif neighbor in rec_stack:
-                        # Found cycle
-                        cycle_start = path.index(neighbor) if neighbor in path else 0
-                        cycle = path[cycle_start:] + [neighbor]
-                        issues.append(LintIssue(
-                            severity="error",
-                            code="workflow-cycle",
-                            skill_id=skill_id,
-                            message=f"Circular dependency in workflow: {' -> '.join(cycle)}",
-                            detail=f"Step '{neighbor}' creates a dependency cycle.",
-                        ))
-                        return True
-
-                path.pop()
-                rec_stack.discard(node)
-                return False
+                try:
+                    for neighbor in step_deps.get(node, set()):
+                        if neighbor not in visited:
+                            dfs(neighbor, path)  # Continue to find all cycles
+                        elif neighbor in rec_stack:
+                            # Found cycle
+                            cycle_start = path.index(neighbor) if neighbor in path else 0
+                            cycle = path[cycle_start:] + [neighbor]
+                            issues.append(LintIssue(
+                                severity="error",
+                                code="workflow-cycle",
+                                skill_id=skill_id,
+                                message=f"Circular dependency in workflow: {' -> '.join(cycle)}",
+                                detail=f"Step '{neighbor}' creates a dependency cycle.",
+                            ))
+                    return False
+                finally:
+                    path.pop()
+                    rec_stack.discard(node)
 
             for step_id in step_deps:
                 if step_id not in visited:

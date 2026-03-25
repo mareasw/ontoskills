@@ -213,11 +213,16 @@ def serialize_skill(
 
     # Helper to create deterministic blank node IDs
     def make_bnode(component_type: str, identifier: str) -> BNode:
-        """Create a deterministic blank node ID from skill hash + component."""
-        # Use first 8 chars of skill hash for uniqueness
-        hash_prefix = skill.hash[:8]
-        safe_id = re.sub(r'[^a-zA-Z0-9]', '_', identifier)
-        return BNode(f"ref_{hash_prefix}_{component_type}_{safe_id}")
+        """Create a deterministic blank node ID from a fixed-length hash.
+
+        Uses SHA-256 of {skill.hash}:{component_type}:{identifier} to ensure:
+        - Fixed length (16 hex chars)
+        - No collisions from identifier normalization
+        - No TTL bloat from long identifiers
+        """
+        raw = f"{skill.hash}:{component_type}:{identifier}".encode("utf-8")
+        digest = hashlib.sha256(raw).hexdigest()[:16]
+        return BNode(f"ref_{digest}")
 
     # Reference Files (progressive disclosure)
     for i, ref in enumerate(getattr(skill, 'reference_files', [])):
