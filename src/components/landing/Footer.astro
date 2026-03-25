@@ -9,6 +9,9 @@ interface Props {
 const { lang = defaultLang } = Astro.props;
 const t = translations.footer[lang];
 
+// Home link: / for English, /zh/ for Chinese
+const homeHref = lang === 'en' ? '/' : `/${lang}/`;
+
 const productLinks = [
   { label: 'OntoCore', href: `/${lang}/ontocore/` },
   { label: 'OntoStore', href: '/ontostore/' },
@@ -34,7 +37,7 @@ const communityLinks = [
   <div class="section-shell">
     <!-- Logo at top -->
     <div class="flex justify-center mb-10">
-      <a href={`/${lang}/`} class="flex items-center gap-2">
+      <a href={homeHref} class="flex items-center gap-2">
         <img src={logo.src} alt="OntoSkills" class="h-6 w-auto" />
         <span class="font-semibold text-text-primary">OntoSkills</span>
       </a>
