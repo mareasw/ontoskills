@@ -330,3 +330,103 @@ class TestMimeTypeFromPath:
 
     def test_mime_type_case_insensitive(self):
         assert mime_type_from_path(Path("FILE.MD")) == "text/markdown"
+
+
+class TestCRLFHandling:
+    """Tests for cross-platform line ending support."""
+
+    def test_parse_frontmatter_handles_crlf(self):
+        """Frontmatter with CRLF (Windows) line endings should parse."""
+        content = "---\r\nname: crlf-skill\r\ndescription: Test skill\r\n---\r\n# Content"
+        result = parse_frontmatter(content)
+        assert result.name == "crlf-skill"
+        assert result.description == "Test skill"
+
+    def test_parse_frontmatter_handles_lf(self):
+        """Frontmatter with LF (Unix) line endings should parse."""
+        content = "---\nname: lf-skill\ndescription: Test skill\n---\n# Content"
+        result = parse_frontmatter(content)
+        assert result.name == "lf-skill"
+        assert result.description == "Test skill"
+
+    def test_parse_frontmatter_handles_mixed_line_endings(self):
+        """Frontmatter with mixed line endings should parse."""
+        content = "---\nname: mixed-skill\r\ndescription: Test skill\n---\r\n# Content"
+        result = parse_frontmatter(content)
+        assert result.name == "mixed-skill"
+
+    def test_parse_frontmatter_handles_no_trailing_newline(self):
+        """Frontmatter at EOF without trailing newline should parse."""
+        content = "---\nname: no-trailing\ndescription: Test\n---"
+        result = parse_frontmatter(content)
+        assert result.name == "no-trailing"
+
+
+class TestSymlinkProtection:
+    """Tests for symlink escape protection."""
+
+    def test_scan_skill_directory_skips_symlinks(self, tmp_path):
+        """Symlinks should be skipped to prevent directory escape."""
+        skill_dir = tmp_path / "skills" / "symlink-test"
+        skill_dir.mkdir(parents=True)
+
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text("""---
+name: symlink-test
+description: Test symlink protection.
+---
+""", encoding="utf-8")
+
+        # Create external directory with file
+        external_dir = tmp_path / "external"
+        external_dir.mkdir()
+        (external_dir / "secret.txt").write_text("SECRET DATA", encoding="utf-8")
+
+        # Create symlink pointing outside skill directory
+        symlink_path = skill_dir / "escape"
+        try:
+            symlink_path.symlink_to(external_dir, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            pytest.skip("Symlinks not supported on this platform")
+
+        result = scan_skill_directory(skill_dir)
+
+        # The symlink and its contents should NOT be included
+        relative_paths = [f.relative_path for f in result.files]
+        assert "escape/secret.txt" not in relative_paths
+        assert "escape" not in relative_paths
+
+        # Only SKILL.md should be present
+        assert len(result.files) == 1
+        assert result.files[0].relative_path == "SKILL.md"
+
+    def test_scan_skill_directory_skips_symlink_files(self, tmp_path):
+        """Symlink files should be skipped."""
+        skill_dir = tmp_path / "skills" / "symlink-file-test"
+        skill_dir.mkdir(parents=True)
+
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text("""---
+name: symlink-file-test
+description: Test symlink file protection.
+---
+""", encoding="utf-8")
+
+        # Create external file
+        external_file = tmp_path / "external-secret.txt"
+        external_file.write_text("SECRET", encoding="utf-8")
+
+        # Create symlink file
+        symlink_file = skill_dir / "linked-secret.txt"
+        try:
+            symlink_file.symlink_to(external_file)
+        except (OSError, NotImplementedError):
+            pytest.skip("Symlinks not supported on this platform")
+
+        result = scan_skill_directory(skill_dir)
+
+        # The symlink file should NOT be included
+        relative_paths = [f.relative_path for f in result.files]
+        assert "linked-secret.txt" not in relative_paths
+        assert len(result.files) == 1
+        assert result.files[0].relative_path == "SKILL.md"
