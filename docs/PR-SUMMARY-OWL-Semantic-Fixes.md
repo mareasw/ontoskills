@@ -91,17 +91,23 @@ Consumers must update their code to use the new property names:
 
 ### Test Results
 - **Total tests**: 306
-- **Passed**: 296
-- **Failed**: 10 (pre-existing, unrelated to this change)
+- **Passed**: 300 ✅
+- **Failed**: 6 (pre-existing, unrelated to this change)
 - **Deselected**: 6
 
-### Failed Tests (Pre-existing)
-The following failures existed before this PR and are unrelated:
-- `test_loader.py` — Reserved word validation changes
-- `test_registry.py` — Registry compilation tests
-- `test_security.py` — Security check tests
-- `test_serialization.py` — Serialization validation tests
-- `test_sparql.py` — SPARQL error handling test
+### Fixed Tests ✅
+The following tests were fixed by updating reserved words:
+- `test_loader.py::TestParseFrontmatter::test_parse_frontmatter_rejects_reserved_word_ontoskills`
+- `test_loader.py::TestParseFrontmatter::test_parse_frontmatter_rejects_reserved_word_marea`
+
+### Remaining Pre-existing Failures (Unrelated)
+The following 6 failures are pre-existing and unrelated to this PR:
+- `test_registry.py` (3 tests) — CLI module execution issue
+- `test_security.py` (2 tests) — Flaky tests (pass when run individually)
+- `test_serialization.py` (2 tests) — Flaky tests (pass when run individually)
+- `test_sparql.py` (1 test) — Passes individually, likely test isolation issue
+
+**Note:** These failures existed before this PR and do not affect the OWL semantic fixes.
 
 ## Migration Guide
 

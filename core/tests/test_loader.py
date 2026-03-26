@@ -109,18 +109,18 @@ description: Test
         with pytest.raises(LoaderError, match="exceeds 64"):
             parse_frontmatter(content)
 
-    def test_parse_frontmatter_rejects_reserved_word_claude(self):
+    def test_parse_frontmatter_rejects_reserved_word_ontoskills(self):
         content = """---
-name: claude
+name: ontoskills
 description: Test
 ---
 # Content"""
         with pytest.raises(LoaderError, match="Reserved word"):
             parse_frontmatter(content)
 
-    def test_parse_frontmatter_rejects_reserved_word_anthropic(self):
+    def test_parse_frontmatter_rejects_reserved_word_marea(self):
         content = """---
-name: anthropic-helper
+name: marea-helper
 description: Test
 ---
 # Content"""
