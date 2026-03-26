@@ -24,6 +24,19 @@ export default defineConfig({
       favicon: '/ontoskills-logo.png',
       disable404Route: true,
       customCss: ['./src/styles/starlight.css'],
+      head: [
+        {
+          tag: 'meta',
+          attrs: { property: 'og:image', content: 'https://ontoskills.sh/ontoskills-logo.png' }
+        },
+        {
+          tag: 'meta',
+          attrs: { name: 'twitter:image', content: 'https://ontoskills.sh/ontoskills-logo.png' }
+        }
+      ],
+      components: {
+        PageTitle: './src/components/CustomPageTitle.astro',
+      },
       defaultLocale: 'en',
       locales: {
         en: {
