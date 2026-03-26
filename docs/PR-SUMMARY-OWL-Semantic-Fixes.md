@@ -96,9 +96,13 @@ Consumers must update their code to use the new property names:
 - **Deselected**: 6
 
 ### Fixed Tests ✅
-The following tests were fixed by updating reserved words:
+The following tests were fixed by updating reserved words to match the new validation:
 - `test_loader.py::TestParseFrontmatter::test_parse_frontmatter_rejects_reserved_word_ontoskills`
 - `test_loader.py::TestParseFrontmatter::test_parse_frontmatter_rejects_reserved_word_marea`
+
+**Changed from:**
+- `test_parse_frontmatter_rejects_reserved_word_claude`
+- `test_parse_frontmatter_rejects_reserved_word_anthropic`
 
 ### Remaining Pre-existing Failures (Unrelated)
 The following 6 failures are pre-existing and unrelated to this PR:
