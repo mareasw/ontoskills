@@ -19,8 +19,8 @@ const t = translations.hero[lang];
       </div>
 
       <h1 class="hero-headline">
-        <span class="headline-line">{t.headline.split(' ').slice(0, 5).join(' ')}</span>
-        <span class="headline-line headline-accent">{t.headline.split(' ').slice(5).join(' ')}</span>
+        <span>{t.headline.split(' ').slice(0, 5).join(' ')}</span>{' '}
+        <span class="headline-accent">{t.headline.split(' ').slice(5).join(' ')}</span>
       </h1>
 
       <p class="hero-subheadline">
@@ -28,8 +28,10 @@ const t = translations.hero[lang];
       </p>
 
       <div class="hero-cta">
-        <div class="command-shell p-3 md:p-4">
-          <code class="text-text-primary">npx ontoskills install mcp</code>
+        <div class="command-shell-gradient p-[1px] rounded-lg">
+          <div class="command-shell p-3 md:p-4 rounded-lg bg-bg-elevated">
+            <code class="text-text-primary">npx ontoskills install mcp</code>
+          </div>
         </div>
       </div>
 
@@ -87,7 +89,30 @@ const t = translations.hero[lang];
     right: -200px;
     width: 600px;
     height: 600px;
-    background: radial-gradient(circle, rgba(125, 211, 252, 0.08) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(125, 211, 252, 0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-glow::before {
+    content: '';
+    position: absolute;
+    bottom: -300px;
+    left: -200px;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(171, 249, 204, 0.08) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .hero-glow::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 800px;
+    height: 800px;
+    background: radial-gradient(ellipse at center, rgba(146, 239, 244, 0.05) 0%, transparent 50%);
     pointer-events: none;
   }
 
@@ -130,15 +155,15 @@ const t = translations.hero[lang];
     animation: fadeInUp 0.6s ease-out 0.1s both;
   }
 
-  .headline-line {
-    display: block;
-  }
 
   .headline-accent {
     background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 50%, var(--accent-mint) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    padding-right: 0.1em;
   }
 
   .hero-subheadline {
@@ -154,6 +179,17 @@ const t = translations.hero[lang];
     max-width: 400px;
     margin-bottom: 16px;
     animation: fadeInUp 0.6s ease-out 0.3s both;
+  }
+
+  .command-shell-gradient {
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-mint), var(--accent-purple));
+    animation: gradientShift 4s ease infinite;
+    background-size: 200% 200%;
+  }
+
+  @keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
   }
 
   .hero-buttons {
@@ -221,8 +257,11 @@ const t = translations.hero[lang];
     font-family: 'JetBrains Mono Variable', monospace;
     font-size: 1.25rem;
     font-weight: 600;
-    color: var(--accent-cyan);
     letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-mint));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   .stat-label {
@@ -236,7 +275,8 @@ const t = translations.hero[lang];
   .stat-divider {
     width: 1px;
     height: 32px;
-    background: var(--border);
+    background: linear-gradient(180deg, transparent, var(--accent-cyan), transparent);
+    opacity: 0.3;
   }
 
   .hero-visual {
