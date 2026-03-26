@@ -2,12 +2,12 @@
 
 The maintained guide now lives in:
 
-- [docs/mcp-claude-code.md](../docs/mcp-claude-code.md)
+- [site/src/docs/claude-code-mcp.md](../site/src/docs/claude-code-mcp.md)
 
 Use that document for the current product-standard flow based on:
 
 ```bash
-npx ontoskills install mcp
+npx ontoskills install mcp --claude
 ```
 
 This file remains only as a compatibility pointer for existing links.

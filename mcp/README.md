@@ -183,6 +183,18 @@ cargo run --manifest-path mcp/Cargo.toml -- --ontology-root ./ontoskills
 
 ---
 
+## One-Command Bootstrap
+
+With the product CLI:
+
+```bash
+npx ontoskills install mcp --claude
+npx ontoskills install mcp --codex --cursor
+npx ontoskills install mcp --cursor --project
+```
+
+The CLI installs `ontomcp` first and then configures the selected client globally or for the current project where supported.
+
 ## Claude Code Integration
 
 Register the MCP server:
