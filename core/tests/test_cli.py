@@ -375,6 +375,7 @@ skill:test-skill a oc:Skill ;
          patch.object(compiler.cli.compile, 'serialize_skill_to_module'):
         mock_tool_use_loop.return_value = mock_extracted
 
+        # First: verify baseline behavior (without --force, matching hash causes skip)
         mock_tool_use_loop.reset_mock()
         mock_extracted.model_dump.reset_mock()
         mock_extracted.reset_mock()
@@ -404,8 +405,54 @@ skill:test-skill a oc:Skill ;
             "provenance": None,
             "knowledge_nodes": [],
         })
-        # With --force, tool_use_loop SHOULD be called even though hash matches
+
+        # Without --force, tool_use_loop should NOT be called (hash matches)
         # Use --skip-security to avoid LLM security check in test
+        result_without_force = runner.invoke(cli, [
+            'compile',
+            '-i', str(tmp_path / "skills"),
+            '-o', str(output_dir),
+            '--skip-security',
+            '-y'  # Skip confirmation
+        ])
+
+        assert result_without_force.exit_code == 0
+        # tool_use_loop should NOT have been called (hash match causes skip)
+        assert mock_tool_use_loop.call_count == 0, \
+            "Expected cache hit to skip extraction, but tool_use_loop was called"
+
+        # Second: verify --force bypasses hash check
+        mock_tool_use_loop.reset_mock()
+        mock_extracted.model_dump.reset_mock()
+        mock_extracted.reset_mock()
+        mock_extracted.id = "test-skill"
+        mock_extracted.nature = "Extracted skill"
+        mock_extracted.genus = "action"
+        mock_extracted.intents = ["test"]
+        mock_extracted.extends = []  # Real list for .append() in enrich_extracted_skill
+        mock_extracted.depends_on = []  # Real list for filtering
+        mock_extracted.state_transitions = MagicMock()
+        mock_extracted.state_transitions.requires_state = []
+        mock_extracted.state_transitions.yields_state = []
+        mock_extracted.model_dump = MagicMock(return_value={
+            "id": "test-skill",
+            "hash": skill_hash,
+            "nature": "Extracted skill",
+            "genus": "action",
+            "differentia": "test",
+            "intents": ["test"],
+            "requirements": [],
+            "depends_on": [],
+            "extends": [],
+            "contradicts": [],
+            "state_transitions": None,
+            "generated_by": "test",
+            "execution_payload": None,
+            "provenance": None,
+            "knowledge_nodes": [],
+        })
+
+        # With --force, tool_use_loop SHOULD be called even though hash matches
         result_with_force = runner.invoke(cli, [
             'compile',
             '-i', str(tmp_path / "skills"),
@@ -417,7 +464,8 @@ skill:test-skill a oc:Skill ;
 
         assert result_with_force.exit_code == 0
         # tool_use_loop SHOULD have been called with --force
-        assert mock_tool_use_loop.call_count == 1
+        assert mock_tool_use_loop.call_count == 1, \
+            "Expected --force to bypass cache and trigger extraction"
 
 
 def test_infer_parent_skill_id_from_nested_skill_path(tmp_path):

@@ -224,7 +224,7 @@ def serialize_skill(
         return BNode(f"ref_{digest}")
 
     # Reference Files (progressive disclosure)
-    for i, ref in enumerate(getattr(skill, 'reference_files', [])):
+    for ref in getattr(skill, 'reference_files', []):
         ref_node = make_bnode("ref", ref.relative_path)
         graph.add((skill_uri, oc.hasReferenceFile, ref_node))
         graph.add((ref_node, RDF.type, oc.ReferenceFile))

@@ -205,8 +205,14 @@ def scan_skill_directory(skill_dir: Path, package_id: str | None = None) -> Dire
             mime_type=mime_type_from_path(f)
         ))
 
-        dir_hash.update(rel_path.encode())
-        dir_hash.update(file_hash.encode())
+        # Use structured encoding to avoid hash collisions:
+        # length-prefixed rel_path followed by length-prefixed file_hash
+        rel_bytes = rel_path.encode('utf-8')
+        hash_bytes = file_hash.encode('ascii')
+        dir_hash.update(len(rel_bytes).to_bytes(4, 'big'))
+        dir_hash.update(rel_bytes)
+        dir_hash.update(len(hash_bytes).to_bytes(4, 'big'))
+        dir_hash.update(hash_bytes)
 
     # Build file tree string for LLM context
     file_tree_lines = [f"  {f.relative_path} ({f.file_size} bytes, {f.mime_type})"

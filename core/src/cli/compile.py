@@ -57,14 +57,20 @@ def infer_parent_skill_id(skill_dir: Path, input_path: Path, skill_parent_map: d
     Returns:
         The canonical parent skill ID (from frontmatter if available) or None
     """
-    current = skill_dir.parent
+    # Normalize all paths to avoid mixing resolved and unresolved paths
+    current = skill_dir.resolve().parent
     input_root = input_path.resolve()
+
+    # Normalize skill_parent_map keys for consistent lookups
+    normalized_map: dict | None = None
+    if skill_parent_map is not None:
+        normalized_map = {Path(p).resolve(): v for p, v in skill_parent_map.items()}
 
     while current != input_root and current != current.parent:
         if (current / "SKILL.md").exists():
-            # Use frontmatter-based ID from skill_parent_map if available
-            if skill_parent_map and current in skill_parent_map:
-                qualified_id, _ = skill_parent_map[current]
+            # Use frontmatter-based ID from normalized map if available
+            if normalized_map and current in normalized_map:
+                qualified_id, _ = normalized_map[current]
                 # Extract short ID from qualified ID (package/skill_id -> skill_id)
                 return qualified_id.split('/')[-1]
             # Fallback to directory name (for cases outside main compilation)
