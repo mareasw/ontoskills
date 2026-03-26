@@ -118,7 +118,7 @@ const products = {
       {
         name: 'OntoStore',
         description: 'The registry. Browse, publish, and discover ontological skills.',
-        features: ['Intent-based search', 'Version control', 'CLI integration'],
+        features: ['Skill discovery', 'Version control', 'CLI integration'],
         link: '/ontostore/',
       },
       {
@@ -142,7 +142,7 @@ const products = {
       {
         name: 'OntoStore',
         description: '注册表。浏览、发布和发现本体技能。',
-        features: ['基于意图的搜索', '版本控制', 'CLI 集成'],
+        features: ['技能发现', '版本控制', 'CLI 集成'],
         link: '/ontostore/',
       },
       {
