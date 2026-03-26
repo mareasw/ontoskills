@@ -18,7 +18,7 @@ const {
   lang = defaultLang,
 } = Astro.props;
 
-const rootId = `market-${crypto.randomUUID()}`;
+const rootId = `ontoskills-store`;
 
 // i18n strings
 const i18n = {
@@ -335,12 +335,28 @@ const t = i18n[lang];
   // Initial load
   loadStore();
 
-  // Handle ViewTransitions - reinitialize when navigating back to this page
-  document.addEventListener('astro:page-load', () => {
-    // Only reinitialize if this component's root exists in the new page
-    const newRoot = document.getElementById(rootId);
-    if (newRoot && !skills.length) {
+  // Handle ViewTransitions - reinitialize when navigating to this page
+  const initOnPageLoad = () => {
+    const currentRoot = document.getElementById(rootId);
+    if (!currentRoot) return;
+
+    // Re-query DOM elements for the new page
+    const currentSearch = currentRoot.querySelector('[data-role="search"]');
+    const currentGrid = currentRoot.querySelector('[data-role="grid"]');
+    const currentStatus = currentRoot.querySelector('[data-role="status"]');
+    const currentCount = currentRoot.querySelector('[data-role="count"]');
+
+    if (currentGrid && currentCount && currentStatus) {
+      // Reset state and reload
+      skills = [];
+      currentStatus.textContent = i18n.connecting;
       loadStore();
     }
-  });
+
+    // Re-attach search listener
+    currentSearch?.addEventListener('input', render);
+  };
+
+  // Run on ViewTransition navigation
+  document.addEventListener('astro:page-load', initOnPageLoad);
 </script>
