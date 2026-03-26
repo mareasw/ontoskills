@@ -97,6 +97,22 @@ a:hover {
   color: var(--sl-color-accent-high);
 }
 
+/* Site title - unified with main site */
+.site-title {
+  color: #ffffff !important;
+  font-size: 1.125rem !important;
+  font-weight: 600 !important;
+}
+
+.site-title:hover {
+  color: #f0f0f0 !important;
+}
+
+.site-title img {
+  height: 2rem !important;
+  width: auto !important;
+}
+
 [data-search] {
   background: #111111 !important;
   border: 1px solid var(--sl-color-border) !important;
