@@ -157,15 +157,15 @@ oc:exampleName a owl:DatatypeProperty ;
     rdfs:domain oc:Example ;
     rdfs:range xsd:string .
 
-oc:exampleInput a owl:DatatypeProperty ;
+oc:inputDescription a owl:DatatypeProperty ;
     rdfs:domain oc:Example ;
     rdfs:range xsd:string .
 
-oc:exampleOutput a owl:DatatypeProperty ;
+oc:outputExample a owl:DatatypeProperty ;
     rdfs:domain oc:Example ;
     rdfs:range xsd:string .
 
-oc:exampleTag a owl:DatatypeProperty ;
+oc:hasTag a owl:DatatypeProperty ;
     rdfs:domain oc:Example ;
     rdfs:range xsd:string .
 ```

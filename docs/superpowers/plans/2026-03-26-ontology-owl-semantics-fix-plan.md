@@ -80,7 +80,7 @@ Add after file properties:
     g.add((oc.scriptExecutor, RDFS.comment, Literal(
         "Executor for the script (python, bash, node, etc.)"
     )))
-    g.add((oc.scriptExecutor, RDFS.range, XSD.xstring))
+    g.add((oc.scriptExecutor, RDFS.range, XSD.string))
 
     # oc:scriptIntent - Whether script should be executed or read-only
     g.add((oc.scriptIntent, RDF.type, OWL.DatatypeProperty))

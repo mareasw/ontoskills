@@ -281,8 +281,17 @@ def _check_workflow_cycles(g: Graph) -> list[LintIssue]:
                 step_id_obj = next(g.objects(step, OC.stepId), None)
                 if step_id_obj:
                     step_id = str(step_id_obj)
-                    deps = {str(d) for d in g.objects(step, OC.dependsOn)}
-                    step_deps[step_id] = deps
+                    dep_ids: set[str] = set()
+                    # New workflow model: dependencies as node references via oc:stepDependsOn.
+                    # Resolve each referenced step node back to its oc:stepId literal.
+                    for dep_step in g.objects(step, OC.stepDependsOn):
+                        dep_step_id_obj = next(g.objects(dep_step, OC.stepId), None)
+                        if dep_step_id_obj:
+                            dep_ids.add(str(dep_step_id_obj))
+                    # Backward compatibility: also honor literal step-id dependencies via oc:dependsOn.
+                    for dep_literal in g.objects(step, OC.dependsOn):
+                        dep_ids.add(str(dep_literal))
+                    step_deps[step_id] = dep_ids
 
             # Detect cycles via DFS
             visited: set[str] = set()
