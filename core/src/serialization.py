@@ -228,44 +228,44 @@ def serialize_skill(
         ref_node = make_bnode("ref", ref.relative_path)
         graph.add((skill_uri, oc.hasReferenceFile, ref_node))
         graph.add((ref_node, RDF.type, oc.ReferenceFile))
-        graph.add((ref_node, oc.relativePath, Literal(ref.relative_path)))
+        graph.add((ref_node, oc.filePath, Literal(ref.relative_path)))
         graph.add((ref_node, oc.purpose, Literal(ref.purpose)))
 
         # O(1) lookup using pre-indexed files
         if ref.relative_path in files_index:
             f = files_index[ref.relative_path]
-            graph.add((ref_node, oc.contentHash, Literal(f.content_hash)))
+            graph.add((ref_node, oc.fileHash, Literal(f.content_hash)))
             graph.add((ref_node, oc.fileSize, Literal(f.file_size)))
-            graph.add((ref_node, oc.mimeType, Literal(f.mime_type)))
+            graph.add((ref_node, oc.fileMimeType, Literal(f.mime_type)))
 
     # Executable Scripts
     for script in getattr(skill, 'executable_scripts', []):
         script_node = make_bnode("script", script.relative_path)
         graph.add((skill_uri, oc.hasExecutableScript, script_node))
         graph.add((script_node, RDF.type, oc.ExecutableScript))
-        graph.add((script_node, oc.relativePath, Literal(script.relative_path)))
-        graph.add((script_node, oc.executor, Literal(script.executor)))
-        graph.add((script_node, oc.executionIntent, Literal(script.execution_intent)))
+        graph.add((script_node, oc.filePath, Literal(script.relative_path)))
+        graph.add((script_node, oc.scriptExecutor, Literal(script.executor)))
+        graph.add((script_node, oc.scriptIntent, Literal(script.execution_intent)))
 
         if script.command_template:
-            graph.add((script_node, oc.commandTemplate, Literal(script.command_template)))
+            graph.add((script_node, oc.scriptCommand, Literal(script.command_template)))
 
         # Requirements as blank nodes
         for req in script.requirements:
             req_node = make_bnode("req", req)
-            graph.add((script_node, oc.hasRequirement, req_node))
+            graph.add((script_node, oc.scriptHasRequirement, req_node))
             graph.add((req_node, RDF.type, oc.Requirement))
             graph.add((req_node, oc.requirementType, Literal("Tool")))
             graph.add((req_node, oc.requirementValue, Literal(req)))
             graph.add((req_node, oc.isOptional, Literal(False)))
 
         if script.produces_output:
-            graph.add((script_node, oc.producesOutput, Literal(script.produces_output)))
+            graph.add((script_node, oc.scriptOutput, Literal(script.produces_output)))
 
         # O(1) lookup using pre-indexed files
         if script.relative_path in files_index:
             f = files_index[script.relative_path]
-            graph.add((script_node, oc.contentHash, Literal(f.content_hash)))
+            graph.add((script_node, oc.fileHash, Literal(f.content_hash)))
 
     # Workflows
     for wf in getattr(skill, 'workflows', []):
@@ -274,18 +274,27 @@ def serialize_skill(
         graph.add((wf_node, RDF.type, oc.Workflow))
         graph.add((wf_node, oc.workflowId, Literal(wf.workflow_id)))
         graph.add((wf_node, oc.workflowName, Literal(wf.name)))
-        graph.add((wf_node, oc.description, Literal(wf.description)))
+        graph.add((wf_node, DCTERMS.description, Literal(wf.description)))
 
+        # Build step node mapping for dependency resolution
+        step_nodes = {}
         for step in wf.steps:
             step_node = make_bnode("step", f"{wf.workflow_id}_{step.step_id}")
+            step_nodes[step.step_id] = step_node
             graph.add((wf_node, oc.hasStep, step_node))
             graph.add((step_node, RDF.type, oc.WorkflowStep))
             graph.add((step_node, oc.stepId, Literal(step.step_id)))
-            graph.add((step_node, oc.description, Literal(step.description)))
+            graph.add((step_node, DCTERMS.description, Literal(step.description)))
             if step.expected_outcome:
                 graph.add((step_node, oc.expectedOutcome, Literal(step.expected_outcome)))
-            for dep in step.depends_on:
-                graph.add((step_node, oc.dependsOn, Literal(dep)))
+
+        # Add step dependencies as ObjectProperty (second pass after all nodes created)
+        for step in wf.steps:
+            step_node = step_nodes[step.step_id]
+            for dep_id in step.depends_on:
+                if dep_id in step_nodes:
+                    dep_node = step_nodes[dep_id]
+                    graph.add((step_node, oc.stepDependsOn, dep_node))
 
     # Examples
     for ex in getattr(skill, 'examples', []):
