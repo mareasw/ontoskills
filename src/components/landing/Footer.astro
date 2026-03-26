@@ -43,56 +43,58 @@ const communityLinks = [
       </a>
     </div>
 
-    <!-- 3-column grid - centered on mobile -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-12 mb-10 sm:mb-12 text-center sm:text-left">
-      <!-- Product Column -->
-      <div>
-        <h3 class="font-semibold text-text-primary mb-4 text-sm uppercase tracking-wider">{t.product}</h3>
-        <nav class="flex flex-col gap-3">
-          {productLinks.map((link) => (
-            <a
-              href={link.href}
-              class="text-text-secondary hover:text-cyan-400 transition-colors text-sm"
-            >
-              {link.label}
-            </a>
-          ))}
-        </nav>
-      </div>
+    <!-- 3-column grid - centered with max-width -->
+    <div class="max-w-3xl mx-auto">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-6 mb-10 sm:mb-12 text-center">
+        <!-- Product Column -->
+        <div>
+          <h3 class="font-semibold text-text-primary mb-4 text-sm uppercase tracking-wider">{t.product}</h3>
+          <nav class="flex flex-col items-center sm:items-start gap-3">
+            {productLinks.map((link) => (
+              <a
+                href={link.href}
+                class="text-text-secondary hover:text-cyan-400 transition-colors text-sm"
+              >
+                {link.label}
+              </a>
+            ))}
+          </nav>
+        </div>
 
-      <!-- Resources Column -->
-      <div>
-        <h3 class="font-semibold text-text-primary mb-4 text-sm uppercase tracking-wider">{t.resources}</h3>
-        <nav class="flex flex-col gap-3">
-          {resourceLinks.map((link) => (
-            <a
-              href={link.href}
-              class="text-text-secondary hover:text-cyan-400 transition-colors text-sm"
-            >
-              {link.label}
-            </a>
-          ))}
-        </nav>
-      </div>
+        <!-- Resources Column -->
+        <div>
+          <h3 class="font-semibold text-text-primary mb-4 text-sm uppercase tracking-wider">{t.resources}</h3>
+          <nav class="flex flex-col items-center sm:items-start gap-3">
+            {resourceLinks.map((link) => (
+              <a
+                href={link.href}
+                class="text-text-secondary hover:text-cyan-400 transition-colors text-sm"
+              >
+                {link.label}
+              </a>
+            ))}
+          </nav>
+        </div>
 
-      <!-- Community Column -->
-      <div>
-        <h3 class="font-semibold text-text-primary mb-4 text-sm uppercase tracking-wider">{t.community}</h3>
-        <nav class="flex flex-col gap-3">
-          {communityLinks.map((link) => (
-            <a
-              href={link.href}
-              class="text-text-secondary hover:text-cyan-400 transition-colors text-sm inline-flex items-center justify-center sm:justify-start gap-1.5"
-              target="_blank"
-              rel="noopener"
-            >
-              {link.label}
-              <svg class="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
-          ))}
-        </nav>
+        <!-- Community Column -->
+        <div>
+          <h3 class="font-semibold text-text-primary mb-4 text-sm uppercase tracking-wider">{t.community}</h3>
+          <nav class="flex flex-col items-center sm:items-start gap-3">
+            {communityLinks.map((link) => (
+              <a
+                href={link.href}
+                class="text-text-secondary hover:text-cyan-400 transition-colors text-sm inline-flex items-center gap-1.5"
+                target="_blank"
+                rel="noopener"
+              >
+                {link.label}
+                <svg class="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            ))}
+          </nav>
+        </div>
       </div>
     </div>
 
