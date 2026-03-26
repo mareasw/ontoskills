@@ -21,6 +21,14 @@ Add after the existing Phase 2 properties (around line 470):
 
 ```python
     # ========== Phase 2: File Properties ==========
+    from rdflib.collection import Collection
+
+    # Create union domain class for file properties (ReferenceFile OR ExecutableScript)
+    file_domain = BNode()
+    g.add((file_domain, RDF.type, OWL.Class))
+    file_union_list = BNode()
+    Collection(g, file_union_list, [oc.ReferenceFile, oc.ExecutableScript])
+    g.add((file_domain, OWL.unionOf, file_union_list))
 
     # oc:filePath - Relative path from skill directory
     g.add((oc.filePath, RDF.type, OWL.DatatypeProperty))
@@ -28,8 +36,7 @@ Add after the existing Phase 2 properties (around line 470):
     g.add((oc.filePath, RDFS.comment, Literal(
         "Relative path from skill directory"
     )))
-    g.add((oc.filePath, RDFS.domain, oc.ReferenceFile))
-    g.add((oc.filePath, RDFS.domain, oc.ExecutableScript))
+    g.add((oc.filePath, RDFS.domain, file_domain))
     g.add((oc.filePath, RDFS.range, XSD.string))
 
     # oc:fileHash - SHA-256 hash of file content
@@ -38,9 +45,8 @@ Add after the existing Phase 2 properties (around line 470):
     g.add((oc.fileHash, RDFS.comment, Literal(
         "SHA-256 hash of file content"
     )))
-    g.add((oc.fileHash, RDFS.domain, oc.ReferenceFile))
-    g.add((oc.fileHash, RDFS.domain, oc.ExecutableScript))
-    g.add((oc.fileHash, RDFS.range, XSD.xstring))
+    g.add((oc.fileHash, RDFS.domain, file_domain))
+    g.add((oc.fileHash, RDFS.range, XSD.string))
 
     # oc:fileSize - File size in bytes
     g.add((oc.fileSize, RDF.type, OWL.DatatypeProperty))
@@ -48,8 +54,7 @@ Add after the existing Phase 2 properties (around line 470):
     g.add((oc.fileSize, RDFS.comment, Literal(
         "File size in bytes"
     )))
-    g.add((oc.fileSize, RDFS.domain, oc.ReferenceFile))
-    g.add((oc.fileSize, RDFS.domain, oc.ExecutableScript))
+    g.add((oc.fileSize, RDFS.domain, file_domain))
     g.add((oc.fileSize, RDFS.range, XSD.integer))
 
     # oc:fileMimeType - MIME type of the file
@@ -58,8 +63,7 @@ Add after the existing Phase 2 properties (around line 470):
     g.add((oc.fileMimeType, RDFS.comment, Literal(
         "MIME type of the file"
     )))
-    g.add((oc.fileMimeType, RDFS.domain, oc.ReferenceFile))
-    g.add((oc.fileMimeType, RDFS.domain, oc.ExecutableScript))
+    g.add((oc.fileMimeType, RDFS.domain, file_domain))
     g.add((oc.fileMimeType, RDFS.range, XSD.string))
 ```
 
