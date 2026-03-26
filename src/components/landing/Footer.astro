@@ -33,8 +33,13 @@ const communityLinks = [
 ];
 ---
 
-<footer class="border-t border-white/10 py-12 sm:py-16 bg-transparent">
-  <div class="section-shell">
+<footer class="border-t border-white/10 py-12 sm:py-16 bg-transparent relative overflow-hidden">
+  <!-- Subtle gradient background -->
+  <div class="absolute inset-0 pointer-events-none">
+    <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-to-t from-cyan-500/5 to-transparent rounded-full blur-3xl"></div>
+  </div>
+
+  <div class="section-shell relative">
     <!-- Logo at top -->
     <div class="flex justify-center mb-10 sm:mb-12">
       <a href={homeHref} class="flex items-center gap-2 hover:opacity-80 transition-opacity">
