@@ -19,6 +19,12 @@ const alternateLang: Lang = lang === 'en' ? 'zh' : 'en';
 let alternateHref: string;
 if (currentPath === '/' || currentPath === '') {
   alternateHref = '/zh/';
+} else if (currentPath === '/ontostore/' || currentPath === '/ontostore') {
+  // OntoStore EN -> ZH
+  alternateHref = '/zh/ontostore/';
+} else if (currentPath === '/zh/ontostore/' || currentPath === '/zh/ontostore') {
+  // OntoStore ZH -> EN
+  alternateHref = '/ontostore/';
 } else if (currentPath.startsWith('/zh/')) {
   // Chinese to English: /zh/how-it-works/ -> /en/how-it-works/
   alternateHref = currentPath.replace(/^\/zh\//, '/en/') || '/';
@@ -26,7 +32,7 @@ if (currentPath === '/' || currentPath === '') {
   // English to Chinese: /en/how-it-works/ -> /zh/how-it-works/
   alternateHref = currentPath.replace(/^\/en\//, '/zh/');
 } else {
-  // Non-localized pages (like /ontostore/) stay the same
+  // Other non-localized pages stay the same
   alternateHref = currentPath;
 }
 
