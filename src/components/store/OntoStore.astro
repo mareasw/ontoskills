@@ -32,7 +32,7 @@ const i18n = {
     verified: 'verified',
     install: 'Install',
     copyToClipboard: 'Copy to clipboard',
-    unableToLoad: 'Unable to load store data. ',
+    unableToLoad: 'Unable to load store data.',
     openStore: 'Open the official store',
     showingResults: 'Showing results for',
     allSkills: 'All published skills from the official registry.',
@@ -40,6 +40,7 @@ const i18n = {
     trySearch: 'Try searching for: hello, xlsx, docx, or office',
     skill_one: 'skill',
     skill_other: 'skills',
+    retry: 'Retry',
   },
   zh: {
     searchPlaceholder: '按技能、意图或描述搜索...',
@@ -59,6 +60,7 @@ const i18n = {
     trySearch: '尝试搜索: hello, xlsx, docx, 或 office',
     skill_one: '个技能',
     skill_other: '个技能',
+    retry: '重试',
   },
 };
 
@@ -207,18 +209,20 @@ const t = i18n[lang];
     count.textContent = `${filtered.length} ${filtered.length === 1 ? i18n.skill_one : i18n.skill_other}`;
 
     if (!skills.length) {
-      status.innerHTML = '';
-      const text1 = document.createTextNode(i18n.unableToLoad);
-      const link = document.createElement('a');
-      link.href = storeRepoUrl;
-      link.target = '_blank';
-      link.rel = 'noopener';
-      link.className = 'text-cyan-400 hover:text-cyan-300 underline';
-      link.textContent = i18n.openStore;
-      const text2 = document.createTextNode('.');
-      status.appendChild(text1);
-      status.appendChild(link);
-      status.appendChild(text2);
+      status.innerHTML = `
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-3 text-center">
+          <span>${i18n.unableToLoad}</span>
+          <button
+            data-action="retry"
+            class="px-3 py-1.5 rounded-md bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 transition-colors text-sm font-medium"
+          >
+            ${i18n.retry || 'Retry'}
+          </button>
+          <a href="${storeRepoUrl}" target="_blank" rel="noopener" class="text-cyan-400 hover:text-cyan-300 underline text-sm">
+            ${i18n.openStore}
+          </a>
+        </div>
+      `;
       grid.innerHTML = '';
       return;
     }
@@ -245,29 +249,57 @@ const t = i18n[lang];
 
   const loadStore = async () => {
     try {
-      const indexResponse = await fetch(storeIndexUrl, { mode: 'cors' });
+      status.textContent = i18n.connecting;
+      const indexResponse = await fetch(storeIndexUrl, {
+        mode: 'cors',
+        headers: { 'Accept': 'application/json' }
+      });
       if (!indexResponse.ok) throw new Error(`Index request failed: ${indexResponse.status}`);
       const indexData = await indexResponse.json();
-      const manifests = await Promise.all(
+
+      // Use allSettled to handle partial failures gracefully
+      const results = await Promise.allSettled(
         (indexData.packages || []).map(async (entry) => {
           const manifestUrl = new URL(entry.manifest_url, storeIndexUrl).toString();
-          const response = await fetch(manifestUrl, { mode: 'cors' });
+          const response = await fetch(manifestUrl, {
+            mode: 'cors',
+            headers: { 'Accept': 'application/json' }
+          });
           if (!response.ok) throw new Error(`Manifest request failed: ${response.status}`);
           return response.json();
         })
       );
 
+      // Only use fulfilled manifests, log rejected ones
+      const manifests = results
+        .filter((r) => r.status === 'fulfilled')
+        .map((r) => r.value);
+
+      const failedCount = results.filter((r) => r.status === 'rejected').length;
+      if (failedCount > 0) {
+        console.warn(`${failedCount} manifest(s) failed to load`);
+      }
+
       skills = manifests.flatMap((pkg) => (pkg.skills || []).map((skill) => normalizeSkill(pkg, skill)));
       skills.sort((left, right) => left.qualifiedId.localeCompare(right.qualifiedId));
       render();
     } catch (error) {
-      console.error(error);
+      console.error('Failed to load store:', error);
       skills = [];
       render();
     }
   };
 
   root?.addEventListener('click', async (event) => {
+    // Handle retry button
+    const retryBtn = event.target.closest('[data-action="retry"]');
+    if (retryBtn) {
+      event.preventDefault();
+      await loadStore();
+      return;
+    }
+
+    // Handle copy button
     const target = event.target.closest('[data-copy]');
     if (!target) return;
     const command = target.getAttribute('data-copy') ?? '';
@@ -299,5 +331,16 @@ const t = i18n[lang];
   });
 
   search?.addEventListener('input', render);
+
+  // Initial load
   loadStore();
+
+  // Handle ViewTransitions - reinitialize when navigating back to this page
+  document.addEventListener('astro:page-load', () => {
+    // Only reinitialize if this component's root exists in the new page
+    const newRoot = document.getElementById(rootId);
+    if (newRoot && !skills.length) {
+      loadStore();
+    }
+  });
 </script>
