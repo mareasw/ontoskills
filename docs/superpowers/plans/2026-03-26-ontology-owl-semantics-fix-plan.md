@@ -13,7 +13,7 @@
 ## Task 1: Update Core Ontology Properties
 > **Files:**
 > Modify: `core/src/core_ontology.py`
-> Test: `tests/test_core_ontology.py`
+> Test: `core/tests/test_core_ontology.py`
 
 - [ ] **Step 1: Add file properties to core_ontology.py**
 
@@ -30,7 +30,7 @@ Add after the existing Phase 2 properties (around line 470):
     )))
     g.add((oc.filePath, RDFS.domain, oc.ReferenceFile))
     g.add((oc.filePath, RDFS.domain, oc.ExecutableScript))
-    g.add((oc.filePath, RDFS.range, XSD.xstring))
+    g.add((oc.filePath, RDFS.range, XSD.string))
 
     # oc:fileHash - SHA-256 hash of file content
     g.add((oc.fileHash, RDF.type, OWL.DatatypeProperty))
@@ -288,29 +288,32 @@ git commit -m "fix(schemas): use OntoSkills reserved words in validation"
 
 ## Task 4: Update Tests
 > **Files:**
-    Modify: `tests/test_serialization.py`
-    Create: `tests/test_core_ontology_phase2.py`
+    Modify: `core/tests/test_serialization.py`
+    Create: `core/tests/test_core_ontology_phase2.py`
 
 - [ ] **Step 1: Add test for new file properties**
 
 ```python
 def test_file_properties_defined():
     """Test that new file properties are defined with correct domains."""
-    from rdflib import Graph
+    from rdflib import Graph, RDF, OWL
     from compiler.core_ontology import create_core_ontology
     from compiler.config import BASE_URI
     from rdflib.namespace import Namespace
+    from pathlib import Path
+    import tempfile
 
     oc = Namespace(BASE_URI)
 
-    g = Graph()
-    create_core_ontology()  # Creates in temp or use mock
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output_path = Path(tmpdir) / "ontoskills-core.ttl"
+        g = create_core_ontology(output_path)
 
-    # Check file properties exist
-    assert (oc.filePath, None, g) is not None
-    assert (oc.fileHash, None, g) is not None
-    assert (oc.fileSize, None, g) is not None
-    assert (oc.fileMimeType, None, g) is not None
+        # Check file properties exist as DatatypeProperty
+        assert (oc.filePath, RDF.type, OWL.DatatypeProperty) in g
+        assert (oc.fileHash, RDF.type, OWL.DatatypeProperty) in g
+        assert (oc.fileSize, RDF.type, OWL.DatatypeProperty) in g
+        assert (oc.fileMimeType, RDF.type, OWL.DatatypeProperty) in g
 ```
 
 - [ ] **Step 2: Add test for script properties**
@@ -318,22 +321,25 @@ def test_file_properties_defined():
 ```python
 def test_script_properties_defined():
     """Test that script properties are defined with correct domains."""
-    from rdflib import Graph
+    from rdflib import Graph, RDF, OWL
     from compiler.core_ontology import create_core_ontology
     from compiler.config import BASE_URI
     from rdflib.namespace import Namespace
+    from pathlib import Path
+    import tempfile
 
     oc = Namespace(BASE_URI)
 
-    g = Graph()
-    create_core_ontology()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output_path = Path(tmpdir) / "ontoskills-core.ttl"
+        g = create_core_ontology(output_path)
 
-    # Check script properties exist
-    assert (oc.scriptExecutor, None, g) is not None
-    assert (oc.scriptIntent, None, g) is not None
-    assert (oc.scriptCommand, None, g) is not None
-    assert (oc.scriptOutput, None, g) is not None
-    assert (oc.scriptHasRequirement, None, g) is not None
+        # Check script properties exist as DatatypeProperty
+        assert (oc.scriptExecutor, RDF.type, OWL.DatatypeProperty) in g
+        assert (oc.scriptIntent, RDF.type, OWL.DatatypeProperty) in g
+        assert (oc.scriptCommand, RDF.type, OWL.DatatypeProperty) in g
+        assert (oc.scriptOutput, RDF.type, OWL.DatatypeProperty) in g
+        assert (oc.scriptHasRequirement, RDF.type, OWL.ObjectProperty) in g
 ```
 
 - [ ] **Step 3: Add test for step dependency property**
@@ -341,18 +347,24 @@ def test_script_properties_defined():
 ```python
 def test_step_depends_on_is_object_property():
     """Test that oc:stepDependsOn is an ObjectProperty with correct domain/range."""
-    from rdflib import Graph, OWL
+    from rdflib import Graph, RDF, OWL, RDFS
     from compiler.core_ontology import create_core_ontology
     from compiler.config import BASE_URI
     from rdflib.namespace import Namespace
+    from pathlib import Path
+    import tempfile
 
     oc = Namespace(BASE_URI)
 
-    g = Graph()
-    create_core_ontology()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output_path = Path(tmpdir) / "ontoskills-core.ttl"
+        g = create_core_ontology(output_path)
 
-    # Check stepDependsOn is ObjectProperty
-    assert (oc.stepDependsOn, RDF.type, OWL.ObjectProperty) in g
+        # Check stepDependsOn is ObjectProperty
+        assert (oc.stepDependsOn, RDF.type, OWL.ObjectProperty) in g
+        # Check domain and range are WorkflowStep
+        assert (oc.stepDependsOn, RDFS.domain, oc.WorkflowStep) in g
+        assert (oc.stepDependsOn, RDFS.range, oc.WorkflowStep) in g
 ```
 
 - [ ] **Step 4: Add test for reserved words validation**
@@ -377,12 +389,16 @@ def test_reserved_words_blocked_in_any_segment():
     # Should fail - reserved at end
     with pytest.raises(ValueError, match="Reserved word"):
         Frontmatter(name="helper-core", description="Test")
+
+    # Should fail - reserved as single word
+    with pytest.raises(ValueError, match="Reserved word"):
+        Frontmatter(name="system", description="Test")
 ```
 
 - [ ] **Step 5: Run all tests**
 
 ```bash
-python3 -m pytest tests/test_core_ontology_phase2.py tests/test_schemas.py -v
+python3 -m pytest core/tests/test_core_ontology_phase2.py core/tests/test_schemas.py -v
 ```
 
 Expected: All tests pass
@@ -470,7 +486,7 @@ git commit -m "docs: update CHANGELOG for v0.9.3 OWL semantic fixes"
 
 ```bash
 cd /Users/marcello/Developer/Marea/ontoclaw/core
-python3 -m pytest tests/ -v
+python3 -m pytest core/tests/ -v
 ```
 
 Expected: All tests pass (except pre-existing 8 failures unrelated to this change)
