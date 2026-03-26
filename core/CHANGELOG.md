@@ -4,6 +4,28 @@ All notable changes to OntoCore (Python package) will be documented in this file
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.3] - 2026-03-26
+
+### Changed
+
+- **OWL Semantic Fixes** — Breaking changes to ontology properties for correct OWL reasoning:
+  - `oc:contentHash` on files → `oc:fileHash` (domain: ReferenceFile, ExecutableScript via owl:unionOf)
+  - `oc:executor` on scripts → `oc:scriptExecutor` (domain: ExecutableScript)
+  - `oc:executionIntent` → `oc:scriptIntent`
+  - `oc:commandTemplate` → `oc:scriptCommand`
+  - `oc:producesOutput` → `oc:scriptOutput`
+  - `oc:hasRequirement` on scripts → `oc:scriptHasRequirement`
+  - `oc:description` on workflows → `dcterms:description`
+  - `oc:dependsOn` on steps with Literal → `oc:stepDependsOn` (ObjectProperty)
+  - `oc:relativePath` → `oc:filePath`
+  - `oc:mimeType` → `oc:fileMimeType`
+
+### Fixed
+
+- **Reserved words validation** — Now blocks OntoSkills system words (ontoskills, marea, mareasw, core, system, index) in any segment of skill name
+- **Missing RDFS.domain** — Added domain declaration for `oc:requirementType` property
+- **Duplicate imports** — Removed redundant import statements in core_ontology.py
+
 ## [0.9.2] - 2026-03-25
 
 ### Added
