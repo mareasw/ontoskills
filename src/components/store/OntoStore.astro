@@ -1,11 +1,13 @@
 ---
 import { OFFICIAL_STORE_INDEX_URL, OFFICIAL_STORE_REPO_URL } from '../../data/store';
+import { type Lang, defaultLang } from '../../i18n/translations';
 
 interface Props {
   title?: string;
   description?: string;
   compact?: boolean;
   showHeader?: boolean;
+  lang?: Lang;
 }
 
 const {
@@ -13,9 +15,54 @@ const {
   description = 'Search the official store, inspect published skills, and copy the exact install command.',
   compact = false,
   showHeader = true,
+  lang = defaultLang,
 } = Astro.props;
 
 const rootId = `market-${crypto.randomUUID()}`;
+
+// i18n strings
+const i18n = {
+  en: {
+    searchPlaceholder: 'Search by skill, intent, or description...',
+    loading: 'Loading store…',
+    viewRepo: 'View Repo',
+    connecting: 'Connecting to the official store…',
+    noDescription: 'No description available.',
+    official: 'official',
+    verified: 'verified',
+    install: 'Install',
+    copyToClipboard: 'Copy to clipboard',
+    unableToLoad: 'Unable to load store data. ',
+    openStore: 'Open the official store',
+    showingResults: 'Showing results for',
+    allSkills: 'All published skills from the official registry.',
+    noMatch: 'No matching skills found',
+    trySearch: 'Try searching for: hello, xlsx, docx, or office',
+    skill_one: 'skill',
+    skill_other: 'skills',
+  },
+  zh: {
+    searchPlaceholder: '按技能、意图或描述搜索...',
+    loading: '加载商店中…',
+    viewRepo: '查看仓库',
+    connecting: '正在连接官方商店…',
+    noDescription: '暂无描述。',
+    official: '官方',
+    verified: '已验证',
+    install: '安装',
+    copyToClipboard: '复制到剪贴板',
+    unableToLoad: '无法加载商店数据。',
+    openStore: '打开官方商店',
+    showingResults: '显示搜索结果',
+    allSkills: '来自官方注册表的所有已发布技能。',
+    noMatch: '未找到匹配的技能',
+    trySearch: '尝试搜索: hello, xlsx, docx, 或 office',
+    skill_one: '个技能',
+    skill_other: '个技能',
+  },
+};
+
+const t = i18n[lang];
 ---
 
 <section id="marketplace" class={`${compact ? 'py-14' : ''}`}>
@@ -39,17 +86,17 @@ const rootId = `market-${crypto.randomUUID()}`;
             <input
               class="w-full bg-bg-secondary border border-white/10 rounded-xl pl-12 pr-4 py-3 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 transition-colors"
               type="search"
-              placeholder="Search by skill, intent, or description..."
+              placeholder={t.searchPlaceholder}
               data-role="search"
             />
           </div>
           <div class="flex items-center justify-between lg:justify-end gap-4">
-            <span class="text-sm text-text-secondary" data-role="count">Loading store…</span>
+            <span class="text-sm text-text-secondary" data-role="count">{t.loading}</span>
             <a href={OFFICIAL_STORE_REPO_URL} target="_blank" rel="noopener" class="inline-flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 transition-colors">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
-              View Repo
+              {t.viewRepo}
             </a>
           </div>
         </div>
@@ -57,7 +104,7 @@ const rootId = `market-${crypto.randomUUID()}`;
 
       <!-- Status -->
       <div data-role="status" class="px-4 sm:px-6 py-4 text-sm text-text-secondary border-b border-white/5 bg-black/20">
-        Connecting to the official store…
+        {t.connecting}
       </div>
 
       <!-- Results -->
@@ -66,7 +113,7 @@ const rootId = `market-${crypto.randomUUID()}`;
   </div>
 </section>
 
-<script define:vars={{ rootId, storeIndexUrl: OFFICIAL_STORE_INDEX_URL, storeRepoUrl: OFFICIAL_STORE_REPO_URL }} is:inline>
+<script define:vars={{ rootId, storeIndexUrl: OFFICIAL_STORE_INDEX_URL, storeRepoUrl: OFFICIAL_STORE_REPO_URL, i18n: t }} is:inline>
   const root = document.getElementById(rootId);
   const search = root?.querySelector('[data-role="search"]');
   const grid = root?.querySelector('[data-role="grid"]');
@@ -99,9 +146,9 @@ const rootId = `market-${crypto.randomUUID()}`;
   const renderRow = (skill, index) => {
     const aliases = skill.aliases.length ? skill.aliases.slice(0, 3).map(a => `<span class="px-2 py-0.5 rounded bg-white/5 text-xs text-text-muted">${escapeHtml(a)}</span>`).join('') : '';
     const trustBadge = skill.trustTier === 'official'
-      ? '<span class="px-2 py-0.5 rounded bg-cyan-500/10 text-xs text-cyan-400 font-medium">official</span>'
+      ? `<span class="px-2 py-0.5 rounded bg-cyan-500/10 text-xs text-cyan-400 font-medium">${escapeHtml(i18n.official)}</span>`
       : skill.trustTier === 'verified'
-        ? '<span class="px-2 py-0.5 rounded bg-green-500/10 text-xs text-green-400 font-medium">verified</span>'
+        ? `<span class="px-2 py-0.5 rounded bg-green-500/10 text-xs text-green-400 font-medium">${escapeHtml(i18n.verified)}</span>`
         : `<span class="px-2 py-0.5 rounded bg-white/5 text-xs text-text-muted">${escapeHtml(skill.trustTier)}</span>`;
 
     return `
@@ -121,12 +168,12 @@ const rootId = `market-${crypto.randomUUID()}`;
           <div class="lg:min-w-[280px]">
             <div class="relative px-3 py-2.5 rounded-lg bg-black/40 border border-white/5 group/install">
               <div class="flex items-center justify-between mb-1">
-                <span class="text-[10px] uppercase tracking-wider text-text-muted">Install</span>
+                <span class="text-[10px] uppercase tracking-wider text-text-muted">${escapeHtml(i18n.install)}</span>
                 <button
                   type="button"
                   data-copy="${escapeHtml(skill.installCommand)}"
                   class="copy-btn opacity-50 group-hover/install:opacity-100 transition-opacity p-1 rounded hover:bg-white/5"
-                  title="Copy to clipboard"
+                  title="${escapeHtml(i18n.copyToClipboard)}"
                 >
                   <svg class="w-3.5 h-3.5 text-text-muted hover:text-cyan-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -157,17 +204,17 @@ const rootId = `market-${crypto.randomUUID()}`;
       return haystack.includes(query);
     });
 
-    count.textContent = `${filtered.length} skill${filtered.length === 1 ? '' : 's'}`;
+    count.textContent = `${filtered.length} ${filtered.length === 1 ? i18n.skill_one : i18n.skill_other}`;
 
     if (!skills.length) {
       status.innerHTML = '';
-      const text1 = document.createTextNode('Unable to load store data. ');
+      const text1 = document.createTextNode(i18n.unableToLoad);
       const link = document.createElement('a');
       link.href = storeRepoUrl;
       link.target = '_blank';
       link.rel = 'noopener';
       link.className = 'text-cyan-400 hover:text-cyan-300 underline';
-      link.textContent = 'Open the official store';
+      link.textContent = i18n.openStore;
       const text2 = document.createTextNode('.');
       status.appendChild(text1);
       status.appendChild(link);
@@ -177,8 +224,8 @@ const rootId = `market-${crypto.randomUUID()}`;
     }
 
     status.textContent = query
-      ? `Showing results for "${search.value.trim()}"`
-      : 'All published skills from the official registry.';
+      ? `${i18n.showingResults} "${search.value.trim()}"`
+      : i18n.allSkills;
 
     if (!filtered.length) {
       grid.innerHTML = `
@@ -186,8 +233,8 @@ const rootId = `market-${crypto.randomUUID()}`;
           <svg class="w-12 h-12 mx-auto mb-4 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <p class="text-text-secondary mb-2">No matching skills found</p>
-          <p class="text-sm text-text-muted">Try searching for: hello, xlsx, docx, or office</p>
+          <p class="text-text-secondary mb-2">${escapeHtml(i18n.noMatch)}</p>
+          <p class="text-sm text-text-muted">${escapeHtml(i18n.trySearch)}</p>
         </div>
       `;
       return;
