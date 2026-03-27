@@ -778,7 +778,7 @@ impl Catalog {
             SELECT ?executor ?code ?timeout
             WHERE {{
                 <{skill_uri}> oc:hasPayload ?payload .
-                ?payload oc:scriptExecutor ?executor ;
+                ?payload oc:executor ?executor ;
                          oc:code ?code .
                 OPTIONAL {{ ?payload oc:timeout ?timeout }}
             }}
@@ -1781,7 +1781,7 @@ oc:skill_install a oc:Skill, oc:ExecutableSkill ;
     oc:hasPayload oc:payload_install .
 
 oc:payload_install a oc:ExecutionPayload ;
-    oc:scriptExecutor "shell" ;
+    oc:executor "shell" ;
     oc:code "tool install" ;
     oc:timeout 30 .
 
