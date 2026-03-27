@@ -1,4 +1,43 @@
-:root {
+/* Light theme */
+:root[data-theme='light'] {
+  --sl-color-bg: #ffffff;
+  --sl-color-bg-nav: #ffffff;
+  --sl-color-bg-sidebar: #f8f9fa;
+  --sl-color-bg-inline-code: #f1f3f5;
+  --sl-color-bg-accent: #f1f3f5;
+
+  --sl-color-text: #1a1a1a;
+  --sl-color-text-accent: #0284c7;
+  --sl-color-text-muted: #6b7280;
+  --sl-color-text-invert: #ffffff;
+
+  --sl-color-accent-low: #e0f2fe;
+  --sl-color-accent: #0284c7;
+  --sl-color-accent-high: #0369a1;
+
+  --sl-color-border: rgba(0, 0, 0, 0.1);
+  --sl-color-border-accent: rgba(2, 132, 199, 0.35);
+  --sl-color-hairline: rgba(0, 0, 0, 0.06);
+
+  --sl-color-code-bg: #f1f3f5;
+  --sl-color-code-border: rgba(0, 0, 0, 0.1);
+
+  --sl-font: 'Inter Variable', sans-serif;
+  --sl-font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', monospace;
+
+  --sl-shadow-sm: none;
+  --sl-shadow-md: none;
+  --sl-shadow-lg: none;
+
+  --custom-bg-primary: #ffffff;
+  --custom-bg-secondary: #f8f9fa;
+  --custom-bg-tertiary: #f1f3f5;
+  --custom-border-subtle: rgba(0, 0, 0, 0.05);
+  --custom-border-light: rgba(0, 0, 0, 0.08);
+}
+
+/* Dark theme */
+:root[data-theme='dark'] {
   --sl-color-bg: #090909;
   --sl-color-bg-nav: #090909;
   --sl-color-bg-sidebar: #101010;
@@ -27,28 +66,25 @@
   --sl-shadow-sm: none;
   --sl-shadow-md: none;
   --sl-shadow-lg: none;
-}
 
-:root[data-theme='light'] {
-  --sl-color-bg: #090909;
-  --sl-color-bg-nav: #090909;
-  --sl-color-bg-sidebar: #101010;
-  --sl-color-text: #f5f5f5;
-  --sl-color-text-muted: #8a8a8a;
-  --sl-color-accent: #7dd3fc;
+  --custom-bg-primary: #090909;
+  --custom-bg-secondary: #101010;
+  --custom-bg-tertiary: #111111;
+  --custom-border-subtle: rgba(255, 255, 255, 0.05);
+  --custom-border-light: rgba(255, 255, 255, 0.08);
 }
 
 body {
-  background: #090909;
+  background: var(--sl-color-bg);
 }
 
 header {
-  background: #090909 !important;
+  background: var(--sl-color-bg-nav) !important;
   border-bottom: 1px solid var(--sl-color-border) !important;
 }
 
 .sidebar-pane {
-  background: #101010 !important;
+  background: var(--sl-color-bg-sidebar) !important;
   border-inline-end: 1px solid var(--sl-color-border) !important;
 }
 
@@ -62,7 +98,7 @@ header {
 .sl-markdown-content table,
 .expressive-code,
 .card {
-  background: #101010 !important;
+  background: var(--sl-color-bg-sidebar) !important;
   border: 1px solid var(--sl-color-border) !important;
   border-radius: 0.9rem !important;
   box-shadow: none !important;
@@ -99,13 +135,13 @@ a:hover {
 
 /* Site title - unified with main site */
 .site-title {
-  color: #ffffff !important;
+  color: var(--sl-color-text) !important;
   font-size: 1.125rem !important;
   font-weight: 600 !important;
 }
 
 .site-title:hover {
-  color: #f0f0f0 !important;
+  color: var(--sl-color-text-accent) !important;
 }
 
 .site-title img {
@@ -114,7 +150,7 @@ a:hover {
 }
 
 [data-search] {
-  background: #111111 !important;
+  background: var(--custom-bg-tertiary) !important;
   border: 1px solid var(--sl-color-border) !important;
   border-radius: 999px !important;
 }
@@ -140,7 +176,7 @@ a:hover {
 }
 
 .sl-markdown-content td {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--custom-border-subtle);
 }
 
 /* Remove border from last row */
@@ -182,18 +218,18 @@ a:hover {
 
 /* Code blocks - keep border but subtle */
 pre.expressive-code {
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid var(--custom-border-light) !important;
 }
 
 /* Card styling */
 .card {
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid var(--custom-border-light) !important;
   box-shadow: none !important;
 }
 
 /* Right sidebar (table of contents) - cleaner */
 .right-sidebar {
-  border-left: 1px solid rgba(255, 255, 255, 0.05);
+  border-left: 1px solid var(--custom-border-subtle);
 }
 
 .right-sidebar button {
@@ -202,9 +238,9 @@ pre.expressive-code {
 
 /* Pagination links */
 .pagination-links {
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid var(--custom-border-subtle);
 }
 
 .pagination-links a {
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--custom-border-light);
 }
