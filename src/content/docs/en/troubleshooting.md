@@ -2,7 +2,7 @@
 title: Troubleshooting
 description: Common issues with installs, store access, compiler setup, and OntoMCP
 sidebar:
-  order: 15
+  order: 16
 ---
 
 ## Installation Issues

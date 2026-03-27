@@ -2,7 +2,7 @@
 title: Store
 description: OntoStore, third-party stores, and package lifecycle
 sidebar:
-  order: 13
+  order: 14
 ---
 
 OntoSkills uses a simple distribution model:

@@ -2,7 +2,7 @@
 title: CLI Reference
 description: Complete command reference for the ontoskills CLI
 sidebar:
-  order: 9
+  order: 10
 ---
 
 `ontoskills` is the product entrypoint. It installs and manages the runtime, compiler, store skills, and local state under `~/.ontoskills/`.
@@ -25,16 +25,37 @@ ontoskills --help
 
 ### `install mcp`
 
-Install the MCP runtime.
+Install the MCP runtime, or install it and bootstrap one or more MCP clients in one command.
 
 ```bash
 ontoskills install mcp
+ontoskills install mcp --claude
+ontoskills install mcp --codex --cursor
+ontoskills install mcp --cursor --vscode --project
 ```
 
 Creates:
 - `~/.ontoskills/bin/ontomcp` — the MCP server binary
 - `~/.ontoskills/ontologies/` — compiled ontology packages
 - `~/.ontoskills/state/` — lockfiles and metadata
+
+Supported flags:
+
+| Flag | Meaning |
+|------|---------|
+| `--global` | Configure user-wide MCP settings (default) |
+| `--project` | Configure only the current repository/workspace |
+| `--all-clients` | Bootstrap every supported MCP client |
+| `--codex` | Configure Codex |
+| `--claude` | Configure Claude Code |
+| `--qwen` | Configure Qwen Code |
+| `--cursor` | Configure Cursor |
+| `--vscode` | Configure VS Code |
+| `--windsurf` | Configure Windsurf |
+| `--antigravity` | Configure Antigravity (best effort/manual fallback) |
+| `--opencode` | Configure OpenCode |
+
+When a client cannot be configured fully, `ontoskills` still installs `ontomcp` and prints exact manual steps.
 
 ### `install core`
 

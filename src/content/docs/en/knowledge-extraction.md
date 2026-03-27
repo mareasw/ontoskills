@@ -2,7 +2,7 @@
 title: Knowledge Extraction
 description: How OntoCore extracts structured knowledge from skills
 sidebar:
-  order: 8
+  order: 9
 ---
 
 A skill is not just code — it's **structured knowledge**. OntoCore extracts this knowledge and compiles it into a queryable ontology.
@@ -22,6 +22,15 @@ Every skill is compiled with:
 | **State Transitions** | `oc:requiresState`, `oc:yieldsState`, `oc:handlesFailure` | Preconditions, outcomes, error handling |
 | **Execution Payload** | `oc:hasPayload` | Optional code to execute |
 | **Provenance** | `oc:generatedBy` | Attestation (which LLM compiled it) |
+
+### Components
+
+| Element | Property | Description |
+|----------|-----------|-------------|
+| **Reference Files** | `oc:hasReferenceFile` | Supporting docs with `purpose` (api-reference, examples, guide, domain-specific, other) |
+| **Executable Scripts** | `oc:hasExecutableScript` | Scripts with `executor`, `executionIntent`, `requirements` |
+| **Workflows** | `oc:hasWorkflow` | Multi-step processes with `hasStep` dependencies |
+| **Examples** | `oc:hasExample` | Input/output pairs for pattern matching |
 
 ---
 

@@ -2,7 +2,7 @@
 title: Semantic Intent Discovery
 description: Find skills by natural language intent without knowing exact intent strings
 sidebar:
-  order: 7
+  order: 8
 ---
 
 **Status:** ✅ Implemented

@@ -2,7 +2,7 @@
 title: Roadmap
 description: From core to autonomous agent — the OntoSkills ecosystem
 sidebar:
-  order: 14
+  order: 15
 ---
 
 > This roadmap evolves with the project.
