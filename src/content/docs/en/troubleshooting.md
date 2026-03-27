@@ -5,7 +5,7 @@ sidebar:
   order: 16
 ---
 
-## Installation Issues
+## Installation issues
 
 ### `ontoskills install mcp` fails
 
@@ -51,7 +51,7 @@ ontoskills install core
 
 ---
 
-## Store and Package Issues
+## Store and package issues
 
 ### "Package not found"
 
@@ -97,7 +97,7 @@ The MCP server caches the ontology index. Ensure:
 
 ---
 
-## Compiler Issues
+## Compiler issues
 
 ### Compiler commands fail
 
@@ -163,7 +163,7 @@ Use this skill when the user wants to extract text from PDF files.
 
 ---
 
-## Import Issues
+## Import issues
 
 ### Imported source repo compiled, but the skill still is not visible
 
@@ -202,7 +202,7 @@ The import process looks for `SKILL.md` files in the repository. Ensure:
 
 ---
 
-## MCP Connection Issues
+## MCP connection issues
 
 ### "MCP server not starting"
 
@@ -238,7 +238,7 @@ Ensure `~/.ontoskills/bin` is in your PATH, or use the full path in your MCP con
 
 ---
 
-## Index and State Issues
+## Index and state issues
 
 ### "Index corrupted"
 
@@ -279,7 +279,7 @@ chmod -R u+rw ~/.ontoskills/
 
 ---
 
-## Diagnostic Tools
+## Diagnostic tools
 
 ### `ontoskills doctor`
 
@@ -308,7 +308,7 @@ ontoskills install mcp -v
 
 ---
 
-## Reset and Recovery
+## Reset and recovery
 
 ### Reset everything
 
@@ -333,7 +333,7 @@ ontoskills install mareasw/greeting/hello
 
 ---
 
-## Getting Help
+## Getting help
 
 If your issue isn't covered here:
 

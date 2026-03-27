@@ -19,7 +19,7 @@ This installs:
 ~/.ontoskills/bin/ontomcp
 ```
 
-## Fast Bootstrap
+## Fast bootstrap
 
 The recommended setup is:
 
@@ -39,7 +39,7 @@ Codex global setup uses the same local `stdio` command as other clients:
 ~/.ontoskills/bin/ontomcp
 ```
 
-## Integration Model
+## Integration model
 
 Codex-based workflows use the same MCP contract as other local clients:
 
@@ -53,7 +53,7 @@ The stable executable to register is:
 ~/.ontoskills/bin/ontomcp
 ```
 
-## Recommended Runtime Command
+## Recommended runtime command
 
 ```bash
 ~/.ontoskills/bin/ontomcp --ontology-root ~/.ontoskills/ontologies
@@ -65,7 +65,7 @@ If your Codex client supports environment-based configuration, the equivalent se
 ONTOMCP_ONTOLOGY_ROOT=~/.ontoskills/ontologies
 ```
 
-## Tools Exposed
+## Tools exposed
 
 - `search_skills`
 - `get_skill_context`
@@ -85,7 +85,7 @@ npx ontoskills install core
 - Then compile or import source skills — they are auto-enabled on install for MCP access
 - `--codex` automates Codex global setup only; for repository-local Codex MCP config, `ontoskills` currently prints manual steps instead of forcing a non-standard config file
 
-## Practical Rule
+## Practical rule
 
 Treat Codex integration as a standard local `stdio` MCP registration whose command points at:
 

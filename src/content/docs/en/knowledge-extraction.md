@@ -9,7 +9,7 @@ A skill is not just code — it's **structured knowledge**. OntoCore extracts th
 
 ---
 
-## What Gets Extracted
+## What gets extracted
 
 Every skill is compiled with:
 
@@ -34,7 +34,7 @@ Every skill is compiled with:
 
 ---
 
-## Knowledge Nodes
+## Knowledge nodes
 
 The heart of knowledge extraction. Each skill contains 8-12 **Knowledge Nodes** — structured epistemic rules.
 
@@ -130,7 +130,7 @@ Lifecycle hooks.
 
 ---
 
-### Knowledge Node Structure
+### Knowledge node structure
 
 Each Knowledge Node has:
 
@@ -152,9 +152,9 @@ oc:kn_a1b2c3d4
 
 ---
 
-## Modular Architecture
+## Modular architecture
 
-### The Skill as Module
+### The skill as module
 
 Each compiled skill is a **self-contained `.ttl` file**:
 
@@ -170,7 +170,7 @@ ontoskills/
     └── ontoskill.ttl        # Email skill module
 ```
 
-### Pluggable Knowledge
+### Pluggable knowledge
 
 - **Add** a skill → Drop a `.ttl` file
 - **Remove** a skill → Delete the `.ttl` file
@@ -180,9 +180,9 @@ The global ontology grows by **addition**, not modification.
 
 ---
 
-## Querying the Knowledge
+## Querying the knowledge
 
-### Find Skills by Intent
+### Find skills by intent
 
 ```sparql
 SELECT ?skill WHERE {
@@ -190,7 +190,7 @@ SELECT ?skill WHERE {
 }
 ```
 
-### Get Knowledge Nodes for a Skill
+### Get knowledge nodes for a skill
 
 ```sparql
 SELECT ?content ?type WHERE {
@@ -200,7 +200,7 @@ SELECT ?content ?type WHERE {
 }
 ```
 
-### Find All AntiPatterns
+### Find all AntiPatterns
 
 ```sparql
 SELECT ?skill ?content WHERE {
@@ -210,7 +210,7 @@ SELECT ?skill ?content WHERE {
 }
 ```
 
-### Find All PreFlightChecks
+### Find all PreFlightChecks
 
 ```sparql
 SELECT ?skill ?content WHERE {
@@ -222,7 +222,7 @@ SELECT ?skill ?content WHERE {
 
 ---
 
-## The Value Proposition
+## The value proposition
 
 | Before (Reading Files) | After (Ontology Query) |
 |------------------------|------------------------|

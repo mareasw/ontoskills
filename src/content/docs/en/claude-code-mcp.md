@@ -19,7 +19,7 @@ This gives you the managed runtime binary:
 ~/.ontoskills/bin/ontomcp
 ```
 
-## Register The Server
+## Register the server
 
 Fastest bootstrap:
 
@@ -60,7 +60,7 @@ Expected state:
 Status: ✓ Connected
 ```
 
-## What Claude Code Can Use
+## What Claude Code can use
 
 Once connected, Claude Code can call:
 

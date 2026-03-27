@@ -18,14 +18,14 @@ npx ontoskills install mcp --codex --cursor
 npx ontoskills install mcp --cursor --vscode --project
 ```
 
-## Scope Model
+## Scope model
 
 - `--global`: configure the current user or machine
 - `--project`: configure only the current repository/workspace
 
 If you omit both flags, `ontoskills` uses `--global`.
 
-## Supported Clients
+## Supported clients
 
 | Client | Global | Project | Bootstrap mode |
 |--------|--------|---------|----------------|
@@ -38,7 +38,7 @@ If you omit both flags, `ontoskills` uses `--global`.
 | Antigravity | Best effort | Manual | Config detection or manual fallback |
 | OpenCode | Yes | Yes | JSON file |
 
-## What Gets Registered
+## What gets registered
 
 Every client is configured against the same managed runtime:
 
@@ -52,7 +52,7 @@ By default `ontomcp` reads compiled ontologies from:
 ~/.ontoskills/ontologies
 ```
 
-## Common Commands
+## Common commands
 
 ```bash
 # Claude Code, global
@@ -68,7 +68,7 @@ ontoskills install mcp --cursor --vscode --project
 ontoskills install mcp
 ```
 
-## Manual Fallbacks
+## Manual fallbacks
 
 Some clients do not expose a stable project-local bootstrap flow. In those cases `ontoskills`:
 

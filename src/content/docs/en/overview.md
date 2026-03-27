@@ -11,7 +11,7 @@ sidebar:
 
 ## Why OntoSkills?
 
-### The Determinism Problem
+### The determinism problem
 
 LLMs read skills probabilistically. Same query, different results. Long skill files are expensive for large models and confusing for small ones.
 
@@ -20,7 +20,7 @@ LLMs read skills probabilistically. Same query, different results. Long skill fi
 - **Small model limits** — Complex skills are unreadable by edge models
 - **No verifiable structure** — Relationships between skills are implicit
 
-### The Ontological Solution
+### The ontological solution
 
 OntoSkills transforms skills into formal ontologies with **Description Logics (OWL 2)**:
 
@@ -29,7 +29,7 @@ OntoSkills transforms skills into formal ontologies with **Description Logics (O
 - **Democratized intelligence** — Small models query what large models read
 - **Formal semantics** — No ambiguity in skill relationships
 
-### Performance Comparison
+### Performance comparison
 
 | Operation | Reading Files | Ontology Query |
 |-----------|---------------|----------------|
@@ -41,11 +41,11 @@ OntoSkills transforms skills into formal ontologies with **Description Logics (O
 
 ---
 
-## How It Works
+## How it works
 
 <img src="/architecture.webp" alt="OntoCore Architecture" style="max-height: 500px; width: auto; max-width: 100%; display: block; margin: 0 auto;" />
 
-### The Compilation Pipeline
+### The compilation pipeline
 
 1. **Extract** — Claude reads SKILL.md and extracts structured knowledge
 2. **Validate** — Security pipeline checks for malicious content
@@ -53,7 +53,7 @@ OntoSkills transforms skills into formal ontologies with **Description Logics (O
 4. **Verify** — SHACL gatekeeper ensures logical validity
 5. **Write** — Compiled `.ttl` files to `ontoskills/`
 
-### The Runtime
+### The runtime
 
 - **OntoMCP** loads compiled `.ttl` files from `ontoskills/`
 - Agents query via SPARQL through the MCP protocol
@@ -62,7 +62,7 @@ OntoSkills transforms skills into formal ontologies with **Description Logics (O
 
 ---
 
-## Key Capabilities
+## Key capabilities
 
 | Capability | Description |
 |------------|-------------|
@@ -78,7 +78,7 @@ OntoSkills transforms skills into formal ontologies with **Description Logics (O
 
 ---
 
-## What Gets Compiled
+## What gets compiled
 
 Every skill is extracted with:
 
@@ -106,7 +106,7 @@ Every skill is extracted with:
 
 ---
 
-## Use Cases
+## Use cases
 
 | Use Case | How OntoSkills Help |
 |----------|---------------------|
@@ -118,7 +118,7 @@ Every skill is extracted with:
 
 ---
 
-## Next Steps
+## Next steps
 
 - **[Getting Started](/getting-started/)** — Install and compile your first skill
 - **[CLI](/cli/)** — Learn the managed command surface

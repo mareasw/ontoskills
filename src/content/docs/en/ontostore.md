@@ -12,7 +12,7 @@ It is backed by OntoStore and exposed in two places:
 - the homepage marketplace section
 - the dedicated live page at [`/ontostore/`](/ontostore/)
 
-## Quick Example
+## Quick example
 
 ```bash
 ontoskills search xlsx
@@ -35,7 +35,7 @@ Examples:
 - `mareasw/office/xlsx`
 - `mareasw/office/docx`
 
-## Install Flow
+## Install flow
 
 1. Search or browse the OntoStore.
 2. Copy the install command for the chosen skill.
@@ -51,7 +51,7 @@ If you previously disabled a skill and want to re-enable it:
 ontoskills enable mareasw/greeting/hello
 ```
 
-## Official vs Third-Party
+## Official vs third-party
 
 The official marketplace is built in by default.
 
@@ -63,7 +63,7 @@ ontoskills store add-source acme https://example.com/index.json
 
 Those stores become visible to `ontoskills search`, but OntoStore remains the default discovery path.
 
-## Live Marketplace Page
+## Live marketplace page
 
 Use the interactive page for the full searchable catalog:
 

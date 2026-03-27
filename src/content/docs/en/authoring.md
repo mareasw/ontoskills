@@ -9,9 +9,9 @@ OntoSkills compiles natural-language `SKILL.md` files into formal RDF ontologies
 
 ---
 
-## Core Principles
+## Core principles
 
-### Concise is Key
+### Concise is key
 
 The context window is shared with everything else Claude needs. Challenge each piece of information:
 
@@ -44,7 +44,7 @@ pdfplumber is recommended because it's easy to use and handles most cases well.
 First, you'll need to install it using pip. Then you can use the code below...
 ```
 
-### Set Appropriate Degrees of Freedom
+### Set appropriate degrees of freedom
 
 Match specificity to the task's fragility:
 
@@ -54,7 +54,7 @@ Match specificity to the task's fragility:
 | **Medium** | Preferred pattern exists | "Use this template and customize as needed" |
 | **Low** | Exact sequence required | "Run exactly: `python migrate.py --verify`" |
 
-### Test with All Models
+### Test with all models
 
 Skills behave differently across models:
 
@@ -66,7 +66,7 @@ Skills behave differently across models:
 
 ## SKILL.md Structure
 
-### YAML Frontmatter
+### YAML frontmatter
 
 ```yaml
 ---
@@ -85,7 +85,7 @@ description: Extracts text and tables from PDF files. Use when working with PDFs
 - Write in third person
 - Include both what and when
 
-### Body Sections
+### Body sections
 
 A well-structured SKILL.md:
 
@@ -113,7 +113,7 @@ Guidelines, heuristics, anti-patterns (optional but recommended).
 
 ---
 
-## Writing Effective Descriptions
+## Writing effective descriptions
 
 The `description` field is critical for skill discovery. Claude uses it to choose from potentially 100+ skills.
 
@@ -139,11 +139,11 @@ description: Processes data
 
 ---
 
-## Progressive Disclosure
+## Progressive disclosure
 
 Keep SKILL.md under 500 lines. Split content when approaching this limit.
 
-### Pattern: High-level Guide with References
+### Pattern: high-level guide with references
 
 ```
 pdf/
@@ -166,7 +166,7 @@ SKILL.md:
 - **API reference**: See [reference.md](reference.md)
 ```
 
-### Keep References One Level Deep
+### Keep references one level deep
 
 ```markdown
 # Bad: Too deep
@@ -180,9 +180,9 @@ SKILL.md → examples.md
 
 ---
 
-## Workflows and Feedback Loops
+## Workflows and feedback loops
 
-### Use Workflows for Complex Tasks
+### Use workflows for complex tasks
 
 ```markdown
 ## PDF Form Filling Workflow
@@ -204,7 +204,7 @@ Edit `fields.json` to add values...
 [Continue with clear steps]
 ```
 
-### Implement Validation Loops
+### Implement validation loops
 
 ```markdown
 ## Document Editing Process
@@ -220,11 +220,11 @@ Edit `fields.json` to add values...
 
 ---
 
-## Skill Components
+## Skill components
 
 OntoSkills supports structured components for progressive disclosure:
 
-### Reference Files
+### Reference files
 
 Organize supporting documentation by purpose:
 
@@ -244,7 +244,7 @@ The compiler identifies reference files and their purpose:
 - `domain-specific`: Domain knowledge
 - `other`: Everything else
 
-### Executable Scripts
+### Executable scripts
 
 Bundle utility scripts with clear intent:
 
@@ -296,7 +296,7 @@ Provide input/output pairs for pattern matching:
 
 ---
 
-## Knowledge Nodes
+## Knowledge nodes
 
 OntoSkills extracts structured knowledge from your SKILL.md. Write clear sections that map to node types:
 
@@ -335,9 +335,9 @@ See [Knowledge Extraction](/knowledge-extraction/) for all 26 node types.
 
 ---
 
-## Common Patterns
+## Common patterns
 
-### Template Pattern
+### Template pattern
 
 ```markdown
 ## Report Structure
@@ -359,7 +359,7 @@ ALWAYS use this exact format:
 \`\`\`
 ```
 
-### Examples Pattern
+### Examples pattern
 
 ```markdown
 ## Commit Message Format
@@ -385,9 +385,9 @@ Use UTC consistently in date formatting
 
 ---
 
-## Anti-Patterns to Avoid
+## Anti-patterns to avoid
 
-### Windows-Style Paths
+### Windows-style paths
 
 ```markdown
 # Bad
@@ -399,7 +399,7 @@ scripts/helper.py
 reference/guide.md
 ```
 
-### Too Many Options
+### Too many options
 
 ```markdown
 # Bad: Paralyzing choice
@@ -409,7 +409,7 @@ reference/guide.md
 "Use pdfplumber for text extraction. For scanned PDFs requiring OCR, use pdf2image with pytesseract."
 ```
 
-### Assuming Tools Are Installed
+### Assuming tools are installed
 
 ```markdown
 # Bad
@@ -437,14 +437,14 @@ ontoskills init-core
 ontoskills compile my-skill
 ```
 
-### What Happens During Compilation
+### What happens during compilation
 
 1. **Parsing**: Extracts structure from markdown
 2. **LLM Extraction**: Identifies knowledge nodes using Claude
 3. **SHACL Validation**: Verifies required fields exist
 4. **RDF Generation**: Produces `ontoskill.ttl`
 
-### Common Validation Errors
+### Common validation errors
 
 | Error | Fix |
 |-------|-----|
@@ -489,7 +489,7 @@ Before publishing a skill:
 
 ---
 
-## Next Steps
+## Next steps
 
 - [Knowledge Extraction](/knowledge-extraction/) — Understanding all 26 node types
 - [OntoCore](/ontocore/) — Compiler reference

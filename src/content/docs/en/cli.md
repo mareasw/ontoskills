@@ -21,7 +21,7 @@ ontoskills --help
 
 ---
 
-## Installation Commands
+## Installation commands
 
 ### `install mcp`
 
@@ -69,7 +69,7 @@ Requires Python 3.10+. Creates `~/.ontoskills/core/` with the compiler runtime.
 
 ---
 
-## Store Commands
+## Store commands
 
 ### `search <query>`
 
@@ -128,7 +128,7 @@ ontoskills list-installed
 
 ---
 
-## Store Source Commands
+## Store source commands
 
 ### `store list`
 
@@ -148,7 +148,7 @@ ontoskills store add-source acme https://example.com/skills/index.json
 
 ---
 
-## Import Commands
+## Import commands
 
 ### `import-source <url>`
 
@@ -162,7 +162,7 @@ Imported skills are stored under `~/.ontoskills/skills/vendor/` and compiled to 
 
 ---
 
-## Compiler Commands
+## Compiler commands
 
 These commands require `ontocore` to be installed.
 
@@ -232,7 +232,7 @@ ontoskills security-audit
 
 ---
 
-## Management Commands
+## Management commands
 
 ### `update [target]`
 
@@ -282,7 +282,7 @@ ontoskills uninstall --all
 
 ---
 
-## Managed Home Structure
+## Managed home structure
 
 ```text
 ~/.ontoskills/
@@ -304,7 +304,7 @@ ontoskills uninstall --all
 
 ---
 
-## Environment Variables
+## Environment variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -314,7 +314,7 @@ ontoskills uninstall --all
 
 ---
 
-## Exit Codes
+## Exit codes
 
 | Code | Meaning |
 |------|---------|
@@ -328,7 +328,7 @@ ontoskills uninstall --all
 
 ---
 
-## See Also
+## See also
 
 - [Getting Started](/getting-started/) — First-time setup tutorial
 - [OntoCore](/ontocore/) — Compiler reference

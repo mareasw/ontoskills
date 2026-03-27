@@ -5,7 +5,7 @@ sidebar:
   order: 3
 ---
 
-## The Compilation Pipeline
+## The compilation pipeline
 
 ```mermaid
 flowchart LR
@@ -25,7 +25,7 @@ flowchart LR
     style FAIL fill:#ff6b6b,stroke:#2a2a3e,color:#f0f0f5
 ```
 
-### Stage Details
+### Stage details
 
 | Stage | Input | Output | Description |
 |-------|-------|--------|-------------|
@@ -37,7 +37,7 @@ flowchart LR
 
 ---
 
-## Skill Types
+## Skill types
 
 ```mermaid
 flowchart LR
@@ -83,7 +83,7 @@ flowchart LR
 
 ---
 
-## The Validation Gatekeeper
+## The validation gatekeeper
 
 Every skill must pass SHACL validation before being written. The constitutional shapes enforce:
 
@@ -97,7 +97,7 @@ Every skill must pass SHACL validation before being written. The constitutional 
 
 ---
 
-## Security Pipeline
+## Security pipeline
 
 ```mermaid
 flowchart LR
@@ -127,7 +127,7 @@ flowchart LR
 
 ---
 
-## Project Structure
+## Project structure
 
 ```
 ontoskills/
@@ -175,7 +175,7 @@ ontoskills/
 
 **Any source skill directory works** — add a `SKILL.md` file and OntoCore will compile it to a validated ontology module.
 
-## Runtime Model
+## Runtime model
 
 OntoMCP reads compiled ontology packages from `ontoskills/`. It does not read raw `SKILL.md` sources directly.
 
@@ -187,7 +187,7 @@ The user-facing `ontoskills` CLI is responsible for:
 - installing compiled packages from OntoStore or third-party stores
 - enabling and disabling skills before they reach the MCP runtime
 
-## Store Model
+## Store model
 
 OntoStore is published as a static GitHub repository and is built in by default.
 

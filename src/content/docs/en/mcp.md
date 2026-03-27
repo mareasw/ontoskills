@@ -27,7 +27,7 @@ For one-command client bootstrap, see [MCP Bootstrap](/mcp-bootstrap/).
 
 ---
 
-## What OntoMCP Loads
+## What OntoMCP loads
 
 **Primary source:**
 
@@ -53,7 +53,7 @@ ONTOMCP_ONTOLOGY_ROOT=~/.ontoskills/ontologies
 
 ---
 
-## Tool Reference
+## Tool reference
 
 OntoMCP exposes **5 tools** for skill discovery and reasoning.
 
@@ -326,7 +326,7 @@ Query normalized knowledge nodes with guided filters.
 
 ---
 
-## Local Development
+## Local development
 
 From the repository root:
 
@@ -343,7 +343,7 @@ cargo build --release --manifest-path mcp/Cargo.toml
 
 ---
 
-## Client Guides
+## Client guides
 
 - [Claude Code](./claude-code-mcp.md) — Setup for Claude Code CLI
 - [Codex](./codex-mcp.md) — Setup for Codex-based workflows
@@ -395,7 +395,7 @@ Check logs for errors:
 
 ---
 
-## Environment Variables
+## Environment variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|

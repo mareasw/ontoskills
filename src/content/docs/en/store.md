@@ -13,9 +13,9 @@ OntoSkills uses a simple distribution model:
 
 ---
 
-## Store Types
+## Store types
 
-### OntoStore (Built-in)
+### OntoStore (built-in)
 
 OntoStore ships with the product. No configuration needed.
 
@@ -30,7 +30,7 @@ Skills are automatically enabled on install.
 
 Example: `mareasw/office/xlsx`
 
-### Third-Party Stores
+### Third-party stores
 
 Opt-in stores maintained by other teams or communities.
 
@@ -44,7 +44,7 @@ ontoskills store list
 
 Third-party packages use the same ID format and install flow.
 
-### Source Imports
+### Source imports
 
 Raw repositories with `SKILL.md` files, compiled locally.
 
@@ -58,7 +58,7 @@ ontoskills import-source https://github.com/user/skill-repo
 
 ---
 
-## Package Lifecycle
+## Package lifecycle
 
 ### Install
 
@@ -93,7 +93,7 @@ ontoskills remove mareasw/office/xlsx
 
 Deletes the package from local storage.
 
-### Rebuild Index
+### Rebuild index
 
 ```bash
 ontoskills rebuild-index
@@ -103,7 +103,7 @@ Regenerates `~/.ontoskills/ontologies/system/index.enabled.ttl` from all enabled
 
 ---
 
-## CLI Commands Reference
+## CLI commands reference
 
 | Command | Description |
 |---------|-------------|
@@ -122,7 +122,7 @@ Regenerates `~/.ontoskills/ontologies/system/index.enabled.ttl` from all enabled
 
 ---
 
-## Local Layout
+## Local layout
 
 ```text
 ~/.ontoskills/
@@ -144,7 +144,7 @@ Regenerates `~/.ontoskills/ontologies/system/index.enabled.ttl` from all enabled
 
 ---
 
-## Store Index Format
+## Store index format
 
 Stores serve a static `index.json`:
 
@@ -199,7 +199,7 @@ ontoskills rebuild-index
 
 ---
 
-## Practical Rules
+## Practical rules
 
 | Command | What it does |
 |---------|--------------|

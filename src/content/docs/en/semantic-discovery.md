@@ -65,7 +65,7 @@ Semantic Intent Discovery enables LLM agents to find skills by natural language 
 
 ## Usage
 
-### Export Embeddings
+### Export embeddings
 
 ```bash
 ontoskills export-embeddings --ontology-root ./ontoskills
@@ -101,7 +101,7 @@ Returns matching intents with similarity scores:
 }
 ```
 
-### MCP Resource: ontology://schema
+### MCP resource: ontology://schema
 
 A compact JSON schema describing available classes and properties:
 
@@ -118,7 +118,7 @@ A compact JSON schema describing available classes and properties:
 
 ---
 
-## Agent Workflow
+## Agent workflow
 
 ```
 1. Agent starts → reads ontology://schema (2KB)
@@ -138,7 +138,7 @@ A compact JSON schema describing available classes and properties:
 
 ---
 
-## Performance Targets
+## Performance targets
 
 | Metric | Target | Verification |
 |--------|--------|--------------|
@@ -149,7 +149,7 @@ A compact JSON schema describing available classes and properties:
 
 ---
 
-## File Structure
+## File structure
 
 ```
 ontoskills/
@@ -200,19 +200,19 @@ anyhow = "1.0"
 
 ## Testing
 
-### Python Tests
+### Python tests
 
 ```bash
 cd core && python -m pytest tests/test_embeddings.py -v
 ```
 
-### Rust Tests
+### Rust tests
 
 ```bash
 cd mcp && cargo test
 ```
 
-### CLI Verification
+### CLI verification
 
 ```bash
 ontoskills export-embeddings --help

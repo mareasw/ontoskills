@@ -48,7 +48,7 @@ This creates a managed home at `~/.ontoskills/` with:
 
 ---
 
-## Step 2: Install a Skill from OntoStore
+## Step 2: Install a skill from OntoStore
 
 OntoStore is built in. Let's install a greeting skill:
 
@@ -75,7 +75,7 @@ ontoskills install mareasw/greeting/hello
 
 ---
 
-## Step 3: Query the Skill
+## Step 3: Query the skill
 
 Now let's query the installed skill using SPARQL:
 
@@ -94,7 +94,7 @@ You just queried a compiled ontology. The result is deterministic — same query
 
 ---
 
-## Step 4: (Optional) Install the Compiler
+## Step 4: (Optional) Install the compiler
 
 If you want to write custom skills from source, install the compiler:
 
@@ -115,7 +115,7 @@ This creates `ontoskills-core.ttl` — the base ontology with classes and proper
 
 ---
 
-## Step 5: (Optional) Write Your First Skill
+## Step 5: (Optional) Write your first skill
 
 Create a simple skill:
 
@@ -165,7 +165,7 @@ ontoskills query "SELECT ?intent WHERE { skill:my_first_skill oc:resolvesIntent 
 
 ---
 
-## What You Learned
+## What you learned
 
 - How to install OntoSkills CLI and MCP runtime
 - How to install skills from OntoStore
@@ -174,7 +174,7 @@ ontoskills query "SELECT ?intent WHERE { skill:my_first_skill oc:resolvesIntent 
 
 ---
 
-## Next Steps
+## Next steps
 
 Now that you're set up:
 
@@ -189,7 +189,7 @@ Now that you're set up:
 
 ---
 
-## Common Issues
+## Common issues
 
 ### "Command not found: ontoskills"
 

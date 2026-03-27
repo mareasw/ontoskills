@@ -32,7 +32,7 @@ Requirements:
 
 ---
 
-## The Compilation Pipeline
+## The compilation pipeline
 
 ```
 SKILL.md → [Extract] → [Security] → [Serialize] → [SHACL] → ontoskill.ttl
@@ -50,7 +50,7 @@ If any stage fails, the skill is **not written**. The SHACL gatekeeper enforces 
 
 ---
 
-## File Processing Rules
+## File processing rules
 
 OntoCore processes files based on their type:
 
@@ -60,7 +60,7 @@ OntoCore processes files based on their type:
 | **B** | `*.md` (auxiliary) | `*.ttl` | LLM compilation as sub-skill |
 | **C** | Other files | Direct copy | Asset (images, etc.) |
 
-### Directory Mirroring
+### Directory mirroring
 
 The output structure mirrors the input:
 
@@ -75,7 +75,7 @@ skills/                          →    ontoskills/
     └── diagram.png              →        └── diagram.png
 ```
 
-### Sub-Skills
+### Sub-skills
 
 Auxiliary `.md` files in a skill directory become **sub-skills**:
 
@@ -85,9 +85,9 @@ Auxiliary `.md` files in a skill directory become **sub-skills**:
 
 ---
 
-## CLI Commands
+## CLI commands
 
-### Initialize Core Ontology
+### Initialize core ontology
 
 ```bash
 ontoskills init-core
@@ -95,7 +95,7 @@ ontoskills init-core
 
 Creates `ontoskills-core.ttl` with the base TBox ontology (classes, properties, state definitions).
 
-### Compile Skills
+### Compile skills
 
 ```bash
 # Compile all skills in skills/
@@ -122,7 +122,7 @@ ontoskills compile -v               # Verbose logging
 | `-v, --verbose` | Enable debug logging |
 | `-q, --quiet` | Suppress progress output |
 
-### Query the Graph
+### Query the graph
 
 ```bash
 ontoskills query "SELECT ?s WHERE { ?s a oc:Skill }"
@@ -130,7 +130,7 @@ ontoskills query "SELECT ?s WHERE { ?s a oc:Skill }"
 
 Runs SPARQL queries against the compiled ontology.
 
-### Inspect Quality
+### Inspect quality
 
 ```bash
 # List all compiled skills
@@ -142,7 +142,7 @@ ontoskills security-audit
 
 ---
 
-## Output Structure
+## Output structure
 
 After compilation:
 
@@ -156,7 +156,7 @@ ontoskills/
     └── ontoskill.ttl        # Individual skill module
 ```
 
-### The Core Ontology
+### The core ontology
 
 `ontoskills-core.ttl` defines:
 
@@ -165,7 +165,7 @@ ontoskills/
 - Knowledge node classes: `oc:Heuristic`, `oc:AntiPattern`, etc.
 - State classes for preconditions/postconditions
 
-### The Index
+### The index
 
 `index.ttl` is a manifest that:
 - Lists all compiled skills
@@ -184,7 +184,7 @@ OntoCore is **cache-aware**:
 
 ---
 
-## Security Pipeline
+## Security pipeline
 
 The compiler runs a defense-in-depth security check:
 
@@ -203,7 +203,7 @@ Use `--skip-security` to bypass LLM review (regex checks still run).
 
 ---
 
-## SHACL Validation
+## SHACL validation
 
 Every skill must pass SHACL validation before being written.
 
@@ -221,7 +221,7 @@ If validation fails, the skill is **not written** and an error is shown.
 
 ---
 
-## Error Handling
+## Error handling
 
 | Error | Cause | Solution |
 |-------|-------|----------|
@@ -233,7 +233,7 @@ If validation fails, the skill is **not written** and an error is shown.
 
 ---
 
-## Environment Variables
+## Environment variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -243,7 +243,7 @@ If validation fails, the skill is **not written** and an error is shown.
 
 ---
 
-## Next Steps
+## Next steps
 
 - [Getting Started](/getting-started/) — Install and first steps
 - [Architecture](/architecture/) — How the system works
