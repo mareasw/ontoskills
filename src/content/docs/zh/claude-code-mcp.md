@@ -1,8 +1,8 @@
 ---
-title: MCP 与 Claude Code
-description: 为 Claude Code 配置 OntoMCP
+title: MCP with Claude Code
+description: 在 Claude Code 中注册和验证 OntoMCP
 sidebar:
-  order: 10
+  order: 11
 ---
 
 ## 安装
@@ -13,65 +13,79 @@ sidebar:
 npx ontoskills install mcp
 ```
 
-这会安装：
+这会安装托管运行时二进制文件：
 
 ```text
 ~/.ontoskills/bin/ontomcp
 ```
 
-## Claude Code 配置
+## 注册服务器
 
-在 Claude Code 中注册 MCP 服务器。编辑 `~/.claude/settings.json`：
+最快引导：
 
-```json
-{
-  "mcpServers": {
-    "ontoskills": {
-      "command": "/Users/你的用户名/.ontoskills/bin/ontomcp",
-      "args": ["--ontology-root", "/Users/你的用户名/.ontoskills/ontologies"]
-    }
-  }
-}
+```bash
+npx ontoskills install mcp --claude
 ```
 
-或者使用环境变量：
+手动等效：
 
-```json
-{
-  "mcpServers": {
-    "ontoskills": {
-      "command": "/Users/你的用户名/.ontoskills/bin/ontomcp",
-      "env": {
-        "ONTOMCP_ONTOLOGY_ROOT": "/Users/你的用户名/.ontoskills/ontologies"
-      }
-    }
-  }
-}
+```bash
+claude mcp add --scope user ontomcp -- \
+  ~/.ontoskills/bin/ontomcp
 ```
 
-## 暴露的工具
+项目本地设置：
+
+```bash
+npx ontoskills install mcp --claude --project
+```
+
+如果你想手动指定本体根目录：
+
+```bash
+claude mcp add --scope user ontomcp -- \
+  ~/.ontoskills/bin/ontomcp --ontology-root ~/.ontoskills/ontologies
+```
+
+## 验证
+
+```bash
+claude mcp get ontomcp
+claude mcp list
+```
+
+预期状态：
+
+```text
+Status: ✓ Connected
+```
+
+## Claude Code 可用的工具
+
+连接后，Claude Code 可以调用：
 
 - `search_skills`
 - `get_skill_context`
 - `evaluate_execution_plan`
 - `query_epistemic_rules`
-- `search_intents`（可选，需先运行 `ontoskills export-embeddings`）
 
-## 验证
+## 故障排除
 
-重启 Claude Code 后，检查工具是否可用：
+### 连接失败
+
+检查：
+- `~/.ontoskills/bin/ontomcp` 存在
+- `~/.ontoskills/ontologies/` 存在
+- `index.enabled.ttl` 或已编译的 `.ttl` 文件存在
+
+### 找不到本体
+
+使用显式根目录运行：
 
 ```bash
-claude --mcp-debug
+~/.ontoskills/bin/ontomcp --ontology-root ~/.ontoskills/ontologies
 ```
 
-## 注意事项
+### 重建二进制后 Claude 行为异常
 
-- MCP 服务器读取已编译的 `.ttl` 本体，而不是原始 `SKILL.md`
-- 如果你想要自定义技能，也要安装编译器：
-
-```bash
-npx ontoskills install core
-```
-
-- 然后编译或导入源技能。技能默认自动启用；仅当之前被手动禁用时才需要运行 `ontoskills enable <qualified-id>`
+移除并重新添加 MCP 服务器，或重启 Claude Code。过期的后台进程可能仍在使用旧二进制。

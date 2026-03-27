@@ -2,7 +2,7 @@
 title: 语义意图发现
 description: 通过自然语言意图查找技能，无需知道确切的意图字符串
 sidebar:
-  order: 7
+  order: 8
 ---
 
 **状态：** ✅ 已实现

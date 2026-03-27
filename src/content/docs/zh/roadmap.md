@@ -2,7 +2,7 @@
 title: 路线图
 description: 从核心到自主智能体 — OntoSkills 生态系统
 sidebar:
-  order: 14
+  order: 15
 ---
 
 > 此路线图随项目发展而演变。

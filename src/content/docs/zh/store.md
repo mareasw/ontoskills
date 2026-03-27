@@ -2,7 +2,7 @@
 title: 商店
 description: OntoStore、第三方商店和包生命周期
 sidebar:
-  order: 13
+  order: 14
 ---
 
 OntoSkills 使用简单的分发模型：

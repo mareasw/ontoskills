@@ -2,7 +2,7 @@
 title: 知识提取
 description: OntoCore 如何从技能中提取结构化知识
 sidebar:
-  order: 8
+  order: 9
 ---
 
 技能不仅仅是代码 — 它是**结构化知识**。OntoCore 提取这些知识并将其编译为可查询的本体。
@@ -22,6 +22,15 @@ sidebar:
 | **状态转换** | `oc:requiresState`、`oc:yieldsState`、`oc:handlesFailure` | 前置条件、结果、错误处理 |
 | **执行负载** | `oc:hasPayload` | 可选的要执行的代码 |
 | **溯源** | `oc:generatedBy` | 证明（哪个 LLM 编译的）|
+
+### 组件
+
+| 元素 | 属性 | 描述 |
+|------|------|------|
+| **参考文件** | `oc:hasReferenceFile` | 支持 `purpose`（api-reference、examples、guide、domain-specific、other）的文档 |
+| **可执行脚本** | `oc:hasExecutableScript` | 带有 `executor`、`executionIntent`、`requirements` 的脚本 |
+| **工作流** | `oc:hasWorkflow` | 带有 `hasStep` 依赖的多步骤流程 |
+| **示例** | `oc:hasExample` | 用于模式匹配的输入/输出对 |
 
 ---
 

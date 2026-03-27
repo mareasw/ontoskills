@@ -2,7 +2,7 @@
 title: CLI 参考
 description: ontoskills CLI 完整命令参考
 sidebar:
-  order: 9
+  order: 10
 ---
 
 `ontoskills` 是产品入口点。它在 `~/.ontoskills/` 下安装和管理运行时、编译器、商店技能和本地状态。
@@ -25,16 +25,37 @@ ontoskills --help
 
 ### `install mcp`
 
-安装 MCP 运行时。
+安装 MCP 运行时，或在一条命令中安装并引导一个或多个 MCP 客户端。
 
 ```bash
 ontoskills install mcp
+ontoskills install mcp --claude
+ontoskills install mcp --codex --cursor
+ontoskills install mcp --cursor --vscode --project
 ```
 
 创建：
 - `~/.ontoskills/bin/ontomcp` — MCP 服务器二进制文件
 - `~/.ontoskills/ontologies/` — 已编译的本体包
 - `~/.ontoskills/state/` — 锁定文件和元数据
+
+支持的标志：
+
+| 标志 | 含义 |
+|------|------|
+| `--global` | 配置用户级 MCP 设置（默认）|
+| `--project` | 仅配置当前仓库/工作区 |
+| `--all-clients` | 引导所有支持的 MCP 客户端 |
+| `--codex` | 配置 Codex |
+| `--claude` | 配置 Claude Code |
+| `--qwen` | 配置 Qwen Code |
+| `--cursor` | 配置 Cursor |
+| `--vscode` | 配置 VS Code |
+| `--windsurf` | 配置 Windsurf |
+| `--antigravity` | 配置 Antigravity（尽力/手动回退）|
+| `--opencode` | 配置 OpenCode |
+
+当客户端无法完全配置时，`ontoskills` 仍会安装 `ontomcp` 并打印确切的手动步骤。
 
 ### `install core`
 

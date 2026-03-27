@@ -220,6 +220,82 @@ SKILL.md → examples.md
 
 ---
 
+## 技能组件
+
+OntoSkills 支持用于渐进式披露的结构化组件：
+
+### 参考文件
+
+按用途组织支持文档：
+
+```text
+pdf-skill/
+├── SKILL.md
+└── reference/
+    ├── api.md      # api-reference
+    ├── examples.md # examples
+    └── guide.md    # guide
+```
+
+编译器识别参考文件及其用途：
+- `api-reference`：API 文档、方法参考
+- `examples`：代码示例、使用模式
+- `guide`：教程、操作指南
+- `domain-specific`：领域知识
+- `other`：其他
+
+### 可执行脚本
+
+捆绑具有明确意图的实用脚本：
+
+```text
+pdf-skill/
+├── SKILL.md
+└── scripts/
+    ├── extract.py   # execution_intent: "execute"
+    └── validate.py  # execution_intent: "execute"
+```
+
+脚本的序列化包括：
+- `executor`：python、bash、node、other
+- `execution_intent`："execute" 或 "read_only"
+- `requirements`：所需工具（如 ["pypdf"]）
+
+### 工作流
+
+定义多步骤流程：
+
+```markdown
+## PDF 表单填写工作流
+
+**步骤 1：分析**
+运行：`python scripts/analyze_form.py input.pdf`
+
+**步骤 2：填写**
+编辑 `fields.json` 添加值
+
+**步骤 3：验证**
+运行：`python scripts/verify.py output.pdf`
+```
+
+### 示例
+
+提供用于模式匹配的输入/输出对：
+
+```markdown
+## 提交消息示例
+
+**示例 1：**
+- 输入：Added JWT auth
+- 输出：`feat(auth): implement JWT authentication`
+
+**示例 2：**
+- 输入：Fixed date bug
+- 输出：`fix(reports): correct timezone handling`
+```
+
+---
+
 ## 知识节点
 
 OntoSkills 从你的 SKILL.md 中提取结构化知识。编写清晰的部分以映射到节点类型：

@@ -2,7 +2,7 @@
 title: OntoStore 界面
 description: 从 OntoStore 市场搜索和安装技能
 sidebar:
-  order: 12
+  order: 13
 ---
 
 OntoSkills 市场是已发布、已编译技能的安装界面。
