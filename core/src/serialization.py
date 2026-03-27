@@ -294,9 +294,19 @@ def serialize_skill(
         for step in wf.steps:
             step_node = step_nodes[step.step_id]
             for dep_id in step.depends_on:
-                if dep_id in step_nodes:
-                    dep_node = step_nodes[dep_id]
+                dep_node = step_nodes.get(dep_id)
+                if dep_node is not None:
                     graph.add((step_node, oc.stepDependsOn, dep_node))
+                else:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        "Unresolved workflow step dependency '%s' referenced from step '%s' "
+                        "in workflow '%s'; dependency will not be serialized.",
+                        dep_id,
+                        step.step_id,
+                        wf.workflow_id,
+                    )
 
     # Examples (use index for unique BNode IDs to avoid collisions with same name)
     for idx, ex in enumerate(getattr(skill, 'examples', [])):

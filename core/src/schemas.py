@@ -225,8 +225,8 @@ class Frontmatter(BaseModel):
     def validate_name(cls, v: str) -> str:
         if len(v) > 64:
             raise ValueError(f"Skill name exceeds 64 characters: {len(v)}")
-        if not re.match(r'^[a-z0-9-]+$', v):
-            raise ValueError("Skill name must be lowercase with hyphens only")
+        if not re.match(r'^[a-z0-9]+(?:-[a-z0-9]+)*$', v):
+            raise ValueError("Skill name must be lowercase alphanumeric with single hyphens (no leading/trailing/repeated hyphens)")
         # Check for OntoSkills reserved words anywhere in the skill name
         reserved = ('ontoskills', 'marea', 'mareasw', 'core', 'system', 'index')
         segments = v.lower().split('-')

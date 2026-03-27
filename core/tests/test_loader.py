@@ -87,7 +87,7 @@ name: InvalidName
 description: Test
 ---
 # Content"""
-        with pytest.raises(LoaderError, match="lowercase with hyphens"):
+        with pytest.raises(LoaderError, match="lowercase alphanumeric"):
             parse_frontmatter(content)
 
     def test_parse_frontmatter_rejects_invalid_name_spaces(self):
@@ -96,7 +96,7 @@ name: invalid name
 description: Test
 ---
 # Content"""
-        with pytest.raises(LoaderError, match="lowercase with hyphens"):
+        with pytest.raises(LoaderError, match="lowercase alphanumeric"):
             parse_frontmatter(content)
 
     def test_parse_frontmatter_rejects_long_name(self):

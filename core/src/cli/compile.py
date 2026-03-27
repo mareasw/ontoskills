@@ -68,13 +68,17 @@ def infer_parent_skill_id(skill_dir: Path, input_path: Path, skill_parent_map: d
 
     while current != input_root and current != current.parent:
         if (current / "SKILL.md").exists():
-            # Use frontmatter-based ID from normalized map if available
-            if normalized_map and current in normalized_map:
-                qualified_id, _ = normalized_map[current]
-                # Extract short ID from qualified ID (package/skill_id -> skill_id)
-                return qualified_id.split('/')[-1]
-            # Fallback to directory name (for cases outside main compilation)
-            return generate_skill_id(current.name)
+            if normalized_map is not None:
+                # Map provided: only accept parent if it passed Phase 1 and will be compiled
+                if current in normalized_map:
+                    qualified_id, _ = normalized_map[current]
+                    # Extract short ID from qualified ID (package/skill_id -> skill_id)
+                    return qualified_id.split('/')[-1]
+                # Parent has SKILL.md but failed Phase 1 - continue walking up
+                # to find a valid parent (avoids extends to non-existent module)
+            else:
+                # No map provided (outside main compilation): use directory name as fallback
+                return generate_skill_id(current.name)
         current = current.parent
 
     return None
