@@ -11,6 +11,8 @@ description: OntoMCP runtime guide and tool reference
 
 ```bash
 npx ontoskills install mcp
+npx ontoskills install mcp --claude
+npx ontoskills install mcp --cursor --project
 ```
 
 This installs the runtime binary at:
@@ -18,6 +20,8 @@ This installs the runtime binary at:
 ```text
 ~/.ontoskills/bin/ontomcp
 ```
+
+For one-command client bootstrap, see [`MCP Bootstrap`](/mcp-bootstrap/).
 
 ---
 
