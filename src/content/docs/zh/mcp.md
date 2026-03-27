@@ -13,6 +13,8 @@ sidebar:
 
 ```bash
 npx ontoskills install mcp
+npx ontoskills install mcp --claude
+npx ontoskills install mcp --cursor --project
 ```
 
 这将在以下位置安装运行时二进制文件：
@@ -20,6 +22,8 @@ npx ontoskills install mcp
 ```text
 ~/.ontoskills/bin/ontomcp
 ```
+
+有关一条命令客户端引导，请参见 [MCP 引导](/zh/mcp-bootstrap/)。
 
 ---
 

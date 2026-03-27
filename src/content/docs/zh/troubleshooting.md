@@ -2,7 +2,7 @@
 title: 故障排除
 description: 安装、商店访问、编译器设置和 OntoMCP 的常见问题
 sidebar:
-  order: 15
+  order: 16
 ---
 
 ## 安装问题

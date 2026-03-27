@@ -2,7 +2,7 @@
 title: MCP 与 Codex
 description: 为基于 Codex 的本地工作流配置 OntoMCP
 sidebar:
-  order: 11
+  order: 12
 ---
 
 ## 安装
@@ -14,6 +14,26 @@ npx ontoskills install mcp
 ```
 
 这会安装：
+
+```text
+~/.ontoskills/bin/ontomcp
+```
+
+## 快速引导
+
+推荐设置：
+
+```bash
+npx ontoskills install mcp --codex
+```
+
+手动等效：
+
+```bash
+codex mcp add ontomcp -- ~/.ontoskills/bin/ontomcp
+```
+
+Codex 全局设置使用与其他客户端相同的本地 `stdio` 命令：
 
 ```text
 ~/.ontoskills/bin/ontomcp
@@ -63,6 +83,7 @@ npx ontoskills install core
 ```
 
 - 然后编译或导入源技能。技能默认自动启用；仅当之前被手动禁用时才需要运行 `ontoskills enable <qualified-id>`
+- `--codex` 仅自动化 Codex 全局设置；对于仓库级 Codex MCP 配置，`ontoskills` 目前会打印手动步骤而非强制写入非标准配置文件
 
 ## 实用规则
 
