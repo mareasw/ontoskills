@@ -19,25 +19,36 @@ This gives you the managed runtime binary:
 
 ## Register The Server
 
-Recommended command:
+Fastest bootstrap:
 
 ```bash
-claude mcp add --scope local ontoskills \
+npx ontoskills install mcp --claude
+```
+
+Manual equivalent:
+
+```bash
+claude mcp add --scope user ontomcp -- \
   ~/.ontoskills/bin/ontomcp
 ```
 
-If you want to force a specific ontology root:
+Project-local instead:
 
 ```bash
-claude mcp add --scope local ontoskills \
-  ~/.ontoskills/bin/ontomcp \
-  -- --ontology-root ~/.ontoskills/ontologies
+npx ontoskills install mcp --claude --project
+```
+
+If you want to force a specific ontology root manually:
+
+```bash
+claude mcp add --scope user ontomcp -- \
+  ~/.ontoskills/bin/ontomcp --ontology-root ~/.ontoskills/ontologies
 ```
 
 ## Verify
 
 ```bash
-claude mcp get ontoskills
+claude mcp get ontomcp
 claude mcp list
 ```
 
@@ -77,4 +88,3 @@ Run with an explicit root:
 ### Rebuilt binary but Claude still behaves strangely
 
 Remove and re-add the MCP server, or restart Claude Code. A stale background process can keep the old binary alive.
-

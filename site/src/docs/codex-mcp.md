@@ -9,6 +9,7 @@ Install the runtime first:
 
 ```bash
 npx ontoskills install mcp
+npx ontoskills install mcp --codex
 ```
 
 This installs:
@@ -17,30 +18,24 @@ This installs:
 ~/.ontoskills/bin/ontomcp
 ```
 
-## Integration Model
+## Fast Bootstrap
 
-Codex-based workflows use the same MCP contract as other local clients:
+The recommended setup is:
 
-- launch `ontomcp` as a local `stdio` subprocess
-- point it at the managed ontology home in `~/.ontoskills/ontologies`
-- let the client call the five public tools
+```bash
+npx ontoskills install mcp --codex
+```
 
-The stable executable to register is:
+Manual equivalent:
+
+```bash
+codex mcp add ontomcp -- ~/.ontoskills/bin/ontomcp
+```
+
+Codex global setup uses the same local `stdio` command as other clients:
 
 ```text
 ~/.ontoskills/bin/ontomcp
-```
-
-## Recommended Runtime Command
-
-```bash
-~/.ontoskills/bin/ontomcp --ontology-root ~/.ontoskills/ontologies
-```
-
-If your Codex client supports environment-based configuration, the equivalent setting is:
-
-```bash
-ONTOMCP_ONTOLOGY_ROOT=~/.ontoskills/ontologies
 ```
 
 ## Tools Exposed
@@ -61,14 +56,4 @@ npx ontoskills install core
 ```
 
 - Then compile or import source skills — they are auto-enabled on install for MCP access
-
-## Practical Rule
-
-Treat Codex integration as a standard local `stdio` MCP registration whose command points at:
-
-```text
-~/.ontoskills/bin/ontomcp
-```
-
-The exact UI or config file shape may vary across Codex builds, but the server command and ontology root remain the same.
-
+- `--codex` automates Codex global setup only; for repository-local Codex MCP config, `ontoskills` currently prints manual steps instead of forcing a non-standard config file
