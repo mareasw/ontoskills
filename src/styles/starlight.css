@@ -74,6 +74,10 @@
   --custom-border-light: rgba(255, 255, 255, 0.08);
 }
 
+:root {
+  --sl-content-width: 72rem;
+}
+
 body {
   background: var(--sl-color-bg);
 }
@@ -95,17 +99,12 @@ header {
 
 .content-panel,
 .sl-markdown-content blockquote,
-.sl-markdown-content table,
 .expressive-code,
 .card {
   background: var(--sl-color-bg-sidebar) !important;
   border: 1px solid var(--sl-color-border) !important;
   border-radius: 0.9rem !important;
   box-shadow: none !important;
-}
-
-.sl-markdown-content table {
-  overflow: hidden;
 }
 
 pre,
@@ -155,8 +154,9 @@ a:hover {
   border-radius: 999px !important;
 }
 
-/* Tables - centered text, cleaner look */
+/* Tables - proper column alignment */
 .sl-markdown-content table {
+  display: table !important;
   border-collapse: collapse;
   width: 100%;
   margin: 1.5rem 0;
@@ -164,9 +164,18 @@ a:hover {
 
 .sl-markdown-content th,
 .sl-markdown-content td {
-  text-align: center;
+  text-align: left;
   vertical-align: middle;
   padding: 0.75rem 1rem;
+  overflow-wrap: break-word;
+}
+
+/* Override Starlight's first/last child zero-padding */
+.sl-markdown-content :is(th, td):first-child {
+  padding-inline-start: 1rem;
+}
+.sl-markdown-content :is(th, td):last-child {
+  padding-inline-end: 1rem;
 }
 
 .sl-markdown-content th {
