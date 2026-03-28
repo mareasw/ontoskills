@@ -12,7 +12,7 @@ export const defaultLang: Lang = 'en';
 // Hero translations
 const hero = {
   en: {
-    badgeTerms: ['OWL 2 ontologies', 'Rust MCP', 'Deterministic queries'],
+    badgeTagline: 'Ontology-Powered Skill Resolution',
     headline: 'Skills your agent can look up, not guess.',
     subheadline: 'Deterministic ontological queries replace probabilistic skill discovery. Zero ambiguity, zero tokens wasted.',
     cta: 'Browse OntoStore',
@@ -24,7 +24,7 @@ const hero = {
     ],
   },
   zh: {
-    badgeTerms: ['OWL 2 本体', 'Rust MCP', '确定性查询'],
+    badgeTagline: '基于本体的技能解析',
     headline: '技能是查出来的，不是猜出来的。',
     subheadline: '用确定性的本体查询替代概率性的技能发现。零歧义，零令牌浪费。',
     cta: '浏览 OntoStore',
