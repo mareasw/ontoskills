@@ -156,12 +156,20 @@ a:hover {
   border-radius: 999px !important;
 }
 
-/* Tables - proper column alignment */
+/* Tables - scrollable on mobile, proper layout on desktop */
 .sl-markdown-content table {
-  display: table !important;
+  display: block;
+  overflow-x: auto;
   border-collapse: collapse;
   width: 100%;
   margin: 1.5rem 0;
+}
+
+@media (min-width: 50em) {
+  .sl-markdown-content table {
+    display: table !important;
+    overflow-x: visible;
+  }
 }
 
 .sl-markdown-content th,
