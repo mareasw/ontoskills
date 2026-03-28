@@ -15,12 +15,16 @@ const t = translations.hero[lang];
     <div class="max-w-2xl">
       <div class="hero-badge">
         <span class="badge-dot"></span>
-        <span>{t.badge}</span>
+        <span class="badge-text-rotating">
+          {t.badgeTerms.map((term, i) => (
+            <span class={`badge-term badge-term-${i}`}>{term}</span>
+          ))}
+        </span>
       </div>
 
       <h1 class="hero-headline">
-        <span>{t.headline.split(' ').slice(0, 5).join(' ')}</span>{' '}
-        <span class="headline-accent">{t.headline.split(' ').slice(5).join(' ')}</span>
+        <span>{t.headline.split(',')[0]},</span>{' '}
+        <span class="headline-accent">{t.headline.split(',').slice(1).join(',')}</span>
       </h1>
 
       <p class="hero-subheadline">
@@ -120,7 +124,7 @@ const t = translations.hero[lang];
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 12px;
+    padding: 6px 14px;
     background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: 100px;
@@ -139,6 +143,36 @@ const t = translations.hero[lang];
     background: #22c55e;
     border-radius: 50%;
     animation: pulse 2s infinite;
+    flex-shrink: 0;
+  }
+
+  .badge-text-rotating {
+    position: relative;
+    height: 1.4em;
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .badge-term {
+    position: absolute;
+    left: 0;
+    white-space: nowrap;
+    animation: rotateBadge 6s ease-in-out infinite;
+    opacity: 0;
+    transform: translateY(100%);
+  }
+
+  .badge-term-0 { animation-delay: 0s; }
+  .badge-term-1 { animation-delay: 2s; }
+  .badge-term-2 { animation-delay: 4s; }
+
+  @keyframes rotateBadge {
+    0% { opacity: 0; transform: translateY(100%); }
+    5% { opacity: 1; transform: translateY(0); }
+    30% { opacity: 1; transform: translateY(0); }
+    35% { opacity: 0; transform: translateY(-100%); }
+    100% { opacity: 0; transform: translateY(-100%); }
   }
 
   @keyframes pulse {
