@@ -1,12 +1,15 @@
 # OntoSkills Site
 
-Public site and documentation shell for OntoSkills.
+Static site and documentation for [ontoskills.sh](https://ontoskills.sh).
 
-The site presents the current product surface:
-- `ontoskills` as the user-facing CLI
-- `ontomcp` as the runtime server
-- `ontocore` as the optional compiler
-- `OntoSkills Registry` as the official compiled-skill registry
+## Pages
+
+| Route | Description |
+|-------|-------------|
+| `/` | Landing page (Hero, Problem/Solution, Products, Roadmap, CTA) |
+| `/how-it-works` | Define → Compile → Query → Execute walkthrough |
+| `/ontostore` | Live OntoStore browser — fetches skills from the official store index |
+| `/docs/*` | Starlight documentation (EN + ZH) |
 
 ## Tech Stack
 
@@ -15,37 +18,53 @@ The site presents the current product surface:
 | [Astro 5](https://astro.build/) | Static site generator |
 | [Starlight](https://starlight.astro.build/) | Documentation framework |
 | [Tailwind CSS](https://tailwindcss.com/) | Utility-first styling |
-| [Pagefind](https://pagefind.app/) | Static search |
+| [Mermaid](https://mermaid.js.org/) | Diagram rendering in docs |
 
-## Commands
+## i18n
 
-```bash
-npm install
-npm run dev
-npm run build
-npm run preview
-```
+Bilingual support via Starlight locales and custom translation dictionaries in `src/i18n/translations.ts`:
+
+- **English** (`en`) — default locale
+- **Chinese** (`zh`)
 
 ## Project Structure
 
 ```
 site/
-├── public/              # Static assets
+├── public/              # Static assets (images, robots.txt)
 ├── src/
-│   ├── components/      # Landing-page UI
-│   ├── content/         # Starlight docs source (symlink to ../../docs)
-│   ├── layouts/         # Page layouts
-│   └── styles/          # Global styles
-└── astro.config.mjs     # Astro configuration
+│   ├── assets/          # Logo and image imports
+│   ├── components/
+│   │   ├── landing/     # Hero, Header, Footer, CTA, Products, etc.
+│   │   ├── store/       # OntoStore browser component
+│   │   └── ui/          # Reusable Button, Card, CommandSnippet
+│   ├── content/
+│   │   └── docs/        # Starlight docs source (en/ + zh/)
+│   ├── data/            # Store index URLs
+│   ├── i18n/            # Translation dictionaries
+│   ├── layouts/         # LandingLayout
+│   ├── pages/           # Astro pages (landing, ontostore, i18n routes)
+│   └── styles/          # Global CSS, Starlight theme overrides
+├── astro.config.mjs     # Astro + Starlight + Tailwind config
+└── tailwind.config.mjs  # OntoSkills design system colors and fonts
 ```
 
-## Documentation
+## Commands
 
-The docs are rendered through Starlight and loaded from the repository-level `docs/` directory via `site/src/content/docs`.
+```bash
+npm install
+npm run dev       # Dev server
+npm run build     # Production build
+npm run preview   # Preview production build
+```
+
+## Requirements
+
+- Node.js >= 22
 
 ## Deployment
 
-Built for static hosting such as Vercel, Netlify, or Cloudflare Pages.
+Static output, compatible with Vercel, Netlify, or Cloudflare Pages.
 
 ## License
 
