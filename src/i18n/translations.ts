@@ -12,11 +12,11 @@ export const defaultLang: Lang = 'en';
 // Hero translations
 const hero = {
   en: {
-    badge: 'OWL 2 Ontologies • Rust MCP • Deterministic Queries',
-    headline: 'Your agent shouldn\'t have to read to know what to do.',
-    subheadline: 'Replace probabilistic skill discovery with deterministic ontological queries. Zero ambiguity. Zero tokens wasted on parsing.',
+    badgeTerms: ['OWL 2 ontologies', 'Rust MCP', 'Deterministic queries'],
+    headline: 'Skills your agent can look up, not guess.',
+    subheadline: 'Deterministic ontological queries replace probabilistic skill discovery. Zero ambiguity, zero tokens wasted.',
     cta: 'Browse OntoStore',
-    secondaryCta: 'Get Started',
+    secondaryCta: 'Get started',
     stats: [
       { value: 'O(1)', label: 'Lookup' },
       { value: '100%', label: 'Deterministic' },
@@ -24,9 +24,9 @@ const hero = {
     ],
   },
   zh: {
-    badge: 'OWL 2 本体 • Rust MCP • 确定性查询',
-    headline: '你的代理不应该通过阅读来知道该做什么。',
-    subheadline: '用确定性的本体查询替代概率性的技能发现。零歧义。零令牌浪费。',
+    badgeTerms: ['OWL 2 本体', 'Rust MCP', '确定性查询'],
+    headline: '技能是查出来的，不是猜出来的。',
+    subheadline: '用确定性的本体查询替代概率性的技能发现。零歧义，零令牌浪费。',
     cta: '浏览 OntoStore',
     secondaryCta: '开始使用',
     stats: [
@@ -41,7 +41,7 @@ const hero = {
 const problemSolution = {
   en: {
     problem: {
-      label: 'The Problem',
+      label: 'The problem',
       headline: 'LLMs waste tokens guessing',
       subheadline: 'Every time your agent uses a skill, it burns through a 4-step pipeline that\'s slow, expensive, and unreliable.',
       steps: [
@@ -51,14 +51,14 @@ const problemSolution = {
         { name: 'Execute', desc: 'Run skill' },
       ],
       painPoints: [
-        { title: 'Token Waste', desc: 'Large models burn thousands of tokens just parsing documentation files.', icon: 'warning' },
+        { title: 'Token waste', desc: 'Large models burn thousands of tokens just parsing documentation files.', icon: 'warning' },
         { title: 'Inconsistency', desc: 'Same query, different results. Every. Single. Time.', icon: 'shuffle' },
         { title: 'Confusion', desc: 'Complex skills overwhelm smaller models with ambiguity.', icon: 'confusion' },
-        { title: 'No Guarantees', desc: 'LLMs interpret text probabilistically. Errors are inevitable.', icon: 'warning2' },
+        { title: 'No guarantees', desc: 'LLMs interpret text probabilistically. Errors are inevitable.', icon: 'warning2' },
       ],
     },
     solution: {
-      label: 'The Solution',
+      label: 'The solution',
       headline: 'Skip the guesswork. Query. Execute.',
       subheadline: 'OntoSkills eliminates reading and understanding. An OWL 2 reasoner handles the heavy lifting — deterministically.',
       codeExample: {
@@ -158,7 +158,7 @@ const products = {
 // Roadmap translations
 const roadmap = {
   en: {
-    badge: 'Coming Soon',
+    badge: 'Coming soon',
     title: 'OntoClaw',
     subtitle: 'The first natively ontological AI agent',
     description: 'Neuro-symbolic architecture. Ontological knowledge is native — no MCP bridge needed for OntoSkills.',
@@ -176,7 +176,7 @@ const cta = {
   en: {
     headline: 'Ready to make your agent deterministic?',
     command: 'npx ontoskills install mcp',
-    primaryButton: 'Get Started',
+    primaryButton: 'Get started',
     secondaryButton: 'Browse OntoStore',
   },
   zh: {
@@ -192,7 +192,7 @@ const landingCta = {
   en: {
     headline: 'Ready to make your agent deterministic?',
     command: 'npx ontoskills install mcp',
-    primaryButton: 'Get Started',
+    primaryButton: 'Get started',
     secondaryButton: 'Browse OntoStore',
   },
   zh: {
@@ -207,9 +207,9 @@ const landingCta = {
 const header = {
   en: {
     ontostore: 'OntoStore',
-    howItWorks: 'How it Works',
+    howItWorks: 'How it works',
     docs: 'Docs',
-    getStarted: 'Get Started',
+    getStarted: 'Get started',
   },
   zh: {
     ontostore: 'OntoStore',
@@ -227,8 +227,8 @@ const footer = {
     community: 'Community',
     roadmap: 'Roadmap',
     documentation: 'Documentation',
-    gettingStarted: 'Getting Started',
-    cliReference: 'CLI Reference',
+    gettingStarted: 'Getting started',
+    cliReference: 'CLI reference',
     architecture: 'Architecture',
     copyright: '© 2026 OntoSkills. All rights reserved.',
   },
@@ -248,7 +248,7 @@ const footer = {
 // How it Works translations
 const howItWorks = {
   en: {
-    title: 'How it Works',
+    title: 'How it works',
     subtitle: 'Four steps to deterministic skill discovery',
     steps: [
       {
@@ -312,7 +312,7 @@ const howItWorks = {
 // OntoStore translations
 const ontostore = {
   en: {
-    title: 'OntoStore — Browse Ontological Skills',
+    title: 'OntoStore — Browse ontological skills',
     headline: 'Browse ontological skills. Copy install commands.',
     subtitle: 'Find skills by intent, name, or description. Copy install commands directly.',
   },
