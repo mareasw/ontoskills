@@ -15,11 +15,9 @@ const t = translations.hero[lang];
     <div class="max-w-2xl">
       <div class="hero-badge">
         <span class="badge-dot"></span>
-        <span class="badge-text-rotating">
-          {t.badgeTerms.map((term) => (
-            <span class="badge-term">{term}</span>
-          ))}
-        </span>
+        <span class="badge-label">v0.1</span>
+        <span class="badge-sep"></span>
+        <span class="badge-text">{t.badgeTagline}</span>
       </div>
 
       <h1 class="hero-headline">
@@ -128,11 +126,8 @@ const t = translations.hero[lang];
     background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: 100px;
-    font-family: 'JetBrains Mono Variable', monospace;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    color: var(--text-muted);
+    font-size: 12px;
+    color: var(--text-secondary);
     margin-bottom: 20px;
     animation: fadeInUp 0.6s ease-out;
   }
@@ -146,31 +141,24 @@ const t = translations.hero[lang];
     flex-shrink: 0;
   }
 
-  .badge-text-rotating {
-    display: inline-block;
-    position: relative;
-    min-width: 14em;
+  .badge-label {
+    font-family: 'JetBrains Mono Variable', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent-cyan);
   }
 
-  .badge-term {
-    display: inline;
-    animation: rotateBadge 6s ease-in-out infinite;
-    opacity: 0;
-    position: absolute;
-    left: 0;
-    white-space: nowrap;
+  .badge-sep {
+    width: 1px;
+    height: 12px;
+    background: var(--border);
   }
 
-  .badge-term:nth-child(1) { animation-delay: 0s; }
-  .badge-term:nth-child(2) { animation-delay: 2s; }
-  .badge-term:nth-child(3) { animation-delay: 4s; }
-
-  @keyframes rotateBadge {
-    0% { opacity: 0; }
-    5% { opacity: 1; }
-    30% { opacity: 1; }
-    35% { opacity: 0; }
-    100% { opacity: 0; }
+  .badge-text {
+    font-size: 12px;
+    color: var(--text-secondary);
   }
 
   @keyframes pulse {
