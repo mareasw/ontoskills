@@ -217,7 +217,7 @@ flowchart LR
     style TOOLS fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
 ```
 
-For full setup steps, see [CLAUDE_CODE_GUIDE.md](CLAUDE_CODE_GUIDE.md).
+For full setup steps, see [Claude Code MCP guide](../site/src/docs/claude-code-mcp.md).
 
 ---
 
