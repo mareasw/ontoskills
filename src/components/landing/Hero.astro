@@ -16,8 +16,8 @@ const t = translations.hero[lang];
       <div class="hero-badge">
         <span class="badge-dot"></span>
         <span class="badge-text-rotating">
-          {t.badgeTerms.map((term, i) => (
-            <span class={`badge-term badge-term-${i}`}>{term}</span>
+          {t.badgeTerms.map((term) => (
+            <span class="badge-term">{term}</span>
           ))}
         </span>
       </div>
@@ -163,9 +163,9 @@ const t = translations.hero[lang];
     transform: translateY(100%);
   }
 
-  .badge-term-0 { animation-delay: 0s; }
-  .badge-term-1 { animation-delay: 2s; }
-  .badge-term-2 { animation-delay: 4s; }
+  .badge-term:nth-child(1) { animation-delay: 0s; }
+  .badge-term:nth-child(2) { animation-delay: 2s; }
+  .badge-term:nth-child(3) { animation-delay: 4s; }
 
   @keyframes rotateBadge {
     0% { opacity: 0; transform: translateY(100%); }
