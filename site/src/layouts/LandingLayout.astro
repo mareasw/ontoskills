@@ -10,11 +10,13 @@ import '../styles/global.css';
 interface Props {
   title?: string;
   description?: string;
+  lang?: string;
 }
 
 const {
   title = 'OntoSkills — Deterministic AI Skills via Rust MCP & OWL Ontologies',
-  description = 'Stop burning tokens on probabilistic skill reading. OntoSkills delivers sub-millisecond SPARQL queries through a Rust MCP runtime. Ontological, deterministic, precise.'
+  description = 'Stop burning tokens on probabilistic skill reading. OntoSkills delivers sub-millisecond SPARQL queries through a Rust MCP runtime. Ontological, deterministic, precise.',
+  lang = 'en'
 } = Astro.props;
 
 const jsonLd = {
@@ -22,7 +24,7 @@ const jsonLd = {
   "@type": "SoftwareApplication",
   "name": "OntoSkills",
   "description": "Deterministic AI skills through OWL 2 ontologies and a Rust MCP runtime. Query skills with SPARQL in sub-millisecond time.",
-  "url": "https://ontoskills.marea.software",
+  "url": "https://ontoskills.sh",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Any",
   "programmingLanguage": ["Rust", "Python", "TypeScript"],
@@ -48,19 +50,21 @@ const jsonLd = {
 };
 ---
 
-<html lang="en">
+<html lang={lang}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
-    <meta name="keywords" content="AI skills, MCP, Model Context Protocol, ontology, SPARQL, Rust, deterministic skills, OWL 2, agent skills, Claude Code, semantic search" />
+    <meta name="keywords" content="AI skills, MCP, Model Context Protocol, ontology, SPARQL, Rust, deterministic skills, OWL 2, agent skills, Claude Code" />
     <meta name="author" content="Marea Software" />
-    <link rel="canonical" href="https://ontoskills.marea.software" />
+    <link rel="canonical" href="https://ontoskills.sh" />
     <link rel="icon" type="image/png" href="/ontoskills-logo.png" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image" content="https://ontoskills.sh/ontoskills-logo.png" />
+    <meta name="twitter:image" content="https://ontoskills.sh/ontoskills-logo.png" />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://ontoskills.sh" />
     <meta name="twitter:card" content="summary_large_image" />
     <title>{title}</title>
     <ViewTransitions />

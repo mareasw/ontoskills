@@ -1,30 +1,23 @@
 ---
+// Root page serves English content directly (no redirect)
 import LandingLayout from '../layouts/LandingLayout.astro';
 import Header from '../components/landing/Header.astro';
 import Hero from '../components/landing/Hero.astro';
-import OntoStore from '../components/store/OntoStore.astro';
 import ProblemSolution from '../components/landing/ProblemSolution.astro';
-import Features from '../components/landing/Features.astro';
-import Architecture from '../components/landing/Architecture.astro';
-import HowItWorks from '../components/landing/HowItWorks.astro';
-import GettingStarted from '../components/landing/GettingStarted.astro';
+import Products from '../components/landing/Products.astro';
 import Roadmap from '../components/landing/Roadmap.astro';
 import CTA from '../components/landing/CTA.astro';
 import Footer from '../components/landing/Footer.astro';
 ---
 
-<LandingLayout>
-  <Header />
+<LandingLayout lang="en">
+  <Header lang="en" />
   <main>
-    <Hero />
-    <OntoStore compact={true} title="Install a skill from the official store" description="Search all verified skills published in the official store and copy the exact install command for your local runtime." />
-    <ProblemSolution />
-    <Features />
-    <Architecture />
-    <HowItWorks />
-    <GettingStarted />
-    <Roadmap />
-    <CTA />
+    <Hero lang="en" />
+    <ProblemSolution lang="en" />
+    <Products lang="en" />
+    <Roadmap lang="en" />
+    <CTA lang="en" />
   </main>
-  <Footer />
+  <Footer lang="en" />
 </LandingLayout>

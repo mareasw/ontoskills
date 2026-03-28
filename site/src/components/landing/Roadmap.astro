@@ -1,92 +1,48 @@
 ---
-const phases = [
-  {
-    status: 'done',
-    phase: 'Phase 1',
-    title: 'OntoCore',
-    description: 'Source skills compile into validated ontologies and reusable knowledge nodes',
-  },
-  {
-    status: 'done',
-    phase: 'Phase 2',
-    title: 'OntoMCP',
-    description: 'Package-aware MCP runtime serves enabled ontologies through a small tool surface',
-  },
-  {
-    status: 'done',
-    phase: 'Phase 3',
-    title: 'OntoSkills',
-    description: 'Managed CLI orchestrates installs, updates, enable/disable, and local home layout',
-  },
-  {
-    status: 'done',
-    phase: 'Phase 4',
-    title: 'OntoStore',
-    description: 'Official store publishes compiled skills and supports remote installs by qualified id',
-  },
-  {
-    status: 'planned',
-    phase: 'Phase 5',
-    title: 'Community Imports',
-    description: 'Third-party registries, source repository imports, and stricter release/update automation',
-  },
-];
+import { type Lang, translations, defaultLang } from '../../i18n/translations';
 
-const statusStyles = {
-  done: 'border-accent-mint text-accent-mint',
-  wip: 'border-accent-cyan text-accent-cyan animate-pulse',
-  planned: 'border-text-muted text-text-muted',
-  future: 'border-border text-text-muted opacity-60',
-};
+interface Props {
+  lang?: Lang;
+}
 
-const statusIcons = {
-  done: '✓',
-  wip: '🔨',
-  planned: '💡',
-  future: '🔮',
-};
+const { lang = defaultLang } = Astro.props;
+const t = translations.roadmap[lang];
 ---
 
-<section id="roadmap" class="py-20">
-  <div class="section-shell max-w-5xl">
-    <div class="text-center mb-12">
-      <div class="section-kicker mx-auto mb-4">Build status</div>
-      <h2 class="text-3xl sm:text-4xl font-bold text-text-primary mb-4">
-        <span class="gradient-text">Roadmap</span>
-      </h2>
-      <p class="text-text-muted">
-        This evolves as we build.
-      </p>
-    </div>
+<section class="roadmap-section py-20 border-b border-white/10 relative overflow-hidden">
+  <!-- Background gradient -->
+  <div class="absolute inset-0 pointer-events-none">
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-gradient-to-r from-cyan-500/5 via-mint-500/5 to-aqua-500/5 rounded-full blur-3xl"></div>
+  </div>
 
-    <div class="glass-panel relative rounded-[2rem] px-4 py-8">
-      <!-- Timeline line -->
-      <div class="absolute left-8 md:left-1/2 top-0 bottom-0 w-px bg-border md:-translate-x-px"></div>
+  <div class="section-shell relative">
+    <div class="max-w-2xl mx-auto">
+      <div class="border border-white/10 bg-bg-elevated rounded-xl p-8 hover:border-cyan-500/30 transition-all duration-300 relative overflow-hidden group">
+        <!-- Gradient border top -->
+        <div class="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
 
-      <!-- Phases -->
-      <div class="space-y-8">
-        {phases.map((phase, i) => (
-          <div class={`relative flex items-start gap-6 ${i % 2 === 1 ? 'md:flex-row-reverse' : ''}`}>
-            <!-- Marker -->
-            <div class={`absolute left-8 md:left-1/2 w-8 h-8 rounded-full border-2 bg-bg-primary flex items-center justify-center text-sm -translate-x-1/2 ${statusStyles[phase.status]}`}>
-              {statusIcons[phase.status]}
-            </div>
-
-            <!-- Content -->
-            <div class={`ml-20 md:ml-0 md:w-1/2 px-2 ${i % 2 === 1 ? 'md:pr-20 md:text-right' : 'md:pl-20'}`}>
-              <span class="text-xs uppercase tracking-wider text-text-muted">{phase.phase}</span>
-              <h3 class="text-xl font-bold text-text-primary mt-1">{phase.title}</h3>
-              <p class="text-text-muted mt-2">{phase.description}</p>
-            </div>
+        <div class="flex items-center gap-4 mb-4">
+          <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-cyan-500/10 to-mint-500/10 border border-cyan-500/30 flex items-center justify-center">
+            <svg class="w-6 h-6 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+              <path d="M2 17l10 5 10-5"/>
+              <path d="M2 12l10 5 10-5"/>
+            </svg>
           </div>
-        ))}
-      </div>
-    </div>
+          <div>
+            <h3 class="text-xl font-semibold">{t.title}</h3>
+            <p class="text-sm text-cyan-400">{t.subtitle}</p>
+          </div>
+        </div>
 
-    <div class="mt-12 text-center">
-      <p class="text-text-muted text-sm">
-        Track progress on <a href="https://github.com/mareasw/ontoskills" class="text-accent-cyan hover:underline">GitHub</a> and the official store at <a href="https://github.com/mareasw/ontostore" class="text-accent-cyan hover:underline">ontostore</a>
-      </p>
+        <p class="text-text-secondary mb-4">
+          {t.description}
+        </p>
+
+        <div class="inline-block px-3 py-1 bg-orange-500/10 border border-orange-500/30 rounded-full text-sm text-orange-400">
+          {t.badge}
+        </div>
+      </div>
     </div>
   </div>
 </section>
