@@ -58,7 +58,7 @@ export default {
         name: 'OntoStore',
         description: '注册表。浏览、发布和发现本体技能。',
         features: ['技能发现', '版本控制', 'CLI 集成'],
-        link: '/ontostore/',
+        link: '/zh/ontostore/',
       },
       {
         name: 'OntoMCP',
