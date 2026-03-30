@@ -57,14 +57,14 @@ const jsonLd = {
     <meta name="description" content={description} />
     <meta name="keywords" content="AI skills, MCP, Model Context Protocol, ontology, SPARQL, Rust, deterministic skills, OWL 2, agent skills, Claude Code" />
     <meta name="author" content="Marea Software" />
-    <link rel="canonical" href={Astro.url.href} />
+    <link rel="canonical" href={Astro.url.origin + Astro.url.pathname} />
     <link rel="icon" type="image/png" href="/ontoskills-logo.png" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:image" content="https://ontoskills.sh/ontoskills-logo.png" />
-    <meta name="twitter:image" content="https://ontoskills.sh/ontoskills-logo.png" />
+    <meta property="og:image" content="https://ontoskills.sh/ontoskills-banner.png" />
+    <meta name="twitter:image" content="https://ontoskills.sh/ontoskills-banner.png" />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content={Astro.url.href} />
+    <meta property="og:url" content={Astro.url.origin + Astro.url.pathname} />
     <meta name="twitter:card" content="summary_large_image" />
     <title>{title}</title>
     <ViewTransitions />
