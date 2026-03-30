@@ -165,6 +165,24 @@ a:hover {
   margin: 1.5rem 0;
 }
 
+@media (max-width: 49.99em) {
+  .sl-markdown-content table {
+    position: relative;
+  }
+  .sl-markdown-content table::after {
+    content: '';
+    position: sticky;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 2rem;
+    background: linear-gradient(to right, transparent, var(--sl-color-bg));
+    pointer-events: none;
+    float: right;
+    shape-outside: inset(0);
+  }
+}
+
 @media (min-width: 50em) {
   .sl-markdown-content table {
     display: table !important;
