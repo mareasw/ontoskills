@@ -1,71 +1,61 @@
 # OntoSkills Site
 
-Static site and documentation for [ontoskills.sh](https://ontoskills.sh).
+Public site and documentation for [OntoSkills](https://ontoskills.sh) — ontology-powered skill resolution for AI agents.
 
-## Pages
+## What's here
 
-| Route | Description |
-|-------|-------------|
-| `/` | Landing page (Hero, Problem/Solution, Products, Roadmap, CTA) |
-| `/how-it-works` | Define → Compile → Query → Execute walkthrough |
-| `/ontostore` | Live OntoStore browser — fetches skills from the official store index |
-| `/docs/*` | Starlight documentation (EN + ZH) |
+- **Landing page** (`/`) — marketing page with i18n support (English, Chinese)
+- **Documentation** (`/en/`, `/zh/`) — Starlight-powered docs with bilingual content
+- **OntoStore** (`/ontostore/`) — browsable skill registry
 
-## Tech Stack
+## Tech stack
 
 | Technology | Purpose |
 |------------|---------|
 | [Astro 5](https://astro.build/) | Static site generator |
 | [Starlight](https://starlight.astro.build/) | Documentation framework |
 | [Tailwind CSS](https://tailwindcss.com/) | Utility-first styling |
-| [Mermaid](https://mermaid.js.org/) | Diagram rendering in docs |
-
-## i18n
-
-Bilingual support via Starlight locales and custom translation dictionaries in `src/i18n/translations.ts`:
-
-- **English** (`en`) — default locale
-- **Chinese** (`zh`)
-
-## Project Structure
-
-```
-site/
-├── public/              # Static assets (images, robots.txt)
-├── src/
-│   ├── assets/          # Logo and image imports
-│   ├── components/
-│   │   ├── landing/     # Hero, Header, Footer, CTA, Products, etc.
-│   │   ├── store/       # OntoStore browser component
-│   │   └── ui/          # Reusable Button, Card, CommandSnippet
-│   ├── content/
-│   │   └── docs/        # Starlight docs source (en/ + zh/)
-│   ├── data/            # Store index URLs
-│   ├── i18n/            # Translation dictionaries
-│   ├── layouts/         # LandingLayout
-│   ├── pages/           # Astro pages (landing, ontostore, i18n routes)
-│   └── styles/          # Global CSS, Starlight theme overrides
-├── astro.config.mjs     # Astro + Starlight + Tailwind config
-└── tailwind.config.mjs  # OntoSkills design system colors and fonts
-```
+| [Mermaid](https://mermaid.js.org/) | Diagrams in docs |
+| [Vercel Analytics](https://vercel.com/analytics) | Traffic analytics |
 
 ## Commands
 
 ```bash
 npm install
-npm run dev       # Dev server
-npm run build     # Production build
-npm run preview   # Preview production build
+npm run dev      # dev server at localhost:4321
+npm run build    # static build to dist/
+npm run preview  # preview production build
 ```
 
-## Requirements
+Requires Node >= 22.
 
-- Node.js >= 22
+## Project structure
+
+```
+src/
+├── components/
+│   └── landing/        # Hero, Products, CTA, etc.
+├── content/
+│   └── docs/           # Starlight markdown docs (en/, zh/)
+├── i18n/
+│   ├── translations.ts  # Helpers + assembles per-lang dicts
+│   ├── en.ts            # English strings
+│   └── zh.ts            # Chinese strings
+├── layouts/
+│   └── LandingLayout.astro
+├── pages/
+│   ├── index.astro     # English landing (root)
+│   ├── en/             # English Starlight pages
+│   ├── zh/             # Chinese Starlight pages
+│   └── ontostore.astro
+└── styles/
+    └── starlight.css   # Custom Starlight theme overrides
+```
 
 ## Deployment
 
-Static output, compatible with Vercel, Netlify, or Cloudflare Pages.
+Built for static hosting such as Vercel, Netlify, or Cloudflare Pages.
 
 ## License
 
-© 2026 [Marea Software](https://marea.software)
+(c) 2026 [Marea Software](https://marea.software)
