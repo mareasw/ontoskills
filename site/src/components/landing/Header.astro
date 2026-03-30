@@ -10,8 +10,10 @@ interface Props {
 const { lang = defaultLang } = Astro.props;
 const t = translations.header[lang];
 
-// Localized path helper: root for English, /{lang}/... for other locales
-const href = (subpath: string) => lang === 'en' ? `/${subpath}/` : `/${lang}/${subpath}/`;
+// Starlight docs paths: root for English, /{lang}/... for other locales
+const docHref = (subpath: string) => lang === 'en' ? `/${subpath}/` : `/${lang}/${subpath}/`;
+// Custom pages always use /{lang}/ prefix
+const pageHref = (subpath: string) => `/${lang}/${subpath}/`;
 const homeHref = lang === 'en' ? '/' : `/${lang}/`;
 
 // Determine alternate language URL
@@ -55,9 +57,9 @@ const githubIcon = `<svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"
       </a>
 
       <div class="hidden md:flex items-center gap-6">
-        <a href={href('ontostore')} class="text-text-secondary hover:text-text-primary transition-colors">{t.ontostore}</a>
-        <a href={href('how-it-works')} class="text-text-secondary hover:text-text-primary transition-colors">{t.howItWorks}</a>
-        <a href={href('overview')} class="text-text-secondary hover:text-text-primary transition-colors">{t.docs}</a>
+        <a href={docHref('ontostore')} class="text-text-secondary hover:text-text-primary transition-colors">{t.ontostore}</a>
+        <a href={pageHref('how-it-works')} class="text-text-secondary hover:text-text-primary transition-colors">{t.howItWorks}</a>
+        <a href={docHref('overview')} class="text-text-secondary hover:text-text-primary transition-colors">{t.docs}</a>
 
         <!-- Language Toggle -->
         <a href={alternateHref} class="lang-toggle flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-white/10 bg-white/5 hover:bg-white/10 transition-colors text-sm">
@@ -69,7 +71,7 @@ const githubIcon = `<svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"
         <a href="https://github.com/mareasw/ontoskills" target="_blank" rel="noopener" class="text-text-secondary hover:text-text-primary transition-colors flex items-center gap-1" aria-label="GitHub">
           <Fragment set:html={githubIcon} />
         </a>
-        <Button href={href('getting-started')}>{t.getStarted}</Button>
+        <Button href={docHref('getting-started')}>{t.getStarted}</Button>
       </div>
 
       <input type="checkbox" id="menu-toggle" class="hidden peer" />
@@ -80,9 +82,9 @@ const githubIcon = `<svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"
       </label>
 
       <div class="hidden peer-checked:flex md:hidden absolute top-16 left-0 right-0 border-b border-white/10 bg-black/95 backdrop-blur flex-col p-4 gap-4">
-        <a href={href('ontostore')} class="text-text-secondary hover:text-text-primary transition-colors py-2">{t.ontostore}</a>
-        <a href={href('how-it-works')} class="text-text-secondary hover:text-text-primary transition-colors py-2">{t.howItWorks}</a>
-        <a href={href('overview')} class="text-text-secondary hover:text-text-primary transition-colors py-2">{t.docs}</a>
+        <a href={docHref('ontostore')} class="text-text-secondary hover:text-text-primary transition-colors py-2">{t.ontostore}</a>
+        <a href={pageHref('how-it-works')} class="text-text-secondary hover:text-text-primary transition-colors py-2">{t.howItWorks}</a>
+        <a href={docHref('overview')} class="text-text-secondary hover:text-text-primary transition-colors py-2">{t.docs}</a>
 
         <!-- Mobile Language Toggle -->
         <a href={alternateHref} class="lang-toggle flex items-center gap-1.5 px-3 py-2 rounded-md border border-white/10 bg-white/5 hover:bg-white/10 transition-colors text-sm w-fit">
@@ -95,7 +97,7 @@ const githubIcon = `<svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"
           <Fragment set:html={githubIcon} />
           <span>GitHub</span>
         </a>
-        <Button href={href('getting-started')} class="w-full text-center">{t.getStarted}</Button>
+        <Button href={docHref('getting-started')} class="w-full text-center">{t.getStarted}</Button>
       </div>
     </div>
   </nav>

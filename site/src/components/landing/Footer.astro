@@ -9,22 +9,22 @@ interface Props {
 const { lang = defaultLang } = Astro.props;
 const t = translations.footer[lang];
 
-// Localized path helper: root for English, /{lang}/... for other locales
-const href = (subpath: string) => lang === 'en' ? `/${subpath}/` : `/${lang}/${subpath}/`;
+// Starlight docs paths: root for English, /{lang}/... for other locales
+const docHref = (subpath: string) => lang === 'en' ? `/${subpath}/` : `/${lang}/${subpath}/`;
 const homeHref = lang === 'en' ? '/' : `/${lang}/`;
 
 const productLinks = [
-  { label: 'OntoCore', href: href('ontocore') },
-  { label: 'OntoStore', href: href('ontostore') },
-  { label: 'OntoMCP', href: href('mcp') },
-  { label: t.roadmap, href: href('roadmap') }
+  { label: 'OntoCore', href: docHref('ontocore') },
+  { label: 'OntoStore', href: docHref('ontostore') },
+  { label: 'OntoMCP', href: docHref('mcp') },
+  { label: t.roadmap, href: docHref('roadmap') }
 ];
 
 const resourceLinks = [
-  { label: t.documentation, href: href('overview') },
-  { label: t.gettingStarted, href: href('getting-started') },
-  { label: t.cliReference, href: href('cli') },
-  { label: t.architecture, href: href('architecture') }
+  { label: t.documentation, href: docHref('overview') },
+  { label: t.gettingStarted, href: docHref('getting-started') },
+  { label: t.cliReference, href: docHref('cli') },
+  { label: t.architecture, href: docHref('architecture') }
 ];
 
 const communityLinks = [
