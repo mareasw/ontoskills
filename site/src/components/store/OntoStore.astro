@@ -372,12 +372,24 @@ const t = i18n[lang];
   };
 
   // initStore is idempotent (uses AbortController) — safe to re-run on ViewTransitions
-  document.addEventListener('astro:page-load', initStore);
+  let didInit = false;
+  document.addEventListener('astro:page-load', () => {
+    if (!didInit) {
+      didInit = true;
+      initStore();
+    }
+  });
 
-  // Also run immediately for SSR/first page load before ViewTransitions are active
+  // Run immediately for SSR/first page load before ViewTransitions are active
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initStore);
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!didInit) {
+        didInit = true;
+        initStore();
+      }
+    });
   } else {
+    didInit = true;
     initStore();
   }
 </script>
