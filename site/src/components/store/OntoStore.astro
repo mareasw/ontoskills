@@ -371,12 +371,7 @@ const t = i18n[lang];
     }
   };
 
-  // Guard against multiple initialization from ViewTransitions
-  const initKey = `ontoskills-initialized-${rootId}`;
-  if (window[initKey]) return;
-  window[initKey] = true;
-
-  // Run on astro:page-load only (not immediately - let the event handle first load too)
+  // initStore is idempotent (uses AbortController) — safe to re-run on ViewTransitions
   document.addEventListener('astro:page-load', initStore);
 
   // Also run immediately for SSR/first page load before ViewTransitions are active
