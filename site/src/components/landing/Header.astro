@@ -10,10 +10,8 @@ interface Props {
 const { lang = defaultLang } = Astro.props;
 const t = translations.header[lang];
 
-// Starlight docs paths: root for English, /{lang}/... for other locales
-const docHref = (subpath: string) => lang === 'en' ? `/${subpath}/` : `/${lang}/${subpath}/`;
-// Custom pages always use /{lang}/ prefix
-const pageHref = (subpath: string) => `/${lang}/${subpath}/`;
+// All custom pages and Starlight docs use /{lang}/... convention
+const href = (subpath: string) => `/${lang}/${subpath}/`;
 const homeHref = lang === 'en' ? '/' : `/${lang}/`;
 
 // Determine alternate language URL
@@ -22,21 +20,11 @@ const alternateLang: Lang = lang === 'en' ? 'zh' : 'en';
 let alternateHref: string;
 if (currentPath === '/' || currentPath === '') {
   alternateHref = '/zh/';
-} else if (currentPath === '/ontostore/' || currentPath === '/ontostore') {
-  // OntoStore EN -> ZH
-  alternateHref = '/zh/ontostore/';
-} else if (currentPath === '/zh/ontostore/' || currentPath === '/zh/ontostore') {
-  // OntoStore ZH -> EN
-  alternateHref = '/ontostore/';
-} else if (currentPath === '/zh' || currentPath.startsWith('/zh/')) {
-  // Chinese to English: /zh/how-it-works/ -> /en/how-it-works/
-  const replaced = currentPath.replace(/^\/zh\/?/, '/en/');
-  alternateHref = replaced === '/en/' ? '/' : replaced;
-} else if (currentPath === '/en' || currentPath.startsWith('/en/')) {
-  // English to Chinese: /en/how-it-works/ -> /zh/how-it-works/
-  alternateHref = currentPath.replace(/^\/en\/?/, '/zh/');
+} else if (currentPath.startsWith('/zh/')) {
+  alternateHref = currentPath.replace(/^\/zh\//, '/en/');
+} else if (currentPath.startsWith('/en/')) {
+  alternateHref = currentPath.replace(/^\/en\//, '/zh/');
 } else {
-  // Other non-localized pages stay the same (if any)
   alternateHref = currentPath;
 }
 
@@ -57,9 +45,9 @@ const githubIcon = `<svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"
       </a>
 
       <div class="hidden md:flex items-center gap-6">
-        <a href={docHref('ontostore')} class="text-text-secondary hover:text-text-primary transition-colors">{t.ontostore}</a>
-        <a href={pageHref('how-it-works')} class="text-text-secondary hover:text-text-primary transition-colors">{t.howItWorks}</a>
-        <a href={docHref('overview')} class="text-text-secondary hover:text-text-primary transition-colors">{t.docs}</a>
+        <a href={href('ontostore')} class="text-text-secondary hover:text-text-primary transition-colors">{t.ontostore}</a>
+        <a href={href('how-it-works')} class="text-text-secondary hover:text-text-primary transition-colors">{t.howItWorks}</a>
+        <a href={href('overview')} class="text-text-secondary hover:text-text-primary transition-colors">{t.docs}</a>
 
         <!-- Language Toggle -->
         <a href={alternateHref} class="lang-toggle flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-white/10 bg-white/5 hover:bg-white/10 transition-colors text-sm">
@@ -71,7 +59,7 @@ const githubIcon = `<svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"
         <a href="https://github.com/mareasw/ontoskills" target="_blank" rel="noopener" class="text-text-secondary hover:text-text-primary transition-colors flex items-center gap-1" aria-label="GitHub">
           <Fragment set:html={githubIcon} />
         </a>
-        <Button href={docHref('getting-started')}>{t.getStarted}</Button>
+        <Button href={href('getting-started')}>{t.getStarted}</Button>
       </div>
 
       <input type="checkbox" id="menu-toggle" class="hidden peer" />
@@ -82,9 +70,9 @@ const githubIcon = `<svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"
       </label>
 
       <div class="hidden peer-checked:flex md:hidden absolute top-16 left-0 right-0 border-b border-white/10 bg-black/95 backdrop-blur flex-col p-4 gap-4">
-        <a href={docHref('ontostore')} class="text-text-secondary hover:text-text-primary transition-colors py-2">{t.ontostore}</a>
-        <a href={pageHref('how-it-works')} class="text-text-secondary hover:text-text-primary transition-colors py-2">{t.howItWorks}</a>
-        <a href={docHref('overview')} class="text-text-secondary hover:text-text-primary transition-colors py-2">{t.docs}</a>
+        <a href={href('ontostore')} class="text-text-secondary hover:text-text-primary transition-colors py-2">{t.ontostore}</a>
+        <a href={href('how-it-works')} class="text-text-secondary hover:text-text-primary transition-colors py-2">{t.howItWorks}</a>
+        <a href={href('overview')} class="text-text-secondary hover:text-text-primary transition-colors py-2">{t.docs}</a>
 
         <!-- Mobile Language Toggle -->
         <a href={alternateHref} class="lang-toggle flex items-center gap-1.5 px-3 py-2 rounded-md border border-white/10 bg-white/5 hover:bg-white/10 transition-colors text-sm w-fit">

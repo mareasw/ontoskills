@@ -7,8 +7,7 @@ interface Props {
 
 const { lang = defaultLang } = Astro.props;
 const t = translations.hero[lang];
-// Starlight docs paths: root for English, /{lang}/... for other locales
-const docHref = (subpath: string) => lang === 'en' ? `/${subpath}/` : `/${lang}/${subpath}/`;
+const href = (subpath: string) => `/${lang}/${subpath}/`;
 ---
 
 <section class="hero-section">
@@ -38,10 +37,10 @@ const docHref = (subpath: string) => lang === 'en' ? `/${subpath}/` : `/${lang}/
       </div>
 
       <div class="hero-buttons">
-        <a href={docHref('getting-started')} class="hero-btn hero-btn-primary">
+        <a href={href('getting-started')} class="hero-btn hero-btn-primary">
           {t.secondaryCta}
         </a>
-        <a href={docHref('ontostore')} class="hero-btn hero-btn-secondary">
+        <a href={href('ontostore')} class="hero-btn hero-btn-secondary">
           {t.cta}
         </a>
       </div>
