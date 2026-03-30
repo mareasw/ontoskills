@@ -2,7 +2,8 @@ export default {
   hero: {
     badgeTagline: 'Ontology-Powered Skill Resolution',
     badgeTerms: ['OWL 2 ontologies', 'Rust MCP', 'Deterministic queries'],
-    headline: 'Skills your agent can look up, not guess.',
+    headline: 'Skills your agent can look up,',
+    headlineAccent: 'not guess.',
     subheadline: 'Deterministic ontological queries replace probabilistic skill discovery. Zero ambiguity, zero tokens wasted.',
     cta: 'Browse OntoStore',
     secondaryCta: 'Get started',
