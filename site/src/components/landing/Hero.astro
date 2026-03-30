@@ -19,8 +19,8 @@ const t = translations.hero[lang];
       </div>
 
       <h1 class="hero-headline">
-        <span>{t.headline.split(',')[0]},</span>{' '}
-        <span class="headline-accent">{t.headline.split(',').slice(1).join(',')}</span>
+        <span>{t.headline}</span>{' '}
+        <span class="headline-accent">{t.headlineAccent}</span>
       </h1>
 
       <p class="hero-subheadline">
@@ -386,7 +386,7 @@ const t = translations.hero[lang];
   const el = document.getElementById('badge-text');
   if (el && terms.length > 1) {
     let i = 0;
-    setInterval(() => {
+    const id = setInterval(() => {
       el.style.opacity = '0';
       setTimeout(() => {
         i = (i + 1) % terms.length;
@@ -394,5 +394,7 @@ const t = translations.hero[lang];
         el.style.opacity = '1';
       }, 300);
     }, 2500);
+    // Clean up interval on ViewTransition navigation
+    document.addEventListener('astro:before-swap', () => clearInterval(id), { once: true });
   }
 </script>

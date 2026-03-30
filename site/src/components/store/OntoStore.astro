@@ -143,7 +143,7 @@ const t = i18n[lang];
       packageId: pkg.package_id,
       skillId: skill.id,
       qualifiedId,
-      description: skill.description || pkg.description || 'No description available.',
+      description: skill.description || pkg.description || i18n.noDescription,
       aliases: Array.isArray(skill.aliases) ? skill.aliases : [],
       trustTier: pkg.trust_tier || 'verified',
       installCommand: `npx ontoskills install ${qualifiedId}`,
@@ -368,6 +368,11 @@ const t = i18n[lang];
       loadStore();
     }
   };
+
+  // Guard against multiple initialization from ViewTransitions
+  const initKey = `ontoskills-initialized-${rootId}`;
+  if (window[initKey]) return;
+  window[initKey] = true;
 
   // Run on astro:page-load only (not immediately - let the event handle first load too)
   document.addEventListener('astro:page-load', initStore);

@@ -2,7 +2,8 @@ export default {
   hero: {
     badgeTagline: '基于本体的技能解析',
     badgeTerms: ['OWL 2 本体', 'Rust MCP', '确定性查询'],
-    headline: '技能是查出来的，不是猜出来的。',
+    headline: '技能是查出来的，',
+    headlineAccent: '不是猜出来的。',
     subheadline: '用确定性的本体查询替代概率性的技能发现。零歧义，零令牌浪费。',
     cta: '浏览 OntoStore',
     secondaryCta: '开始使用',
