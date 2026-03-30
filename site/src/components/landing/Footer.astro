@@ -11,7 +11,7 @@ const t = translations.footer[lang];
 
 // All pages use /{lang}/... convention
 const href = (subpath: string) => `/${lang}/${subpath}/`;
-const homeHref = lang === 'en' ? '/' : `/${lang}/`;
+const homeHref = `/${lang}/`;
 
 const productLinks = [
   { label: 'OntoCore', href: href('ontocore') },

@@ -12,7 +12,7 @@ const t = translations.header[lang];
 
 // All custom pages and Starlight docs use /{lang}/... convention
 const href = (subpath: string) => `/${lang}/${subpath}/`;
-const homeHref = lang === 'en' ? '/' : `/${lang}/`;
+const homeHref = `/${lang}/`;
 
 // Determine alternate language URL
 const currentPath = Astro.url.pathname;

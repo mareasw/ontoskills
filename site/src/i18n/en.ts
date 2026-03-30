@@ -58,7 +58,7 @@ export default {
         name: 'OntoStore',
         description: 'The registry. Browse, publish, and discover ontological skills.',
         features: ['Skill discovery', 'Version control', 'CLI integration'],
-        link: '/ontostore/',
+        link: '/en/ontostore/',
       },
       {
         name: 'OntoMCP',
