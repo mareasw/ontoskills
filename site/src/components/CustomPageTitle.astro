@@ -1,0 +1,30 @@
+---
+// Custom PageTitle with Copy button
+import CopyPage from './CopyPage.astro';
+
+const title = Astro.locals.starlightRoute.entry.data.title;
+const PAGE_TITLE_ID = '_top';
+---
+
+<div class="page-title-wrapper">
+  <h1 id={PAGE_TITLE_ID}>{title}</h1>
+  <CopyPage />
+</div>
+
+<style>
+  .page-title-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: var(--sl-text-h1);
+    line-height: var(--sl-line-height-headings);
+    font-weight: 600;
+    color: var(--sl-color-text);
+  }
+</style>

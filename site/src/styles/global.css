@@ -14,16 +14,19 @@
     --text-secondary: #d4d4d4;
     --text-muted: #8a8a8a;
 
-    --accent-cyan: #7dd3fc;
-    --accent-blue: #93c5fd;
-    --accent-mint: #bbf7d0;
+    --accent-cyan: #52c7e8;
+    --accent-blue: #6ed8c4;
+    --accent-mint: #85f496;
+    --accent-aqua: #92eff4;
     --accent-pink: #f9a8d4;
+    --accent-purple: #9763e1;
 
     --border: rgba(255, 255, 255, 0.1);
     --border-strong: rgba(255, 255, 255, 0.18);
     --shadow-panel: none;
 
     --gradient-text: linear-gradient(180deg, #fafafa 0%, #a3a3a3 100%);
+    --gradient-brand: linear-gradient(135deg, #52c7e8 0%, #85f496 100%);
   }
 
   html {
@@ -45,7 +48,7 @@
   }
 
   ::selection {
-    background: rgba(125, 211, 252, 0.2);
+    background: rgba(82, 199, 232, 0.2);
   }
 
   :focus-visible {
@@ -62,6 +65,24 @@
     background-clip: text;
   }
 
+  .gradient-border {
+    position: relative;
+  }
+
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-mint), var(--accent-aqua));
+    border-radius: inherit;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    -webkit-mask-composite: xor;
+    pointer-events: none;
+  }
+
   .glass-panel,
   .glass-panel-strong,
   .command-shell {
@@ -72,8 +93,34 @@
     -webkit-backdrop-filter: none;
   }
 
+  .command-shell {
+    position: relative;
+  }
+
+  .command-shell::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+    opacity: 0.5;
+  }
+
   .section-shell {
     @apply mx-auto max-w-6xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .site-title-gradient {
+    transition: all 0.3s ease;
+  }
+
+  a:hover .site-title-gradient {
+    background: var(--gradient-brand);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   .section-kicker {

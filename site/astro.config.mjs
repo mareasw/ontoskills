@@ -24,9 +24,22 @@ export default defineConfig({
       favicon: '/ontoskills-logo.png',
       disable404Route: true,
       customCss: ['./src/styles/starlight.css'],
-      defaultLocale: 'root',
+      head: [
+        {
+          tag: 'meta',
+          attrs: { property: 'og:image', content: 'https://ontoskills.sh/og-image.png' }
+        },
+        {
+          tag: 'meta',
+          attrs: { name: 'twitter:image', content: 'https://ontoskills.sh/og-image.png' }
+        }
+      ],
+      components: {
+        PageTitle: './src/components/CustomPageTitle.astro',
+      },
+      defaultLocale: 'en',
       locales: {
-        root: {
+        en: {
           label: 'English',
           lang: 'en',
         },
@@ -35,12 +48,6 @@ export default defineConfig({
           lang: 'zh-CN',
         },
       },
-      sidebar: [
-        {
-          label: 'Documentation',
-          autogenerate: { directory: '.' },
-        },
-      ],
     }),
     tailwind(),
   ],
