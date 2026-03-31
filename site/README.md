@@ -4,9 +4,9 @@ Public site and documentation for [OntoSkills](https://ontoskills.sh) — ontolo
 
 ## What's here
 
-- **Landing page** (`/`) — marketing page with i18n support (English, Chinese)
-- **Documentation** (`/en/`, `/zh/`) — Starlight-powered docs with bilingual content
-- **OntoStore** (`/ontostore/`) — browsable skill registry
+- **Landing page** (`/`) — redirects to `/en/`, marketing page with i18n support (English, Chinese)
+- **Documentation** (`/en/docs/`, `/zh/docs/`) — Starlight-powered docs with bilingual content
+- **OntoStore** (`/en/ontostore/`, `/zh/ontostore/`) — browsable skill registry
 
 ## Tech stack
 
@@ -44,10 +44,11 @@ src/
 ├── layouts/
 │   └── LandingLayout.astro
 ├── pages/
-│   ├── index.astro     # English landing (root)
+│   ├── index.astro     # Redirects to /en/
 │   ├── en/             # English Starlight pages
-│   ├── zh/             # Chinese Starlight pages
-│   └── ontostore.astro
+│   │   └── ontostore.astro
+│   └── zh/             # Chinese Starlight pages
+│       └── ontostore.astro
 └── styles/
     └── starlight.css   # Custom Starlight theme overrides
 ```
