@@ -1,0 +1,131 @@
+---
+// Copy page content button component for Starlight docs
+const { lang = 'en' } = Astro.locals.starlightRoute.entry.data;
+
+// Normalize lang (zh-CN -> zh)
+const normalizedLang = lang.startsWith('zh') ? 'zh' : lang;
+
+const i18n = {
+  en: {
+    copyPage: 'Copy page',
+    copied: 'Copied!',
+    copyFailed: 'Copy failed',
+    title: 'Copy page content',
+  },
+  zh: {
+    copyPage: '复制页面',
+    copied: '已复制！',
+    copyFailed: '复制失败',
+    title: '复制页面内容',
+  },
+};
+
+const t = i18n[normalizedLang] || i18n.en;
+---
+
+<button
+  type="button"
+  id="copy-page-btn"
+  class="copy-page-btn"
+  title={t.title}
+  data-copy-text={t.copyPage}
+  data-copied-text={t.copied}
+  data-failed-text={t.copyFailed}
+>
+  <svg class="copy-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+  </svg>
+  <svg class="check-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16" style="display: none;">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+  </svg>
+  <span class="btn-text">{t.copyPage}</span>
+</button>
+
+<style>
+  .copy-page-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--sl-color-text-muted);
+    background: var(--sl-color-bg-inline-code);
+    border: 1px solid var(--sl-color-border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .copy-page-btn:hover {
+    color: var(--sl-color-text);
+    background: var(--sl-color-bg-accent);
+    border-color: var(--sl-color-border-accent);
+  }
+
+  .copy-page-btn.copied {
+    color: #22c55e;
+    border-color: rgba(34, 197, 94, 0.3);
+  }
+
+  .copy-page-btn svg {
+    flex-shrink: 0;
+  }
+</style>
+
+<script is:inline>
+  document.addEventListener('astro:page-load', initCopyButton);
+
+  function initCopyButton() {
+    const btn = document.getElementById('copy-page-btn');
+    if (!btn) return;
+
+    // Remove any existing listener by cloning
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+
+    newBtn.addEventListener('click', async () => {
+      const contentPanel = document.querySelector('.sl-markdown-content');
+      if (!contentPanel) return;
+
+      const copyIcon = newBtn.querySelector('.copy-icon');
+      const checkIcon = newBtn.querySelector('.check-icon');
+      const btnText = newBtn.querySelector('.btn-text');
+      const copyText = newBtn.getAttribute('data-copy-text') || 'Copy page';
+      const copiedText = newBtn.getAttribute('data-copied-text') || 'Copied!';
+      const failedText = newBtn.getAttribute('data-failed-text') || 'Copy failed';
+
+      try {
+        // Get the page content as text
+        const content = contentPanel.innerText;
+        await navigator.clipboard.writeText(content);
+
+        // Show success state
+        newBtn.classList.add('copied');
+        if (copyIcon) copyIcon.style.display = 'none';
+        if (checkIcon) checkIcon.style.display = 'block';
+        if (btnText) btnText.textContent = copiedText;
+
+        setTimeout(() => {
+          newBtn.classList.remove('copied');
+          if (copyIcon) copyIcon.style.display = 'block';
+          if (checkIcon) checkIcon.style.display = 'none';
+          if (btnText) btnText.textContent = copyText;
+        }, 2000);
+      } catch (err) {
+        console.error('Failed to copy:', err);
+        if (btnText) btnText.textContent = failedText;
+        setTimeout(() => {
+          if (btnText) btnText.textContent = copyText;
+        }, 2000);
+      }
+    });
+  }
+
+  // Also run on DOMContentLoaded for initial page load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCopyButton);
+  } else {
+    initCopyButton();
+  }
+</script>

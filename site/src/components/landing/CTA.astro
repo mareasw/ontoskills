@@ -1,28 +1,44 @@
 ---
 import Button from '../ui/Button.astro';
 import CommandSnippet from '../ui/CommandSnippet.astro';
+import { type Lang, translations, defaultLang } from '../../i18n/translations';
+
+interface Props {
+  lang?: Lang;
+}
+
+const { lang = defaultLang } = Astro.props;
+const t = translations.cta[lang];
+const href = (subpath: string) => `/${lang}/${subpath}/`;
 ---
 
-<section class="py-20">
-  <div class="section-shell">
-    <div class="mx-auto max-w-5xl border border-white/10 px-6 py-10 text-center sm:px-10">
-      <div class="section-kicker mx-auto mb-4">Start building now</div>
-      <h2 class="text-3xl sm:text-4xl font-bold text-text-primary mb-4 tracking-[-0.04em]">
-        Install. <span class="gradient-text">Query.</span>
+<section class="py-20 relative overflow-hidden">
+  <!-- Background gradient orbs -->
+  <div class="absolute inset-0 pointer-events-none overflow-hidden">
+    <div class="absolute top-1/2 left-0 w-[500px] h-[500px] -translate-y-1/2 -translate-x-1/4 bg-[#52c7e8]/10 rounded-full blur-3xl"></div>
+    <div class="absolute top-1/2 right-0 w-[400px] h-[400px] -translate-y-1/2 translate-x-1/4 bg-[#85f496]/8 rounded-full blur-3xl"></div>
+  </div>
+
+  <div class="section-shell relative">
+    <div class="mx-auto max-w-5xl border border-white/10 px-6 py-10 text-center sm:px-10 relative overflow-hidden">
+      <!-- Gradient border top -->
+      <div class="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#52c7e8]/50 to-transparent"></div>
+      <div class="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#85f496]/30 to-transparent"></div>
+
+      <h2 class="text-3xl sm:text-4xl font-bold text-text-primary mb-4 tracking-[-0.04em] relative z-10">
+        <span class="bg-gradient-to-r from-white via-[#52c7e8] to-white bg-clip-text text-transparent">
+          {t.headline}
+        </span>
       </h2>
-      <p class="text-text-secondary mb-8 mx-auto max-w-2xl">
-        Start with the managed CLI, pull from the official store, and let OntoMCP serve the enabled skill set.
-        Install OntoCore only when you need to author or import custom source skills.
-      </p>
       <div class="mx-auto mb-8 max-w-3xl">
-        <CommandSnippet command="npx ontoskills install mareasw/greeting/hello" label="Try the demo skill" />
+        <CommandSnippet command={t.command} label={t.installMCP} />
       </div>
       <div class="flex flex-col sm:flex-row gap-4 justify-center">
-        <Button href="/getting-started/" size="lg">
-          Open docs
+        <Button href={href('getting-started')} size="lg">
+          {t.primaryButton}
         </Button>
-        <Button href="/explore/" variant="secondary" size="lg">
-          Browse marketplace
+        <Button href={href('ontostore')} variant="secondary" size="lg">
+          {t.secondaryButton}
         </Button>
       </div>
     </div>

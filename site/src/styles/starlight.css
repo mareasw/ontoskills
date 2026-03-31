@@ -1,4 +1,43 @@
-:root {
+/* Light theme */
+:root[data-theme='light'] {
+  --sl-color-bg: #ffffff;
+  --sl-color-bg-nav: #ffffff;
+  --sl-color-bg-sidebar: #f8f9fa;
+  --sl-color-bg-inline-code: #f1f3f5;
+  --sl-color-bg-accent: #f1f3f5;
+
+  --sl-color-text: #1a1a1a;
+  --sl-color-text-accent: #0284c7;
+  --sl-color-text-muted: #6b7280;
+  --sl-color-text-invert: #ffffff;
+
+  --sl-color-accent-low: #e0f2fe;
+  --sl-color-accent: #0284c7;
+  --sl-color-accent-high: #0369a1;
+
+  --sl-color-border: rgba(0, 0, 0, 0.1);
+  --sl-color-border-accent: rgba(2, 132, 199, 0.35);
+  --sl-color-hairline: rgba(0, 0, 0, 0.06);
+
+  --sl-color-code-bg: #f1f3f5;
+  --sl-color-code-border: rgba(0, 0, 0, 0.1);
+
+  --sl-font: 'Inter Variable', sans-serif;
+  --sl-font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', monospace;
+
+  --sl-shadow-sm: none;
+  --sl-shadow-md: none;
+  --sl-shadow-lg: none;
+
+  --custom-bg-primary: #ffffff;
+  --custom-bg-secondary: #f8f9fa;
+  --custom-bg-tertiary: #f1f3f5;
+  --custom-border-subtle: rgba(0, 0, 0, 0.05);
+  --custom-border-light: rgba(0, 0, 0, 0.08);
+}
+
+/* Dark theme */
+:root[data-theme='dark'] {
   --sl-color-bg: #090909;
   --sl-color-bg-nav: #090909;
   --sl-color-bg-sidebar: #101010;
@@ -6,16 +45,16 @@
   --sl-color-bg-accent: #111111;
 
   --sl-color-text: #f5f5f5;
-  --sl-color-text-accent: #7dd3fc;
+  --sl-color-text-accent: #85f496;
   --sl-color-text-muted: #8a8a8a;
   --sl-color-text-invert: #090909;
 
   --sl-color-accent-low: #111111;
-  --sl-color-accent: #7dd3fc;
+  --sl-color-accent: #52c7e8;
   --sl-color-accent-high: #e5e5e5;
 
   --sl-color-border: rgba(255, 255, 255, 0.1);
-  --sl-color-border-accent: rgba(125, 211, 252, 0.35);
+  --sl-color-border-accent: rgba(82, 199, 232, 0.35);
   --sl-color-hairline: rgba(255, 255, 255, 0.08);
 
   --sl-color-code-bg: #101010;
@@ -27,28 +66,31 @@
   --sl-shadow-sm: none;
   --sl-shadow-md: none;
   --sl-shadow-lg: none;
+
+  --custom-bg-primary: #090909;
+  --custom-bg-secondary: #101010;
+  --custom-bg-tertiary: #111111;
+  --custom-border-subtle: rgba(255, 255, 255, 0.05);
+  --custom-border-light: rgba(255, 255, 255, 0.08);
 }
 
-:root[data-theme='light'] {
-  --sl-color-bg: #090909;
-  --sl-color-bg-nav: #090909;
-  --sl-color-bg-sidebar: #101010;
-  --sl-color-text: #f5f5f5;
-  --sl-color-text-muted: #8a8a8a;
-  --sl-color-accent: #7dd3fc;
+@media (min-width: 72rem) {
+  :root {
+    --sl-content-width: 72rem;
+  }
 }
 
 body {
-  background: #090909;
+  background: var(--sl-color-bg);
 }
 
 header {
-  background: #090909 !important;
+  background: var(--sl-color-bg-nav) !important;
   border-bottom: 1px solid var(--sl-color-border) !important;
 }
 
 .sidebar-pane {
-  background: #101010 !important;
+  background: var(--sl-color-bg-sidebar) !important;
   border-inline-end: 1px solid var(--sl-color-border) !important;
 }
 
@@ -59,17 +101,12 @@ header {
 
 .content-panel,
 .sl-markdown-content blockquote,
-.sl-markdown-content table,
 .expressive-code,
 .card {
-  background: #101010 !important;
+  background: var(--sl-color-bg-sidebar) !important;
   border: 1px solid var(--sl-color-border) !important;
   border-radius: 0.9rem !important;
   box-shadow: none !important;
-}
-
-.sl-markdown-content table {
-  overflow: hidden;
 }
 
 pre,
@@ -97,8 +134,155 @@ a:hover {
   color: var(--sl-color-accent-high);
 }
 
+/* Site title - brand gradient on hover */
+.site-title {
+  color: var(--sl-color-text) !important;
+  font-size: 1.125rem !important;
+  font-weight: 600 !important;
+  transition: all 0.3s ease;
+}
+
+.site-title:hover {
+  background: linear-gradient(135deg, #52c7e8 0%, #85f496 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+}
+
+.site-title img {
+  height: 2rem !important;
+  width: auto !important;
+}
+
 [data-search] {
-  background: #111111 !important;
+  background: var(--custom-bg-tertiary) !important;
   border: 1px solid var(--sl-color-border) !important;
   border-radius: 999px !important;
+}
+
+/* Tables - scrollable on mobile, proper layout on desktop */
+.sl-markdown-content table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1.5rem 0;
+}
+
+@media (max-width: 49.99em) {
+  .sl-markdown-content table {
+    position: relative;
+  }
+  .sl-markdown-content table::after {
+    content: '';
+    position: sticky;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 2rem;
+    background: linear-gradient(to right, transparent, var(--sl-color-bg));
+    pointer-events: none;
+    float: right;
+    shape-outside: inset(0);
+  }
+}
+
+@media (min-width: 50em) {
+  .sl-markdown-content table {
+    display: table !important;
+    overflow-x: visible;
+  }
+}
+
+.sl-markdown-content th,
+.sl-markdown-content td {
+  text-align: left;
+  vertical-align: middle;
+  padding: 0.75rem 1rem;
+  overflow-wrap: break-word;
+}
+
+/* Override Starlight's first/last child zero-padding */
+.sl-markdown-content :is(th, td):first-child {
+  padding-inline-start: 1rem;
+}
+.sl-markdown-content :is(th, td):last-child {
+  padding-inline-end: 1rem;
+}
+
+.sl-markdown-content th {
+  font-weight: 600;
+  background: transparent;
+  border-bottom: 1px solid var(--sl-color-border);
+}
+
+.sl-markdown-content td {
+  border-bottom: 1px solid var(--custom-border-subtle);
+}
+
+/* Remove border from last row */
+.sl-markdown-content tr:last-child td {
+  border-bottom: none;
+}
+
+/* Headings - cleaner, no borders */
+.sl-markdown-content h1 {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 1.5rem;
+}
+
+.sl-markdown-content h2 {
+  border-bottom: none;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.sl-markdown-content h3 {
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Content panel - cleaner */
+.content-panel {
+  border: none !important;
+  background: transparent !important;
+}
+
+/* Blockquote - minimal */
+.sl-markdown-content blockquote {
+  background: transparent !important;
+  border-left: 2px solid var(--sl-color-accent) !important;
+  border-radius: 0 !important;
+  padding-left: 1rem !important;
+  margin-left: 0 !important;
+}
+
+/* Code blocks - keep border but subtle */
+pre.expressive-code {
+  border: 1px solid var(--custom-border-light) !important;
+}
+
+/* Card styling */
+.card {
+  border: 1px solid var(--custom-border-light) !important;
+  box-shadow: none !important;
+}
+
+/* Right sidebar (table of contents) - cleaner */
+.right-sidebar {
+  border-left: 1px solid var(--custom-border-subtle);
+}
+
+.right-sidebar button {
+  border: none;
+}
+
+/* Pagination links */
+.pagination-links {
+  border-top: 1px solid var(--custom-border-subtle);
+}
+
+.pagination-links a {
+  border: 1px solid var(--custom-border-light);
 }

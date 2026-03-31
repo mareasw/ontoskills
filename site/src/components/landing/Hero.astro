@@ -1,57 +1,60 @@
 ---
-// Hero component
+import { type Lang, translations, defaultLang } from '../../i18n/translations';
+
+interface Props {
+  lang?: Lang;
+}
+
+const { lang = defaultLang } = Astro.props;
+const t = translations.hero[lang];
+const href = (subpath: string) => `/${lang}/${subpath}/`;
 ---
 
 <section class="hero-section">
   <div class="hero-glow"></div>
-  <div class="section-shell py-20 sm:py-28 lg:py-32 relative">
-    <div class="max-w-4xl">
+  <div class="section-shell py-12 sm:py-16 lg:py-20 relative">
+    <div class="max-w-2xl">
       <div class="hero-badge">
         <span class="badge-dot"></span>
-        <span>Rust MCP • Sub-millisecond Queries • OWL 2 Ontologies</span>
+        <span id="badge-text" class="badge-text">{t.badgeTerms[0]}</span>
       </div>
 
       <h1 class="hero-headline">
-        <span class="headline-line">Skills that don't</span>
-        <span class="headline-line headline-accent">hallucinate.</span>
+        <span>{t.headline}</span>{' '}
+        <span class="headline-accent">{t.headlineAccent}</span>
       </h1>
 
       <p class="hero-subheadline">
-        Ontological skills for AI agents. Query deterministic knowledge with
-        <span class="text-accent-cyan">SPARQL</span> through a Rust-powered MCP runtime.
-        No token waste. No guessing. Just precision.
+        {t.subheadline}
       </p>
 
       <div class="hero-cta">
-        <div class="command-shell p-5 md:p-6">
-          <code class="text-text-primary">npx ontoskills install mcp</code>
+        <div class="command-shell-gradient p-[1px] rounded-lg">
+          <div class="command-shell p-3 md:p-4 rounded-lg bg-bg-elevated">
+            <code class="text-text-primary">npx ontoskills install mcp</code>
+          </div>
         </div>
       </div>
 
       <div class="hero-buttons">
-        <a href="/getting-started/" class="hero-btn hero-btn-primary">
-          Install now
+        <a href={href('getting-started')} class="hero-btn hero-btn-primary">
+          {t.secondaryCta}
         </a>
-        <a href="/explore/" class="hero-btn hero-btn-secondary">
-          Browse OntoStore
+        <a href={href('ontostore')} class="hero-btn hero-btn-secondary">
+          {t.cta}
         </a>
       </div>
 
       <div class="hero-stats">
-        <div class="stat-item">
-          <div class="stat-value">&lt;1ms</div>
-          <div class="stat-label">Query latency</div>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <div class="stat-value">O(1)</div>
-          <div class="stat-label">Intent lookup</div>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <div class="stat-value">100%</div>
-          <div class="stat-label">Deterministic</div>
-        </div>
+        {t.stats.map((stat, index) => (
+          <>
+            <div class="stat-item">
+              <div class="stat-value">{stat.value}</div>
+              <div class="stat-label">{stat.label}</div>
+            </div>
+            {index < t.stats.length - 1 && <div class="stat-divider"></div>}
+          </>
+        ))}
       </div>
     </div>
 
@@ -87,24 +90,47 @@
     right: -200px;
     width: 600px;
     height: 600px;
-    background: radial-gradient(circle, rgba(125, 211, 252, 0.08) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(82, 199, 232, 0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-glow::before {
+    content: '';
+    position: absolute;
+    bottom: -300px;
+    left: -200px;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(171, 249, 204, 0.08) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .hero-glow::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 800px;
+    height: 800px;
+    background: radial-gradient(ellipse at center, rgba(146, 239, 244, 0.05) 0%, transparent 50%);
     pointer-events: none;
   }
 
   .hero-badge {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 16px;
+    gap: 8px;
+    padding: 6px 14px;
     background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: 100px;
     font-family: 'JetBrains Mono Variable', monospace;
-    font-size: 11px;
+    font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.15em;
     color: var(--text-muted);
-    margin-bottom: 28px;
+    margin-bottom: 20px;
     animation: fadeInUp 0.6s ease-out;
   }
 
@@ -114,6 +140,11 @@
     background: #22c55e;
     border-radius: 50%;
     animation: pulse 2s infinite;
+    flex-shrink: 0;
+  }
+
+  .badge-text {
+    transition: opacity 0.3s ease;
   }
 
   @keyframes pulse {
@@ -122,45 +153,56 @@
   }
 
   .hero-headline {
-    font-size: clamp(2.75rem, 8vw, 5rem);
+    font-size: clamp(2rem, 5vw, 3.5rem);
     font-weight: 700;
-    line-height: 1;
+    line-height: 1.1;
     letter-spacing: -0.04em;
-    margin-bottom: 24px;
+    margin-bottom: 16px;
     animation: fadeInUp 0.6s ease-out 0.1s both;
   }
 
-  .headline-line {
-    display: block;
-  }
 
   .headline-accent {
-    background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 50%, var(--accent-mint) 100%);
+    background: linear-gradient(135deg, #52c7e8 0%, #85f496 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    padding-right: 0.1em;
   }
 
   .hero-subheadline {
-    font-size: 1.125rem;
-    line-height: 1.7;
+    font-size: 1rem;
+    line-height: 1.6;
     color: var(--text-secondary);
-    max-width: 600px;
-    margin-bottom: 32px;
+    max-width: 560px;
+    margin-bottom: 20px;
     animation: fadeInUp 0.6s ease-out 0.2s both;
   }
 
   .hero-cta {
     max-width: 400px;
-    margin-bottom: 24px;
+    margin-bottom: 16px;
     animation: fadeInUp 0.6s ease-out 0.3s both;
+  }
+
+  .command-shell-gradient {
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-mint), var(--accent-purple));
+    animation: gradientShift 4s ease infinite;
+    background-size: 200% 200%;
+  }
+
+  @keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
   }
 
   .hero-buttons {
     display: flex;
     flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 48px;
+    gap: 12px;
+    margin-bottom: 32px;
     animation: fadeInUp 0.6s ease-out 0.4s both;
   }
 
@@ -180,8 +222,8 @@
   }
 
   .hero-btn-primary {
-    padding: 0.875rem 1.75rem;
-    font-size: 1.125rem;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
     border: 1px solid rgba(255, 255, 255, 0.1);
     background: white;
     color: black;
@@ -192,8 +234,8 @@
   }
 
   .hero-btn-secondary {
-    padding: 0.875rem 1.75rem;
-    font-size: 1.125rem;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
     background: transparent;
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: var(--text-primary);
@@ -207,8 +249,8 @@
   .hero-stats {
     display: flex;
     align-items: center;
-    gap: 24px;
-    padding-top: 32px;
+    gap: 20px;
+    padding-top: 24px;
     border-top: 1px solid var(--border);
     animation: fadeInUp 0.6s ease-out 0.5s both;
   }
@@ -219,38 +261,49 @@
 
   .stat-value {
     font-family: 'JetBrains Mono Variable', monospace;
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     font-weight: 600;
-    color: var(--accent-cyan);
     letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-mint));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   .stat-label {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    margin-top: 4px;
+    margin-top: 2px;
   }
 
   .stat-divider {
     width: 1px;
-    height: 40px;
-    background: var(--border);
+    height: 32px;
+    background: linear-gradient(180deg, transparent, var(--accent-cyan), transparent);
+    opacity: 0.3;
   }
 
   .hero-visual {
     display: none;
     position: absolute;
-    right: 4%;
+    right: 2%;
     top: 50%;
     transform: translateY(-50%);
+    z-index: 10;
     animation: fadeInRight 0.8s ease-out 0.6s both;
   }
 
   @media (min-width: 1280px) {
     .hero-visual {
       display: block;
+    }
+  }
+
+  @media (min-width: 1400px) {
+    .hero-visual {
+      right: 4%;
     }
   }
 
@@ -300,8 +353,8 @@
   }
 
   .code-keyword { color: #f9a8d4; }
-  .code-property { color: #7dd3fc; }
-  .code-string { color: #bbf7d0; }
+  .code-property { color: #52c7e8; }
+  .code-string { color: #85f496; }
   .code-comment {
     color: var(--text-muted);
     font-style: italic;
@@ -329,3 +382,20 @@
     }
   }
 </style>
+
+<script define:vars={{ terms: t.badgeTerms }} is:inline>
+  const el = document.getElementById('badge-text');
+  if (el && terms.length > 1) {
+    let i = 0;
+    const id = setInterval(() => {
+      el.style.opacity = '0';
+      setTimeout(() => {
+        i = (i + 1) % terms.length;
+        el.textContent = terms[i];
+        el.style.opacity = '1';
+      }, 300);
+    }, 2500);
+    // Clean up interval on ViewTransition navigation
+    document.addEventListener('astro:before-swap', () => clearInterval(id), { once: true });
+  }
+</script>
