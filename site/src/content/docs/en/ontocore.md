@@ -93,7 +93,7 @@ Auxiliary `.md` files in a skill directory become **sub-skills**:
 ontoskills init-core
 ```
 
-Creates `ontoskills-core.ttl` with the base TBox ontology (classes, properties, state definitions).
+Creates `core.ttl` with the base TBox ontology (classes, properties, state definitions).
 
 ### Compile skills
 
@@ -148,7 +148,7 @@ After compilation:
 
 ```text
 ontoskills/
-├── ontoskills-core.ttl      # Core TBox (shared classes/properties)
+├── core.ttl      # Core TBox (shared classes/properties)
 ├── index.ttl                # Manifest with owl:imports
 ├── system/
 │   └── index.enabled.ttl    # Skills enabled for MCP
@@ -158,7 +158,15 @@ ontoskills/
 
 ### The core ontology
 
-`ontoskills-core.ttl` defines:
+The core ontology (`core.ttl`) is the shared TBox that all skill modules reference via `owl:imports`. It is:
+
+- **Served online** at `https://ontoskills.sh/ontology/core.ttl`
+- **Downloaded automatically** by `ontoskills install mcp` into `~/.ontoskills/ontologies/core.ttl`
+- **Regenerated locally** by `ontoskills init-core` or `ontoskills compile` when developing
+
+Compiled skill modules reference the core via `owl:imports <https://ontoskills.sh/ontology/core.ttl>`. The MCP resolves this to the local copy in your ontology root.
+
+`core.ttl` defines:
 
 - `oc:Skill`, `oc:ExecutableSkill`, `oc:DeclarativeSkill`
 - Properties: `dependsOn`, `extends`, `contradicts`, `resolvesIntent`, etc.
@@ -169,7 +177,7 @@ ontoskills/
 
 `index.ttl` is a manifest that:
 - Lists all compiled skills
-- Enables `owl:imports` for the full graph
+- References the core ontology via `owl:imports <https://ontoskills.sh/ontology/core.ttl>`
 - Used by OntoMCP to discover available skills
 
 ---
@@ -205,9 +213,9 @@ Use `--skip-security` to bypass LLM review (regex checks still run).
 
 ## SHACL validation
 
-Every skill must pass SHACL validation before being written.
+Every skill must pass SHACL validation before being written. The constitutional shapes are defined in `core/specs/ontoskills.shacl.ttl` and enforce constraints across 6 node shapes.
 
-Constitutional rules enforced:
+**Required fields (blocking):**
 
 | Constraint | Rule |
 |------------|------|
@@ -217,7 +225,13 @@ Constitutional rules enforced:
 | `yieldsState` | Must be valid IRI |
 | `handlesFailure` | Must be valid IRI |
 
+**Type-specific rules:**
+- `ExecutableSkill` must have exactly 1 `hasPayload` (with `code` or `executionPath`)
+- `DeclarativeSkill` must not have `hasPayload`
+
 If validation fails, the skill is **not written** and an error is shown.
+
+See [Skill Authoring](/authoring/) for practical guidance on writing skills that pass validation.
 
 ---
 

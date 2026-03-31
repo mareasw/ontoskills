@@ -130,7 +130,7 @@ Regenerates `~/.ontoskills/ontologies/system/index.enabled.ttl` from all enabled
 │   └── ontomcp
 ├── core/                   # Compiler runtime (optional)
 ├── ontologies/             # Compiled ontologies
-│   ├── ontoskills-core.ttl
+│   ├── core.ttl
 │   ├── index.ttl
 │   ├── system/             # System-level files
 │   │   └── index.enabled.ttl  # Enabled skills manifest

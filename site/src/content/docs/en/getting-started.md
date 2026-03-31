@@ -111,7 +111,7 @@ export ANTHROPIC_API_KEY="your-key-here"
 ontoskills init-core
 ```
 
-This creates `ontoskills-core.ttl` — the base ontology with classes and properties.
+This creates `core.ttl` — the base ontology with classes and properties.
 
 ---
 

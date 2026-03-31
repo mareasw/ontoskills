@@ -11,6 +11,7 @@ use oxigraph::sparql::{QueryResults, SparqlEvaluator};
 use oxigraph::store::Store;
 use serde::Serialize;
 use serde::Deserialize;
+
 use walkdir::WalkDir;
 
 const DEFAULT_BASE_URI: &str = "https://ontoskills.sh/ontology#";
@@ -1295,7 +1296,7 @@ fn load_manifest_tree(
     collect_skill_records_from_file(&canonical, ontology_root, registry_lookup, skill_index, base_uri)?;
 
     let content = std::fs::read_to_string(&canonical)?;
-    for imported in parse_import_paths(&content) {
+    for imported in parse_import_paths(&content, ontology_root) {
         if imported.exists() {
             load_manifest_tree(
                 store,
@@ -1312,8 +1313,10 @@ fn load_manifest_tree(
     Ok(())
 }
 
-fn parse_import_paths(content: &str) -> Vec<PathBuf> {
+fn parse_import_paths(content: &str, ontology_root: &Path) -> Vec<PathBuf> {
     let mut imports = Vec::new();
+
+    // Resolve file:// imports
     for segment in content.split("owl:imports <file://").skip(1) {
         if let Some(raw_path) = segment.split('>').next() {
             let normalized = if raw_path.starts_with('/') {
@@ -1324,6 +1327,22 @@ fn parse_import_paths(content: &str) -> Vec<PathBuf> {
             imports.push(PathBuf::from(normalized));
         }
     }
+
+    // Resolve https:// imports — check if the file exists locally in ontology root
+    for segment in content.split("owl:imports <https://").skip(1) {
+        if let Some(raw_url) = segment.split('>').next() {
+            // Extract filename from URL (e.g. "core.ttl" from "ontoskills.sh/ontology/core.ttl")
+            if let Some(filename) = raw_url.rsplit('/').next() {
+                let local_path = ontology_root.join(filename);
+                if local_path.exists() {
+                    imports.push(local_path);
+                } else {
+                    eprintln!("Warning: https import https://{} not found locally at {:?}", raw_url, local_path);
+                }
+            }
+        }
+    }
+
     imports
 }
 
@@ -1386,7 +1405,7 @@ fn collect_skill_records_from_file(
     skill_index: &mut Vec<SkillRecord>,
     base_uri: &str,
 ) -> Result<(), CatalogError> {
-    if path.file_name().and_then(|name| name.to_str()) == Some("ontoskills-core.ttl") {
+    if path.file_name().and_then(|name| name.to_str()) == Some("core.ttl") {
         return Ok(());
     }
 

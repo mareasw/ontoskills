@@ -9,7 +9,7 @@ from compiler.sparql import execute_sparql, format_results
 def sample_ontology(tmp_path):
     """Create a sample ontology for testing."""
     # Create core ontology
-    core_path = tmp_path / "ontoskills-core.ttl"
+    core_path = tmp_path / "core.ttl"
     graph = create_core_ontology(core_path)
 
     # Add some test skills

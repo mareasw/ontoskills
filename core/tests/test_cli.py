@@ -32,7 +32,7 @@ def test_init_core_command(tmp_path):
     result = runner.invoke(cli, ['init-core', '-o', str(output_dir)])
 
     assert result.exit_code == 0
-    assert (output_dir / "ontoskills-core.ttl").exists()
+    assert (output_dir / "core.ttl").exists()
     assert "created core ontology" in result.output.lower()
 
 
@@ -46,7 +46,7 @@ def test_init_core_idempotent(tmp_path):
     result1 = runner.invoke(cli, ['init-core', '-o', str(output_dir)])
     assert result1.exit_code == 0
 
-    core_path = output_dir / "ontoskills-core.ttl"
+    core_path = output_dir / "core.ttl"
     import hashlib
     content1 = core_path.read_text()
     hash1 = hashlib.sha256(content1.encode()).hexdigest()
@@ -335,7 +335,7 @@ skill:test-skill a oc:Skill ;
     output_skill_path.write_text(existing_ttl, encoding="utf-8")
 
     # Create core ontology
-    core_path = output_dir / "ontoskills-core.ttl"
+    core_path = output_dir / "core.ttl"
     core_path.parent.mkdir(parents=True, exist_ok=True)
     core_path.write_text(f"@prefix oc: <{BASE_URI}> .", encoding="utf-8")
 
@@ -619,7 +619,7 @@ def test_dry_run_does_not_write_sub_skill_modules(tmp_path):
     output_skill_dir.mkdir(parents=True)
 
     # Create core ontology
-    core_path = output_dir / "ontoskills-core.ttl"
+    core_path = output_dir / "core.ttl"
     core_path.write_text("@prefix oc: <https://ontoskills.sh/ontology#> .", encoding="utf-8")
 
     runner = CliRunner()

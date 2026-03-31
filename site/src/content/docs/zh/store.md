@@ -130,7 +130,7 @@ ontoskills rebuild-index
 │   └── ontomcp
 ├── core/                   # 编译器运行时（可选）
 ├── ontologies/             # 已编译的本体
-│   ├── ontoskills-core.ttl
+│   ├── core.ttl
 │   ├── index.ttl
 │   ├── system/             # 系统级文件
 │   │   └── index.enabled.ttl  # 已启用技能清单

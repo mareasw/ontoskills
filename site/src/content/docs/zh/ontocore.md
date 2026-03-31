@@ -93,7 +93,7 @@ skills/                          →    ontoskills/
 ontoskills init-core
 ```
 
-创建 `ontoskills-core.ttl`，包含基础 TBox 本体（类、属性、状态定义）。
+创建 `core.ttl`，包含基础 TBox 本体（类、属性、状态定义）。
 
 ### 编译技能
 
@@ -148,7 +148,7 @@ ontoskills security-audit
 
 ```text
 ontoskills/
-├── ontoskills-core.ttl      # 核心 TBox（共享类/属性）
+├── core.ttl      # 核心 TBox（共享类/属性）
 ├── index.ttl                # 带 owl:imports 的清单
 ├── system/
 │   └── index.enabled.ttl    # 为 MCP 启用的技能
@@ -158,7 +158,15 @@ ontoskills/
 
 ### 核心本体
 
-`ontoskills-core.ttl` 定义：
+核心本体（`core.ttl`）是所有技能模块通过 `owl:imports` 引用的共享 TBox。它：
+
+- **在线服务**于 `https://ontoskills.sh/ontology/core.ttl`
+- **由 `ontoskills install mcp` 自动下载**到 `~/.ontoskills/ontologies/core.ttl`
+- 在开发时由 `ontoskills init-core` 或 `ontoskills compile` **本地重新生成**
+
+已编译的技能模块通过 `owl:imports <https://ontoskills.sh/ontology/core.ttl>` 引用核心本体。MCP 将此解析为本体根目录中的本地副本。
+
+`core.ttl` 定义：
 
 - `oc:Skill`、`oc:ExecutableSkill`、`oc:DeclarativeSkill`
 - 属性：`dependsOn`、`extends`、`contradicts`、`resolvesIntent` 等
@@ -169,7 +177,7 @@ ontoskills/
 
 `index.ttl` 是一个清单，它：
 - 列出所有已编译的技能
-- 为完整图谱启用 `owl:imports`
+- 通过 `owl:imports <https://ontoskills.sh/ontology/core.ttl>` 引用核心本体
 - 被 OntoMCP 用于发现可用技能
 
 ---
@@ -205,9 +213,9 @@ OntoCore 是**缓存感知**的：
 
 ## SHACL 验证
 
-每个技能在写入前必须通过 SHACL 验证。
+每个技能在写入前必须通过 SHACL 验证。宪法形状定义在 `core/specs/ontoskills.shacl.ttl` 中，跨 6 个节点形状强制执行约束。
 
-强制执行的宪法规则：
+**必需字段（阻止）：**
 
 | 约束 | 规则 |
 |------|------|
@@ -217,7 +225,13 @@ OntoCore 是**缓存感知**的：
 | `yieldsState` | 必须是有效的 IRI |
 | `handlesFailure` | 必须是有效的 IRI |
 
+**类型特定规则：**
+- `ExecutableSkill` 必须恰好有 1 个 `hasPayload`（带 `code` 或 `executionPath`）
+- `DeclarativeSkill` 不能有 `hasPayload`
+
 如果验证失败，技能**不会被写入**并显示错误。
+
+参见[技能创作](/zh/authoring/)获取通过验证的实用指南。
 
 ---
 

@@ -36,7 +36,7 @@ ontoskills install mcp --cursor --vscode --project
 
 Creates:
 - `~/.ontoskills/bin/ontomcp` — the MCP server binary
-- `~/.ontoskills/ontologies/` — compiled ontology packages
+- `~/.ontoskills/ontologies/core.ttl` — core ontology (downloaded from `ontoskills.sh`)
 - `~/.ontoskills/state/` — lockfiles and metadata
 
 Supported flags:
@@ -174,7 +174,7 @@ Initialize the core ontology.
 ontoskills init-core
 ```
 
-Creates `ontoskills-core.ttl` with base classes and properties.
+Creates `core.ttl` with base classes and properties.
 
 ### `compile [skill]`
 
@@ -290,7 +290,7 @@ ontoskills uninstall --all
 │   └── ontomcp           # MCP server binary
 ├── core/                  # Compiler runtime (if installed)
 ├── ontologies/            # Compiled ontology packages
-│   ├── ontoskills-core.ttl
+│   ├── core.ttl
 │   ├── index.ttl
 │   ├── system/            # System-level files
 │   │   └── index.enabled.ttl  # Enabled skills manifest
