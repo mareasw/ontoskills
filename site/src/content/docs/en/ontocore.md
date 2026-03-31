@@ -158,6 +158,14 @@ ontoskills/
 
 ### The core ontology
 
+The core ontology (`core.ttl`) is the shared TBox that all skill modules reference via `owl:imports`. It is:
+
+- **Served online** at `https://ontoskills.sh/ontology/core.ttl`
+- **Downloaded automatically** by `ontoskills install mcp` into `~/.ontoskills/ontologies/core.ttl`
+- **Regenerated locally** by `ontoskills init-core` or `ontoskills compile` when developing
+
+Compiled skill modules reference the core via `owl:imports <https://ontoskills.sh/ontology/core.ttl>`. The MCP resolves this to the local copy in your ontology root.
+
 `core.ttl` defines:
 
 - `oc:Skill`, `oc:ExecutableSkill`, `oc:DeclarativeSkill`
@@ -169,7 +177,7 @@ ontoskills/
 
 `index.ttl` is a manifest that:
 - Lists all compiled skills
-- Enables `owl:imports` for the full graph
+- References the core ontology via `owl:imports <https://ontoskills.sh/ontology/core.ttl>`
 - Used by OntoMCP to discover available skills
 
 ---

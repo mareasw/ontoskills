@@ -165,10 +165,10 @@ ontoskills/
 │       ├── main.rs             # MCP stdio server
 │       └── ...
 ├── skills/                     # Input: SKILL.md definitions
-├── ontoskills/                 # Output: compiled .ttl files
-│   ├── core.ttl     # Core ontology with states
+├── ontoskills/                 # Output: compiled .ttl files (gitignored build artifacts)
 │   └── */ontoskill.ttl         # Individual skill modules
-├── registry/                   # OntoStore blueprint
+├── site/public/ontology/
+│   └── core.ttl                # Core ontology (canonical, served online)
 └── specs/
     └── ontoskills.shacl.ttl    # SHACL shapes constitution
 ```
