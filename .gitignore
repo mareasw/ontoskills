@@ -223,7 +223,6 @@ mcp/tests/fixtures/
 ontoskills/*/
 ontoskills/*.ttl
 ontoskills/system/
-!ontoskills/core.ttl
 
 # Claude Code runtime artifacts
 .claude/scheduled_tasks.lock
