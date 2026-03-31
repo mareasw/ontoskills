@@ -34,7 +34,7 @@ from compiler.exceptions import (
     SkillNotFoundError,
     OrphanSubSkillsError,
 )
-from compiler.config import SKILLS_DIR, OUTPUT_DIR, resolve_ontology_root
+from compiler.config import CORE_ONTOLOGY_FILENAME, SKILLS_DIR, OUTPUT_DIR, resolve_ontology_root
 from compiler.loader import scan_skill_directory, LoaderError
 from compiler.schemas import CompiledSkill
 
@@ -124,7 +124,7 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
 
     Output structure:
       ontoskills/
-      ├── ontoskills-core.ttl
+      ├── core.ttl
       ├── index.ttl
       └── <mirrored paths>/
           ├── ontoskill.ttl
@@ -141,7 +141,7 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
     ensure_registry_layout(ontology_root)
 
     # Ensure core ontology exists
-    core_path = ontology_root / "ontoskills-core.ttl"
+    core_path = ontology_root / CORE_ONTOLOGY_FILENAME
     if not core_path.exists():
         logger.info("Creating core ontology...")
         create_core_ontology(core_path)
@@ -472,7 +472,7 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
     # Collect all skill output paths for index (including sub-skills)
     all_skill_paths = list(output_path.rglob("*.ttl"))
     # Exclude system files
-    all_skill_paths = [p for p in all_skill_paths if p.name not in {"ontoskills-core.ttl", "index.ttl", "index.enabled.ttl", "index.installed.ttl"}]
+    all_skill_paths = [p for p in all_skill_paths if p.name not in {CORE_ONTOLOGY_FILENAME, "index.ttl", "index.enabled.ttl", "index.installed.ttl"}]
 
     # Generate index manifest
     index_path = ontology_root / "index.ttl"
