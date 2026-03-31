@@ -7,7 +7,7 @@ sidebar:
 
 > This roadmap evolves with the project.
 
-## Phase 1: OntoCore ✅
+## Phase 1: OntoCore
 
 **Status:** Complete
 
@@ -19,7 +19,7 @@ The foundation. OntoCore is our neuro-symbolic core that transforms natural lang
 - [x] Security audit pipeline
 - [x] 156+ tests
 
-## Phase 2: OntoSkills ✅
+## Phase 2: OntoSkills
 
 **Status:** Complete
 
@@ -30,7 +30,7 @@ The knowledge base. OntoSkills are the compiled, validated skills published from
 - [x] Skill versioning and updates
 - [x] Dependency management
 
-## Phase 3: OntoMCP ✅
+## Phase 3: OntoMCP
 
 **Status:** Complete
 
@@ -42,7 +42,7 @@ The interface. OntoMCP exposes OntoSkills via the Model Context Protocol, giving
 - [x] 5 semantic tools (search_skills, get_skill_context, evaluate_execution_plan, query_epistemic_rules, search_intents)
 - [x] Claude Code integration
 
-## Phase 4: OntoStore 🔨
+## Phase 4: OntoStore
 
 **Status:** In Development
 
@@ -53,7 +53,7 @@ The marketplace. OntoStore is a centralized repository where teams can publish, 
 - [ ] Team collaboration features
 - [ ] Community contributions
 
-## Phase 5: OntoAgent 💡
+## Phase 5: OntoClaw
 
 **Status:** Planned
 

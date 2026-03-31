@@ -94,16 +94,14 @@ Every skill is extracted with:
 
 ## Components
 
-| Component | Language | Status | Description |
-|-----------|----------|--------|-------------|
-| **ontoskills** | CLI | ✅ Ready | User-facing installer and manager |
-| **OntoCore** | Python | ✅ Ready | Skill compiler for `SKILL.md` sources |
-| **OntoMCP** | Rust | ✅ Ready | MCP server with 5 semantic tools (incl. search_intents) |
-| **OntoStore** | GitHub repo | ✅ Ready | Official compiled skill store |
-| `skills/` | Markdown | Input | Human-authored source skills |
-| `ontoskills/` | Turtle | Output | Compiled ontology artifacts |
-| `specs/` | Turtle | Constitution | SHACL shapes for validation |
-
+| Component | Language | Description |
+|-----------|----------|-------------|
+| **ontoskills** | CLI | User-facing installer and manager |
+| **OntoCore** | Python | Skill compiler for `SKILL.md` sources |
+| **OntoMCP** | Rust | MCP server with 5 semantic tools (incl. search_intents) |
+| **OntoStore** | GitHub repo | Official compiled skill store |
+| `skills/` | Markdown | Human-authored source skills |
+| `ontoskills/` | Turtle | Compiled ontology artifacts |
 ---
 
 ## Use cases

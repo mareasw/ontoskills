@@ -158,19 +158,18 @@ ontoskills/
 │   │   ├── storage.py          # 文件 I/O、合并、孤立清理
 │   │   ├── transformer.py      # LLM 工具使用提取
 │   │   └── validator.py        # SHACL 验证守门员
+│   ├── specs/                  # SHACL 形状宪法
 │   └── tests/                  # 测试套件
 ├── mcp/                        # OntoMCP — Rust MCP 服务器
 │   ├── Cargo.toml              # Rust 包清单
 │   └── src/
 │       ├── main.rs             # MCP stdio 服务器
 │       └── ...
-├── skills/                     # 输入：SKILL.md 定义
-├── ontoskills/                 # 输出：已编译的 .ttl 文件
-│   ├── ontoskills-core.ttl     # 带状态的核心本体
+├── skills/                     # 输入：SKILL.md 定义（用户创建）
+├── ontoskills/                 # 输出：已编译的 .ttl 文件（gitignored 构建产物）
 │   └── */ontoskill.ttl         # 单个技能模块
-├── registry/                   # OntoStore 蓝图
-└── specs/
-    └── ontoskills.shacl.ttl    # SHACL 形状宪法
+└── site/public/ontology/
+    └── core.ttl                # 核心本体（规范副本，在线服务）
 ```
 
 **任何源技能目录都可以** — 添加一个 `SKILL.md` 文件，OntoCore 就会将其编译为已验证的本体模块。

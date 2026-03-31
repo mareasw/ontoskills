@@ -160,7 +160,7 @@ oc:kn_a1b2c3d4
 
 ```
 ontoskills/
-├── ontoskills-core.ttl      # 核心 TBox（共享）
+├── core.ttl      # 核心 TBox（共享）
 ├── index.ttl                # 带 owl:imports 的清单
 ├── pdf/
 │   └── ontoskill.ttl        # PDF 技能模块
