@@ -7,7 +7,7 @@ from rich.console import Console
 
 from compiler.core_ontology import create_core_ontology
 from compiler.registry import rebuild_registry_indexes
-from compiler.config import OUTPUT_DIR, resolve_ontology_root
+from compiler.config import CORE_ONTOLOGY_FILENAME, OUTPUT_DIR, resolve_ontology_root
 
 console = Console()
 
@@ -18,7 +18,7 @@ console = Console()
 @click.option('-f', '--force', is_flag=True, help='Overwrite existing core ontology')
 @click.pass_context
 def init_core(ctx, output_dir, force):
-    """Initialize the core ontology (ontoskills-core.ttl).
+    """Initialize the core ontology (core.ttl).
 
     Creates the foundational TBox with classes, properties, and predefined states.
     Safe to run multiple times - skips if file exists unless --force is used.
@@ -26,7 +26,7 @@ def init_core(ctx, output_dir, force):
     import logging
     _logger = logging.getLogger(__name__)  # Use underscore prefix for internal use
     output_path = Path(output_dir)
-    core_path = output_path / "ontoskills-core.ttl"
+    core_path = output_path / CORE_ONTOLOGY_FILENAME
 
     if core_path.exists() and not force:
         console.print(f"[yellow]Core ontology already exists at {core_path}[/yellow]")
