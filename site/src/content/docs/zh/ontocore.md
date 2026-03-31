@@ -93,7 +93,7 @@ skills/                          →    ontoskills/
 ontoskills init-core
 ```
 
-创建 `ontoskills-core.ttl`，包含基础 TBox 本体（类、属性、状态定义）。
+创建 `core.ttl`，包含基础 TBox 本体（类、属性、状态定义）。
 
 ### 编译技能
 
@@ -148,7 +148,7 @@ ontoskills security-audit
 
 ```text
 ontoskills/
-├── ontoskills-core.ttl      # 核心 TBox（共享类/属性）
+├── core.ttl      # 核心 TBox（共享类/属性）
 ├── index.ttl                # 带 owl:imports 的清单
 ├── system/
 │   └── index.enabled.ttl    # 为 MCP 启用的技能
@@ -158,7 +158,7 @@ ontoskills/
 
 ### 核心本体
 
-`ontoskills-core.ttl` 定义：
+`core.ttl` 定义：
 
 - `oc:Skill`、`oc:ExecutableSkill`、`oc:DeclarativeSkill`
 - 属性：`dependsOn`、`extends`、`contradicts`、`resolvesIntent` 等

@@ -166,7 +166,7 @@ ontoskills/
 │       └── ...
 ├── skills/                     # Input: SKILL.md definitions
 ├── ontoskills/                 # Output: compiled .ttl files
-│   ├── ontoskills-core.ttl     # Core ontology with states
+│   ├── core.ttl     # Core ontology with states
 │   └── */ontoskill.ttl         # Individual skill modules
 ├── registry/                   # OntoStore blueprint
 └── specs/

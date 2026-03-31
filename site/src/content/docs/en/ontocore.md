@@ -93,7 +93,7 @@ Auxiliary `.md` files in a skill directory become **sub-skills**:
 ontoskills init-core
 ```
 
-Creates `ontoskills-core.ttl` with the base TBox ontology (classes, properties, state definitions).
+Creates `core.ttl` with the base TBox ontology (classes, properties, state definitions).
 
 ### Compile skills
 
@@ -148,7 +148,7 @@ After compilation:
 
 ```text
 ontoskills/
-├── ontoskills-core.ttl      # Core TBox (shared classes/properties)
+├── core.ttl      # Core TBox (shared classes/properties)
 ├── index.ttl                # Manifest with owl:imports
 ├── system/
 │   └── index.enabled.ttl    # Skills enabled for MCP
@@ -158,7 +158,7 @@ ontoskills/
 
 ### The core ontology
 
-`ontoskills-core.ttl` defines:
+`core.ttl` defines:
 
 - `oc:Skill`, `oc:ExecutableSkill`, `oc:DeclarativeSkill`
 - Properties: `dependsOn`, `extends`, `contradicts`, `resolvesIntent`, etc.

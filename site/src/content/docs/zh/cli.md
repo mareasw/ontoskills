@@ -146,7 +146,7 @@ ontoskills store add-source acme https://example.com/index.json
 ontoskills init-core
 ```
 
-创建 `ontoskills-core.ttl`，包含基础 TBox 本体（类、属性、状态定义）。
+创建 `core.ttl`，包含基础 TBox 本体（类、属性、状态定义）。
 
 ### `compile [skill]`
 
@@ -262,7 +262,7 @@ ontoskills uninstall --all
 │   └── ontomcp           # MCP 服务器二进制文件
 ├── core/                  # 编译器运行时（如果已安装）
 ├── ontologies/            # 已编译的本体包
-│   ├── ontoskills-core.ttl
+│   ├── core.ttl
 │   ├── index.ttl
 │   ├── system/            # 系统级文件
 │   │   └── index.enabled.ttl  # 已启用技能清单

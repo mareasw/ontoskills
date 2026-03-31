@@ -166,7 +166,7 @@ ontoskills/
 │       └── ...
 ├── skills/                     # 输入：SKILL.md 定义
 ├── ontoskills/                 # 输出：已编译的 .ttl 文件
-│   ├── ontoskills-core.ttl     # 带状态的核心本体
+│   ├── core.ttl     # 带状态的核心本体
 │   └── */ontoskill.ttl         # 单个技能模块
 ├── registry/                   # OntoStore 蓝图
 └── specs/

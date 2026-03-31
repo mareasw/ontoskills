@@ -112,7 +112,7 @@ export ANTHROPIC_API_KEY="你的-key"
 ontoskills init-core
 ```
 
-这会创建 `ontoskills-core.ttl` — 包含类和属性的基础本体。
+这会创建 `core.ttl` — 包含类和属性的基础本体。
 
 ---
 
