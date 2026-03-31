@@ -21,7 +21,7 @@ from rdflib.namespace import DCTERMS, SKOS, PROV
 
 from compiler.schemas import ExtractedSkill
 from compiler.exceptions import OntologyLoadError, OntologyValidationError
-from compiler.config import BASE_URI, SKILLS_DIR, OUTPUT_DIR, resolve_ontology_root
+from compiler.config import BASE_URI, CORE_ONTOLOGY_FILENAME, CORE_ONTOLOGY_URL, SKILLS_DIR, OUTPUT_DIR, resolve_ontology_root
 from compiler.core_ontology import get_oc_namespace
 from compiler.serialization import serialize_skill
 from compiler.validator import validate_and_raise
@@ -419,9 +419,9 @@ def generate_index_manifest(
     g.add((base_uri, DCTERMS.created, Literal(datetime.now().isoformat())))
 
     # Import core ontology
-    core_path = ontology_root / "ontoskills-core.ttl"
+    core_path = ontology_root / CORE_ONTOLOGY_FILENAME
     if core_path.exists():
-        g.add((base_uri, OWL.imports, URIRef(f"file://{core_path}")))
+        g.add((base_uri, OWL.imports, URIRef(CORE_ONTOLOGY_URL)))
 
     # Import all skill modules
     for skill_path in skill_paths:
@@ -442,7 +442,7 @@ def generate_index_manifest(
 
 # System-generated files that should never be considered orphans
 SYSTEM_FILES = {
-    "ontoskills-core.ttl",
+    CORE_ONTOLOGY_FILENAME,
     "index.ttl",
     "index.enabled.ttl",
     "index.installed.ttl",

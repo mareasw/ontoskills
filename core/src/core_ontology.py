@@ -20,7 +20,7 @@ from rdflib import Graph, Namespace, RDF, RDFS, OWL, Literal, URIRef, BNode, XSD
 from rdflib.namespace import DCTERMS, SKOS, PROV
 from rdflib.collection import Collection
 
-from compiler.config import BASE_URI, CORE_STATES, FAILURE_STATES, OUTPUT_DIR
+from compiler.config import BASE_URI, CORE_ONTOLOGY_FILENAME, CORE_STATES, FAILURE_STATES, OUTPUT_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
     """
     Create the core OntoSkills ontology (TBox) with state transition system.
 
-    Generates ontoskills-core.ttl containing:
+    Generates core.ttl containing:
     - Core classes (Skill, State, Attempt, ExecutionPayload)
     - State transition properties (requiresState, yieldsState, handlesFailure, hasStatus)
     - Execution payload properties (hasPayload, executor, code, timeout)
@@ -99,14 +99,14 @@ def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
     - Predefined core and failure states
 
     Args:
-        output_path: Path where ontoskills-core.ttl will be saved (default: OUTPUT_DIR/ontoskills-core.ttl)
+        output_path: Path where core.ttl will be saved (default: OUTPUT_DIR/core.ttl)
 
     Returns:
         Graph with core ontology definitions
     """
     if output_path is None:
         output_base = Path(OUTPUT_DIR).resolve()
-        output_path = output_base / "ontoskills-core.ttl"
+        output_path = output_base / CORE_ONTOLOGY_FILENAME
 
     oc = get_oc_namespace()
     g = Graph()

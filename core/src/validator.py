@@ -11,7 +11,7 @@ from typing import NamedTuple
 from rdflib import Graph
 from pyshacl import validate
 
-from compiler.config import OUTPUT_DIR
+from compiler.config import CORE_ONTOLOGY_FILENAME, OUTPUT_DIR
 from compiler.exceptions import OntologyValidationError
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 SHACL_SHAPES_PATH = Path(__file__).parent.parent.parent / "specs" / "ontoskills.shacl.ttl"
 
 # Path to core ontology (output directory)
-CORE_ONTOLOGY_PATH = Path(OUTPUT_DIR) / "ontoskills-core.ttl"
+CORE_ONTOLOGY_PATH = Path(OUTPUT_DIR) / CORE_ONTOLOGY_FILENAME
 
 
 class ValidationResult(NamedTuple):
