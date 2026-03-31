@@ -7,7 +7,7 @@ sidebar:
 
 > 此路线图随项目发展而演变。
 
-## 阶段 1：OntoCore ✅
+## 阶段 1：OntoCore
 
 **状态：** 完成
 
@@ -19,7 +19,7 @@ sidebar:
 - [x] 安全审计管道
 - [x] 156+ 测试
 
-## 阶段 2：OntoSkills ✅
+## 阶段 2：OntoSkills
 
 **状态：** 完成
 
@@ -30,7 +30,7 @@ sidebar:
 - [x] 技能版本控制和更新
 - [x] 依赖管理
 
-## 阶段 3：OntoMCP ✅
+## 阶段 3：OntoMCP
 
 **状态：** 完成
 
@@ -42,7 +42,7 @@ sidebar:
 - [x] 5 个语义工具（search_skills、get_skill_context、evaluate_execution_plan、query_epistemic_rules、search_intents）
 - [x] Claude Code 集成
 
-## 阶段 4：OntoStore 🔨
+## 阶段 4：OntoStore
 
 **状态：** 开发中
 
@@ -53,7 +53,7 @@ sidebar:
 - [ ] 团队协作功能
 - [ ] 社区贡献
 
-## 阶段 5：OntoAgent 💡
+## 阶段 5：OntoClaw
 
 **状态：** 计划中
 

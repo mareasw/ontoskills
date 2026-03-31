@@ -36,7 +36,7 @@ ontoskills install mcp --cursor --vscode --project
 
 创建：
 - `~/.ontoskills/bin/ontomcp` — MCP 服务器二进制文件
-- `~/.ontoskills/ontologies/` — 已编译的本体包
+- `~/.ontoskills/ontologies/core.ttl` — 核心本体（从 `ontoskills.sh` 下载）
 - `~/.ontoskills/state/` — 锁定文件和元数据
 
 支持的标志：

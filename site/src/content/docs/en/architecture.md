@@ -164,7 +164,7 @@ ontoskills/
 │   └── src/
 │       ├── main.rs             # MCP stdio server
 │       └── ...
-├── skills/                     # Input: SKILL.md definitions
+├── skills/                     # Input: SKILL.md definitions (user-created)
 ├── ontoskills/                 # Output: compiled .ttl files (gitignored build artifacts)
 │   └── */ontoskill.ttl         # Individual skill modules
 ├── site/public/ontology/

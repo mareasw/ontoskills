@@ -53,7 +53,7 @@ The marketplace. OntoStore is a centralized repository where teams can publish, 
 - [ ] Team collaboration features
 - [ ] Community contributions
 
-## Phase 5: OntoAgent
+## Phase 5: OntoClaw
 
 **Status:** Planned
 

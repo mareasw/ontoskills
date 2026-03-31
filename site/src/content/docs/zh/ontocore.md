@@ -158,6 +158,14 @@ ontoskills/
 
 ### 核心本体
 
+核心本体（`core.ttl`）是所有技能模块通过 `owl:imports` 引用的共享 TBox。它：
+
+- **在线服务**于 `https://ontoskills.sh/ontology/core.ttl`
+- **由 `ontoskills install mcp` 自动下载**到 `~/.ontoskills/ontologies/core.ttl`
+- 在开发时由 `ontoskills init-core` 或 `ontoskills compile` **本地重新生成**
+
+已编译的技能模块通过 `owl:imports <https://ontoskills.sh/ontology/core.ttl>` 引用核心本体。MCP 将此解析为本体根目录中的本地副本。
+
 `core.ttl` 定义：
 
 - `oc:Skill`、`oc:ExecutableSkill`、`oc:DeclarativeSkill`
@@ -169,7 +177,7 @@ ontoskills/
 
 `index.ttl` 是一个清单，它：
 - 列出所有已编译的技能
-- 为完整图谱启用 `owl:imports`
+- 通过 `owl:imports <https://ontoskills.sh/ontology/core.ttl>` 引用核心本体
 - 被 OntoMCP 用于发现可用技能
 
 ---
