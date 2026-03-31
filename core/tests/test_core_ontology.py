@@ -42,33 +42,33 @@ class TestCreateCoreOntology:
 
     def test_creates_graph(self, tmp_path):
         """Test that create_core_ontology returns a Graph."""
-        output_path = tmp_path / "ontoskills-core.ttl"
+        output_path = tmp_path / "core.ttl"
         graph = create_core_ontology(output_path)
         assert isinstance(graph, Graph)
 
     def test_creates_file(self, tmp_path):
         """Test that create_core_ontology creates the output file."""
-        output_path = tmp_path / "ontoskills-core.ttl"
+        output_path = tmp_path / "core.ttl"
         create_core_ontology(output_path)
         assert output_path.exists()
 
     def test_creates_parent_directories(self, tmp_path):
         """Test that create_core_ontology creates parent directories if needed."""
-        output_path = tmp_path / "nested" / "dir" / "ontoskills-core.ttl"
+        output_path = tmp_path / "nested" / "dir" / "core.ttl"
         create_core_ontology(output_path)
         assert output_path.exists()
         assert output_path.parent.is_dir()
 
     def test_uses_default_output_path(self, tmp_path):
         """Test that create_core_ontology uses default path when None provided."""
-        # When output_path is None, it uses OUTPUT_DIR/ontoskills-core.ttl
+        # When output_path is None, it uses OUTPUT_DIR/core.ttl
         # This test verifies the function doesn't error with None
         graph = create_core_ontology(None)
         assert isinstance(graph, Graph)
 
     def test_graph_has_triples(self, tmp_path):
         """Test that the created graph has triples."""
-        output_path = tmp_path / "ontoskills-core.ttl"
+        output_path = tmp_path / "core.ttl"
         graph = create_core_ontology(output_path)
         assert len(graph) > 0
 
@@ -79,7 +79,7 @@ class TestCoreClasses:
     @pytest.fixture
     def core_ontology(self, tmp_path):
         """Fixture that creates core ontology and returns graph."""
-        output_path = tmp_path / "ontoskills-core.ttl"
+        output_path = tmp_path / "core.ttl"
         graph = create_core_ontology(output_path)
         return graph
 
@@ -122,7 +122,7 @@ class TestStateTransitionProperties:
     @pytest.fixture
     def core_ontology(self, tmp_path):
         """Fixture that creates core ontology and returns graph."""
-        output_path = tmp_path / "ontoskills-core.ttl"
+        output_path = tmp_path / "core.ttl"
         graph = create_core_ontology(output_path)
         return graph
 
@@ -162,7 +162,7 @@ class TestExecutionPayloadProperties:
     @pytest.fixture
     def core_ontology(self, tmp_path):
         """Fixture that creates core ontology and returns graph."""
-        output_path = tmp_path / "ontoskills-core.ttl"
+        output_path = tmp_path / "core.ttl"
         graph = create_core_ontology(output_path)
         return graph
 
@@ -199,7 +199,7 @@ class TestSkillRelationshipProperties:
     @pytest.fixture
     def core_ontology(self, tmp_path):
         """Fixture that creates core ontology and returns graph."""
-        output_path = tmp_path / "ontoskills-core.ttl"
+        output_path = tmp_path / "core.ttl"
         graph = create_core_ontology(output_path)
         return graph
 
@@ -239,7 +239,7 @@ class TestAdditionalSkillProperties:
     @pytest.fixture
     def core_ontology(self, tmp_path):
         """Fixture that creates core ontology and returns graph."""
-        output_path = tmp_path / "ontoskills-core.ttl"
+        output_path = tmp_path / "core.ttl"
         graph = create_core_ontology(output_path)
         return graph
 
@@ -285,7 +285,7 @@ class TestPredefinedStates:
     @pytest.fixture
     def core_ontology(self, tmp_path):
         """Fixture that creates core ontology and returns graph."""
-        output_path = tmp_path / "ontoskills-core.ttl"
+        output_path = tmp_path / "core.ttl"
         graph = create_core_ontology(output_path)
         return graph
 
@@ -329,7 +329,7 @@ class TestOntologyHeader:
     @pytest.fixture
     def core_ontology(self, tmp_path):
         """Fixture that creates core ontology and returns graph."""
-        output_path = tmp_path / "ontoskills-core.ttl"
+        output_path = tmp_path / "core.ttl"
         graph = create_core_ontology(output_path)
         return graph
 
@@ -371,7 +371,7 @@ class TestKnowledgeNodeHierarchy:
     @pytest.fixture
     def core_ontology(self, tmp_path):
         """Fixture that creates core ontology and returns graph."""
-        output_path = tmp_path / "ontoskills-core.ttl"
+        output_path = tmp_path / "core.ttl"
         graph = create_core_ontology(output_path)
         return graph
 
@@ -425,7 +425,7 @@ class TestKnowledgeNodeProperties:
     @pytest.fixture
     def core_ontology(self, tmp_path):
         """Fixture that creates core ontology and returns graph."""
-        output_path = tmp_path / "ontoskills-core.ttl"
+        output_path = tmp_path / "core.ttl"
         graph = create_core_ontology(output_path)
         return graph
 
@@ -467,7 +467,7 @@ class TestKnowledgeRBoxAxioms:
     @pytest.fixture
     def core_ontology(self, tmp_path):
         """Fixture that creates core ontology and returns graph."""
-        output_path = tmp_path / "ontoskills-core.ttl"
+        output_path = tmp_path / "core.ttl"
         graph = create_core_ontology(output_path)
         return graph
 

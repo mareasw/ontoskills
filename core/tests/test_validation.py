@@ -61,7 +61,7 @@ def test_load_core_ontology_returns_none_if_missing():
 
     # This test assumes core ontology might not exist in test environment
     result = load_core_ontology()
-    # Result could be None or a Graph depending on whether ontoskills-core.ttl exists
+    # Result could be None or a Graph depending on whether core.ttl exists
     if result is None:
         assert True  # Expected if file doesn't exist
     else:
