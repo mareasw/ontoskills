@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from rdflib import Graph, RDF, URIRef
 from rdflib.namespace import DCTERMS
 
-from compiler.config import ONTOLOGY_SYSTEM_DIR, ONTOLOGY_VENDOR_DIR
+from compiler.config import CORE_ONTOLOGY_FILENAME, ONTOLOGY_SYSTEM_DIR, ONTOLOGY_VENDOR_DIR
 from compiler.core_ontology import get_oc_namespace
 
 from .models import (
@@ -83,7 +83,7 @@ def discover_local_skill_paths(root: Path | None = None) -> list[Path]:
         base / "official",
         base / "community",
     }
-    system_files = {"ontoskills-core.ttl", "index.ttl", "index.enabled.ttl", "index.installed.ttl"}
+    system_files = {CORE_ONTOLOGY_FILENAME, "index.ttl", "index.enabled.ttl", "index.installed.ttl"}
     paths: list[Path] = []
     for path in base.rglob("*.ttl"):
         # Skip if in excluded directories
