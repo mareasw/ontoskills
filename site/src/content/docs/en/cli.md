@@ -36,7 +36,7 @@ ontoskills install mcp --cursor --vscode --project
 
 Creates:
 - `~/.ontoskills/bin/ontomcp` — the MCP server binary
-- `~/.ontoskills/ontologies/` — compiled ontology packages
+- `~/.ontoskills/ontologies/core.ttl` — core ontology (downloaded from `ontoskills.sh`)
 - `~/.ontoskills/state/` — lockfiles and metadata
 
 Supported flags:
