@@ -16,7 +16,6 @@ const homeHref = `/${lang}/`;
 
 // Determine alternate language URL
 const currentPath = Astro.url.pathname;
-const alternateLang: Lang = lang === 'en' ? 'zh' : 'en';
 let alternateHref: string;
 if (currentPath === '/' || currentPath === '') {
   alternateHref = '/zh/';

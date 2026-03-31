@@ -383,7 +383,7 @@ const href = (subpath: string) => `/${lang}/${subpath}/`;
   }
 </style>
 
-<script define:vars={{ terms: t.badgeTerms }}>
+<script define:vars={{ terms: t.badgeTerms }} is:inline>
   const el = document.getElementById('badge-text');
   if (el && terms.length > 1) {
     let i = 0;

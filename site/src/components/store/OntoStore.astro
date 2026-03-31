@@ -118,7 +118,7 @@ const t = i18n[lang];
   </div>
 </section>
 
-<script define:vars={{ rootId, storeIndexUrl: OFFICIAL_STORE_INDEX_URL, storeRepoUrl: OFFICIAL_STORE_REPO_URL, i18n: t }}>
+<script define:vars={{ rootId, storeIndexUrl: OFFICIAL_STORE_INDEX_URL, storeRepoUrl: OFFICIAL_STORE_REPO_URL, i18n: t }} is:inline>
   // Unique keys per language to persist skills across ViewTransitions
   const skillsKey = `ontoskills-skills-${rootId}`;
   const abortKey = `ontoskills-abort-${rootId}`;
