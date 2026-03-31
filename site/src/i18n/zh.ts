@@ -77,6 +77,7 @@ export default {
   cta: {
     headline: '准备好让你的代理变得确定性了吗？',
     command: 'npx ontoskills install mcp',
+    installMCP: '安装 OntoMCP',
     primaryButton: '开始使用',
     secondaryButton: '浏览 OntoStore',
   },
@@ -131,5 +132,6 @@ export default {
     title: 'OntoStore — 浏览本体技能',
     headline: '浏览本体技能。复制安装命令。',
     subtitle: '通过意图、名称或描述查找技能。直接复制安装命令。',
+    storeLabel: '商店',
   },
 } as const;

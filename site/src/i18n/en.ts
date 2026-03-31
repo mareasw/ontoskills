@@ -77,6 +77,7 @@ export default {
   cta: {
     headline: 'Ready to make your agent deterministic?',
     command: 'npx ontoskills install mcp',
+    installMCP: 'Install OntoMCP',
     primaryButton: 'Get started',
     secondaryButton: 'Browse OntoStore',
   },
@@ -131,5 +132,6 @@ export default {
     title: 'OntoStore — Browse ontological skills',
     headline: 'Browse ontological skills. Copy install commands.',
     subtitle: 'Find skills by intent, name, or description. Copy install commands directly.',
+    storeLabel: 'Store',
   },
 } as const;
