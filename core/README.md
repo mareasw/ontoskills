@@ -7,6 +7,10 @@
 </p>
 
 <p align="center">
+  <b>🇬🇧 English</b> • <a href="README_zh.md">🇨🇳 中文</a>
+</p>
+
+<p align="center">
   <em>The neuro-symbolic compiler for the <a href="https://ontoskills.sh">OntoSkills</a> platform.</em>
 </p>
 
@@ -114,9 +118,9 @@ Run `ontocore --help` or `ontocore <command> --help` for detailed usage.
 
 ## Documentation & Source
 
-For the full documentation, architecture details, and to contribute to the project, please visit the main repository:
-
-👉 **[mareasw/ontoskills GitHub Repository](https://github.com/mareasw/ontoskills)**
+- **[OntoCore docs](https://ontoskills.sh/docs/ontocore/)** — Architecture, compilation pipeline, and SHACL validation
+- **[Getting Started](https://ontoskills.sh/docs/getting-started/)** — Full installation and first steps
+- **[mareasw/ontoskills](https://github.com/mareasw/ontoskills)** — Source code and contributions
 
 ---
 
