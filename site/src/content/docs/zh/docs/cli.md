@@ -302,7 +302,7 @@ ontoskills uninstall --all
 
 ## 另见
 
-- [快速开始](/zh/getting-started/) — 安装教程
-- [OntoCore](/zh/ontocore/) — 编译器参考
-- [商店](/zh/store/) — 包管理详情
-- [故障排除](/zh/troubleshooting/) — 常见问题
+- [快速开始](/zh/docs/getting-started/) — 安装教程
+- [OntoCore](/zh/docs/ontocore/) — 编译器参考
+- [商店](/zh/docs/store/) — 包管理详情
+- [故障排除](/zh/docs/troubleshooting/) — 常见问题
