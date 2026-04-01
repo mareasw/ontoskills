@@ -118,15 +118,15 @@ Every skill is extracted with:
 
 ## Next steps
 
-- **[Getting Started](/getting-started/)** — Install and compile your first skill
-- **[CLI](/cli/)** — Learn the managed command surface
+- **[Getting Started](/docs/getting-started/)** — Install and compile your first skill
+- **[CLI](/docs/cli/)** — Learn the managed command surface
 - **[OntoStore](/ontostore/)** — Browse installable store skills
-- **[OntoCore](/ontocore/)** — Install compiler for custom skills
-- **[Store](/store/)** — Learn how official and third-party stores work
-- **[Architecture](/architecture/)** — Deep dive into the system design
-- **[Knowledge Extraction](/knowledge-extraction/)** — Understanding knowledge nodes
-- **[Troubleshooting](/troubleshooting/)** — Fix common install and runtime issues
-- **[Roadmap](/roadmap/)** — See what's coming next
+- **[OntoCore](/docs/ontocore/)** — Install compiler for custom skills
+- **[Store](/docs/store/)** — Learn how official and third-party stores work
+- **[Architecture](/docs/architecture/)** — Deep dive into the system design
+- **[Knowledge Extraction](/docs/knowledge-extraction/)** — Understanding knowledge nodes
+- **[Troubleshooting](/docs/troubleshooting/)** — Fix common install and runtime issues
+- **[Roadmap](/docs/roadmap/)** — See what's coming next
 
 ---
 

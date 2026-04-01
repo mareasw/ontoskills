@@ -331,7 +331,7 @@ Instead, validate against a whitelist of allowed directories.
 For large spreadsheets (>10k rows), process in chunks of 1000 to avoid memory issues.
 ```
 
-See [Knowledge Extraction](/knowledge-extraction/) for all 26 node types.
+See [Knowledge Extraction](/docs/knowledge-extraction/) for all 26 node types.
 
 ---
 
@@ -518,6 +518,6 @@ Before publishing a skill:
 
 ## Next steps
 
-- [Knowledge Extraction](/knowledge-extraction/) — Understanding all 26 node types
-- [OntoCore](/ontocore/) — Compiler reference
-- [Getting Started](/getting-started/) — Compile your first skill
+- [Knowledge Extraction](/docs/knowledge-extraction/) — Understanding all 26 node types
+- [OntoCore](/docs/ontocore/) — Compiler reference
+- [Getting Started](/docs/getting-started/) — Compile your first skill

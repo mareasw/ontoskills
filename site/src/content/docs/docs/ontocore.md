@@ -231,7 +231,7 @@ Every skill must pass SHACL validation before being written. The constitutional 
 
 If validation fails, the skill is **not written** and an error is shown.
 
-See [Skill Authoring](/authoring/) for practical guidance on writing skills that pass validation.
+See [Skill Authoring](/docs/authoring/) for practical guidance on writing skills that pass validation.
 
 ---
 
@@ -259,7 +259,7 @@ See [Skill Authoring](/authoring/) for practical guidance on writing skills that
 
 ## Next steps
 
-- [Getting Started](/getting-started/) — Install and first steps
-- [Architecture](/architecture/) — How the system works
-- [Knowledge Extraction](/knowledge-extraction/) — Understanding knowledge nodes
-- [Skill Authoring](/authoring/) — Write your own skills
+- [Getting Started](/docs/getting-started/) — Install and first steps
+- [Architecture](/docs/architecture/) — How the system works
+- [Knowledge Extraction](/docs/knowledge-extraction/) — Understanding knowledge nodes
+- [Skill Authoring](/docs/authoring/) — Write your own skills

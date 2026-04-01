@@ -330,7 +330,7 @@ ontoskills uninstall --all
 
 ## See also
 
-- [Getting Started](/getting-started/) — First-time setup tutorial
-- [OntoCore](/ontocore/) — Compiler reference
-- [Store](/store/) — Package management details
-- [Troubleshooting](/troubleshooting/) — Common issues
+- [Getting Started](/docs/getting-started/) — First-time setup tutorial
+- [OntoCore](/docs/ontocore/) — Compiler reference
+- [Store](/docs/store/) — Package management details
+- [Troubleshooting](/docs/troubleshooting/) — Common issues

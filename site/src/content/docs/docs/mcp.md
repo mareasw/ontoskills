@@ -23,7 +23,7 @@ This installs the runtime binary at:
 ~/.ontoskills/bin/ontomcp
 ```
 
-For one-command client bootstrap, see [MCP Bootstrap](/mcp-bootstrap/).
+For one-command client bootstrap, see [MCP Bootstrap](/docs/mcp-bootstrap/).
 
 ---
 
