@@ -23,8 +23,8 @@ const currentPath = Astro.url.pathname;
 let alternateHref: string;
 if (currentPath === '/' || currentPath === '') {
   alternateHref = '/zh/';
-} else if (currentPath.startsWith('/zh/')) {
-  alternateHref = currentPath.replace(/^\/zh\//, '/');
+} else if (currentPath === '/zh' || currentPath.startsWith('/zh/')) {
+  alternateHref = currentPath.replace(/^\/zh\/?/, '/');
 } else {
   alternateHref = currentPath.replace(/^\//, '/zh/');
 }
