@@ -1,0 +1,14 @@
+# Benchmark results
+results/
+
+# Generated skills
+skills/*.md
+
+# Rust build artifacts
+ontomcp-bench/target/
+ontomcp-bench/Cargo.lock
+
+# Python
+__pycache__/
+*.pyc
+traditional-bench/.venv/
