@@ -24,6 +24,13 @@ export default defineConfig({
       favicon: '/ontoskills-logo.png',
       disable404Route: true,
       customCss: ['./src/styles/starlight.css'],
+      sidebar: [
+        {
+          label: 'Documentation',
+          translations: { 'zh-CN': '文档' },
+          autogenerate: { directory: 'docs' },
+        },
+      ],
       head: [
         {
           tag: 'meta',
