@@ -22,9 +22,9 @@
 </p>
 
 <p align="center">
-  <a href="docs/overview.md">Overview</a> •
-  <a href="docs/getting-started.md">Getting Started</a> •
-  <a href="docs/roadmap.md">Roadmap</a> •
+  <a href="https://ontoskills.sh/docs/overview/">Overview</a> •
+  <a href="https://ontoskills.sh/docs/getting-started/">Getting Started</a> •
+  <a href="https://ontoskills.sh/docs/roadmap/">Roadmap</a> •
   <a href="PHILOSOPHY.md">Philosophy</a>
 </p>
 
@@ -80,43 +80,37 @@ flowchart LR
 ## Quick Start
 
 ```bash
-# Install
-pip install ontoskills
+# Install the MCP runtime and bootstrap your client
+npx ontoskills install mcp --claude
 
-# Compile skills to ontology
-ontoskills init-core
-ontoskills compile
-
-# Query the knowledge graph
-ontoskills query "SELECT ?skill WHERE { ?skill oc:resolvesIntent 'create_pdf' }"
+# Or install the Python compiler separately
+pip install ontocore
+ontocore compile
 ```
 
-Or use `npx ontoskills` without installing.
-
-[→ Full installation guide](docs/getting-started.md)
+[→ Full installation guide](https://ontoskills.sh/docs/getting-started/)
 
 ---
 
 ## Components
 
-| Component | Language | Status | Description |
-|-----------|----------|--------|-------------|
-| **OntoCore** | Python | ✅ Ready | Skill compiler to OWL 2 ontology |
-| **OntoMCP** | Rust | ✅ Ready | MCP server for semantic skill discovery |
-| **OntoStore** | GitHub | ✅ Ready | Versioned skill store |
-| `skills/` | Markdown | Input | Human-authored skill definitions |
-| `ontoskills/` | Turtle | Output | Compiled, self-contained ontologies |
+| Component | Language | Description |
+|-----------|----------|-------------|
+| **OntoCore** | Python | Neuro-symbolic compiler: SKILL.md → OWL 2 ontology |
+| **OntoMCP** | Rust | MCP server with sub-ms SPARQL queries |
+| **OntoStore** | GitHub | Versioned skill registry |
+| **CLI** | Node.js | One-command installer (`npx ontoskills`) |
 
 ---
 
 ## Documentation
 
-- **[Overview](https://ontoskills.sh/overview/)** — What is OntoSkills and why it matters
-- **[Getting Started](https://ontoskills.sh/getting-started/)** — Installation and first steps
-- **[Architecture](https://ontoskills.sh/architecture/)** — How the system works
-- **[Knowledge Extraction](https://ontoskills.sh/knowledge-extraction/)** — Extracting value from skills
-- **[Store & Packages](https://ontoskills.sh/store/)** — Package distribution and import
-- **[Roadmap](https://ontoskills.sh/roadmap/)** — Development phases
+- **[Overview](https://ontoskills.sh/docs/overview/)** — What is OntoSkills and why it matters
+- **[Getting Started](https://ontoskills.sh/docs/getting-started/)** — Installation and first steps
+- **[Architecture](https://ontoskills.sh/docs/architecture/)** — How the system works
+- **[Knowledge Extraction](https://ontoskills.sh/docs/knowledge-extraction/)** — Extracting value from skills
+- **[OntoStore](https://ontoskills.sh/ontostore/)** — Browse and install skills
+- **[Roadmap](https://ontoskills.sh/docs/roadmap/)** — Development phases
 
 ---
 

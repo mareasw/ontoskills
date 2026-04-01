@@ -22,9 +22,9 @@
 </p>
 
 <p align="center">
-  <a href="docs_zh/overview.md">概述</a> •
-  <a href="docs_zh/getting-started.md">快速开始</a> •
-  <a href="docs_zh/roadmap.md">路线图</a> •
+  <a href="https://ontoskills.sh/zh/docs/overview/">概述</a> •
+  <a href="https://ontoskills.sh/zh/docs/getting-started/">快速开始</a> •
+  <a href="https://ontoskills.sh/zh/docs/roadmap/">路线图</a> •
   <a href="PHILOSOPHY_zh.md">设计理念</a>
 </p>
 
@@ -80,43 +80,37 @@ flowchart LR
 ## 快速开始
 
 ```bash
-# 安装
+# 安装 MCP 运行时并引导你的客户端
+npx ontoskills install mcp --claude
+
+# 或单独安装 Python 编译器
 pip install ontocore
-
-# 编译技能到本体
-ontocore init-core
 ontocore compile
-
-# 查询知识图谱
-ontocore query "SELECT ?skill WHERE { ?skill oc:resolvesIntent 'create_pdf' }"
 ```
 
-或使用 `npx ontoskills` 无需安装。
-
-[→ 完整安装指南](docs_zh/getting-started.md)
+[→ 完整安装指南](https://ontoskills.sh/zh/docs/getting-started/)
 
 ---
 
 ## 组件
 
-| 组件 | 语言 | 状态 | 描述 |
-|-----------|----------|--------|-------------|
-| **OntoCore** | Python | ✅ 就绪 | 技能编译器，输出 OWL 2 本体 |
-| **OntoMCP** | Rust | ✅ 就绪 | 用于语义技能发现的 MCP 服务器 |
-| **OntoStore** | GitHub | ✅ 就绪 | 版本化技能商店 |
-| `skills/` | Markdown | 输入 | 人工编写的技能定义 |
-| `ontoskills/` | Turtle | 输出 | 编译后的自包含本体 |
+| 组件 | 语言 | 描述 |
+|-----------|----------|-------------|
+| **OntoCore** | Python | 神经符号编译器：SKILL.md → OWL 2 本体 |
+| **OntoMCP** | Rust | MCP 服务器，亚毫秒级 SPARQL 查询 |
+| **OntoStore** | GitHub | 版本化技能注册表 |
+| **CLI** | Node.js | 一键安装器（`npx ontoskills`） |
 
 ---
 
 ## 文档
 
-- **[概述](https://ontoskills.sh/zh/overview/)** — OntoSkills 是什么及其重要性
-- **[快速开始](https://ontoskills.sh/zh/getting-started/)** — 安装和入门
-- **[架构](https://ontoskills.sh/zh/architecture/)** — 系统如何工作
-- **[知识提取](https://ontoskills.sh/zh/knowledge-extraction/)** — 从技能中提取价值
-- **[商店与包](https://ontoskills.sh/zh/store/)** — 包分发和导入
-- **[路线图](https://ontoskills.sh/zh/roadmap/)** — 开发阶段
+- **[概述](https://ontoskills.sh/zh/docs/overview/)** — OntoSkills 是什么及其重要性
+- **[快速开始](https://ontoskills.sh/zh/docs/getting-started/)** — 安装和入门
+- **[架构](https://ontoskills.sh/zh/docs/architecture/)** — 系统如何工作
+- **[知识提取](https://ontoskills.sh/zh/docs/knowledge-extraction/)** — 从技能中提取价值
+- **[OntoStore](https://ontoskills.sh/zh/ontostore/)** — 浏览和安装技能
+- **[路线图](https://ontoskills.sh/zh/docs/roadmap/)** — 开发阶段
 
 ---
 

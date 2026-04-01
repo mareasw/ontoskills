@@ -2,7 +2,9 @@
 
 Rust-based local MCP (Model Context Protocol) server for the OntoSkills ecosystem.
 
-**Status:** ✅ Ready
+<p align="right">
+  <b>🇬🇧 English</b> • <a href="README_zh.md">🇨🇳 中文</a>
+</p>
 
 ---
 
@@ -148,7 +150,7 @@ Preferred runtime source:
 
 Fallbacks:
 
-- `ontoskills-core.ttl` — Core TBox ontology with states
+- `core.ttl` — Core TBox ontology with states
 - `index.ttl` — Manifest with `owl:imports`
 - `*/ontoskill.ttl` — Individual skill modules
 
@@ -217,7 +219,7 @@ flowchart LR
     style TOOLS fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
 ```
 
-For full setup steps, see [Claude Code MCP guide](../site/src/docs/claude-code-mcp.md).
+For full setup steps, see the [Claude Code MCP guide](https://ontoskills.sh/docs/claude-code-mcp/).
 
 ---
 
@@ -240,9 +242,10 @@ cargo test
 
 | Component | Language | Description |
 |-----------|----------|-------------|
-| **OntoCore** | Python | Design-time compiler |
+| **OntoCore** | Python | Neuro-symbolic skill compiler |
 | **OntoMCP** | Rust | Runtime server (this) |
-| **ontoskills-registry** | GitHub | Compiled skill registry |
+| **OntoStore** | GitHub | Versioned skill registry |
+| **CLI** | Node.js | One-command installer (`npx ontoskills`) |
 
 ---
 
