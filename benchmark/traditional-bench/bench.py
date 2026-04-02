@@ -72,9 +72,14 @@ def run_task(
     print(f"  Prompt: {prompt_chars:,} chars | {prompt_tokens:,} tokens (exact)")
     print(f"  Context limit: {context_limit:,} tokens")
 
-    # Check for context overflow before making any API calls
-    if prompt_tokens > context_limit:
-        print(f"  STATUS: OVERFLOW — prompt ({prompt_tokens:,} tokens) > limit ({context_limit:,})")
+    # Check for context overflow before making any API calls.
+    # Must account for reserved output tokens (matches max_tokens in the API call).
+    reserved_output_tokens = 1024
+    if prompt_tokens + reserved_output_tokens > context_limit:
+        print(
+            f"  STATUS: OVERFLOW — prompt ({prompt_tokens:,}) + "
+            f"output ({reserved_output_tokens:,}) > limit ({context_limit:,})"
+        )
         return {
             "task_name": task["name"],
             "question": question,

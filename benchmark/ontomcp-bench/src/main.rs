@@ -1,8 +1,9 @@
 use anyhow::Result;
 use oxigraph::io::RdfFormat;
+use oxigraph::model::Term;
 use oxigraph::store::Store;
 use std::env;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::BufReader;
 use std::time::Instant;
 use walkdir::WalkDir;
@@ -27,6 +28,19 @@ struct BenchReport {
     total_triples: usize,
     load_time_ms: u64,
     results: Vec<BenchResult>,
+}
+
+/// Extract the numeric value from a SPARQL COUNT binding.
+/// Oxigraph terms for typed literals stringify as `"42"^^<...>`,
+/// so we must extract the Literal's lexical form, not use to_string().
+fn extract_count(bindings: &oxigraph::sparql::QuerySolution, index: usize) -> usize {
+    bindings
+        .get(index)
+        .and_then(|term| match term {
+            Term::Literal(lit) => lit.value().parse().ok(),
+            _ => None,
+        })
+        .unwrap_or(0)
 }
 
 fn main() -> Result<()> {
@@ -61,27 +75,20 @@ fn main() -> Result<()> {
 
     let load_time = start.elapsed();
 
-    // Count skills via SPARQL (authoritative, not substring matching)
     let oc = "https://ontoskills.sh/ontology#";
+
+    // Count skills via SPARQL (authoritative, not substring matching)
     let total_skills: usize = {
         let query = format!("SELECT (COUNT(?s) AS ?count) WHERE {{ ?s a <{oc}Skill> }}");
         let results: Vec<_> = store.query(&query)?.into_bindings().collect();
-        results
-            .first()
-            .and_then(|r| r.get(0))
-            .and_then(|v| v.to_string().parse().ok())
-            .unwrap_or(0)
+        results.first().map(|r| extract_count(r, 0)).unwrap_or(0)
     };
 
     // Count triples
     let total_triples: usize = {
         let count_query = "SELECT (COUNT(*) AS ?count) WHERE { ?s ?p ?o }";
         let results: Vec<_> = store.query(count_query)?.into_bindings().collect();
-        results
-            .first()
-            .and_then(|r| r.get(0))
-            .and_then(|v| v.to_string().parse().ok())
-            .unwrap_or(0)
+        results.first().map(|r| extract_count(r, 0)).unwrap_or(0)
     };
 
     println!(
@@ -93,6 +100,8 @@ fn main() -> Result<()> {
     );
 
     // Define benchmark queries using the oc: namespace from core.ttl
+    // Property names match the actual ontology: oc:hasDescription (not oc:description),
+    // oc:directiveContent, oc:resolvesIntent, etc.
     let queries: Vec<(&str, String)> = vec![
         (
             "search_skills (by intent)",
@@ -100,7 +109,7 @@ fn main() -> Result<()> {
                 r#"SELECT ?skill ?desc WHERE {{
                     ?skill a <{oc}Skill> .
                     ?skill <{oc}resolvesIntent> "create_pdf" .
-                    OPTIONAL {{ ?skill <{oc}description> ?desc }}
+                    OPTIONAL {{ ?skill <{oc}hasDescription> ?desc }}
                 }}"#
             ),
         ),
@@ -116,8 +125,10 @@ fn main() -> Result<()> {
         (
             "get_skill_context",
             format!(
-                r#"SELECT ?p ?o WHERE {{
-                    <http://ontoskills.sh/ontology/skill/pdf-generator> ?p ?o .
+                r#"SELECT ?skill ?p ?o WHERE {{
+                    ?skill a <{oc}Skill> .
+                    ?skill <{oc}resolvesIntent> "create_pdf" .
+                    ?skill ?p ?o .
                 }}"#
             ),
         ),
@@ -125,8 +136,8 @@ fn main() -> Result<()> {
             "query_epistemic_rules",
             format!(
                 r#"SELECT ?node ?type ?content WHERE {{
+                    ?node a ?type .
                     ?node a <{oc}KnowledgeNode> .
-                    ?node <{oc}knowledgeType> ?type .
                     ?node <{oc}directiveContent> ?content .
                 }}"#
             ),
@@ -147,7 +158,7 @@ fn main() -> Result<()> {
                 r#"SELECT ?skill ?intent ?desc WHERE {{
                     ?skill a <{oc}Skill> .
                     OPTIONAL {{ ?skill <{oc}resolvesIntent> ?intent }}
-                    OPTIONAL {{ ?skill <{oc}description> ?desc }}
+                    OPTIONAL {{ ?skill <{oc}hasDescription> ?desc }}
                 }}"#
             ),
         ),

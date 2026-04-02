@@ -95,17 +95,26 @@ def generate_comparison(ontomcp: dict | None, traditional: dict | None) -> str:
                     break
 
             if trad_task:
-                ontomcp_ms = ontomcp_search["p50_us"] / 1_000
+                ontomcp_p50_us = ontomcp_search["p50_us"]
                 trad_ms = trad_task["latency"]["p50_s"] * 1_000
-                speedup = trad_ms / max(0.001, ontomcp_ms)
+
+                # If the OntoMCP query failed, p50_us is 0 — avoid misleading speedup
+                if ontomcp_p50_us > 0:
+                    ontomcp_ms = ontomcp_p50_us / 1_000
+                    speedup = trad_ms / max(0.001, ontomcp_ms)
+                    ontomcp_latency_str = fmt_us(ontomcp_p50_us)
+                    speedup_str = f"**{speedup:,.0f}x faster**"
+                else:
+                    ontomcp_latency_str = "n/a (query unavailable)"
+                    speedup_str = "**n/a**"
 
                 lines.append("### Skill Discovery (find skill by intent)\n")
                 lines.append("| Metric | OntoSkills | Traditional |")
                 lines.append("|--------|-----------|-------------|")
-                lines.append(f"| Latency (p50) | {fmt_us(ontomcp_search['p50_us'])} | {trad_task['latency']['p50_s']*1000:.0f}ms |")
+                lines.append(f"| Latency (p50) | {ontomcp_latency_str} | {trad_task['latency']['p50_s']*1000:.0f}ms |")
                 lines.append(f"| Tokens per query | 0 | {trad_task['tokens']['input_avg']:,}+{trad_task['tokens']['output_avg']:,} |")
                 lines.append(f"| Determinism | 100% | {trad_task['determinism']['consistency_pct']}% |")
-                lines.append(f"| **Speedup** | **{speedup:,.0f}x faster** | |")
+                lines.append(f"| **Speedup** | {speedup_str} | |")
                 lines.append("")
 
                 # --- Cost comparison across all models ---
