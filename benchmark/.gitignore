@@ -6,7 +6,6 @@ skills/*.md
 
 # Rust build artifacts
 ontomcp-bench/target/
-ontomcp-bench/Cargo.lock
 
 # Python
 __pycache__/

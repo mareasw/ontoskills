@@ -45,13 +45,15 @@ benchmark/
 - **Latency**: sub-ms query times for each SPARQL operation
 - **Queries**: search by intent, search by type, get context, epistemic rules, planning, full scan
 - **Iterations**: 1000 per query (configurable via `--iterations`)
+- **Accuracy**: queries are materialized (solutions consumed) to measure full execution, not lazy setup
 
 ### Traditional (LLM reads files)
 - **Latency**: wall-clock time for each skill-related question
 - **Tokens**: exact count via `client.count_tokens()`, input + output per query
 - **Cost**: computed for 6 models (Claude Opus/Sonnet, GPT-5.4/mini, Gemini Pro/Flash)
 - **Determinism**: same question N times, count unique answers
-- **Context overflow**: flagged when prompt exceeds model context window
+- **Context overflow**: flagged when prompt tokens + reserved output tokens (1024) exceed context window
+- **Rate limit resilience**: exponential backoff retry on `anthropic.RateLimitError`
 - **Runs**: 5 per task (configurable via `--runs`)
 
 ### Tasks compared
