@@ -172,9 +172,10 @@ def run_task(
     # Cost for ALL models (not just this one)
     costs = {}
     for mid in MODEL_PRICING:
+        per_run = get_cost_usd(mid, avg_input, avg_output)
         costs[mid] = {
-            "per_run_usd": get_cost_usd(mid, avg_input, avg_output),
-            "total_usd": get_cost_usd(mid, total_input, total_output),
+            "per_run_usd": per_run,
+            "total_usd": per_run * successful_runs,
         }
 
     result = {

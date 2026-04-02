@@ -33,19 +33,12 @@ def run_ontomcp_bench(ttl_dir: str, iterations: int, output: str):
 
     bench_dir = BENCHMARK_DIR / "ontomcp-bench"
 
-    # Build
-    subprocess.run(
-        ["cargo", "build", "--release", "--manifest-path", str(bench_dir / "Cargo.toml")],
-        check=True,
-    )
-
-    # Run
+    # Use cargo run for cross-platform binary path handling
     subprocess.run(
         [
-            str(bench_dir / "target" / "release" / "ontomcp-bench"),
-            ttl_dir,
-            str(iterations),
-            output,
+            "cargo", "run", "--release",
+            "--manifest-path", str(bench_dir / "Cargo.toml"),
+            "--", ttl_dir, str(iterations), output,
         ],
         check=True,
     )
