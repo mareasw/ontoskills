@@ -224,7 +224,7 @@ def main():
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         print("Error: Set ANTHROPIC_API_KEY to run the traditional benchmark")
-        print("  Or use --ontomcp-only to skip this benchmark entirely.")
+        print("  Or run via benchmark/run.py with --ontomcp-only to skip this benchmark.")
         sys.exit(1)
 
     client = anthropic.Anthropic(api_key=api_key)

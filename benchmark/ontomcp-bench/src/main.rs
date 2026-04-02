@@ -203,7 +203,14 @@ fn main() -> Result<()> {
 
         for _ in 0..iterations {
             let start = Instant::now();
-            let _ = store.query(query.as_str());
+            // Materialize results to measure full execution, not just lazy setup
+            let results = store.query(query.as_str()).unwrap();
+            let count = match results {
+                oxigraph::sparql::QueryResults::Solutions(solutions) => solutions.count(),
+                oxigraph::sparql::QueryResults::Graph(graph) => graph.count(),
+                _ => 0,
+            };
+            std::hint::black_box(count);
             times.push(start.elapsed().as_micros() as u64);
         }
 
