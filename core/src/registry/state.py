@@ -153,7 +153,7 @@ def _skill_relations(module_path: Path) -> tuple[str | None, set[str]]:
 
     skill_id_literal = graph.value(skill_subject, DCTERMS.identifier)
     relations: set[str] = set()
-    for predicate in (oc.extends, oc.dependsOn):
+    for predicate in (oc.extends, oc.dependsOnSkill, oc.dependsOn):
         for target in graph.objects(skill_subject, predicate):
             target_id = graph.value(target, DCTERMS.identifier)
             if target_id:

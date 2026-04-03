@@ -789,7 +789,7 @@ impl Catalog {
             differentia: scalar.optional_literal("differentia"),
             intents: self.list_literal_values(&skill_uri, "oc:resolvesIntent")?,
             requirements: self.get_requirements_for_uri(&skill_uri)?,
-            depends_on: self.get_related_skill_ids(&skill_uri, "oc:dependsOn")?,
+            depends_on: self.get_related_skill_ids(&skill_uri, "oc:dependsOnSkill")?,
             extends: self.get_related_skill_ids(&skill_uri, "oc:extends")?,
             contradicts: self.get_related_skill_ids(&skill_uri, "oc:contradicts")?,
             requires_state: self.get_related_state_values(&skill_uri, "oc:requiresState")?,
