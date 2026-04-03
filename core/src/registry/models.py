@@ -15,6 +15,10 @@ class PackageSkillManifest(BaseModel):
     path: str
     default_enabled: bool = False
     aliases: list[str] = Field(default_factory=list)
+    category: str | None = None
+    version: str | None = None
+    is_user_invocable: bool | None = None
+    depends_on_skills: list[str] = Field(default_factory=list)
 
 
 class PackageManifest(BaseModel):
@@ -36,6 +40,10 @@ class InstalledSkillState(BaseModel):
     aliases: list[str] = Field(default_factory=list)
     enabled: bool = False
     default_enabled: bool = False
+    category: str | None = None
+    version: str | None = None
+    is_user_invocable: bool | None = None
+    depends_on_skills: list[str] = Field(default_factory=list)
 
 
 class InstalledPackageState(BaseModel):

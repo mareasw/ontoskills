@@ -26,6 +26,52 @@ from .index import rebuild_registry_indexes
 from .compile import compile_source_tree, rewrite_compiled_payload_paths, discover_skill_entries
 
 
+def _extract_skill_metadata_from_ttl(ttl_path: Path) -> dict:
+    """Read optional metadata fields from a compiled TTL module.
+
+    Returns a dict with category, version, is_user_invocable, depends_on_skills.
+    """
+    from rdflib import Graph, Namespace, RDF, Literal as RDFLiteral
+
+    OC = Namespace("https://ontoskills.sh/ontology#")
+    metadata: dict = {}
+
+    if not ttl_path.exists():
+        return metadata
+
+    try:
+        g = Graph()
+        g.parse(str(ttl_path), format="turtle")
+    except Exception:
+        return metadata
+
+    # Find the skill subject (type oc:Skill)
+    for subject in g.subjects(RDF.type, OC.Skill):
+        # category
+        cat = g.value(subject, OC.hasCategory)
+        if cat:
+            metadata["category"] = str(cat)
+
+        # version
+        ver = g.value(subject, OC.hasVersion)
+        if ver:
+            metadata["version"] = str(ver)
+
+        # is_user_invocable
+        inv = g.value(subject, OC.isUserInvocable)
+        if inv is not None:
+            metadata["is_user_invocable"] = str(inv).lower() in ("true", "1", "yes")
+
+        # depends_on_skills (repeatable)
+        deps = [str(o).rsplit("#", 1)[-1].rsplit("_", 1)[-1] for o in g.objects(subject, OC.dependsOnSkill)]
+        if deps:
+            metadata["depends_on_skills"] = deps
+
+        break  # only first skill subject
+
+    return metadata
+
+
 def install_package_from_directory(
     package_dir: Path,
     root: Path | None = None,
@@ -196,6 +242,31 @@ def import_source_repository(
         compile_source_tree(raw_root, compiled_root)
         rewrite_compiled_payload_paths(compiled_root)
 
+        # Build skill states with metadata extracted from compiled TTLs
+        skill_states = []
+        skill_manifests = []
+        for skill_id, module_path in skill_entries:
+            ttl_path = compiled_root / module_path
+            meta = _extract_skill_metadata_from_ttl(ttl_path)
+            skill_states.append(InstalledSkillState(
+                skill_id=skill_id,
+                module_path=str((compiled_root / module_path).resolve()),
+                aliases=[],
+                enabled=False,
+                default_enabled=False,
+                category=meta.get("category"),
+                version=meta.get("version"),
+                is_user_invocable=meta.get("is_user_invocable"),
+                depends_on_skills=meta.get("depends_on_skills", []),
+            ))
+            skill_manifests.append({
+                "id": skill_id,
+                "path": str(module_path),
+                "default_enabled": False,
+                "aliases": [],
+                **({k: v for k, v in meta.items() if v is not None and v != []}),
+            })
+
         package_state = InstalledPackageState(
             package_id=resolved_package_id,
             version=datetime.now(timezone.utc).strftime("import-%Y%m%d%H%M%S"),
@@ -205,16 +276,7 @@ def import_source_repository(
             installed_at=datetime.now(timezone.utc).isoformat(),
             install_root=str(compiled_root),
             manifest_path="",
-            skills=[
-                InstalledSkillState(
-                    skill_id=skill_id,
-                    module_path=str((compiled_root / module_path).resolve()),
-                    aliases=[],
-                    enabled=False,
-                    default_enabled=False,
-                )
-                for skill_id, module_path in skill_entries
-            ],
+            skills=skill_states,
         )
 
         synthetic_manifest = {
@@ -222,15 +284,7 @@ def import_source_repository(
             "version": package_state.version,
             "trust_tier": package_state.trust_tier,
             "source": package_state.source,
-            "skills": [
-                {
-                    "id": skill.skill_id,
-                    "path": str(Path(skill.module_path).relative_to(compiled_root)),
-                    "default_enabled": False,
-                    "aliases": [],
-                }
-                for skill in package_state.skills
-            ],
+            "skills": skill_manifests,
         }
         manifest_path = compiled_root / "package.json"
         manifest_path.write_text(json.dumps(synthetic_manifest, indent=2), encoding="utf-8")
