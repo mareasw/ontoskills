@@ -403,6 +403,8 @@ fn handle_tool_call(
                 requires_state: optional_string(&arguments, "requires_state"),
                 yields_state: optional_string(&arguments, "yields_state"),
                 skill_type: optional_skill_type(&arguments, "skill_type")?,
+                category: optional_string(&arguments, "category"),
+                is_user_invocable: optional_bool(&arguments, "is_user_invocable"),
                 limit: optional_usize(&arguments, "limit").unwrap_or(25),
             };
             json!(catalog.search_skills(params).map_err(public_error)?)
@@ -471,6 +473,10 @@ fn handle_tool_call(
                     .query_epistemic_rules(params)
                     .map_err(public_error)?
             )
+        }
+        "resolve_alias" => {
+            let alias = required_string(&arguments, "alias")?;
+            json!(catalog.resolve_alias(&alias).map_err(public_error)?)
         }
         _ => return Err(format!("Unknown tool: {tool_name}")),
     };
@@ -660,7 +666,7 @@ fn tool_definitions() -> Vec<Value> {
     vec![
         tool(
             "search_skills",
-            "Discover skills with optional filters for intent, required state, yielded state, and skill type.",
+            "Discover skills with optional filters for intent, required state, yielded state, skill type, category, and user-invocability.",
             json!({
                 "type": "object",
                 "properties": {
@@ -668,6 +674,8 @@ fn tool_definitions() -> Vec<Value> {
                     "requires_state": { "type": "string", "description": "State URI or oc:StateName compact value." },
                     "yields_state": { "type": "string", "description": "State URI or oc:StateName compact value." },
                     "skill_type": { "type": "string", "enum": ["executable", "declarative"] },
+                    "category": { "type": "string", "description": "Filter by skill category (e.g., automation, document, marketing)." },
+                    "is_user_invocable": { "type": "boolean", "description": "Filter by whether the skill is directly invocable by users." },
                     "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
                 }
             }),
@@ -733,6 +741,20 @@ fn tool_definitions() -> Vec<Value> {
                     "include_inherited": { "type": "boolean", "default": true },
                     "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
                 }
+            }),
+        ),
+        tool(
+            "resolve_alias",
+            "Resolve a skill alias to its canonical skill(s). Returns all skills that have the given alias.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "alias": {
+                        "type": "string",
+                        "description": "Alias to resolve (case-insensitive)"
+                    }
+                },
+                "required": ["alias"]
             }),
         ),
     ]

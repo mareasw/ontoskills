@@ -95,6 +95,8 @@ pub struct SkillSummary {
     pub intents: Vec<String>,
     pub requires_state: Vec<String>,
     pub yields_state: Vec<String>,
+    pub category: Option<String>,
+    pub is_user_invocable: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -111,6 +113,8 @@ pub struct SkillSearchResult {
     pub requires_state: Vec<String>,
     pub yields_state: Vec<String>,
     pub matched_by: Vec<String>,
+    pub category: Option<String>,
+    pub is_user_invocable: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -208,6 +212,8 @@ pub struct SearchSkillsParams {
     pub requires_state: Option<String>,
     pub yields_state: Option<String>,
     pub skill_type: Option<SkillType>,
+    pub category: Option<String>,
+    pub is_user_invocable: Option<bool>,
     pub limit: usize,
 }
 
@@ -387,6 +393,18 @@ impl Catalog {
                 }
             }
 
+            if let Some(filter_category) = &params.category {
+                if skill.category.as_deref() != Some(filter_category.as_str()) {
+                    continue;
+                }
+            }
+
+            if let Some(filter_invocable) = params.is_user_invocable {
+                if skill.is_user_invocable.unwrap_or(true) != filter_invocable {
+                    continue;
+                }
+            }
+
             let mut matched_by = Vec::new();
 
             if let Some(intent) = params.intent.as_deref() {
@@ -438,6 +456,8 @@ impl Catalog {
                 requires_state: skill.requires_state,
                 yields_state: skill.yields_state,
                 matched_by,
+                category: skill.category,
+                is_user_invocable: skill.is_user_invocable,
             });
 
             if results.len() >= params.limit {
@@ -653,6 +673,9 @@ impl Catalog {
         let mut skills = Vec::new();
         for record in &self.skill_index {
             let details = self.get_skill(&record.qualified_id)?;
+            let category = self.get_optional_literal_for_uri(&record.uri, "oc:hasCategory")?;
+            let is_user_invocable =
+                self.get_optional_bool_for_uri(&record.uri, "oc:isUserInvocable")?;
             skills.push(SkillSummary {
                 id: details.id,
                 qualified_id: details.qualified_id,
@@ -665,6 +688,8 @@ impl Catalog {
                 intents: details.intents,
                 requires_state: details.requires_state,
                 yields_state: details.yields_state,
+                category,
+                is_user_invocable,
             });
         }
 
@@ -682,6 +707,9 @@ impl Catalog {
             {
                 continue;
             }
+            let category = self.get_optional_literal_for_uri(&record.uri, "oc:hasCategory")?;
+            let is_user_invocable =
+                self.get_optional_bool_for_uri(&record.uri, "oc:isUserInvocable")?;
             skills.push(SkillSummary {
                 id: details.id,
                 qualified_id: details.qualified_id,
@@ -694,6 +722,8 @@ impl Catalog {
                 intents: details.intents,
                 requires_state: details.requires_state,
                 yields_state: details.yields_state,
+                category,
+                is_user_invocable,
             });
         }
         skills.sort_by(|left, right| left.qualified_id.cmp(&right.qualified_id));
@@ -818,6 +848,56 @@ impl Catalog {
     ) -> Result<Vec<SkillSummary>, CatalogError> {
         let state_uri = self.expand_state_value(state)?;
         self.find_skills_by_state_relation("oc:yieldsState", &state_uri)
+    }
+
+    pub fn resolve_alias(&self, alias: &str) -> Result<Vec<SkillSummary>, CatalogError> {
+        let mut results = Vec::new();
+        let escaped = alias
+            .to_ascii_lowercase()
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"");
+        let query = format!(
+            r#"
+            PREFIX oc: <https://ontoskills.sh/ontology#>
+            PREFIX dcterms: <http://purl.org/dc/terms/>
+            SELECT ?skill ?skillId ?aliasValue
+            WHERE {{
+                ?skill a oc:Skill ;
+                       dcterms:identifier ?skillId ;
+                       oc:hasAlias ?aliasValue .
+                FILTER(LCASE(?aliasValue) = "{}")
+            }}
+            "#,
+            escaped
+        );
+
+        for row in self.select_rows(&query)? {
+            if let Some(skill_id) = row.optional_literal("skillId") {
+                if let Ok(skill) = self.get_skill(&skill_id) {
+                    let category =
+                        self.get_optional_literal_for_uri(&skill.uri, "oc:hasCategory")?;
+                    let is_user_invocable =
+                        self.get_optional_bool_for_uri(&skill.uri, "oc:isUserInvocable")?;
+                    results.push(SkillSummary {
+                        id: skill.id,
+                        qualified_id: skill.qualified_id,
+                        package_id: skill.package_id,
+                        trust_tier: skill.trust_tier,
+                        version: skill.version,
+                        source: skill.source,
+                        skill_type: skill.skill_type,
+                        nature: skill.nature,
+                        intents: skill.intents,
+                        requires_state: skill.requires_state,
+                        yields_state: skill.yields_state,
+                        category,
+                        is_user_invocable,
+                    });
+                }
+            }
+        }
+        results.sort_by(|left, right| left.qualified_id.cmp(&right.qualified_id));
+        Ok(results)
     }
 
     fn get_knowledge_nodes(
@@ -1032,6 +1112,9 @@ impl Catalog {
             if !matches {
                 continue;
             }
+            let category = self.get_optional_literal_for_uri(&record.uri, "oc:hasCategory")?;
+            let is_user_invocable =
+                self.get_optional_bool_for_uri(&record.uri, "oc:isUserInvocable")?;
             results.push(SkillSummary {
                 id: details.id,
                 qualified_id: details.qualified_id,
@@ -1044,6 +1127,8 @@ impl Catalog {
                 intents: details.intents,
                 requires_state: details.requires_state,
                 yields_state: details.yields_state,
+                category,
+                is_user_invocable,
             });
         }
         results.sort_by(|left, right| left.qualified_id.cmp(&right.qualified_id));
@@ -1107,6 +1192,36 @@ impl Catalog {
             }
         }
         Ok(values)
+    }
+
+    fn get_optional_literal_for_uri(
+        &self,
+        skill_uri: &str,
+        predicate: &str,
+    ) -> Result<Option<String>, CatalogError> {
+        let query = format!(
+            r#"
+            PREFIX oc: <https://ontoskills.sh/ontology#>
+            SELECT ?value WHERE {{
+                <{skill_uri}> {predicate} ?value .
+            }}
+            LIMIT 1
+        "#
+        );
+        Ok(self
+            .select_rows(&query)?
+            .into_iter()
+            .next()
+            .and_then(|row| row.optional_literal("value")))
+    }
+
+    fn get_optional_bool_for_uri(
+        &self,
+        skill_uri: &str,
+        predicate: &str,
+    ) -> Result<Option<bool>, CatalogError> {
+        let literal = self.get_optional_literal_for_uri(skill_uri, predicate)?;
+        Ok(literal.and_then(|v| v.parse::<bool>().ok()))
     }
 
     fn get_related_state_values(
@@ -2030,6 +2145,8 @@ oc:skill_xlsx_local a oc:Skill, oc:ExecutableSkill ;
                 requires_state: None,
                 yields_state: None,
                 skill_type: None,
+                category: None,
+                is_user_invocable: None,
                 limit: 10,
             })
             .unwrap();
