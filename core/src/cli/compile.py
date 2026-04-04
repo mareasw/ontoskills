@@ -1,7 +1,9 @@
 """Compile command - compile skills into modular ontology."""
 
+import json
 import logging
 import shutil
+from datetime import datetime
 from pathlib import Path
 
 import click
@@ -107,6 +109,69 @@ def enrich_extracted_skill(extracted, skill_dir: Path, input_path: Path, skill_p
         ]
     return extracted
 
+
+# In-memory error collector for compile-errors.json
+_compile_errors: list[dict] = []
+
+
+def _record_error(skill_id: str, error: str, kind: str = "extraction") -> None:
+    """Append a compile error to the in-memory collector."""
+    _compile_errors.append({
+        "skill_id": skill_id,
+        "error": str(error),
+        "kind": kind,
+        "timestamp": datetime.now().isoformat(),
+    })
+
+
+def _write_error_log(output_path: Path) -> None:
+    """Flush collected errors to compile-errors.json in the output directory."""
+    if not _compile_errors:
+        return
+    error_file = output_path / "compile-errors.json"
+    existing = []
+    if error_file.exists():
+        try:
+            existing = json.loads(error_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+    existing.extend(_compile_errors)
+    error_file.write_text(json.dumps(existing, indent=2, ensure_ascii=False), encoding="utf-8")
+    logger.info(f"Wrote {len(_compile_errors)} error(s) to {error_file}")
+
+
+MAX_EXTRACTION_RETRIES = 3
+
+
+def retry_extraction(extract_fn, skill_id: str, *args, **kwargs):
+    """Call extract_fn with retries on ExtractionError.
+
+    Args:
+        extract_fn: Callable that performs LLM extraction (e.g., tool_use_loop)
+        skill_id: Skill identifier for logging
+        *args, **kwargs: Forwarded to extract_fn
+
+    Returns:
+        The extraction result
+
+    Raises:
+        ExtractionError: After MAX_EXTRACTION_RETRIES failed attempts
+    """
+    last_error = None
+    for attempt in range(1, MAX_EXTRACTION_RETRIES + 1):
+        try:
+            return extract_fn(*args, **kwargs)
+        except ExtractionError as e:
+            last_error = e
+            if attempt < MAX_EXTRACTION_RETRIES:
+                logger.warning(
+                    f"Extraction attempt {attempt}/{MAX_EXTRACTION_RETRIES} failed for {skill_id}: {e}. Retrying..."
+                )
+            else:
+                logger.error(
+                    f"Extraction failed for {skill_id} after {MAX_EXTRACTION_RETRIES} attempts: {e}"
+                )
+    raise last_error
 
 @click.command()
 @click.argument('skill_name', required=False)
@@ -312,7 +377,7 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
 
         # Phase 2: LLM extraction
         try:
-            extracted = tool_use_loop(skill_dir, skill_hash, skill_id)
+            extracted = retry_extraction(tool_use_loop, skill_id, skill_dir, skill_hash, skill_id)
             extracted = enrich_extracted_skill(extracted, skill_dir, input_path, skill_parent_map)
 
             # Create CompiledSkill with Phase 1 data
@@ -332,6 +397,7 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
             logger.info(f"Successfully extracted: {skill_id}")
         except ExtractionError as e:
             console.print(f"[red]Extraction failed for {skill_id}: {e}[/red]")
+            _record_error(skill_id, e, "main_skill")
             continue
 
     # Process Rule B: Auxiliary Markdown (*.md → *.ttl)
@@ -400,7 +466,7 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
 
         # LLM extraction with context - use SHORT ID for extracted.id
         try:
-            extracted = tool_use_loop(skill_dir, sub_skill_hash, sub_skill_short_id, parent_context=parent_context)
+            extracted = retry_extraction(tool_use_loop, sub_skill_short_id, skill_dir, sub_skill_hash, sub_skill_short_id, parent_context=parent_context)
             extracted = enrich_extracted_skill(extracted, skill_dir, input_path, skill_parent_map)
 
             # Defer serialization until after dry_run check
@@ -412,6 +478,7 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
 
         except ExtractionError as e:
             console.print(f"[red]Extraction failed for sub-skill {sub_skill_short_id}: {e}[/red]")
+            _record_error(sub_skill_short_id, e, "sub_skill")
             continue
 
     # Process Rule C: Asset Files (collect for later - copy deferred until after dry_run check)
@@ -500,6 +567,9 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
     index_path = ontology_root / "system" / "index.ttl"
     generate_index_manifest(all_skill_paths, index_path, ontology_root)
     rebuild_registry_indexes(ontology_root)
+
+    # Flush error log to output directory
+    _write_error_log(output_path)
 
     # Summary output
     summary_parts = []
