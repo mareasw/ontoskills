@@ -35,13 +35,12 @@ oc:SkillShape
         sh:message "Ogni Skill deve avere almeno un resolvesIntent (intento risolto)" ;
     ] ;
 
-    # Every skill MUST have exactly one generatedBy attestation
+    # generatedBy is optional — migrated to system/index.json per-skill metadata
     sh:property [
         sh:path oc:generatedBy ;
-        sh:minCount 1 ;
         sh:maxCount 1 ;
         sh:datatype xsd:string ;
-        sh:message "Ogni Skill deve avere esattamente un generatedBy (modello LLM)" ;
+        sh:message "generatedBy, se presente, deve essere una stringa" ;
     ] ;
 
     # requiresState must be an IRI (novel states are allowed - MCP server resolves them)

@@ -518,3 +518,70 @@ def clean_orphaned_files(
         logger.info("No orphaned files found")
 
     return orphans_removed
+
+
+def generate_registry_json(
+    compiled_skills: list[dict],
+    index_path: Path,
+    output_root: Path,
+) -> None:
+    """Generate or update system/index.json with per-skill registry metadata.
+
+    Implements merge/upsert logic:
+    - Existing packages are updated by package_id
+    - Existing skills within a package are updated by skill_id
+    - New packages and skills are appended
+
+    Args:
+        compiled_skills: List of dicts with keys:
+            skill_id, package_id, manifest_url, generated_by, generated_at
+        index_path: Path to system/index.json
+        output_root: Root output directory for relative manifest_url computation
+    """
+    import json
+
+    registry: dict = {"version": 1, "packages": []}
+    if index_path.exists():
+        try:
+            registry = json.loads(index_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    packages: list[dict] = registry.get("packages", [])
+    pkg_index: dict[str, dict] = {p["package_id"]: p for p in packages}
+
+    for skill_entry in compiled_skills:
+        pkg_id = skill_entry["package_id"]
+
+        if pkg_id not in pkg_index:
+            pkg_index[pkg_id] = {
+                "package_id": pkg_id,
+                "trust_tier": "community",
+                "source_kind": "ontology",
+                "skills": [],
+            }
+            packages.append(pkg_index[pkg_id])
+
+        pkg = pkg_index[pkg_id]
+        existing_skills = {s["skill_id"]: s for s in pkg["skills"]}
+
+        skill_data = {
+            "skill_id": skill_entry["skill_id"],
+            "manifest_url": skill_entry["manifest_url"],
+            "generated_by": skill_entry["generated_by"],
+            "generated_at": skill_entry["generated_at"],
+        }
+
+        if skill_entry["skill_id"] in existing_skills:
+            existing_skills[skill_entry["skill_id"]].update(skill_data)
+        else:
+            pkg["skills"].append(skill_data)
+
+    registry["packages"] = packages
+
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index_path.write_text(
+        json.dumps(registry, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    logger.info(f"Updated registry index with {len(compiled_skills)} skill(s) at {index_path}")

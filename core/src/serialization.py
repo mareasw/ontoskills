@@ -169,9 +169,7 @@ def serialize_skill(
             state_ref = oc[state_name]
             graph.add((skill_uri, oc.handlesFailure, state_ref))
 
-    # LLM attestation
-    if skill.generated_by and skill.generated_by != "unknown":
-        graph.add((skill_uri, oc.generatedBy, Literal(skill.generated_by)))
+    # LLM attestation removed — migrated to system/index.json per-skill metadata
 
     # Execution payload
     if skill.execution_payload:

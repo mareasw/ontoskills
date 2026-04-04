@@ -25,6 +25,7 @@ from compiler.serialization import serialize_skill_to_module
 from compiler.storage import (
     generate_index_manifest,
     clean_orphaned_files,
+    generate_registry_json,
 )
 from compiler.registry import (
     ensure_registry_layout,
@@ -35,8 +36,9 @@ from compiler.exceptions import (
     ExtractionError,
     SkillNotFoundError,
     OrphanSubSkillsError,
+    OntologyValidationError,
 )
-from compiler.config import CORE_ONTOLOGY_FILENAME, SKILLS_DIR, OUTPUT_DIR, resolve_ontology_root
+from compiler.config import CORE_ONTOLOGY_FILENAME, SKILLS_DIR, OUTPUT_DIR, resolve_ontology_root, ANTHROPIC_MODEL
 from compiler.loader import scan_skill_directory, LoaderError
 from compiler.schemas import CompiledSkill
 
@@ -290,9 +292,12 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
                 skill_dir, aux_files,
             )
 
-    # Process Rule A: Core Skills (SKILL.md → ontoskill.ttl)
-    compiled_skills = []
-    skill_output_paths = []
+    # Counters for summary
+    skills_serialized = 0
+    sub_skills_serialized = 0
+    assets_copied = 0
+    compiled_skills = []  # Track extracted skills for summary display
+    _registry_entries = []  # Per-skill metadata for index.json
 
     # Build skill_parent_map for Rule A using frontmatter names (not directory names)
     # This ensures parent/child IDs remain consistent
@@ -306,7 +311,7 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
             dir_scan = scan_skill_directory(skill_dir)
             dir_scan_cache[skill_dir] = dir_scan  # Cache for reuse
             skill_id = dir_scan.skill_id  # From frontmatter.name
-            package_id = resolve_package_id(skill_dir)
+            package_id = resolve_package_id(skill_dir, input_path)
             qualified_parent_id = generate_qualified_skill_id(package_id, skill_id)
             skill_parent_map[skill_dir] = (qualified_parent_id, package_id)
         except LoaderError as e:
@@ -315,6 +320,8 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
             console.print(f"[red]Phase 1 scan failed while building parent map for {skill_dir.name}: {e}[/red]")
             continue
 
+    # Process Rule A: Core Skills (SKILL.md → ontoskill.ttl)
+    # Each skill is serialized to disk immediately after extraction.
     for skill_file in skill_md_files:
         skill_dir = skill_file.parent
 
@@ -330,13 +337,8 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
         # Use Phase 1 data for IDs and hash
         skill_id = dir_scan.skill_id
         skill_hash = dir_scan.content_hash
-        # Derive package_id from dir_scan.qualified_id (format: package_id/skill_id)
-        # Use rsplit to handle package IDs with slashes (e.g., office/public/skill -> office/public)
-        # Fallback to resolve_package_id if qualified_id not available
-        if dir_scan.qualified_id and '/' in dir_scan.qualified_id:
-            package_id = dir_scan.qualified_id.rsplit('/', 1)[0]
-        else:
-            package_id = resolve_package_id(skill_dir)
+        # Derive package_id from directory structure
+        package_id = resolve_package_id(skill_dir, input_path)
 
         logger.info(f"Processing skill: {skill_id}")
 
@@ -387,13 +389,31 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
                 files=dir_scan.files,
             )
 
-            # Keep short/local ID for parent skill (sub-skills extend to this short parent ID)
-            # Note: compiled.id remains the short skill ID (e.g., "brainstorming"), used as extends_parent
-            # Store with package_id for later serialization
-            _, pkg_id = skill_parent_map.get(skill_dir, (skill_id, "local"))
-            compiled_skills.append((compiled, pkg_id))
-            skill_output_paths.append(output_skill_path)
+            # Serialize immediately to disk (unless dry_run)
+            if not dry_run:
+                _, pkg_id = skill_parent_map.get(skill_dir, (skill_id, "local"))
+                qualified_id = f"{pkg_id}/{compiled.id}"
+                try:
+                    serialize_skill_to_module(
+                        compiled, output_skill_path, output_path,
+                        qualified_id=qualified_id
+                    )
+                    skills_serialized += 1
+                    # Track for registry index.json
+                    rel_skill_path = output_skill_path.relative_to(output_path)
+                    _registry_entries.append({
+                        "skill_id": compiled.id,
+                        "package_id": package_id,
+                        "manifest_url": f"./{rel_skill_path}",
+                        "generated_by": ANTHROPIC_MODEL,
+                        "generated_at": datetime.now().isoformat(),
+                    })
+                except OntologyValidationError as e:
+                    console.print(f"[red]Validation failed for {skill.id}: {e}[/red]")
+                    _record_error(skill_id, e, "validation")
 
+            # Track for summary display
+            compiled_skills.append(compiled)
             logger.info(f"Successfully extracted: {skill_id}")
         except ExtractionError as e:
             console.print(f"[red]Extraction failed for {skill_id}: {e}[/red]")
@@ -401,11 +421,7 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
             continue
 
     # Process Rule B: Auxiliary Markdown (*.md → *.ttl)
-    # skill_parent_map already built above for Rule A
-
-    # Process auxiliary files (extraction only - serialization deferred until after dry_run check)
-    # Tuple: (extracted, output_ttl_path, qualified_id, extends_parent, extends_parent_qualified)
-    sub_skills_to_serialize = []
+    # Each sub-skill is serialized to disk immediately after extraction.
     resolved_parent_map = {Path(p).resolve(): v for p, v in skill_parent_map.items()}
     for md_file in auxiliary_md_files:
         # Walk up to find the parent skill directory (the one with SKILL.md)
@@ -469,11 +485,31 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
             extracted = retry_extraction(tool_use_loop, sub_skill_short_id, skill_dir, sub_skill_hash, sub_skill_short_id, parent_context=parent_context)
             extracted = enrich_extracted_skill(extracted, skill_dir, input_path, skill_parent_map)
 
-            # Defer serialization until after dry_run check
-            sub_skills_to_serialize.append((
-                extracted, output_ttl_path, sub_skill_qualified_id,
-                parent_local_id, parent_qualified_id
-            ))
+            # Serialize immediately to disk (unless dry_run)
+            if not dry_run:
+                try:
+                    serialize_skill_to_module(
+                        extracted,
+                        output_ttl_path,
+                        output_path,
+                        qualified_id=sub_skill_qualified_id,
+                        extends_parent=parent_local_id,
+                        extends_parent_qualified=parent_qualified_id,
+                    )
+                    sub_skills_serialized += 1
+                    # Track for registry index.json
+                    rel_sub_path = output_ttl_path.relative_to(output_path)
+                    _registry_entries.append({
+                        "skill_id": extracted.id,
+                        "package_id": package_id,
+                        "manifest_url": f"./{rel_sub_path}",
+                        "generated_by": ANTHROPIC_MODEL,
+                        "generated_at": datetime.now().isoformat(),
+                    })
+                except OntologyValidationError as e:
+                    console.print(f"[red]Validation failed for sub-skill {extracted.id}: {e}[/red]")
+                    _record_error(sub_skill_short_id, e, "validation")
+
             logger.info(f"Successfully extracted sub-skill: {sub_skill_short_id}")
 
         except ExtractionError as e:
@@ -495,11 +531,11 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
 
         assets_to_copy.append((asset_file, output_asset_path))
 
-    # Show summary
+    # Show summary of extracted skills
     if compiled_skills:
         console.print(Panel(f"[green]Compiled {len(compiled_skills)} skill(s)[/green]"))
 
-        for skill, _ in compiled_skills:
+        for skill in compiled_skills:
             console.print(f"\n[bold]{skill.id}[/bold]")
             console.print(f"  Nature: {skill.nature[:80]}...")
             console.print(f"  Genus: {skill.genus}")
@@ -519,39 +555,7 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
             console.print("[yellow]Cancelled[/yellow]")
             return
 
-    # Serialize each skill module (with qualified ID for URI)
-    for (skill, package_id), output_skill_path in zip(compiled_skills, skill_output_paths):
-        qualified_id = f"{package_id}/{skill.id}"
-        try:
-            serialize_skill_to_module(
-                skill, output_skill_path, output_path,
-                qualified_id=qualified_id
-            )
-        except OntologyValidationError as e:
-            console.print(f"[red]Validation failed for {skill.id}: {e}[/red]")
-            continue
-
-    # Serialize sub-skill modules (after dry_run check)
-    sub_skills_serialized = 0
-    for item in sub_skills_to_serialize:
-        extracted, output_ttl_path, qualified_id, extends_parent, extends_parent_qualified = item
-        try:
-            serialize_skill_to_module(
-                extracted,
-                output_ttl_path,
-                output_path,
-                qualified_id=qualified_id,
-                extends_parent=extends_parent,
-                extends_parent_qualified=extends_parent_qualified,
-            )
-            sub_skills_serialized += 1
-        except OntologyValidationError as e:
-            console.print(f"[red]Validation failed for sub-skill {extracted.id}: {e}[/red]")
-            continue
-        sub_skills_serialized += 1
-
     # Copy assets (after dry_run check)
-    assets_copied = 0
     for asset_file, output_asset_path in assets_to_copy:
         output_asset_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(asset_file, output_asset_path)
@@ -571,10 +575,15 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
     # Flush error log to output directory
     _write_error_log(output_path)
 
+    # Generate registry index.json
+    if _registry_entries:
+        registry_path = ontology_root / "system" / "index.json"
+        generate_registry_json(_registry_entries, registry_path, output_path)
+
     # Summary output
     summary_parts = []
-    if compiled_skills:
-        summary_parts.append(f"{len(compiled_skills)} skill(s)")
+    if skills_serialized > 0:
+        summary_parts.append(f"{skills_serialized} skill(s)")
     if sub_skills_serialized > 0:
         summary_parts.append(f"{sub_skills_serialized} sub-skill(s)")
     if assets_copied > 0:

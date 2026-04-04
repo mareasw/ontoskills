@@ -58,6 +58,9 @@ def resolve_ontology_root(path: str | Path) -> Path:
 ANTHROPIC_MODEL = os.getenv('ANTHROPIC_MODEL', 'claude-opus-4-6')
 SECURITY_MODEL = os.getenv('SECURITY_MODEL', 'claude-opus-4-6')
 
+# Default author for skills without a vendor in directory structure
+DEFAULT_SKILLS_AUTHOR = os.environ.get('DEFAULT_SKILLS_AUTHOR')
+
 # Processing limits
 MAX_ITERATIONS = 20
 EXTRACTION_TIMEOUT = 120  # seconds

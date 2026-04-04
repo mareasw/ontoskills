@@ -187,3 +187,26 @@ def test_failure_states_dict():
         assert isinstance(config.FAILURE_STATES[state], str)
         # Check that it's a valid URI fragment
         assert config.FAILURE_STATES[state].startswith('#')
+
+
+def test_default_skills_author():
+    """Verify DEFAULT_SKILLS_AUTHOR is None when env var not set."""
+    import sys
+    for mod in list(sys.modules.keys()):
+        if mod.startswith('config') or mod.startswith('compiler'):
+            del sys.modules[mod]
+
+    with patch.dict(os.environ, {}, clear=False):
+        os.environ.pop('DEFAULT_SKILLS_AUTHOR', None)
+        with patch('compiler.env.load_local_env'):
+            from compiler import config
+        assert config.DEFAULT_SKILLS_AUTHOR is None
+
+
+def test_custom_skills_author():
+    """Verify custom DEFAULT_SKILLS_AUTHOR from environment variable."""
+    with patch.dict(os.environ, {'DEFAULT_SKILLS_AUTHOR': 'mareasw'}):
+        import importlib
+        from compiler import config
+        importlib.reload(config)
+        assert config.DEFAULT_SKILLS_AUTHOR == 'mareasw'
