@@ -140,11 +140,16 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
     ontology_root = output_path if output_dir != OUTPUT_DIR else resolve_ontology_root(output_path)
     ensure_registry_layout(ontology_root)
 
-    # Ensure core ontology exists
+    # Copy canonical core ontology from site if not already present
     core_path = ontology_root / CORE_ONTOLOGY_FILENAME
     if not core_path.exists():
-        logger.info("Creating core ontology...")
-        create_core_ontology(core_path)
+        canonical_core = Path(__file__).parent.parent.parent.parent / "site" / "public" / "ontology" / CORE_ONTOLOGY_FILENAME
+        if canonical_core.exists():
+            logger.info("Copying canonical core ontology from site/public/ontology/")
+            shutil.copy2(canonical_core, core_path)
+        else:
+            logger.info("Creating core ontology (no canonical found)...")
+            create_core_ontology(core_path)
 
     # Clean orphaned files before compilation
     orphans_removed = clean_orphaned_files(input_path, output_path, dry_run=dry_run)
