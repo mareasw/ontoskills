@@ -41,6 +41,25 @@ from compiler.schemas import CompiledSkill
 console = Console()
 
 
+def find_skill_root_dir(start_path: Path, boundary_path: Path) -> Path | None:
+    """Walk up from start_path to find the nearest ancestor containing SKILL.md.
+
+    Args:
+        start_path: Directory to start searching from
+        boundary_path: Stop walking at this path (exclusive)
+
+    Returns:
+        The nearest parent directory containing SKILL.md, or None.
+    """
+    candidate = start_path.resolve()
+    boundary = boundary_path.resolve()
+    while candidate != boundary and candidate != candidate.parent:
+        if (candidate / "SKILL.md").exists():
+            return candidate
+        candidate = candidate.parent
+    return None
+
+
 def infer_parent_skill_id(skill_dir: Path, input_path: Path, skill_parent_map: dict | None = None) -> str | None:
     """Infer the nearest parent skill from the directory structure.
 
@@ -57,31 +76,23 @@ def infer_parent_skill_id(skill_dir: Path, input_path: Path, skill_parent_map: d
     Returns:
         The canonical parent skill ID (from frontmatter if available) or None
     """
-    # Normalize all paths to avoid mixing resolved and unresolved paths
-    current = skill_dir.resolve().parent
-    input_root = input_path.resolve()
-
     # Normalize skill_parent_map keys for consistent lookups
     normalized_map: dict | None = None
     if skill_parent_map is not None:
         normalized_map = {Path(p).resolve(): v for p, v in skill_parent_map.items()}
 
-    while current != input_root and current != current.parent:
-        if (current / "SKILL.md").exists():
-            if normalized_map is not None:
-                # Map provided: only accept parent if it passed Phase 1 and will be compiled
-                if current in normalized_map:
-                    qualified_id, _ = normalized_map[current]
-                    # Extract short ID from qualified ID (package/skill_id -> skill_id)
-                    return qualified_id.split('/')[-1]
-                # Parent has SKILL.md but failed Phase 1 - continue walking up
-                # to find a valid parent (avoids extends to non-existent module)
-            else:
-                # No map provided (outside main compilation): use directory name as fallback
-                return generate_skill_id(current.name)
-        current = current.parent
+    # Walk up from parent of skill_dir to find nearest SKILL.md
+    parent_dir = find_skill_root_dir(skill_dir.resolve().parent, input_path.resolve())
+    if parent_dir is None:
+        return None
 
-    return None
+    if normalized_map is not None:
+        if parent_dir in normalized_map:
+            qualified_id, _ = normalized_map[parent_dir]
+            return qualified_id.split('/')[-1]
+        return None  # Parent has SKILL.md but failed Phase 1
+    else:
+        return generate_skill_id(parent_dir.name)
 
 
 def enrich_extracted_skill(extracted, skill_dir: Path, input_path: Path, skill_parent_map: dict | None = None):
@@ -329,18 +340,23 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
     # Process auxiliary files (extraction only - serialization deferred until after dry_run check)
     # Tuple: (extracted, output_ttl_path, qualified_id, extends_parent, extends_parent_qualified)
     sub_skills_to_serialize = []
+    resolved_parent_map = {Path(p).resolve(): v for p, v in skill_parent_map.items()}
     for md_file in auxiliary_md_files:
-        skill_dir = md_file.parent
+        # Walk up to find the parent skill directory (the one with SKILL.md)
+        skill_dir = find_skill_root_dir(md_file.parent, input_path)
+        if skill_dir is None:
+            logger.warning(f"Skipping {md_file.name}: no parent SKILL.md found in ancestor directories")
+            continue
         rel_path = md_file.relative_to(input_path)
         output_ttl_path = output_path / rel_path.with_suffix(".ttl")
 
         # Skip sub-skills whose parent failed Phase 1 (not in skill_parent_map)
-        if skill_dir not in skill_parent_map:
+        if skill_dir not in resolved_parent_map:
             logger.warning(f"Skipping {md_file.name}: parent skill not in skill_parent_map (failed Phase 1)")
             continue
 
         # Get parent context
-        parent_qualified_id, package_id = skill_parent_map[skill_dir]
+        parent_qualified_id, package_id = resolved_parent_map[skill_dir]
 
         # Extract parent local ID from qualified ID (uses frontmatter name, not directory name)
         # Format: {package_id}/{skill_id}
