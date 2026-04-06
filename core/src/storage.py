@@ -10,6 +10,7 @@ Handles file I/O operations for skills and ontologies including:
 """
 
 import logging
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -524,7 +525,7 @@ def generate_package_manifest(
     package_id: str,
     compiled_skills: list[dict],
     output_dir: Path,
-    trust_tier: str = "community",
+    trust_tier: str = os.environ.get("ONTOSKILLS_TRUST_TIER", "community"),
 ) -> None:
     """Generate a per-package package.json manifest.
 
