@@ -248,17 +248,28 @@ class Frontmatter(BaseModel):
     @field_validator('name')
     @classmethod
     def validate_name(cls, v: str) -> str:
-        if len(v) > 64:
-            raise ValueError(f"Skill name exceeds 64 characters: {len(v)}")
-        if not re.match(r'^[a-z0-9]+(?:-[a-z0-9]+)*$', v):
-            raise ValueError("Skill name must be lowercase alphanumeric with single hyphens (no leading/trailing/repeated hyphens)")
-        # Check for OntoSkills reserved words anywhere in the skill name
-        reserved = ('ontoskills', 'marea', 'mareasw', 'core', 'system', 'index')
-        segments = v.lower().split('-')
-        for word in reserved:
-            if word in segments:
-                raise ValueError(f"Reserved word '{word}' not allowed in skill name")
-        return v
+        # Strip scope prefix (e.g., "ckm:banner-design" → "banner-design")
+        if ':' in v:
+            v = v.rsplit(':', 1)[-1]
+
+        # Auto-normalize: lowercase, spaces/underscores → hyphens, collapse repeated hyphens
+        normalized = v.lower().strip()
+        normalized = re.sub(r'[\s_]+', '-', normalized)
+        normalized = re.sub(r'[^a-z0-9-]', '-', normalized)
+        normalized = re.sub(r'-+', '-', normalized)
+        normalized = normalized.strip('-')
+
+        if not normalized:
+            raise ValueError("Skill name is empty after normalization")
+        if len(normalized) > 64:
+            raise ValueError(f"Skill name exceeds 64 characters: {len(normalized)}")
+
+        # Block only if the FULL name is a reserved word (not a compound like "system-design")
+        fully_reserved = ('ontoskills', 'index')
+        if normalized in fully_reserved:
+            raise ValueError(f"Skill name '{normalized}' is a reserved identifier")
+
+        return normalized
 
     @field_validator('description')
     @classmethod
