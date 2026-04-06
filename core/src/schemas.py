@@ -120,13 +120,12 @@ class ExtractedSkill(BaseModel):
     @field_validator('depends_on', 'extends', 'contradicts')
     @classmethod
     def validate_skill_relation_ids(cls, values: list[str]) -> list[str]:
-        """Validate and normalize relation targets as qualified skill ids.
+        """Validate and normalize relation targets.
 
-        Rules:
-          - "skill-name" (0 slashes) → add default author → "default/skill-name"
-          - "author/skill-name" (1 slash) → keep as-is
-          - "default/repo/skill-name" (2+ slashes) → strip default author → "repo/skill-name"
-          - URIs (http://, https://, oc:) → pass through
+        Accepts: bare skill ids ("office"), qualified ("author/skill"),
+        over-qualified ("default/author/skill"), or URIs.
+        Strips default author prefix from over-qualified IDs only.
+        Does NOT add default author — that belongs in serialization/manifest layer.
         """
         import re
         import os
@@ -143,30 +142,28 @@ class ExtractedSkill(BaseModel):
                 continue
             parts = candidate.split('/')
             if len(parts) == 1:
-                # Just skill name → add default author
+                # Bare skill name → validate and keep as-is
                 if not pattern.match(parts[0]):
                     raise ValueError(
                         f"Invalid skill relation '{value}'. Use canonical skill ids like 'office' or 'docx-review'."
                     )
-                if default_author:
-                    normalized.append(f"{default_author}/{parts[0]}")
-                else:
-                    normalized.append(parts[0])
+                normalized.append(parts[0])
             elif len(parts) == 2:
-                # author/skill → validate both segments
+                # author/skill → validate both segments, keep as-is
                 if not all(pattern.match(p) for p in parts):
                     raise ValueError(
                         f"Invalid skill relation '{value}'. Use format 'author/skill-name'."
                     )
                 normalized.append(f"{parts[0]}/{parts[1]}")
             else:
-                # 3+ segments: strip default author if first segment matches
+                # 3+ segments: strip default author if first segment matches,
+                # otherwise take last two segments
                 if default_author and parts[0] == default_author:
                     parts = parts[1:]
-                if len(parts) < 2:
+                if len(parts) == 1:
                     normalized.append(parts[0])
                 else:
-                    normalized.append(f"{parts[0]}/{parts[1]}")
+                    normalized.append(f"{parts[-2]}/{parts[-1]}")
         return normalized
 
     @field_validator('is_user_invocable', mode='before')
