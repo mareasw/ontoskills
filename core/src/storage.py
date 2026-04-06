@@ -534,8 +534,9 @@ def generate_package_manifest(
     Args:
         package_id: Qualified package ID (e.g., "anthropics/financial-services-plugin")
         compiled_skills: List of dicts with keys:
-            skill_id, nature, modules, aliases, depends_on_skills, default_enabled
-        output_dir: The vendor output directory (e.g., ontostore/packages/anthropics/)
+            skill_id, path, description, category, intents, aliases,
+            depends_on_skills, default_enabled, modules
+        output_dir: The sub-package directory (e.g., ontostore/packages/anthropics/financial-services-plugin/)
         trust_tier: Trust tier for the package
     """
     import json
@@ -544,18 +545,18 @@ def generate_package_manifest(
     skills = []
     for entry in compiled_skills:
         rel_path = entry.get("path", f"{entry['skill_id']}/ontoskill.ttl")
-        skills.append({
+        skill_data = {
             "id": entry["skill_id"],
             "path": rel_path,
             "default_enabled": entry.get("default_enabled", True),
             "aliases": entry.get("aliases", []),
-            "description": entry.get("nature", ""),
+            "description": entry.get("description", ""),
+            "category": entry.get("category", ""),
+            "intents": entry.get("intents", []),
             "depends_on_skills": entry.get("depends_on_skills", []),
-            "generated_by": entry.get("generated_by", ""),
-            "generated_at": entry.get("generated_at", ""),
-        })
+        }
+        skills.append(skill_data)
         modules.add(rel_path)
-        # Also add sub-skill modules if tracked
         for mod in entry.get("modules", []):
             modules.add(mod)
 

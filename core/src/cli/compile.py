@@ -146,31 +146,39 @@ def _write_error_log(output_path: Path) -> None:
 
 
 def _generate_manifests_from_disk(output_path: Path, ontology_root: Path) -> None:
-    """Generate package.json and index.json by scanning existing TTL files on disk.
+    """Generate per-package package.json and root index.json by scanning TTLs on disk.
 
-    This ensures manifests are always complete, even for skills that were
-    skipped by hash match during compilation. Reads skill metadata directly
-    from the compiled TTL files.
+    Reads skill metadata (description, category, intents, extends) directly from
+    compiled TTL files. Generates one package.json per sub-package directory and
+    a root index.json listing all packages.
+
+    Output layout:
+        ontostore/
+        ├── packages/
+        │   └── anthropics/
+        │       ├── financial-services-plugin/package.json
+        │       ├── knowledge-work-plugins/package.json
+        │       └── claude-code/package.json
+        ├── system/
+        └── index.json
     """
-    import re
     from compiler.core_ontology import get_oc_namespace
 
     oc = get_oc_namespace()
     parent_skills = list(output_path.rglob("ontoskill.ttl"))
-    sub_skills = list(output_path.rglob("*.ttl"))
-    sub_skills = [t for t in sub_skills if t.name != "ontoskill.ttl"]
+    all_ttls = list(output_path.rglob("*.ttl"))
 
     if not parent_skills:
         return
 
-    vendor_name = output_path.name  # e.g., "anthropics"
-    packages_on_disk: dict[str, list[dict]] = {}
+    vendor_name = output_path.name
+    # sub_pkg_dir -> list of skill dicts
+    packages_on_disk: dict[Path, list[dict]] = {}
 
     def _extract_skill_id(uri_str: str) -> str:
         """Extract skill ID from a URI like https://ontoskills.sh/ontology#skill_pptx."""
         if "#" in uri_str:
             fragment = uri_str.rsplit("#", 1)[-1]
-            # Remove 'skill_' prefix if present
             if fragment.startswith("skill_"):
                 fragment = fragment[6:]
             return fragment.replace("_", "-")
@@ -186,66 +194,76 @@ def _generate_manifests_from_disk(output_path: Path, ontology_root: Path) -> Non
 
         for skill_uri in graph.subjects(RDF.type, oc.Skill):
             skill_id = str(graph.value(skill_uri, DCTERMS.identifier) or "")
-            nature = str(graph.value(skill_uri, oc.nature) or "")
-            extends = [_extract_skill_id(str(o)) for o in graph.objects(skill_uri, oc.extends)]
-            depends = [_extract_skill_id(str(o)) for o in graph.objects(skill_uri, oc.dependsOnSkill)]
-
             if not skill_id:
                 continue
 
-            # package_id = vendor/first_dir_segment (e.g., "anthropics/financial-services-plugin")
-            parts = rel.parts  # e.g., ("financial-services-plugin", "funding-digest", "ontoskill.ttl")
-            first_segment = parts[0] if parts else vendor_name
-            pkg_id = f"{vendor_name}/{first_segment}"
+            # Use oc:hasDescription (the rich description), not oc:nature
+            description = str(graph.value(skill_uri, oc.hasDescription) or "")
+            category = str(graph.value(skill_uri, getattr(oc, 'hasCategory', None)) or "")
+            extends = [_extract_skill_id(str(o)) for o in graph.objects(skill_uri, oc.extends)]
+            depends = [_extract_skill_id(str(o)) for o in graph.objects(skill_uri, oc.dependsOnSkill)]
+            intents = [str(o) for o in graph.objects(skill_uri, getattr(oc, 'resolvesIntent', None))]
 
-            # Collect sub-skill modules under this skill's directory
+            # Sub-package directory = first segment under vendor
+            # e.g., rel = financial-services-plugin/funding-digest/ontoskill.ttl
+            # → sub_pkg_dir = financial-services-plugin/
+            parts = rel.parts
+            if len(parts) >= 2:
+                sub_pkg_dir = output_path / parts[0]
+            else:
+                sub_pkg_dir = output_path
+            pkg_id = f"{vendor_name}/{parts[0]}" if len(parts) >= 2 else vendor_name
+
+            # Collect all TTL modules under this skill's directory
             skill_dir = ttl_path.parent
-            modules = [str(rel)]
-            for sub_ttl in sub_skills:
-                # Sub-skills live in the same skill dir or nested under it
+            modules = []
+            for t in all_ttls:
                 try:
-                    sub_rel = sub_ttl.relative_to(skill_dir)
-                    modules.append(str(rel.parent / sub_rel))
+                    t.relative_to(skill_dir)
+                    modules.append(str(t.relative_to(output_path)))
                 except ValueError:
                     pass
 
-            if pkg_id not in packages_on_disk:
-                packages_on_disk[pkg_id] = []
-            packages_on_disk[pkg_id].append({
+            if sub_pkg_dir not in packages_on_disk:
+                packages_on_disk[sub_pkg_dir] = []
+            packages_on_disk[sub_pkg_dir].append({
                 "skill_id": skill_id,
                 "path": str(rel),
-                "nature": nature[:200],
+                "description": description.strip()[:500] if description else "",
+                "category": category,
+                "intents": intents,
                 "aliases": [],
                 "depends_on_skills": extends + depends,
                 "default_enabled": True,
-                "generated_by": "",
-                "generated_at": "",
                 "modules": sorted(set(modules)),
+                "package_id": pkg_id,
             })
 
-    # Generate per-package package.json
-    for pkg_id, skills in packages_on_disk.items():
+    # Generate per-sub-package package.json
+    registry_packages = []
+    for sub_pkg_dir, skills in packages_on_disk.items():
+        pkg_id = skills[0]["package_id"] if skills else sub_pkg_dir.name
+        # Write package.json into the sub-package directory
         generate_package_manifest(
             package_id=pkg_id,
             compiled_skills=skills,
-            output_dir=output_path,
+            output_dir=sub_pkg_dir,
         )
+        # Entry for root index.json
+        try:
+            rel_manifest = sub_pkg_dir.relative_to(ontology_root)
+            manifest_url = f"./{rel_manifest}/package.json"
+        except ValueError:
+            manifest_url = f"./packages/{sub_pkg_dir.relative_to(output_path)}/package.json"
+        registry_packages.append({
+            "package_id": pkg_id,
+            "manifest_url": manifest_url,
+            "trust_tier": "community",
+            "source_kind": "ontology",
+        })
 
     # Generate/update root index.json
-    if packages_on_disk:
-        registry_packages = []
-        for pkg_id in packages_on_disk:
-            try:
-                rel_manifest = output_path.relative_to(ontology_root)
-                manifest_url = f"./{rel_manifest}/package.json"
-            except ValueError:
-                manifest_url = f"./{output_path.name}/package.json"
-            registry_packages.append({
-                "package_id": pkg_id,
-                "manifest_url": manifest_url,
-                "trust_tier": "community",
-                "source_kind": "ontology",
-            })
+    if registry_packages:
         generate_registry_index(registry_packages, ontology_root / "index.json")
 
 

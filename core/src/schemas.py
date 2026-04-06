@@ -132,6 +132,10 @@ class ExtractedSkill(BaseModel):
             if candidate.startswith(("http://", "https://", "oc:")):
                 normalized.append(candidate)
                 continue
+            # If qualified ID (e.g., "mareasw/vercel-labs/agent-browser"),
+            # extract the local skill ID (last segment)
+            if '/' in candidate:
+                candidate = candidate.rsplit('/', 1)[-1]
             if not pattern.match(candidate):
                 raise ValueError(
                     f"Invalid skill relation '{value}'. Use canonical skill ids like 'office' or 'docx-review'."
