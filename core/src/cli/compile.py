@@ -19,6 +19,7 @@ from compiler.extractor import (
     resolve_package_id,
     compute_sub_skill_hash,
 )
+from compiler.skill_registry import SkillRegistry
 from compiler.transformer import tool_use_loop
 from compiler.security import security_check, SecurityError
 from compiler.core_ontology import get_oc_namespace, create_core_ontology
@@ -102,7 +103,7 @@ def infer_parent_skill_id(skill_dir: Path, input_path: Path, skill_parent_map: d
         return generate_skill_id(parent_dir.name)
 
 
-def enrich_extracted_skill(extracted, skill_dir: Path, input_path: Path, skill_parent_map: dict | None = None):
+def enrich_extracted_skill(extracted, skill_dir: Path, input_path: Path, skill_parent_map: dict | None = None, skill_registry: SkillRegistry | None = None):
     """Apply deterministic compiler-side enrichments to extracted skills."""
     parent_skill_id = infer_parent_skill_id(skill_dir, input_path, skill_parent_map)
     if parent_skill_id and parent_skill_id != extracted.id and parent_skill_id not in extracted.extends:
@@ -112,6 +113,11 @@ def enrich_extracted_skill(extracted, skill_dir: Path, input_path: Path, skill_p
             dependency for dependency in extracted.depends_on
             if dependency not in extracted.extends
         ]
+    # Filter relation references against known skills in this package
+    if skill_registry:
+        extracted.depends_on = skill_registry.filter_relations(extracted.depends_on, "depends_on")
+        extracted.extends = skill_registry.filter_relations(extracted.extends, "extends")
+        extracted.contradicts = skill_registry.filter_relations(extracted.contradicts, "contradicts")
     return extracted
 
 
@@ -258,7 +264,7 @@ def _generate_manifests_from_disk(output_path: Path, ontology_root: Path) -> Non
         registry_packages.append({
             "package_id": pkg_id,
             "manifest_url": manifest_url,
-            "trust_tier": "community",
+            "trust_tier": os.environ.get("ONTOSKILLS_TRUST_TIER", "community"),
             "source_kind": "ontology",
         })
 
@@ -507,6 +513,17 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
             console.print(f"[red]Phase 1 scan failed while building parent map for {skill_dir.name}: {e}[/red]")
             continue
 
+    # Build intra-package skill registry for LLM context + validation
+    package_name = input_path.name if input_path else ""
+    skill_registry = SkillRegistry.build(
+        dir_scan_cache=dir_scan_cache,
+        package_name=package_name,
+    )
+    logger.info(
+        "Built skill registry with %d known skills for '%s'",
+        len(skill_registry.skills), package_name,
+    )
+
     # Process Rule A: Core Skills (SKILL.md → ontoskill.ttl)
     # Each skill is serialized to disk immediately after extraction.
     for skill_file in skill_md_files:
@@ -566,8 +583,8 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
 
         # Phase 2: LLM extraction
         try:
-            extracted = retry_extraction(tool_use_loop, skill_id, skill_dir, skill_hash, skill_id)
-            extracted = enrich_extracted_skill(extracted, skill_dir, input_path, skill_parent_map)
+            extracted = retry_extraction(tool_use_loop, skill_id, skill_dir, skill_hash, skill_id, skill_registry=skill_registry)
+            extracted = enrich_extracted_skill(extracted, skill_dir, input_path, skill_parent_map, skill_registry)
 
             # Create CompiledSkill with Phase 1 data
             compiled = CompiledSkill(
@@ -660,8 +677,8 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
 
         # LLM extraction with context - use SHORT ID for extracted.id
         try:
-            extracted = retry_extraction(tool_use_loop, sub_skill_short_id, skill_dir, sub_skill_hash, sub_skill_short_id, parent_context=parent_context)
-            extracted = enrich_extracted_skill(extracted, skill_dir, input_path, skill_parent_map)
+            extracted = retry_extraction(tool_use_loop, sub_skill_short_id, skill_dir, sub_skill_hash, sub_skill_short_id, parent_context=parent_context, skill_registry=skill_registry)
+            extracted = enrich_extracted_skill(extracted, skill_dir, input_path, skill_parent_map, skill_registry)
 
             # Serialize immediately to disk (unless dry_run)
             if not dry_run:
