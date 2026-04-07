@@ -4,6 +4,8 @@ import json
 import logging
 import os
 import shutil
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
@@ -122,18 +124,20 @@ def enrich_extracted_skill(extracted, skill_dir: Path, input_path: Path, skill_p
     return extracted
 
 
-# In-memory error collector for compile-errors.json
+# In-memory error collector for compile-errors.json (thread-safe)
 _compile_errors: list[dict] = []
+_errors_lock = threading.Lock()
 
 
 def _record_error(skill_id: str, error: str, kind: str = "extraction") -> None:
     """Append a compile error to the in-memory collector."""
-    _compile_errors.append({
-        "skill_id": skill_id,
-        "error": str(error),
-        "kind": kind,
-        "timestamp": datetime.now().isoformat(),
-    })
+    with _errors_lock:
+        _compile_errors.append({
+            "skill_id": skill_id,
+            "error": str(error),
+            "kind": kind,
+            "timestamp": datetime.now().isoformat(),
+        })
 
 
 def _write_error_log(output_path: Path) -> None:
@@ -277,33 +281,34 @@ def _generate_manifests_from_disk(output_path: Path, ontology_root: Path) -> Non
 MAX_EXTRACTION_RETRIES = 3
 
 
-def retry_extraction(extract_fn, skill_id: str, *args, **kwargs):
+def retry_extraction(extract_fn, skill_id: str, *args, _max_retries: int = MAX_EXTRACTION_RETRIES, **kwargs):
     """Call extract_fn with retries on ExtractionError.
 
     Args:
         extract_fn: Callable that performs LLM extraction (e.g., tool_use_loop)
         skill_id: Skill identifier for logging
+        _max_retries: Max retry attempts (default: MAX_EXTRACTION_RETRIES)
         *args, **kwargs: Forwarded to extract_fn
 
     Returns:
         The extraction result
 
     Raises:
-        ExtractionError: After MAX_EXTRACTION_RETRIES failed attempts
+        ExtractionError: After _max_retries failed attempts
     """
     last_error = None
-    for attempt in range(1, MAX_EXTRACTION_RETRIES + 1):
+    for attempt in range(1, _max_retries + 1):
         try:
             return extract_fn(*args, **kwargs)
         except ExtractionError as e:
             last_error = e
-            if attempt < MAX_EXTRACTION_RETRIES:
+            if attempt < _max_retries:
                 logger.warning(
-                    f"Extraction attempt {attempt}/{MAX_EXTRACTION_RETRIES} failed for {skill_id}: {e}. Retrying..."
+                    f"Extraction attempt {attempt}/{_max_retries} failed for {skill_id}: {e}. Retrying..."
                 )
             else:
                 logger.error(
-                    f"Extraction failed for {skill_id} after {MAX_EXTRACTION_RETRIES} attempts: {e}"
+                    f"Extraction failed for {skill_id} after {_max_retries} attempts: {e}"
                 )
     raise last_error
 
@@ -338,10 +343,14 @@ def _discover_vendor_dirs(input_path: Path) -> list[Path]:
 @click.option('-q', '--quiet', is_flag=True, help='Suppress progress output')
 @click.option('--batch', is_flag=True,
               help='Treat input as a root of vendor directories; compile each subdirectory as a separate vendor')
+@click.option('-w', '--workers', default=1, type=int,
+              help='Number of parallel workers for skill extraction (default: 1)')
+@click.option('--retries', '_retries', default=MAX_EXTRACTION_RETRIES, type=int,
+              help=f'Max extraction retries per skill (default: {MAX_EXTRACTION_RETRIES})')
 @click.option('--ontology-root', '_ontology_root', default=None, hidden=True,
               help='Override ontology root for system/ files (used internally by --batch)')
 @click.pass_context
-def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, force, yes, verbose, quiet, batch, _ontology_root):
+def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, force, yes, verbose, quiet, batch, workers, _retries, _ontology_root):
     """Compile skills into modular ontology with perfect mirroring.
 
     Without SKILL_NAME: Compile all files in input directory.
@@ -397,6 +406,8 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
                     verbose=verbose,
                     quiet=quiet,
                     batch=False,  # don't recurse
+                    workers=workers,
+                    _retries=_retries,
                     _ontology_root=str(batch_ontology_root),
                 )
             except Exception as e:
@@ -488,10 +499,7 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
             )
 
     # Counters for summary
-    skills_serialized = 0
-    sub_skills_serialized = 0
     assets_copied = 0
-    compiled_skills = []  # Track extracted skills for summary display
 
     # Build skill_parent_map for Rule A using frontmatter names (not directory names)
     # This ensures parent/child IDs remain consistent
@@ -525,9 +533,14 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
         len(skill_registry.skills), package_name,
     )
 
-    # Process Rule A: Core Skills (SKILL.md → ontoskill.ttl)
-    # Each skill is serialized to disk immediately after extraction.
-    for skill_file in skill_md_files:
+    # Thread-safe counters and collectors for parallel processing
+    _counters_lock = threading.Lock()
+    _skills_serialized = [0]
+    _sub_skills_serialized = [0]
+    _compiled_skills_list: list[CompiledSkill] = []
+
+    def _process_rule_a(skill_file: Path) -> None:
+        """Process a single Rule A skill (SKILL.md → ontoskill.ttl). Thread-safe."""
         skill_dir = skill_file.parent
 
         # Phase 1: Use cached scan result (or rescan if not cached)
@@ -536,13 +549,12 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
             try:
                 dir_scan = scan_skill_directory(skill_dir)
             except LoaderError as e:
-                console.print(f"[red]Phase 1 scan failed for {skill_dir.name}: {e}[/red]")
-                continue
+                _record_error(skill_dir.name, str(e), "phase1")
+                return
 
         # Use Phase 1 data for IDs and hash
         skill_id = dir_scan.skill_id
         skill_hash = dir_scan.content_hash
-        # Derive package_id from directory structure
         package_id = resolve_package_id(skill_dir, input_path)
 
         logger.info(f"Processing skill: {skill_id}")
@@ -557,16 +569,11 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
             try:
                 existing_graph.parse(output_skill_path, format="turtle")
                 oc = get_oc_namespace()
-                existing_hash = None
                 for skill_uri in existing_graph.subjects(RDF.type, oc.Skill):
                     hash_val = existing_graph.value(skill_uri, oc.contentHash)
-                    if hash_val:
-                        existing_hash = str(hash_val)
-                        break
-
-                if existing_hash == skill_hash:
-                    logger.info(f"Skill {skill_id} unchanged (hash match), skipping")
-                    continue
+                    if hash_val and str(hash_val) == skill_hash:
+                        logger.info(f"Skill {skill_id} unchanged (hash match), skipping")
+                        return
             except Exception as e:
                 logger.debug(f"Could not read existing skill: {e}")
 
@@ -574,17 +581,22 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
         try:
             threats, passed = security_check(dir_scan.skill_md_content, skip_llm=skip_security)
             if not passed:
-                console.print(f"[red]Security check failed for {skill_id}[/red]")
-                for threat in threats:
-                    console.print(f"  - {threat.type}: {threat.match}")
-                continue
+                _record_error(skill_id, "Security check failed", "security")
+                return
         except SecurityError as e:
-            console.print(f"[red]Security error: {e}[/red]")
-            continue
+            _record_error(skill_id, str(e), "security")
+            return
 
         # Phase 2: LLM extraction
         try:
-            extracted = retry_extraction(tool_use_loop, skill_id, skill_dir, skill_hash, skill_id, skill_registry=skill_registry)
+            extracted = retry_extraction(
+                tool_use_loop, skill_id,
+                skill_dir, skill_hash, skill_id,
+                skill_registry=skill_registry,
+                preloaded_content=dir_scan.skill_md_content,
+                preloaded_file_tree=dir_scan.file_tree,
+                _max_retries=_retries,
+            )
             extracted = enrich_extracted_skill(extracted, skill_dir, input_path, skill_parent_map, skill_registry)
 
             # Create CompiledSkill with Phase 1 data
@@ -603,45 +615,38 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
                         compiled, output_skill_path, output_path,
                         qualified_id=qualified_id
                     )
-                    skills_serialized += 1
+                    with _counters_lock:
+                        _skills_serialized[0] += 1
+                        _compiled_skills_list.append(compiled)
                 except OntologyValidationError as e:
-                    console.print(f"[red]Validation failed for {skill.id}: {e}[/red]")
-                    _record_error(skill_id, e, "validation")
+                    _record_error(skill_id, str(e), "validation")
+            else:
+                with _counters_lock:
+                    _compiled_skills_list.append(compiled)
 
-            # Track for summary display
-            compiled_skills.append(compiled)
             logger.info(f"Successfully extracted: {skill_id}")
         except ExtractionError as e:
-            console.print(f"[red]Extraction failed for {skill_id}: {e}[/red]")
-            _record_error(skill_id, e, "main_skill")
-            continue
+            _record_error(skill_id, str(e), "main_skill")
 
-    # Process Rule B: Auxiliary Markdown (*.md → *.ttl)
-    # Each sub-skill is serialized to disk immediately after extraction.
-    resolved_parent_map = {Path(p).resolve(): v for p, v in skill_parent_map.items()}
-    for md_file in auxiliary_md_files:
+    def _process_rule_b(md_file: Path) -> None:
+        """Process a single Rule B sub-skill (*.md → *.ttl). Thread-safe."""
         # Walk up to find the parent skill directory (the one with SKILL.md)
         skill_dir = find_skill_root_dir(md_file.parent, input_path)
         if skill_dir is None:
-            logger.warning(f"Skipping {md_file.name}: no parent SKILL.md found in ancestor directories")
-            continue
+            logger.warning(f"Skipping {md_file.name}: no parent SKILL.md found")
+            return
         rel_path = md_file.relative_to(input_path)
         output_ttl_path = output_path / rel_path.with_suffix(".ttl")
 
-        # Skip sub-skills whose parent failed Phase 1 (not in skill_parent_map)
+        # Skip sub-skills whose parent failed Phase 1
         if skill_dir not in resolved_parent_map:
-            logger.warning(f"Skipping {md_file.name}: parent skill not in skill_parent_map (failed Phase 1)")
-            continue
+            logger.warning(f"Skipping {md_file.name}: parent not in skill_parent_map")
+            return
 
-        # Get parent context
         parent_qualified_id, package_id = resolved_parent_map[skill_dir]
-
-        # Extract parent local ID from qualified ID (uses frontmatter name, not directory name)
-        # Format: {package_id}/{skill_id}
         parent_local_id = parent_qualified_id.split('/')[-1] if '/' in parent_qualified_id else parent_qualified_id
 
-        # Generate IDs: short ID from filename, qualified ID from full path
-        sub_skill_short_id = generate_skill_id(md_file.stem)  # Normalized/slugified
+        sub_skill_short_id = generate_skill_id(md_file.stem)
         sub_skill_qualified_id = generate_sub_skill_id(package_id, parent_local_id, md_file.name)
         sub_skill_hash = compute_sub_skill_hash(md_file)
 
@@ -653,35 +658,35 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
             try:
                 existing_graph.parse(output_ttl_path, format="turtle")
                 oc = get_oc_namespace()
-                existing_hash = None
                 for skill_uri in existing_graph.subjects(RDF.type, oc.Skill):
                     hash_val = existing_graph.value(skill_uri, oc.contentHash)
-                    if hash_val:
-                        existing_hash = str(hash_val)
-                        break
-
-                if existing_hash == sub_skill_hash:
-                    logger.info(f"Sub-skill {sub_skill_short_id} unchanged (hash match), skipping")
-                    continue
+                    if hash_val and str(hash_val) == sub_skill_hash:
+                        logger.info(f"Sub-skill {sub_skill_short_id} unchanged, skipping")
+                        return
             except Exception as e:
                 logger.debug(f"Could not read existing sub-skill: {e}")
 
         # Get sibling names for context
         sibling_names = [f.name for f in auxiliary_md_files if f.parent == skill_dir and f != md_file]
 
-        # Build parent context
         parent_context = {
             "filename": md_file.name,
-            "parent_skill_id": parent_qualified_id,  # Pass qualified ID for prompt context
+            "parent_skill_id": parent_qualified_id,
             "sibling_names": sibling_names
         }
 
-        # LLM extraction with context - use SHORT ID for extracted.id
         try:
-            extracted = retry_extraction(tool_use_loop, sub_skill_short_id, skill_dir, sub_skill_hash, sub_skill_short_id, parent_context=parent_context, skill_registry=skill_registry)
+            sub_skill_content = md_file.read_text(encoding="utf-8")
+            extracted = retry_extraction(
+                tool_use_loop, sub_skill_short_id,
+                skill_dir, sub_skill_hash, sub_skill_short_id,
+                parent_context=parent_context,
+                skill_registry=skill_registry,
+                preloaded_content=sub_skill_content,
+                _max_retries=_retries,
+            )
             extracted = enrich_extracted_skill(extracted, skill_dir, input_path, skill_parent_map, skill_registry)
 
-            # Serialize immediately to disk (unless dry_run)
             if not dry_run:
                 try:
                     serialize_skill_to_module(
@@ -692,18 +697,45 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
                         extends_parent=parent_local_id,
                         extends_parent_qualified=parent_qualified_id,
                     )
-                    sub_skills_serialized += 1
-                    # Sub-skills are NOT tracked in registry — only the parent skill is installable
+                    with _counters_lock:
+                        _sub_skills_serialized[0] += 1
                 except OntologyValidationError as e:
-                    console.print(f"[red]Validation failed for sub-skill {extracted.id}: {e}[/red]")
-                    _record_error(sub_skill_short_id, e, "validation")
+                    _record_error(sub_skill_short_id, str(e), "validation")
 
             logger.info(f"Successfully extracted sub-skill: {sub_skill_short_id}")
-
         except ExtractionError as e:
-            console.print(f"[red]Extraction failed for sub-skill {sub_skill_short_id}: {e}[/red]")
-            _record_error(sub_skill_short_id, e, "sub_skill")
-            continue
+            _record_error(sub_skill_short_id, str(e), "sub_skill")
+
+    # Process Rule A: Core Skills (SKILL.md → ontoskill.ttl)
+    if workers > 1 and len(skill_md_files) > 1:
+        logger.info(f"Processing {len(skill_md_files)} Rule A skills with {workers} workers")
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_process_rule_a, sf): sf for sf in skill_md_files}
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    sf = futures[future]
+                    _record_error(sf.parent.name, str(e), "rule_a_thread")
+    else:
+        for skill_file in skill_md_files:
+            _process_rule_a(skill_file)
+
+    # Process Rule B: Auxiliary Markdown (*.md → *.ttl)
+    resolved_parent_map = {Path(p).resolve(): v for p, v in skill_parent_map.items()}
+    if workers > 1 and len(auxiliary_md_files) > 1:
+        logger.info(f"Processing {len(auxiliary_md_files)} Rule B sub-skills with {workers} workers")
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_process_rule_b, mf): mf for mf in auxiliary_md_files}
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    mf = futures[future]
+                    _record_error(mf.name, str(e), "rule_b_thread")
+    else:
+        for md_file in auxiliary_md_files:
+            _process_rule_b(md_file)
 
     # Process Rule C: Asset Files (collect for later - copy deferred until after dry_run check)
     assets_to_copy = []
@@ -720,6 +752,10 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
         assets_to_copy.append((asset_file, output_asset_path))
 
     # Show summary of extracted skills
+    compiled_skills = _compiled_skills_list
+    skills_serialized = _skills_serialized[0]
+    sub_skills_serialized = _sub_skills_serialized[0]
+
     if compiled_skills:
         console.print(Panel(f"[green]Compiled {len(compiled_skills)} skill(s)[/green]"))
 
