@@ -24,6 +24,7 @@ from .paths import ensure_registry_layout, ontology_vendor_dir, skills_vendor_di
 from .state import load_manifest, load_registry_lock, save_registry_lock
 from .index import rebuild_registry_indexes
 from .compile import compile_source_tree, rewrite_compiled_payload_paths, discover_skill_entries
+from .resolve import NotFoundError
 
 
 def _extract_skill_metadata_from_ttl(ttl_path: Path) -> dict:
@@ -415,3 +416,167 @@ def install_package_from_sources(
         trust_tier=effective_trust,
         source_kind=package.source_kind or source.source_kind,
     )
+
+
+def install_vendor(
+    vendor_name: str,
+    packages: list,
+    root: Path | None = None,
+) -> list[InstalledPackageState]:
+    """Install all packages from a vendor.
+
+    Args:
+        vendor_name: Vendor name (e.g., "anthropics")
+        packages: List of RegistryPackageEntry objects for this vendor
+        root: Ontology root path
+
+    Returns:
+        List of installed package states
+    """
+    base = ensure_registry_layout(root)
+    results = []
+    for package_entry in packages:
+        source, _ = resolve_package_from_sources(package_entry.package_id, root=base)
+        effective_trust = package_entry.trust_tier or source.trust_tier
+        manifest_ref = urljoin(source.index_url, package_entry.manifest_url)
+        pkg_state = install_package_from_manifest_ref(
+            manifest_ref,
+            root=base,
+            trust_tier=effective_trust,
+            source_kind=package_entry.source_kind or source.source_kind,
+        )
+        results.append(pkg_state)
+    return results
+
+
+def install_single_skill(
+    package_entry,
+    skill_id: str,
+    root: Path | None = None,
+) -> InstalledPackageState:
+    """Install a single skill (and its sub-skills) from a package.
+
+    Copies the skill directory (ontoskill.ttl + sibling .ttl files + assets)
+    and registers it as a partial package in the lock.
+
+    Args:
+        package_entry: RegistryPackageEntry for the containing package
+        skill_id: Skill to install
+        root: Ontology root path
+
+    Returns:
+        InstalledPackageState with only the requested skill enabled
+    """
+    base = ensure_registry_layout(root)
+    source, _ = resolve_package_from_sources(package_entry.package_id, root=base)
+    effective_trust = package_entry.trust_tier or source.trust_tier
+    manifest_ref = urljoin(source.index_url, package_entry.manifest_url)
+
+    parsed = urlparse(manifest_ref)
+    if parsed.scheme in ("http", "https", "file"):
+        with urlopen(manifest_ref) as response:
+            manifest_json = response.read().decode("utf-8")
+    else:
+        manifest_json = Path(manifest_ref).read_text(encoding="utf-8")
+
+    manifest = PackageManifest.model_validate_json(manifest_json)
+    install_root = ontology_vendor_dir(base) / manifest.package_id
+
+    # Find the target skill in the manifest
+    target_skill = None
+    for skill in manifest.skills:
+        if skill.id == skill_id:
+            target_skill = skill
+            break
+
+    if target_skill is None:
+        raise NotFoundError(f"Skill '{skill_id}' not found in {manifest.package_id}")
+
+    # The skill path is like "superpowers/brainstorming/ontoskill.ttl"
+    # The skill directory is the parent: "superpowers/brainstorming/"
+    skill_path = Path(target_skill.path)
+    skill_dir = skill_path.parent
+
+    # Collect all modules under the skill directory
+    modules_to_copy = []
+    for module_rel in manifest.modules:
+        module_path = Path(module_rel)
+        try:
+            module_path.relative_to(skill_dir)
+            modules_to_copy.append(module_rel)
+        except ValueError:
+            if module_path == skill_path:
+                modules_to_copy.append(module_rel)
+
+    # Copy modules to install root
+    install_root.mkdir(parents=True, exist_ok=True)
+    copied_modules = []
+
+    manifest_dir = Path(manifest_ref).parent if parsed.scheme == "" else None
+    for module_rel in modules_to_copy:
+        if manifest_dir:
+            src = manifest_dir / module_rel
+        else:
+            ref = urljoin(manifest_ref, module_rel)
+            src = None  # would need download for remote
+
+        if src and src.exists():
+            dest = install_root / module_rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dest)
+            copied_modules.append(dest)
+
+    # Write a partial manifest with only this skill
+    partial_manifest = {
+        "package_id": manifest.package_id,
+        "version": manifest.version,
+        "trust_tier": effective_trust,
+        "source_kind": "ontology",
+        "modules": [str(p) for p in modules_to_copy],
+        "skills": [{
+            "id": target_skill.id,
+            "path": target_skill.path,
+            "default_enabled": True,
+            "aliases": target_skill.aliases,
+        }],
+    }
+    (install_root / "package.json").write_text(
+        json.dumps(partial_manifest, indent=2), encoding="utf-8"
+    )
+
+    # Register in lock
+    package_state = InstalledPackageState(
+        package_id=manifest.package_id,
+        version=manifest.version,
+        trust_tier=effective_trust,
+        source=manifest.source,
+        source_kind="ontology",
+        installed_at=datetime.now(timezone.utc).isoformat(),
+        install_root=str(install_root),
+        manifest_path=str((install_root / "package.json").resolve()),
+        skills=[
+            InstalledSkillState(
+                skill_id=target_skill.id,
+                module_path=str((install_root / target_skill.path).resolve()),
+                aliases=target_skill.aliases,
+                enabled=True,
+                default_enabled=True,
+            )
+        ],
+    )
+
+    lock = load_registry_lock(base)
+    # Merge with existing package if already partially installed
+    existing = lock.packages.get(package_state.package_id)
+    if existing:
+        existing_skills = {s.skill_id: s for s in existing.skills}
+        existing_skills[target_skill.id] = package_state.skills[0]
+        existing.skills = list(existing_skills.values())
+        existing.version = package_state.version
+        lock.packages[package_state.package_id] = existing
+    else:
+        lock.packages[package_state.package_id] = package_state
+
+    save_registry_lock(lock, base)
+    rebuild_registry_indexes(base)
+    return lock.packages[package_state.package_id]

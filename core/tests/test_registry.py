@@ -258,7 +258,7 @@ oc:skill_ui_ux_pro_max a oc:Skill, oc:DeclarativeSkill ;
             encoding="utf-8",
         )
 
-    with patch("compiler.registry.compile_source_tree", side_effect=fake_compile):
+    with patch("compiler.registry.install.compile_source_tree", side_effect=fake_compile):
         package = import_source_repository(str(repo_dir), root=root, trust_tier="community")
 
     ttl_path = Path(package.install_root) / ".claude" / "skills" / "ui-ux-pro-max" / "ontoskill.ttl"
@@ -314,7 +314,7 @@ oc:skill_design a oc:Skill, oc:ExecutableSkill ;
             encoding="utf-8",
         )
 
-    with patch("compiler.registry.compile_source_tree", side_effect=fake_compile):
+    with patch("compiler.registry.install.compile_source_tree", side_effect=fake_compile):
         package = import_source_repository(str(repo_dir), root=root, trust_tier="community")
 
     design_system_ttl = Path(package.install_root) / ".claude" / "skills" / "design-system" / "ontoskill.ttl"

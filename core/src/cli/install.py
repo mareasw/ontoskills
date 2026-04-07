@@ -56,18 +56,83 @@ def import_source_repo_cmd(ctx, repo_ref, package_id, trust_tier, ontology_root_
 
 
 @click.command('install')
-@click.argument('package_id')
+@click.argument('package_ref')
 @click.option('-o', '--ontology-root', 'ontology_root_arg', default=None, type=click.Path(path_type=Path))
 @click.pass_context
-def install_cmd(ctx, package_id, ontology_root_arg):
-    """Install a compiled ontology package by id from configured registry sources."""
+def install_cmd(ctx, package_ref, ontology_root_arg):
+    """Install packages or individual skills by reference.
+
+    Supports vendor-level (anthropics), package-level (anthropics/financial-services-plugin),
+    skill-level (pbakaus/impeccable/harden), and short names (impeccable).
+    """
     from . import setup_logging
     setup_logging(ctx.obj.get('verbose', False), ctx.obj.get('quiet', False))
     root = ontology_root_arg or Path(resolve_ontology_root(OUTPUT_DIR))
-    package = install_package_from_sources(package_id, root=root)
-    console.print(f"[green]Installed package {package.package_id}@{package.version}[/green]")
-    console.print(f"  Trust: {package.trust_tier}")
-    console.print(f"  Skills: {', '.join(skill.skill_id for skill in package.skills)}")
+
+    from compiler.registry import (
+        load_registry_index,
+        load_registry_sources,
+        resolve_install_ref,
+        install_vendor,
+        install_single_skill,
+        install_package_from_sources,
+        NotFoundError,
+        AmbiguousRefError,
+        VendorTarget,
+        PackageTarget,
+        SkillTarget,
+    )
+    from compiler.registry.models import RegistryIndex
+
+    # Merge all source indexes into one combined index
+    combined_packages = []
+    sources = load_registry_sources(root)
+    for source in sources.sources:
+        try:
+            idx = load_registry_index(source.index_url)
+            combined_packages.extend(idx.packages)
+        except Exception:
+            continue
+
+    # Also load local index.json if it exists
+    local_index_path = root / "index.json"
+    if local_index_path.exists():
+        try:
+            local_idx = load_registry_index(str(local_index_path))
+            combined_packages.extend(local_idx.packages)
+        except Exception:
+            pass
+
+    index = RegistryIndex(packages=combined_packages)
+
+    try:
+        target = resolve_install_ref(package_ref, index)
+    except AmbiguousRefError as e:
+        console.print(f"[red]{e}[/red]")
+        raise SystemExit(1)
+    except NotFoundError as e:
+        console.print(f"[red]{e}[/red]")
+        raise SystemExit(1)
+
+    if isinstance(target, VendorTarget):
+        results = install_vendor(target.vendor, target.packages, root=root)
+        total_skills = sum(len(pkg.skills) for pkg in results)
+        console.print(f"[green]Installed vendor {target.vendor}: {len(results)} package(s), {total_skills} skill(s)[/green]")
+
+    elif isinstance(target, PackageTarget):
+        package = install_package_from_sources(target.package.package_id, root=root)
+        console.print(f"[green]Installed {package.package_id}: {len(package.skills)} skill(s)[/green]")
+
+    elif isinstance(target, SkillTarget):
+        if not target.standalone:
+            deps = ", ".join(target.sibling_deps)
+            console.print(
+                f"[red]Cannot install '{target.skill_id}' standalone: depends on {deps}.[/red]\n"
+                f"Install the whole package: [bold]ontoskills install {target.package.package_id}[/bold]"
+            )
+            raise SystemExit(1)
+        package = install_single_skill(target.package, target.skill_id, root=root)
+        console.print(f"[green]Installed skill {target.skill_id} from {package.package_id}[/green]")
 
 
 @click.command('enable')

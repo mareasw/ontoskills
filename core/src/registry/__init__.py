@@ -68,6 +68,20 @@ from .install import (
     resolve_package_from_sources,
     install_package_from_manifest_ref,
     install_package_from_sources,
+    install_vendor,
+    install_single_skill,
+)
+
+# Resolve
+from .resolve import (
+    resolve_install_ref,
+    is_standalone_skill,
+    NotFoundError,
+    AmbiguousRefError,
+    NotStandaloneError,
+    VendorTarget,
+    PackageTarget,
+    SkillTarget,
 )
 
 # Compile
@@ -128,6 +142,17 @@ __all__ = [
     "resolve_package_from_sources",
     "install_package_from_manifest_ref",
     "install_package_from_sources",
+    "install_vendor",
+    "install_single_skill",
+    # Resolve
+    "resolve_install_ref",
+    "is_standalone_skill",
+    "NotFoundError",
+    "AmbiguousRefError",
+    "NotStandaloneError",
+    "VendorTarget",
+    "PackageTarget",
+    "SkillTarget",
     # Compile
     "compile_source_tree",
     "rewrite_compiled_payload_paths",

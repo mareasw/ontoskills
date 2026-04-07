@@ -82,3 +82,25 @@ class RegistryPackageEntry(BaseModel):
 
 class RegistryIndex(BaseModel):
     packages: list[RegistryPackageEntry] = Field(default_factory=list)
+
+
+class VendorTarget(BaseModel):
+    """Resolution result for a vendor-level install."""
+    vendor: str
+    packages: list[RegistryPackageEntry]
+
+
+class PackageTarget(BaseModel):
+    """Resolution result for a package-level install."""
+    package: RegistryPackageEntry
+
+
+class SkillTarget(BaseModel):
+    """Resolution result for a skill-level install."""
+    package: RegistryPackageEntry
+    skill_id: str
+    standalone: bool
+    sibling_deps: list[str] = Field(default_factory=list)
+
+
+InstallTarget = VendorTarget | PackageTarget | SkillTarget
