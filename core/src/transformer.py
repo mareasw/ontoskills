@@ -205,7 +205,7 @@ def tool_use_loop(
             parent_skill_id=parent_context.get("parent_skill_id", ""),
             sibling_names=parent_context.get("sibling_names")
         )
-        system_prompt = SYSTEM_PROMPT + context_augmentation
+        system_prompt = system_prompt + context_augmentation
 
     # Build user message — direct content injection or tool-use discovery
     if preloaded_content:
