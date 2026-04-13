@@ -74,6 +74,8 @@ ontoskills install mareasw/greeting/hello
 ✓ 已安装 mareasw/greeting/hello
 ```
 
+> **注意：** 安装支持多层级限定 ID：`vendor/package/skill`。例如 `mareasw/office/xlsx` 表示 `mareasw` 供应商、`office` 包、`xlsx` 技能。你可以使用 `ontoskills search <query>` 发现可用技能。
+
 ---
 
 ## 第三步：查询技能
@@ -106,6 +108,7 @@ ontoskills install core
 系统要求：
 - **Python** 3.10+
 - 设置 `ANTHROPIC_API_KEY` 环境变量
+- （可选）`sentence-transformers` 用于语义搜索嵌入：`pip install sentence-transformers`
 
 ```bash
 export ANTHROPIC_API_KEY="你的-key"

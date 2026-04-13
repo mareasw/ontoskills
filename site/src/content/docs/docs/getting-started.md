@@ -68,6 +68,8 @@ Install it (auto-enabled on install):
 ontoskills install mareasw/greeting/hello
 ```
 
+> **Note:** Install IDs are resolved at three levels: `owner/repo/skill`, `owner/repo`, or just `skill`. The CLI finds the best match automatically.
+
 **Expected output:**
 ```
 ✓ Installed mareasw/greeting/hello
@@ -104,6 +106,7 @@ ontoskills install core
 
 Requirements:
 - **Python** 3.10+
+- **sentence-transformers** (installed automatically with OntoCore)
 - `ANTHROPIC_API_KEY` environment variable set
 
 ```bash

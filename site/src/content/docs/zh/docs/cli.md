@@ -90,7 +90,17 @@ ontoskills install mareasw/greeting/hello
 ontoskills install mareasw/office/xlsx
 ```
 
-包 ID 格式：`owner/repo/skill`
+包 ID 支持多级解析：
+
+| 级别 | 示例 | 安装内容 |
+|------|------|----------|
+| **供应商** | `mareasw` | 该供应商的所有包 |
+| **包** | `mareasw/office` | 该包中的所有技能 |
+| **技能** | `mareasw/office/xlsx` | 单个技能（带依赖检查）|
+
+| 标志 | 含义 |
+|------|------|
+| `--no-embeddings` | 跳过下载嵌入文件（model.onnx、intents.json）|
 
 ### `enable <package-id>`
 
@@ -118,6 +128,18 @@ ontoskills disable mareasw/greeting/hello
 ontoskills remove mareasw/greeting/hello
 ```
 
+### `list-installed`
+
+列出所有已安装的技能。
+
+```bash
+ontoskills list-installed
+```
+
+---
+
+## 商店源命令
+
 ### `store list`
 
 列出配置的技能商店。
@@ -131,12 +153,28 @@ ontoskills store list
 添加第三方技能商店。
 
 ```bash
-ontoskills store add-source acme https://example.com/index.json
+ontoskills store add-source acme https://example.com/skills/index.json
 ```
 
 ---
 
+## 导入命令
+
+### `import-source <url>`
+
+导入包含 SKILL.md 文件的原始 Git 仓库。
+
+```bash
+ontoskills import-source https://github.com/user/skill-repo
+```
+
+导入的技能存储在 `~/.ontoskills/skills/vendor/` 下，并编译到 `~/.ontoskills/ontologies/vendor/`。
+
+---
+
 ## 编译器命令
+
+这些命令需要安装 `ontocore`。
 
 ### `init-core`
 
@@ -146,24 +184,24 @@ ontoskills store add-source acme https://example.com/index.json
 ontoskills init-core
 ```
 
-创建 `core.ttl`，包含基础 TBox 本体（类、属性、状态定义）。
+创建 `core.ttl`，包含基础类和属性。
 
 ### `compile [skill]`
 
-编译技能。
+将技能编译为本体模块。
 
 ```bash
-# 编译 skills/ 中的所有技能
+# 编译所有技能
 ontoskills compile
 
 # 编译特定技能
-ontoskills compile office
+ontoskills compile my-skill
 
 # 带选项编译
 ontoskills compile --force          # 跳过缓存
-ontoskills compile --dry-run        # 预览但不保存
+ontoskills compile --dry-run        # 仅预览
 ontoskills compile --skip-security  # 跳过 LLM 安全审查
-ontoskills compile -v               # 详细日志
+ontoskills compile -v               # 详细输出
 ```
 
 | 选项 | 描述 |
@@ -172,7 +210,7 @@ ontoskills compile -v               # 详细日志
 | `-o, --output` | 输出目录（默认：`ontoskills/`）|
 | `--dry-run` | 预览但不保存 |
 | `--skip-security` | 跳过 LLM 安全审查 |
-| `-f, --force` | 强制重新编译 |
+| `-f, --force` | 强制重新编译（跳过缓存）|
 | `-y, --yes` | 跳过确认提示 |
 | `-v, --verbose` | 调试日志 |
 | `-q, --quiet` | 抑制进度输出 |
@@ -265,8 +303,15 @@ ontoskills uninstall --all
 │   ├── core.ttl
 │   ├── index.ttl
 │   ├── system/            # 系统级文件
-│   │   └── index.enabled.ttl  # 已启用技能清单
-│   └── */ontoskill.ttl
+│   │   ├── index.enabled.ttl  # 已启用技能清单
+│   │   └── embeddings/        # 语义搜索产物
+│   │       ├── model.onnx     # ONNX 嵌入模型 (~90MB)
+│   │       ├── tokenizer.json # HuggingFace 分词器
+│   │       └── intents.json   # 合并的意图嵌入
+│   └── vendor/            # 已安装的技能包
+│       └── <vendor>/<pkg>/<skill>/
+│           ├── ontoskill.ttl
+│           └── intents.json   # 每技能预计算的嵌入
 ├── skills/                # 源技能
 │   └── vendor/            # 导入的仓库
 └── state/                 # 锁定文件和元数据
@@ -280,7 +325,7 @@ ontoskills uninstall --all
 
 | 变量 | 描述 | 默认值 |
 |------|------|--------|
-| `ANTHROPIC_API_KEY` | API key | 必需 |
+| `ANTHROPIC_API_KEY` | 用于编译的 API key | 编译器必需 |
 | `ANTHROPIC_BASE_URL` | API 基础 URL | `https://api.anthropic.com` |
 | `ONTOSKILLS_HOME` | 托管主目录 | `~/.ontoskills` |
 

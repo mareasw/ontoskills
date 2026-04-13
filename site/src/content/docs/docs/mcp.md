@@ -55,7 +55,7 @@ ONTOMCP_ONTOLOGY_ROOT=~/.ontoskills/ontologies
 
 ## Tool reference
 
-OntoMCP exposes **5 tools** for skill discovery and reasoning.
+OntoMCP exposes **6 tools** for skill discovery and reasoning.
 
 ### `search_skills`
 
@@ -67,6 +67,8 @@ Discover skills with optional filters.
   "requires_state": "oc:DocumentCreated",
   "yields_state": "oc:PdfGenerated",
   "skill_type": "executable",
+  "category": "document",
+  "is_user_invocable": true,
   "limit": 25
 }
 ```
@@ -77,6 +79,8 @@ Discover skills with optional filters.
 | `requires_state` | string | Filter by required state (URI or `oc:StateName`) |
 | `yields_state` | string | Filter by yielded state (URI or `oc:StateName`) |
 | `skill_type` | string | `executable` or `declarative` |
+| `category` | string | Filter by skill category (e.g., `automation`, `document`, `marketing`) |
+| `is_user_invocable` | boolean | Filter by whether the skill is directly invocable by users |
 | `limit` | integer | Max results (1-100, default 25) |
 
 **Example response:**
@@ -296,6 +300,38 @@ Query normalized knowledge nodes with guided filters.
 
 ---
 
+### `resolve_alias`
+
+Resolve a skill alias to its canonical skill(s). Returns all skills that have the given alias.
+
+```json
+{
+  "alias": "pdf"
+}
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `alias` | string | **Required.** Alias to resolve (case-insensitive) |
+
+**Example response:**
+
+```json
+{
+  "alias": "pdf",
+  "skills": [
+    {
+      "id": "pdf",
+      "qualified_id": "mareasw/office/pdf",
+      "nature": "A skill that creates PDF documents",
+      "intents": ["create_pdf", "export_pdf"]
+    }
+  ]
+}
+```
+
+---
+
 ## Architecture
 
 ```
@@ -309,7 +345,7 @@ Query normalized knowledge nodes with guided filters.
 │                       OntoMCP                                │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
 │  │   Catalog   │  │  Embeddings │  │   SPARQL Engine     │  │
-│  │   (Rust)    │  │  (Optional) │  │   (Oxigraph)        │  │
+│  │   (Rust)    │  │ (ONNX/Intents)│  │   (Oxigraph)        │  │
 │  └──────┬──────┘  └──────┬──────┘  └──────────┬──────────┘  │
 └─────────┼────────────────┼───────────────────┼─────────────┘
           │                │                   │
@@ -372,13 +408,23 @@ ontoskills compile
 
 ### "Embeddings not available"
 
-The `search_intents` tool requires pre-computed embeddings:
+The `search_intents` tool requires pre-computed embeddings. Install skills that include embedding support:
 
 ```bash
-ontoskills export-embeddings
+ontoskills install mareasw/office/xlsx
 ```
 
-This creates `~/.ontoskills/ontologies/system/embeddings/`.
+If embeddings are still not found after installing, rebuild:
+
+```bash
+ontoskills rebuild-index
+```
+
+If the ONNX Runtime shared library is missing, set `ORT_DYLIB_PATH`:
+
+```bash
+export ORT_DYLIB_PATH=/path/to/libonnxruntime.so
+```
 
 ### "Server not initialized"
 
@@ -400,3 +446,4 @@ Check logs for errors:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ONTOMCP_ONTOLOGY_ROOT` | Ontology directory | `~/.ontoskills/ontologies` |
+| `ORT_DYLIB_PATH` | Path to ONNX Runtime shared library | Auto-detected |

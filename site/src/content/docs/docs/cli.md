@@ -90,7 +90,17 @@ ontoskills install mareasw/greeting/hello
 ontoskills install mareasw/office/xlsx
 ```
 
-The package ID format is: `owner/repo/skill`
+The package ID supports multi-level resolution:
+
+| Level | Example | Installs |
+|-------|---------|----------|
+| **Vendor** | `mareasw` | All packages from that vendor |
+| **Package** | `mareasw/office` | All skills in that package |
+| **Skill** | `mareasw/office/xlsx` | Single skill (with dependency check) |
+
+| Flag | Meaning |
+|------|---------|
+| `--no-embeddings` | Skip downloading embedding files (model.onnx, intents.json) |
 
 ### `enable <package-id>`
 
@@ -293,8 +303,15 @@ ontoskills uninstall --all
 │   ├── core.ttl
 │   ├── index.ttl
 │   ├── system/            # System-level files
-│   │   └── index.enabled.ttl  # Enabled skills manifest
-│   └── */ontoskill.ttl
+│   │   ├── index.enabled.ttl  # Enabled skills manifest
+│   │   └── embeddings/        # Semantic search artifacts
+│   │       ├── model.onnx     # ONNX embedding model (~90MB)
+│   │       ├── tokenizer.json # HuggingFace tokenizer
+│   │       └── intents.json   # Merged intent embeddings
+│   └── vendor/            # Installed skill packages
+│       └── <vendor>/<pkg>/<skill>/
+│           ├── ontoskill.ttl
+│           └── intents.json   # Per-skill pre-computed embeddings
 ├── skills/                # Source skills
 │   └── vendor/            # Imported repositories
 └── state/                 # Lockfiles and metadata

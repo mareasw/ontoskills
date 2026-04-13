@@ -45,7 +45,7 @@ Codex 全局设置使用与其他客户端相同的本地 `stdio` 命令：
 
 - 将 `ontomcp` 作为本地 `stdio` 子进程启动
 - 将其指向 `~/.ontoskills/ontologies` 中的托管本体主目录
-- 让客户端调用五个公共工具（含可选的 search_intents）
+- 让客户端调用六个公共工具（含可选的 search_intents）
 
 要注册的稳定可执行文件是：
 
@@ -72,6 +72,7 @@ ONTOMCP_ONTOLOGY_ROOT=~/.ontoskills/ontologies
 - `evaluate_execution_plan`
 - `query_epistemic_rules`
 - `search_intents`（可选，需先运行 `ontoskills export-embeddings`）
+- `resolve_alias`
 
 ## 注意事项
 

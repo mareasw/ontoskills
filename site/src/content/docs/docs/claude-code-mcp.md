@@ -68,6 +68,8 @@ Once connected, Claude Code can call:
 - `get_skill_context`
 - `evaluate_execution_plan`
 - `query_epistemic_rules`
+- `search_intents`
+- `resolve_alias`
 
 ## Troubleshooting
 

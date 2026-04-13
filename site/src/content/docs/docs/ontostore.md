@@ -36,6 +36,14 @@ Examples:
 - `mareasw/office/xlsx`
 - `mareasw/office/docx`
 
+Install resolution supports three levels:
+
+| Level | Example | Behavior |
+|-------|---------|----------|
+| Full | `mareasw/greeting/hello` | Installs the exact skill |
+| Package | `mareasw/greeting` | Installs all skills in the package |
+| Skill name | `hello` | Resolves the best match across stores |
+
 ## Install flow
 
 1. Search or browse the OntoStore.
@@ -50,6 +58,12 @@ If you previously disabled a skill and want to re-enable it:
 
 ```bash
 ontoskills enable mareasw/greeting/hello
+```
+
+To install without generating embeddings:
+
+```bash
+ontoskills install mareasw/greeting/hello --no-embeddings
 ```
 
 ## Official vs third-party

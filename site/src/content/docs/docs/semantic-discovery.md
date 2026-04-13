@@ -1,6 +1,6 @@
 ---
 title: Semantic Intent Discovery
-description: Find skills by natural language intent without knowing exact intent strings
+description: Find skills by natural language intent with pre-computed per-skill embeddings
 sidebar:
   order: 8
 ---
@@ -15,25 +15,42 @@ Semantic Intent Discovery enables LLM agents to find skills by natural language 
 |-----------|---------|
 | **Convention** | Predictable naming (`verb_noun` for intents, `camelCase` for properties) |
 | **Schema Summary** | MCP Resource `ontology://schema` — 2KB compact schema |
-| **search_intents** | MCP Tool — semantic matching via embeddings |
+| **search_intents** | MCP Tool — semantic matching via pre-computed embeddings |
 
 ---
 
 ## Architecture
+
+Embeddings are **pre-computed per-skill at compile time** and merged at install time. The MCP server performs ONNX inference only for the query, matching it against pre-loaded intent vectors.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                     COMPILE-TIME (Python)                        │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  ontoskills export-embeddings                                   │
+│  ontocore compile                                                │
 │       │                                                          │
 │       ├──► ontoskill.ttl (existing)                             │
 │       │                                                          │
-│       └──► ontoskills/system/embeddings/                        │
-│                ├── model.onnx          # Exported model (~45MB)  │
-│                ├── tokenizer.json      # HuggingFace tokenizer   │
-│                └── intents.json         # Pre-computed embeddings│
+│       └──► intents.json          # MANDATORY per-skill file     │
+│            Pre-computed 384-dim embeddings (L2-normalized)      │
+│                                                                  │
+│  ontocore export-embeddings      # ONE-TIME: global ONNX model  │
+│       │                                                          │
+│       └──► model.onnx + tokenizer.json                          │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   INSTALL-TIME (JS CLI)                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ontoskills install <package>                                    │
+│       │                                                          │
+│       ├──► Download model.onnx + tokenizer.json (once, cached)  │
+│       ├──► Download per-skill intents.json                       │
+│       └──► mergeEmbeddings() → system/embeddings/intents.json   │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -42,39 +59,97 @@ Semantic Intent Discovery enables LLM agents to find skills by natural language 
 │                      RUNTIME (Rust MCP)                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  Resources:                                                      │
-│    ontology://schema → JSON schema (classes, properties)        │
-│                                                                  │
 │  Tools:                                                          │
 │    search_intents(query: str, top_k: int) → Vec<IntentMatch>    │
 │       │                                                          │
-│       ├── 1. Load tokenizer.json                                 │
-│       ├── 2. Tokenize query → input_ids, attention_mask         │
-│       ├── 3. ONNX inference → embedding (384 dim)               │
-│       ├── 4. Cosine similarity vs intents.json                  │
-│       └── 5. Return top_k matches                               │
+│       ├── 1. Load tokenizer.json + model.onnx                   │
+│       ├── 2. Safety-truncate query (max 512 chars)              │
+│       ├── 3. Tokenize query → input_ids, attention_mask         │
+│       ├── 4. ONNX inference → query embedding (384 dim)         │
+│       ├── 5. Cosine similarity vs pre-computed intents.json     │
+│       └── 6. Adaptive cutoff (min 0.4, gap 0.15) → top_k       │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Usage
+## Per-skill embeddings
 
-### Export embeddings
+Every skill **must** declare at least one intent. During compilation, `ontocore compile` generates an `intents.json` next to each `ontoskill.ttl`:
 
-```bash
-ontoskills export-embeddings --ontology-root ./ontoskills
+```text
+ontoskills/
+└── <skill>/
+    ├── ontoskill.ttl
+    └── intents.json     # MANDATORY — compilation fails without intents
 ```
 
-This creates `ontoskills/system/embeddings/` with:
-- `model.onnx` - ONNX embedding model (~45MB)
-- `tokenizer.json` - HuggingFace tokenizer
-- `intents.json` - Pre-computed intent embeddings
+**intents.json format:**
+
+```json
+{
+  "model": "sentence-transformers/all-MiniLM-L6-v2",
+  "dimension": 384,
+  "intents": [
+    {
+      "intent": "edit spreadsheet",
+      "embedding": [0.12, -0.05, ...],
+      "skills": ["calc-skill"]
+    }
+  ]
+}
+```
+
+If a skill has zero declared intents, compilation **fails** with:
+
+```text
+Skill 'my-skill' has no declared intents. Every skill must declare at
+least one intent for semantic search.
+```
+
+---
+
+## Usage
+
+### Compile (mandatory)
+
+```bash
+ontocore compile -i skills/ -o ontoskills/
+```
+
+This produces both `ontoskill.ttl` and `intents.json` per skill. Requires `sentence-transformers`:
+
+```bash
+pip install sentence-transformers
+```
+
+### Export ONNX model (one-time)
+
+```bash
+ontoskills export-embeddings --ontology-root ./ontoskills --output-dir ./embeddings
+```
+
+This creates the global model artifacts (`model.onnx` + `tokenizer.json`) that the MCP server uses for query inference. Published once to the registry by the maintainer.
+
+### Install + merge (JS CLI)
+
+```bash
+ontoskills install mareasw/office/xlsx
+```
+
+The CLI:
+1. Downloads `model.onnx` + `tokenizer.json` (once, cached)
+2. Downloads per-skill `intents.json` files
+3. Merges all installed intents into `system/embeddings/intents.json`
+
+Opt out of embeddings with `--no-embeddings`:
+
+```bash
+ontoskills install mareasw/office/xlsx --no-embeddings
+```
 
 ### MCP Tool: search_intents
-
-Once embeddings are exported, the MCP server provides:
 
 ```json
 {
@@ -87,6 +162,7 @@ Once embeddings are exported, the MCP server provides:
 ```
 
 Returns matching intents with similarity scores:
+
 ```json
 {
   "query": "create a pdf document",
@@ -140,44 +216,57 @@ A compact JSON schema describing available classes and properties:
 |--------|--------|--------------|
 | Schema resource size | < 4KB | `test_schema_size` |
 | search_intents latency | < 50ms | Manual benchmark |
-| ONNX model size | < 50MB | Check file size |
-| Memory footprint | < 100MB | Monitor with `top` |
+| ONNX model size | ~90MB | Check file size |
+| Memory footprint | < 200MB | Monitor with `top` |
 
 ---
 
 ## File structure
 
+```text
+~/.ontoskills/
+├── ontologies/
+│   ├── system/
+│   │   ├── index.enabled.ttl
+│   │   └── embeddings/
+│   │       ├── model.onnx           # Global ONNX model (~90MB)
+│   │       ├── tokenizer.json       # HuggingFace tokenizer
+│   │       └── intents.json         # MERGED from all installed skills
+│   └── vendor/
+│       └── <vendor>/<pkg>/<skill>/
+│           ├── ontoskill.ttl
+│           └── intents.json         # Per-skill pre-computed embeddings
 ```
-ontoskills/
-└── system/
-    └── embeddings/
-        ├── model.onnx           # ~45MB
-        ├── tokenizer.json       # ~500KB
-        ├── tokenizer_config.json
-        ├── special_tokens_map.json
-        └── intents.json         # Variable
 
+**Source code:**
+
+```text
 core/
-├── embeddings/
-│   ├── __init__.py
-│   └── exporter.py              # Python export script
+├── src/embeddings/
+│   └── exporter.py              # Per-skill export + ONNX model export
 
 mcp/
 ├── src/
-│   ├── embeddings.rs            # Rust embedding engine
+│   ├── embeddings.rs            # Rust embedding engine (ONNX inference)
 │   ├── schema.rs                # Schema resource
 │   └── main.rs                  # MCP tool handlers
+
+cli/
+├── lib/
+│   └── registry.js              # mergeEmbeddings() at install time
 ```
 
 ---
 
 ## Dependencies
 
-### Python (core/)
+### Python (core/) — mandatory for compile
 
-```txt
+```toml
+# pyproject.toml — required dependency
 sentence-transformers>=2.2.0
-transformers>=4.30.0
+
+# pyproject.toml — optional (for export-embeddings only)
 optimum>=1.12.0
 onnx>=1.15.0
 onnxruntime>=1.16.0
@@ -190,6 +279,14 @@ ort = { version = "2.0.0-rc.12", features = ["load-dynamic"] }
 tokenizers = "0.19"
 ndarray = "0.17"
 anyhow = "1.0"
+```
+
+### Runtime requirement
+
+The ONNX Runtime shared library must be available. The MCP server uses `ort` with `load-dynamic`, which looks for `libonnxruntime.so` at runtime. Set `ORT_DYLIB_PATH` if needed:
+
+```bash
+export ORT_DYLIB_PATH=/path/to/libonnxruntime.so
 ```
 
 ---
@@ -208,14 +305,16 @@ cd core && python -m pytest tests/test_embeddings.py -v
 cd mcp && cargo test
 ```
 
-### CLI verification
+### E2E test
 
 ```bash
-ontoskills export-embeddings --help
+bash mcp/tests/e2e_search.sh
 ```
 
 ---
 
 ## Related
 
-- [MCP Server README](../mcp/README.md)
+- [OntoCore Compiler](./ontocore/) — Compilation reference
+- [MCP Runtime](./mcp/) — Tool reference
+- [CLI Reference](./cli/) — Install and merge commands

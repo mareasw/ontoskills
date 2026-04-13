@@ -161,6 +161,25 @@ ontoskills compile my-skill -v
 当用户想从 PDF 文件提取文本时使用此技能。
 ```
 
+### "Embedding generation requires sentence_transformers"
+
+编译器需要 `sentence-transformers` 进行每技能嵌入生成（必需）：
+
+```bash
+pip install sentence-transformers
+```
+
+### "Skill has no declared intents"
+
+每个技能必须声明至少一个意图用于语义搜索。在 SKILL.md 中添加意图部分：
+
+```markdown
+## 何时使用
+
+- edit spreadsheet
+- perform calculation
+```
+
 ---
 
 ## 导入问题
@@ -235,6 +254,20 @@ MCP 服务器可能启动缓慢。检查：
   "command": "/home/user/.ontoskills/bin/ontomcp"
 }
 ```
+
+### "ONNX Runtime shared library not found"
+
+MCP 服务器使用 ONNX Runtime 进行语义搜索。如果库不在系统路径中：
+
+```bash
+# 查找库（通过 pip 安装）
+python3 -c "import onnxruntime; import os; print(os.path.join(os.path.dirname(onnxruntime.__file__), 'capi', 'libonnxruntime.so'))"
+
+# 设置路径
+export ORT_DYLIB_PATH=/path/to/libonnxruntime.so
+```
+
+添加到你的 shell 配置文件（`~/.bashrc`、`~/.zshrc`）以持久化。
 
 ---
 

@@ -68,6 +68,8 @@ Status: ✓ Connected
 - `get_skill_context`
 - `evaluate_execution_plan`
 - `query_epistemic_rules`
+- `search_intents`
+- `resolve_alias`
 
 ## 故障排除
 

@@ -55,7 +55,7 @@ ONTOMCP_ONTOLOGY_ROOT=~/.ontoskills/ontologies
 
 ## 工具参考
 
-OntoMCP 暴露 **5 个工具** 用于技能发现和推理。
+OntoMCP 暴露 **6 个工具** 用于技能发现和推理。
 
 ### `search_skills`
 
@@ -67,6 +67,8 @@ OntoMCP 暴露 **5 个工具** 用于技能发现和推理。
   "requires_state": "oc:DocumentCreated",
   "yields_state": "oc:PdfGenerated",
   "skill_type": "executable",
+  "category": "document",
+  "is_user_invocable": true,
   "limit": 25
 }
 ```
@@ -77,6 +79,8 @@ OntoMCP 暴露 **5 个工具** 用于技能发现和推理。
 | `requires_state` | string | 按所需状态过滤（URI 或 `oc:StateName`）|
 | `yields_state` | string | 按产出状态过滤（URI 或 `oc:StateName`）|
 | `skill_type` | string | `executable` 或 `declarative` |
+| `category` | string | 按技能类别过滤（如 `automation`、`document`、`marketing`）|
+| `is_user_invocable` | boolean | 按技能是否可由用户直接调用过滤 |
 | `limit` | integer | 最大结果数（1-100，默认 25）|
 
 **示例响应：**
@@ -125,6 +129,11 @@ OntoMCP 暴露 **5 个工具** 用于技能发现和推理。
       "intent": "create_pdf",
       "score": 0.92,
       "skills": ["mareasw/office/pdf", "mareasw/documents/pdf-generator"]
+    },
+    {
+      "intent": "export_to_pdf",
+      "score": 0.85,
+      "skills": ["mareasw/office/export"]
     }
   ]
 }
@@ -225,7 +234,9 @@ OntoMCP 暴露 **5 个工具** 用于技能发现和推理。
     }
   ],
   "missing_states": [],
-  "warnings": []
+  "warnings": [
+    "技能 'pdf' 有可选依赖 'fonts-installer' 不在计划中"
+  ]
 }
 ```
 
@@ -252,6 +263,8 @@ OntoMCP 暴露 **5 个工具** 用于技能发现和推理。
   "kind": "AntiPattern",
   "dimension": "SecurityGuardrail",
   "severity_level": "CRITICAL",
+  "applies_to_context": "文件处理",
+  "include_inherited": true,
   "limit": 25
 }
 ```
@@ -265,6 +278,87 @@ OntoMCP 暴露 **5 个工具** 用于技能发现和推理。
 | `applies_to_context` | string | 上下文过滤器 |
 | `include_inherited` | boolean | 包含扩展技能（默认 true）|
 | `limit` | integer | 最大结果数（1-100，默认 25）|
+
+**示例响应：**
+
+```json
+{
+  "rules": [
+    {
+      "skill_id": "pdf",
+      "node_type": "AntiPattern",
+      "dimension": "SecurityGuardrail",
+      "directive_content": "不要接受来自不可信输入的文件路径",
+      "applies_to_context": "处理用户提供的文件名时",
+      "has_rationale": "防止路径遍历攻击",
+      "severity_level": "CRITICAL"
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+### `resolve_alias`
+
+将技能别名解析为其规范技能。返回具有给定别名的所有技能。
+
+```json
+{
+  "alias": "pdf"
+}
+```
+
+| 参数 | 类型 | 描述 |
+|------|------|------|
+| `alias` | string | **必需。** 要解析的别名（不区分大小写）|
+
+**示例响应：**
+
+```json
+{
+  "alias": "pdf",
+  "skills": [
+    {
+      "id": "pdf",
+      "qualified_id": "mareasw/office/pdf",
+      "nature": "创建 PDF 文档的技能",
+      "intents": ["create_pdf", "export_pdf"]
+    }
+  ]
+}
+```
+
+---
+
+## 架构
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        AI 客户端                              │
+│                   (Claude Code, Codex)                       │
+└─────────────────────────┬───────────────────────────────────┘
+                          │ MCP 协议 (stdio)
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       OntoMCP                                │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │   目录       │  │  嵌入        │  │   SPARQL 引擎       │  │
+│  │   (Rust)    │  │(ONNX/Intents)│  │   (Oxigraph)        │  │
+│  └──────┬──────┘  └──────┬──────┘  └──────────┬──────────┘  │
+└─────────┼────────────────┼───────────────────┼─────────────┘
+          │                │                   │
+          ▼                ▼                   ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    ontologies/                               │
+│  ├── index.ttl                                              │
+│  ├── system/                                                │
+│  │   ├── index.enabled.ttl                                  │
+│  │   └── embeddings/                                        │
+│  └── */ontoskill.ttl                                        │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -314,13 +408,23 @@ ontoskills compile
 
 ### "Embeddings not available"
 
-`search_intents` 工具需要预计算的嵌入：
+`search_intents` 工具需要预计算的嵌入。安装包含嵌入支持的技能：
 
 ```bash
-ontoskills export-embeddings
+ontoskills install mareasw/office/xlsx
 ```
 
-这会创建 `~/.ontoskills/ontologies/system/embeddings/`。
+如果安装后嵌入仍然未找到，重建索引：
+
+```bash
+ontoskills rebuild-index
+```
+
+如果 ONNX Runtime 共享库缺失，设置 `ORT_DYLIB_PATH`：
+
+```bash
+export ORT_DYLIB_PATH=/path/to/libonnxruntime.so
+```
 
 ### "Server not initialized"
 
@@ -342,3 +446,4 @@ MCP 客户端必须在调用工具之前发送 `initialize`。合规客户端会
 | 变量 | 描述 | 默认值 |
 |------|------|--------|
 | `ONTOMCP_ONTOLOGY_ROOT` | 本体目录 | `~/.ontoskills/ontologies` |
+| `ORT_DYLIB_PATH` | ONNX Runtime 共享库路径 | 自动检测 |

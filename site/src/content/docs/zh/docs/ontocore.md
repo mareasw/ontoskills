@@ -29,13 +29,14 @@ ontoskills install core
 系统要求：
 - **Python** 3.10+
 - **Anthropic API key**（设置 `ANTHROPIC_API_KEY` 环境变量）
+- **sentence-transformers**（必需 — 使用 `pip install sentence-transformers` 安装）
 
 ---
 
 ## 编译流水线
 
 ```
-SKILL.md → [提取] → [安全检查] → [序列化] → [SHACL] → ontoskill.ttl
+SKILL.md → [提取] → [安全检查] → [序列化] → [SHACL] → [嵌入] → ontoskill.ttl + intents.json
 ```
 
 | 阶段 | 发生什么 |
@@ -44,9 +45,10 @@ SKILL.md → [提取] → [安全检查] → [序列化] → [SHACL] → ontoski
 | **安全检查** | 正则表达式 + LLM 审查恶意内容 |
 | **序列化** | Pydantic 模型 → RDF 三元组 |
 | **验证** | SHACL 形状检查逻辑有效性 |
+| **嵌入** | 生成每技能意图嵌入（384 维，L2 归一化）|
 | **写入** | 带备份的原子写入 |
 
-如果任何阶段失败，技能**不会被写入**。SHACL 守门员强制执行宪法规则。
+如果任何阶段失败，技能**不会被写入**。SHACL 守门员强制执行宪法规则。嵌入阶段需要 `sentence-transformers` 并且每个技能至少声明一个意图。
 
 ---
 
@@ -153,7 +155,8 @@ ontoskills/
 ├── system/
 │   └── index.enabled.ttl    # 为 MCP 启用的技能
 └── <skill-path>/
-    └── ontoskill.ttl        # 单个技能模块
+    ├── ontoskill.ttl        # 单个技能模块
+    └── intents.json         # 预计算的意图嵌入（必需）
 ```
 
 ### 核心本体
@@ -219,8 +222,8 @@ OntoCore 是**缓存感知**的：
 
 | 约束 | 规则 |
 |------|------|
-| `resolvesIntent` | 必需（至少 1 个）|
-| `generatedBy` | 必需（恰好 1 个）|
+| `resolvesIntent` | 必需（至少 1 个）— 也用于语义搜索嵌入 |
+| `generatedBy` | 可选（证明）|
 | `requiresState` | 必须是有效的 IRI |
 | `yieldsState` | 必须是有效的 IRI |
 | `handlesFailure` | 必须是有效的 IRI |
@@ -254,6 +257,7 @@ OntoCore 是**缓存感知**的：
 | `ANTHROPIC_API_KEY` | Anthropic API key | 必需 |
 | `ANTHROPIC_BASE_URL` | API 基础 URL | `https://api.anthropic.com` |
 | `SECURITY_MODEL` | 安全审查模型 | `claude-opus-4-6` |
+| `DEFAULT_SKILLS_AUTHOR` | 技能的默认作者 | `unknown` |
 
 ---
 

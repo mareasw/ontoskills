@@ -68,6 +68,20 @@ ontoskills install mareasw/office/xlsx
 
 Downloads compiled `.ttl` from the store and places it in `~/.ontoskills/ontologies/`.
 
+To install without generating embeddings:
+
+```bash
+ontoskills install mareasw/office/xlsx --no-embeddings
+```
+
+Install resolution supports three levels:
+
+| Level | Example | Behavior |
+|-------|---------|----------|
+| Full | `mareasw/office/xlsx` | Installs the exact skill |
+| Package | `mareasw/office` | Installs all skills in the package |
+| Skill name | `xlsx` | Resolves the best match across stores |
+
 ### Enable / Disable
 
 ```bash
@@ -188,6 +202,14 @@ ontoskills install core
 ```
 
 Then retry the import.
+
+### "ONNX Runtime error"
+
+If you see errors about ONNX Runtime native libraries, set the library path:
+
+```bash
+export ORT_DYLIB_PATH=/path/to/onnxruntime/lib
+```
 
 ### "Index corrupted"
 

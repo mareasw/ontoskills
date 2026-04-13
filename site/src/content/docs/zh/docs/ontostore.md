@@ -27,14 +27,24 @@ ontoskills install mareasw/office/xlsx
 市场安装使用限定 ID：
 
 ```text
-<package_id>/<skill_id>
+<vendor>/<package>/<skill>
 ```
 
-示例：
+支持多层级解析：
 
-- `mareasw/greeting/hello`
-- `mareasw/office/xlsx`
-- `mareasw/office/docx`
+- `mareasw/greeting/hello` — 供应商/包/技能
+- `mareasw/office/xlsx` — 供应商/包/技能
+- `mareasw/office/docx` — 供应商/包/技能
+
+你也可以在包级别或供应商级别安装：
+
+```bash
+# 安装整个包中的所有技能
+ontoskills install mareasw/office
+
+# 安装某供应商的所有包
+ontoskills install mareasw
+```
 
 ## 安装流程
 
@@ -44,6 +54,12 @@ ontoskills install mareasw/office/xlsx
 
 ```bash
 ontoskills install mareasw/greeting/hello
+```
+
+使用 `--no-embeddings` 跳过嵌入生成：
+
+```bash
+ontoskills install mareasw/greeting/hello --no-embeddings
 ```
 
 如果之前禁用了技能并想重新启用：

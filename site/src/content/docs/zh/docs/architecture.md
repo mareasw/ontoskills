@@ -9,7 +9,7 @@ sidebar:
 
 ```mermaid
 flowchart LR
-    MD["SKILL.md"] --> LLM["Claude"] --> PYD["Pydantic"] --> SEC["Security"] --> RDF["RDF"] --> SHACL["SHACL"]
+    MD["SKILL.md"] --> LLM["Claude"] --> PYD["Pydantic"] --> SEC["Security"] --> RDF["RDF"] --> EMBED["Embed"] --> SHACL["SHACL"]
     SHACL -->|"PASS"| TTL["ontoskill.ttl"] --> MCP["OntoMCP"] <--> AGENT["Agent"]
     SHACL -->|"FAIL"| FAIL["❌ Block"]
 
@@ -18,6 +18,7 @@ flowchart LR
     style PYD fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
     style SEC fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
     style RDF fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
+    style EMBED fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
     style SHACL fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
     style TTL fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
     style MCP fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
@@ -32,6 +33,7 @@ flowchart LR
 | **提取** | SKILL.md | ExtractedSkill | LLM 提取结构化知识 |
 | **安全** | ExtractedSkill | ExtractedSkill | 正则表达式 + LLM 审查威胁 |
 | **序列化** | ExtractedSkill | RDF Graph | Pydantic → RDF 三元组 |
+| **嵌入** | RDF Graph | Embeddings | 向量嵌入生成（可选）|
 | **验证** | RDF Graph | ValidationResult | SHACL 形状检查有效性 |
 | **写入** | RDF Graph | .ttl 文件 | 带备份的原子写入 |
 
@@ -60,7 +62,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    A["dependsOn<br/>━━━━━━━━━━<br/>AsymmetricProperty<br/>A needs B"] --> UC1["Prerequisites<br/>━━━━━━━━━━<br/>Install before run"]
+    A["dependsOnSkill<br/>━━━━━━━━━━<br/>AsymmetricProperty<br/>A needs B"] --> UC1["Prerequisites<br/>━━━━━━━━━━<br/>Install before run"]
     B["extends<br/>━━━━━━━━━━<br/>TransitiveProperty<br/>A → B → C"] --> UC2["Inheritance<br/>━━━━━━━━━━<br/>Override behavior"]
     C["contradicts<br/>━━━━━━━━━━<br/>SymmetricProperty<br/>A ↔ B"] --> UC3["Conflicts<br/>━━━━━━━━━━<br/>Mutually exclusive"]
     D["implements<br/>━━━━━━━━━━<br/>Interface<br/>compliance"] --> UC4["Contracts<br/>━━━━━━━━━━<br/>Guaranteed API"]
@@ -75,7 +77,7 @@ flowchart LR
 
 | 属性 | 类型 | 语义 |
 |------|------|------|
-| `dependsOn` | 非对称 | A 需要 B，但 B 不需要 A |
+| `dependsOnSkill` | 非对称 | A 需要 B，但 B 不需要 A |
 | `extends` | 传递 | 如果 A 扩展 B 且 B 扩展 C，则 A 扩展 C |
 | `contradicts` | 对称 | 如果 A 与 B 矛盾，则 B 与 A 矛盾 |
 | `implements` | 非自反 | A 不能实现自己 |
@@ -90,7 +92,7 @@ flowchart LR
 | 约束 | 规则 | 错误 |
 |------|------|------|
 | `resolvesIntent` | 必需（至少 1 个）| 技能必须解决至少一个意图 |
-| `generatedBy` | 必需（恰好 1 个）| 技能必须有证明 |
+| `generatedBy` | 可选（0 或 1 个）| 技能的编译溯源证明 |
 | `requiresState` | 必须是 IRI | 必须是有效的状态 URI |
 | `yieldsState` | 必须是 IRI | 必须是有效的状态 URI |
 | `handlesFailure` | 必须是 IRI | 必须是有效的状态 URI |

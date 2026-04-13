@@ -28,6 +28,19 @@ ontoskills install mareasw/greeting/hello
 
 **包 ID 格式：** `owner/repo/skill`
 
+支持多层级安装：
+
+```bash
+# 安装单个技能
+ontoskills install mareasw/office/xlsx
+
+# 安装整个包中的所有技能
+ontoskills install mareasw/office
+
+# 安装某供应商的所有包
+ontoskills install mareasw
+```
+
 示例：`mareasw/office/xlsx`
 
 ### 第三方商店
@@ -67,6 +80,12 @@ ontoskills install mareasw/office/xlsx
 ```
 
 从商店下载已编译的 `.ttl` 并放入 `~/.ontoskills/ontologies/`。
+
+使用 `--no-embeddings` 跳过嵌入生成：
+
+```bash
+ontoskills install mareasw/office/xlsx --no-embeddings
+```
 
 ### 启用 / 禁用
 
@@ -177,6 +196,20 @@ ontoskills install core
 
 ```bash
 ontoskills rebuild-index
+```
+
+### "嵌入生成失败"
+
+如果 `sentence-transformers` 使用 ONNX Runtime 时出错，设置动态库路径：
+
+```bash
+export ORT_DYLIB_PATH=/path/to/onnxruntime/libonnxruntime.so
+```
+
+或者使用 `--no-embeddings` 跳过嵌入生成：
+
+```bash
+ontoskills install mareasw/office/xlsx --no-embeddings
 ```
 
 ---

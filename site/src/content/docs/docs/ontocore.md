@@ -29,13 +29,14 @@ This creates a managed compiler runtime under:
 Requirements:
 - **Python** 3.10+
 - **Anthropic API key** (set `ANTHROPIC_API_KEY` env var)
+- **sentence-transformers** (mandatory — install with `pip install sentence-transformers`)
 
 ---
 
 ## The compilation pipeline
 
 ```
-SKILL.md → [Extract] → [Security] → [Serialize] → [SHACL] → ontoskill.ttl
+SKILL.md → [Extract] → [Security] → [Serialize] → [SHACL] → [Embed] → ontoskill.ttl + intents.json
 ```
 
 | Stage | What Happens |
@@ -44,9 +45,10 @@ SKILL.md → [Extract] → [Security] → [Serialize] → [SHACL] → ontoskill.
 | **Security** | Regex + LLM review for malicious content |
 | **Serialize** | Pydantic models → RDF triples |
 | **Validate** | SHACL shapes check logical validity |
+| **Embed** | Generate per-skill intent embeddings (384-dim, L2-normalized) |
 | **Write** | Atomic write with backup |
 
-If any stage fails, the skill is **not written**. The SHACL gatekeeper enforces constitutional rules.
+If any stage fails, the skill is **not written**. The SHACL gatekeeper enforces constitutional rules. The embedding stage requires `sentence-transformers` and at least one declared intent per skill.
 
 ---
 
@@ -153,7 +155,8 @@ ontoskills/
 ├── system/
 │   └── index.enabled.ttl    # Skills enabled for MCP
 └── <skill-path>/
-    └── ontoskill.ttl        # Individual skill module
+    ├── ontoskill.ttl        # Individual skill module
+    └── intents.json         # Pre-computed intent embeddings (MANDATORY)
 ```
 
 ### The core ontology
@@ -219,8 +222,8 @@ Every skill must pass SHACL validation before being written. The constitutional 
 
 | Constraint | Rule |
 |------------|------|
-| `resolvesIntent` | Required (at least 1) |
-| `generatedBy` | Required (exactly 1) |
+| `resolvesIntent` | Required (at least 1) — also needed for semantic search embeddings |
+| `generatedBy` | Optional (attestation) |
 | `requiresState` | Must be valid IRI |
 | `yieldsState` | Must be valid IRI |
 | `handlesFailure` | Must be valid IRI |
@@ -254,6 +257,7 @@ See [Skill Authoring](/docs/authoring/) for practical guidance on writing skills
 | `ANTHROPIC_API_KEY` | Anthropic API key | Required |
 | `ANTHROPIC_BASE_URL` | API base URL | `https://api.anthropic.com` |
 | `SECURITY_MODEL` | Model for security review | `claude-opus-4-6` |
+| `DEFAULT_SKILLS_AUTHOR` | Default author for skills | `unknown` |
 
 ---
 
