@@ -39,6 +39,26 @@ pub struct IntentMatch {
     pub skills: Vec<String>,
 }
 
+/// Maximum query length in characters before safety truncation.
+/// Defensive limit to prevent crashes from extremely long LLM-generated queries.
+/// The ONNX tokenizer handles its own token-level truncation, but this prevents
+/// pathological inputs from consuming excessive memory.
+const MAX_QUERY_CHARS: usize = 512;
+
+/// Truncate query to a safe maximum length.
+/// Trusts the LLM to provide concise, targeted queries — this is purely defensive.
+fn safety_truncate(query: &str) -> &str {
+    if query.len() <= MAX_QUERY_CHARS {
+        return query;
+    }
+    // Find a safe char boundary to avoid panicking on multi-byte UTF-8
+    let mut end = MAX_QUERY_CHARS;
+    while end > 0 && !query.is_char_boundary(end) {
+        end -= 1;
+    }
+    &query[..end]
+}
+
 /// Embedding engine for semantic intent search.
 ///
 /// Uses ONNX Runtime for inference and tokenizers for text processing.
@@ -325,6 +345,9 @@ impl EmbeddingEngine {
         if self.intents.is_empty() {
             return Ok(Vec::new());
         }
+
+        // Safety truncation: trust the LLM query but cap defensively
+        let query = safety_truncate(query);
 
         // Tokenize query
         let (input_ids, attention_mask) = self.tokenize(query)?;
@@ -685,5 +708,39 @@ mod tests {
             (0.85, "a", &empty),
         ];
         assert_eq!(adaptive_cutoff(&scores, 0.4, 0.15), 1);
+    }
+
+    // Tests for safety_truncate
+    #[test]
+    fn test_safety_truncate_short_query_unchanged() {
+        assert_eq!(safety_truncate("create a PDF"), "create a PDF");
+    }
+
+    #[test]
+    fn test_safety_truncate_exact_limit_unchanged() {
+        let query: String = "a".repeat(512);
+        assert_eq!(safety_truncate(&query).len(), 512);
+    }
+
+    #[test]
+    fn test_safety_truncate_long_query_truncated() {
+        let query: String = "a".repeat(1000);
+        let truncated = safety_truncate(&query);
+        assert_eq!(truncated.len(), 512);
+    }
+
+    #[test]
+    fn test_safety_truncate_preserves_utf8_boundary() {
+        // Multi-byte UTF-8: each 'é' is 2 bytes
+        let query: String = "é".repeat(300); // 600 bytes
+        let truncated = safety_truncate(&query);
+        // Should truncate to a valid UTF-8 boundary (≤512 bytes)
+        assert!(truncated.len() <= 512);
+        assert!(truncated.chars().all(|c| c == 'é'));
+    }
+
+    #[test]
+    fn test_safety_truncate_empty_query() {
+        assert_eq!(safety_truncate(""), "");
     }
 }

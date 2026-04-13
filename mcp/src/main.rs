@@ -409,7 +409,7 @@ fn handle_tool_call(
         }
         "search_intents" => {
             let engine = embedding_engine
-                .ok_or_else(|| "Embeddings not available. Run 'ontoskills export-embeddings' first.".to_string())?;
+                .ok_or_else(|| "Embeddings not available. Install skills with embedding support to enable semantic search.".to_string())?;
 
             let query = arguments
                 .get("query")

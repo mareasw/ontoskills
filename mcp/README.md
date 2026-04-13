@@ -43,7 +43,7 @@ The server does **not** execute skill payloads. Payload execution is delegated t
 
 ```mermaid
 flowchart LR
-    CLIENT["MCP Client<br/>━━━━━━━━━━<br/>Claude Code<br/>stdio transport"] -->|"tools/call"| TOOLS["MCP Tools<br/>━━━━━━━━━━<br/>4 consolidated tools<br/>search, context, plan, rules"]
+    CLIENT["MCP Client<br/>━━━━━━━━━━<br/>Claude Code<br/>stdio transport"] -->|"tools/call"| TOOLS["MCP Tools<br/>━━━━━━━━━━<br/>6 consolidated tools<br/>search, context, plan, rules, intents, alias"]
     TOOLS -->|"SPARQL"| SPARQL["oxigraph<br/>━━━━━━━━━━<br/>SPARQL 1.1 engine<br/>in-memory store"]
     SPARQL -->|"query"| GRAPH["RDF Graph<br/>━━━━━━━━━━<br/>Loaded .ttl files<br/>OntoSkills catalog"]
 
@@ -68,11 +68,12 @@ flowchart LR
 
 | Tool | Purpose |
 |------|---------|
-| `search_skills` | Discover skills with optional filters for intent, required state, yielded state, and type |
+| `search_skills` | Discover skills with optional filters for intent, required state, yielded state, type, category, and is_user_invocable |
 | `search_intents` | **(Optional)** Semantic search for intents via embeddings — returns matching intents with similarity scores |
 | `get_skill_context` | Return the complete execution context for a skill, including payload and knowledge nodes |
 | `evaluate_execution_plan` | Evaluate applicability and generate a plan for a target intent or skill |
 | `query_epistemic_rules` | Query normalized knowledge nodes across the ontology with guided filters |
+| `resolve_alias` | Resolve a skill alias to its canonical skill ID |
 
 ---
 
@@ -167,6 +168,11 @@ If nothing is found locally, OntoMCP falls back to:
 ONTOMCP_ONTOLOGY_ROOT=/path/to/ontology-root
 ```
 
+**ONNX Runtime** (for semantic intent search):
+```bash
+ORT_DYLIB_PATH=/path/to/onnxruntime/lib
+```
+
 ---
 
 ## Run
@@ -214,6 +220,8 @@ flowchart LR
     CLAUDE -->|"get_skill_context"| TOOLS
     CLAUDE -->|"evaluate_execution_plan"| TOOLS
     CLAUDE -->|"query_epistemic_rules"| TOOLS
+    CLAUDE -->|"search_intents"| TOOLS
+    CLAUDE -->|"resolve_alias"| TOOLS
 
     style CLAUDE fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
     style TOOLS fill:#92eff4,stroke:#2a2a3e,color:#0d0d14

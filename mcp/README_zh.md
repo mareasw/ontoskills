@@ -43,7 +43,7 @@ MCP 服务器专注于以下功能：
 
 ```mermaid
 flowchart LR
-    CLIENT["MCP 客户端<br/>━━━━━━━━━━<br/>Claude Code<br/>stdio 传输"] -->|"tools/call"| TOOLS["MCP 工具<br/>━━━━━━━━━━<br/>4 个整合工具<br/>搜索、上下文、规划、规则"]
+    CLIENT["MCP 客户端<br/>━━━━━━━━━━<br/>Claude Code<br/>stdio 传输"] -->|"tools/call"| TOOLS["MCP 工具<br/>━━━━━━━━━━<br/>6 个整合工具<br/>搜索、上下文、规划、规则、意图、别名"]
     TOOLS -->|"SPARQL"| SPARQL["oxigraph<br/>━━━━━━━━━━<br/>SPARQL 1.1 引擎<br/>内存存储"]
     SPARQL -->|"查询"| GRAPH["RDF 图<br/>━━━━━━━━━━<br/>已加载 .ttl 文件<br/>OntoSkills 目录"]
 
@@ -68,11 +68,12 @@ flowchart LR
 
 | 工具 | 用途 |
 |------|------|
-| `search_skills` | 发现技能，支持按意图、所需状态、产出状态和类型过滤 |
+| `search_skills` | 发现技能，支持按意图、所需状态、产出状态、类型、category 和 is_user_invocable 过滤 |
 | `search_intents` | **（可选）** 通过嵌入进行语义意图搜索 — 返回匹配的意图及相似度分数 |
 | `get_skill_context` | 返回技能的完整执行上下文，包括负载和知识节点 |
 | `evaluate_execution_plan` | 评估适用性并为目标意图或技能生成执行计划 |
 | `query_epistemic_rules` | 通过引导过滤器查询本体中的规范化知识节点 |
+| `resolve_alias` | 将技能别名解析为规范技能 ID |
 
 ---
 
@@ -167,6 +168,11 @@ flowchart LR
 ONTOMCP_ONTOLOGY_ROOT=/path/to/ontology-root
 ```
 
+**ONNX Runtime**（用于语义意图搜索）：
+```bash
+ORT_DYLIB_PATH=/path/to/onnxruntime/lib
+```
+
 ---
 
 ## 运行
@@ -214,6 +220,8 @@ flowchart LR
     CLAUDE -->|"get_skill_context"| TOOLS
     CLAUDE -->|"evaluate_execution_plan"| TOOLS
     CLAUDE -->|"query_epistemic_rules"| TOOLS
+    CLAUDE -->|"search_intents"| TOOLS
+    CLAUDE -->|"resolve_alias"| TOOLS
 
     style CLAUDE fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
     style TOOLS fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
