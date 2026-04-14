@@ -44,7 +44,12 @@ async function installSkill(qualifiedId, options = {}) {
     fail("Install expects a qualified skill id like marea/office/xlsx");
   }
   const noEmbeddings = options.noEmbeddings || false;
-  const [packageId, skillId] = qualifiedId.split("/", 2);
+  const segments = qualifiedId.split("/");
+  if (segments.length < 3) {
+    fail(`Skill-level install requires a qualified id like vendor/package/skill, got: ${qualifiedId}`);
+  }
+  const packageId = segments.slice(0, 2).join("/");
+  const skillId = segments.slice(2).join("/");
   const matches = await findSkillInRegistry(qualifiedId);
   const selected = matches.find((match) => match.manifest.package_id === packageId && match.skill.id === skillId);
   if (!selected) {

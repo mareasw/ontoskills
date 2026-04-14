@@ -517,8 +517,18 @@ def install_single_skill(
         if manifest_dir:
             src = manifest_dir / module_rel
         else:
-            ref = urljoin(manifest_ref, module_rel)
-            src = None  # would need download for remote
+            module_url = urljoin(manifest_ref + "/", module_rel)
+            dest = install_root / module_rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                with urlopen(module_url) as resp:
+                    dest.write_bytes(resp.read())
+                copied_modules.append(dest)
+            except Exception as e:
+                raise NotFoundError(
+                    f"Failed to download module '{module_rel}' from {module_url}: {e}"
+                )
+            continue
 
         if src and src.exists():
             dest = install_root / module_rel

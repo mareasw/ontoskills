@@ -90,7 +90,7 @@ async function extractSkillInfo(modulePath) {
   const idMatch = text.match(/dcterms:identifier\s+"([^"]+)"/);
   const skillId = idMatch ? idMatch[1] : null;
   const relations = new Set();
-  for (const match of text.matchAll(/oc:(?:extends|dependsOn)\s+oc:skill_([A-Za-z0-9_-]+)/g)) {
+  for (const match of text.matchAll(/oc:(?:extends|dependsOn|dependsOnSkill)\s+oc:skill_([A-Za-z0-9_-]+)/g)) {
     relations.add(match[1].replace(/_/g, "-"));
   }
   return { skillId, relations };

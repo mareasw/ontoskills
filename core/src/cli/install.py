@@ -103,6 +103,16 @@ def install_cmd(ctx, package_ref, ontology_root_arg):
 
     index = RegistryIndex(packages=combined_packages)
 
+    # Skill-level refs (3+ segments) require manifest_base which is not
+    # available for remote-only indexes. Detect early with a clear message.
+    ref_parts = [part for part in package_ref.split("/") if part]
+    if len(ref_parts) >= 3:
+        console.print(
+            "[red]Skill-level install references are not supported for remote registries. "
+            "Use a vendor ref ('vendor') or package ref ('vendor/package') instead.[/red]"
+        )
+        raise SystemExit(1)
+
     try:
         target = resolve_install_ref(package_ref, index)
     except AmbiguousRefError as e:
