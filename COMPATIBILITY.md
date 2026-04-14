@@ -15,7 +15,7 @@ Both OntoCore and OntoMCP must support the same ontology format version to work 
 | 0.9.1    | 0.9.1   | 0.9             | Compatible |
 | 0.9.0    | 0.9.0   | 0.9             | Compatible |
 
-> **Note:** OntoMCP 0.11.0 supports ontology format 0.11 because all new properties (`oc:dependsOnSkill`, 9 optional metadata fields, per-skill embeddings) are additive and do not affect existing MCP queries. Trust-tier hybrid scoring uses data already loaded from `registry.lock.json`.
+> **Note:** OntoMCP 0.11.0 requires ontology format 0.11. The `oc:dependsOnSkill` predicate is used for dependency edges (replacing `oc:dependsOn`), and per-skill embeddings are required for semantic search. Older ontologies using `oc:dependsOn` will have missing dependency edges. Upgrade both packages together.
 
 ## Breaking Changes
 
