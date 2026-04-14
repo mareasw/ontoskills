@@ -105,7 +105,7 @@ Discover skills with optional filters.
 
 ### `search_intents`
 
-Search for intents semantically matching a natural language query. Requires embeddings to be exported first.
+Search for intents semantically matching a natural language query. Requires embeddings to be exported first. Results use **hybrid scoring** (cosine similarity × trust-tier quality multiplier) so higher-trust skills rank above community contributions even with slightly lower raw similarity.
 
 ```json
 {

@@ -161,7 +161,7 @@ ontoskills install mareasw/office/xlsx --no-embeddings
 }
 ```
 
-Returns matching intents with similarity scores:
+Returns matching intents with hybrid scores (cosine similarity × trust-tier quality multiplier):
 
 ```json
 {
@@ -172,6 +172,19 @@ Returns matching intents with similarity scores:
   ]
 }
 ```
+
+### Hybrid Scoring
+
+Results are ranked by **hybrid score** — cosine similarity multiplied by a trust-tier quality multiplier. This ensures higher-trust skills rank above community skills even when their raw similarity is slightly lower.
+
+| Trust Tier | Multiplier | Effect |
+|------------|------------|--------|
+| `local` | 1.2 | Boosts locally compiled skills |
+| `trusted` | 1.2 | Boosts official/trusted vendor skills |
+| `verified` | 1.0 | Neutral (baseline) |
+| `community` | 0.8 | Dampens community contributions |
+
+Example: a verified skill with cosine 0.80 (hybrid: 0.80) outranks a community skill with cosine 0.90 (hybrid: 0.72).
 
 ### MCP resource: ontology://schema
 

@@ -93,7 +93,7 @@ When embeddings are exported via `ontoskills export-embeddings`, the MCP server 
 }
 ```
 
-Returns matching intents with similarity scores:
+Returns matching intents with hybrid scores:
 ```json
 {
   "query": "create a pdf document",
@@ -103,6 +103,19 @@ Returns matching intents with similarity scores:
   ]
 }
 ```
+
+### Hybrid Scoring
+
+Search results use **hybrid scoring** — cosine similarity multiplied by a trust-tier quality multiplier:
+
+| Trust Tier | Multiplier | Effect |
+|------------|------------|--------|
+| `local` | 1.2 | Boosts locally compiled skills |
+| `trusted` | 1.2 | Boosts official/trusted vendor skills |
+| `verified` | 1.0 | Neutral (baseline) |
+| `community` | 0.8 | Dampens community contributions |
+
+This ensures that a verified skill with cosine 0.80 (hybrid: 0.80) outranks a community skill with cosine 0.90 (hybrid: 0.72).
 
 ### MCP Resource: `ontology://schema`
 
