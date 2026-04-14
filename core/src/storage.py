@@ -525,7 +525,7 @@ def generate_package_manifest(
     package_id: str,
     compiled_skills: list[dict],
     output_dir: Path,
-    trust_tier: str = os.environ.get("ONTOSKILLS_TRUST_TIER", "community"),
+    trust_tier: str | None = None,
 ) -> None:
     """Generate a per-package package.json manifest.
 
@@ -538,9 +538,12 @@ def generate_package_manifest(
             skill_id, path, description, category, intents, aliases,
             depends_on_skills, default_enabled, modules
         output_dir: The sub-package directory (e.g., ontostore/packages/anthropics/financial-services-plugin/)
-        trust_tier: Trust tier for the package
+        trust_tier: Trust tier for the package (reads ONTOSKILLS_TRUST_TIER env var if None)
     """
     import json
+
+    if trust_tier is None:
+        trust_tier = os.environ.get("ONTOSKILLS_TRUST_TIER", "community")
 
     modules = set()
     embedding_files = []
