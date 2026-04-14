@@ -29,13 +29,13 @@ ok "ontomcp binary built"
 step "Creating compiled skill artifacts..."
 
 ONTOLOGY_ROOT="$SANDBOX/ontology-root"
-VENDOR_DIR="$ONTOLOGY_ROOT/author/test-author/calc-skill"
+SKILL_DIR="$ONTOLOGY_ROOT/author/test-author/calc-skill"
 EMBEDDINGS_DIR="$ONTOLOGY_ROOT/system/embeddings"
 SYSTEM_DIR="$ONTOLOGY_ROOT/system"
-mkdir -p "$VENDOR_DIR" "$EMBEDDINGS_DIR" "$SYSTEM_DIR"
+mkdir -p "$SKILL_DIR" "$EMBEDDINGS_DIR" "$SYSTEM_DIR"
 
 # Create ontoskill.ttl (matches what compiler produces)
-cat > "$VENDOR_DIR/ontoskill.ttl" <<'TTL'
+cat > "$SKILL_DIR/ontoskill.ttl" <<'TTL'
 @prefix oc: <https://ontoskills.sh/ontology#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 
@@ -73,12 +73,12 @@ data = {
     ],
 }
 
-with open('$VENDOR_DIR/intents.json', 'w') as f:
+with open('$SKILL_DIR/intents.json', 'w') as f:
     json.dump(data, f)
 print(f'  Wrote {len(intents)} intents with {DIM}-dim embeddings')
 " 2>/dev/null || fail "Failed to create embeddings"
 
-[[ -f "$VENDOR_DIR/intents.json" ]] || fail "intents.json not created"
+[[ -f "$SKILL_DIR/intents.json" ]] || fail "intents.json not created"
 ok "Per-skill intents.json created with real embeddings"
 
 # ── Step 2: Merge with JS ────────────────────────────────────────────
@@ -89,7 +89,7 @@ const path = require('path');
 const fsp = require('fs/promises');
 
 const EMBEDDINGS_DIR = '$EMBEDDINGS_DIR';
-const VENDOR_DIR = '$ONTOLOGY_ROOT/author';
+const AUTHOR_DIR = '$ONTOLOGY_ROOT/author';
 
 async function walkForIntentsJson(dir) {
   let results = [];
@@ -107,7 +107,7 @@ async function walkForIntentsJson(dir) {
 
 async function run() {
   await fsp.mkdir(EMBEDDINGS_DIR, { recursive: true });
-  let intentsFiles = await walkForIntentsJson(VENDOR_DIR);
+  let intentsFiles = await walkForIntentsJson(AUTHOR_DIR);
 
   const intentMap = new Map();
   for (const filePath of intentsFiles) {
@@ -202,7 +202,7 @@ import json
 msgs = [
     {'jsonrpc':'2.0','id':1,'method':'initialize','params':{'protocolVersion':'2025-11-25','capabilities':{},'clientInfo':{'name':'e2e-test','version':'0.1'}}},
     {'jsonrpc':'2.0','method':'notifications/initialized'},
-    {'jsonrpc':'2.0','id':2,'method':'tools/call','params':{'name':'search_intents','arguments':{'query':'$SEARCH_QUERY','top_k':3}}},
+    {'jsonrpc':'2.0','id':2,'method':'tools/call','params':{'name':'search','arguments':{'query':'$SEARCH_QUERY','top_k':3}}},
 ]
 with open('$INPUT_FILE', 'w') as f:
     for m in msgs:
@@ -227,7 +227,7 @@ if [[ -z "$RESPONSE" ]]; then
     fail "MCP server returned empty response"
 fi
 
-# Parse the search_intents response (id:2)
+# Parse the search response (id:2)
 echo "$RESPONSE" > "$SANDBOX/mcp_response.jsonl"
 
 SEARCH_RESULT=$(python3 -c "
