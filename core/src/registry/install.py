@@ -506,6 +506,17 @@ def install_single_skill(
             if module_path == skill_path:
                 modules_to_copy.append(module_rel)
 
+    # Collect embedding files under the skill directory
+    embedding_files_to_copy = []
+    if manifest.embedding_files:
+        for ef_rel in manifest.embedding_files:
+            ef_path = Path(ef_rel)
+            try:
+                ef_path.relative_to(skill_dir)
+                embedding_files_to_copy.append(ef_rel)
+            except ValueError:
+                pass
+
     # Copy modules to install root
     install_root.mkdir(parents=True, exist_ok=True)
     copied_modules = []
@@ -536,6 +547,27 @@ def install_single_skill(
             shutil.copy2(src, dest)
             copied_modules.append(dest)
 
+    # Copy embedding files for this skill
+    for ef_rel in embedding_files_to_copy:
+        if manifest_dir:
+            src = manifest_dir / ef_rel
+        else:
+            base_url = manifest_ref[:manifest_ref.rfind("/")] + "/"
+            ef_url = urljoin(base_url, ef_rel)
+            dest = install_root / ef_rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                with urlopen(ef_url) as resp:
+                    dest.write_bytes(resp.read())
+            except Exception:
+                pass  # Non-fatal — embeddings may not exist
+            continue
+
+        if src and src.exists():
+            dest = install_root / ef_rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dest)
+
     # Write a partial manifest with only this skill
     partial_manifest = {
         "package_id": manifest.package_id,
@@ -543,6 +575,7 @@ def install_single_skill(
         "trust_tier": effective_trust,
         "source_kind": "ontology",
         "modules": [str(p) for p in modules_to_copy],
+        "embedding_files": [str(p) for p in embedding_files_to_copy],
         "skills": [{
             "id": target_skill.id,
             "path": target_skill.path,
