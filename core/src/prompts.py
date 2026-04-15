@@ -179,10 +179,10 @@ Reference files are loaded only when needed, not at skill activation.
 
 ## METADATA EXTRACTION (NEW FIELDS)
 
-When analyzing a skill, also extract these metadata fields from frontmatter or infer them from the content:
+When analyzing a skill, extract these metadata fields **only if explicitly present** in the frontmatter or skill files:
 
 ### category (string, optional)
-Infer the skill category from its content. Common values:
+Extract the skill category if specified in frontmatter. Common values:
 - "automation" — automates a tool/service (Jira, Slack, email)
 - "document" — creates/modifies documents (PDF, DOCX, PPTX)
 - "marketing" — marketing tasks (SEO, ads, content)
@@ -192,7 +192,7 @@ Infer the skill category from its content. Common values:
 - "productivity" — general productivity workflows
 
 ### is_user_invocable (boolean, default true)
-Determine if the skill is designed for direct user invocation.
+Extract this if explicitly stated in frontmatter. Defaults to true.
 - Most skills are user-invocable (true)
 - Set to false if the skill is purely a dependency, internal helper, or sub-agent spec
 

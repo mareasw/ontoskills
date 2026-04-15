@@ -69,7 +69,7 @@ FIELD_ALIASES: dict[str, list[str]] = {
     "argument_hint": ["arguments", "args", "argument_hint", "parameters"],
     "allowed_tools": ["tools", "allowed_tools", "required_tools", "tool_whitelist"],
     "aliases": ["aliases", "alias", "also_known_as", "tags"],
-    "depends_on": ["depends_on", "depends_on_skills", "dependencies", "extends", "requires"],
+    "depends_on": ["depends_on", "depends_on_skills", "dependencies", "requires"],
 }
 
 
