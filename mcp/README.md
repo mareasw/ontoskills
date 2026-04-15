@@ -108,12 +108,12 @@ Search results use **hybrid scoring** — cosine similarity multiplied by a trus
 
 | Trust Tier | Multiplier | Effect |
 |------------|------------|--------|
-| `local` | 1.2 | Boosts locally compiled skills |
-| `trusted` | 1.2 | Boosts official/trusted author skills |
+| `official` | 1.2 | Boosts official author skills (anthropics, coinbase, obra, etc.) |
+| `local` | 1.0 | Locally compiled skills (same as verified) |
 | `verified` | 1.0 | Neutral (baseline) |
 | `community` | 0.8 | Dampens community contributions |
 
-This ensures that a verified skill with cosine 0.80 (hybrid: 0.80) outranks a community skill with cosine 0.90 (hybrid: 0.72).
+This ensures that an official skill with cosine 0.80 (hybrid: 0.96) outranks a community skill with cosine 0.90 (hybrid: 0.72).
 
 ### MCP Resource: `ontology://schema`
 
@@ -141,7 +141,7 @@ A compact (~2KB) JSON schema describing available classes, properties, and examp
 - qualified ids like `marea/office/xlsx`
 
 When a short id is ambiguous, runtime resolution follows:
-- `local > verified > trusted > community`
+- `official > local > verified > community`
 
 Responses include package metadata such as:
 - `qualified_id`

@@ -197,7 +197,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Changed MCP runtime to prefer the enabled index manifest
 - Extended MCP responses with package-aware metadata
 - Changed MCP skill resolution to accept both short ids and qualified ids
-- Changed short-id conflict resolution to use precedence `local > verified > trusted > community`
+- Changed short-id conflict resolution to use precedence `official > local > verified > community`
 - Changed compiler relation serialization to use stable skill URI references
 - Changed compiler enrichment to infer parent inheritance deterministically
 - Changed the import layout so raw source repos land in `skills/author/`

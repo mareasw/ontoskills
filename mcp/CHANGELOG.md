@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - **Unified `search` tool** — Smart dispatch: `query` → semantic intent search, `alias` → alias resolution, otherwise → structured skill search (consolidated from 6 tools to 4)
-- **Hybrid scoring** — Semantic search results ranked by cosine similarity × trust-tier quality multiplier (local/trusted: 1.2, verified: 1.0, community: 0.8)
+- **Hybrid scoring** — Semantic search results ranked by cosine similarity × trust-tier quality multiplier (official: 1.2, local/verified: 1.0, community: 0.8)
 - **Query safety truncation** — Defensive 512-byte cap on search queries
 - **ONNX embedding engine** — Full pipeline: `model.onnx` + `tokenizer.json` + `intents.json` with mean pooling, L2 normalization, and adaptive cutoff
 - **E2E test** — `mcp/tests/e2e_search.sh` validates compile → merge → ONNX export → JSON-RPC search

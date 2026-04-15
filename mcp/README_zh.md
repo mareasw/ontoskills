@@ -108,12 +108,12 @@ flowchart LR
 
 | 信任层级 | 乘数 | 效果 |
 |----------|------|------|
-| `local` | 1.2 | 提升本地编译技能 |
-| `trusted` | 1.2 | 提升官方/可信供应商技能 |
+| `official` | 1.2 | 提升官方作者技能（anthropics、coinbase、obra 等） |
+| `local` | 1.0 | 本地编译技能（与 verified 相同） |
 | `verified` | 1.0 | 中性（基线） |
 | `community` | 0.8 | 抑制社区贡献 |
 
-这确保了余弦相似度为 0.80 的已验证技能（混合分：0.80）排名高于余弦相似度为 0.90 的社区技能（混合分：0.72）。
+这确保了余弦相似度为 0.80 的官方技能（混合分：0.96）排名高于余弦相似度为 0.90 的社区技能（混合分：0.72）。
 
 ### MCP 资源：`ontology://schema`
 
@@ -141,7 +141,7 @@ flowchart LR
 - 完全限定 ID，如 `marea/office/xlsx`
 
 当短 ID 有歧义时，运行时解析顺序：
-- `local > verified > trusted > community`
+- `official > local > verified > community`
 
 响应包含包元数据，如：
 - `qualified_id`
