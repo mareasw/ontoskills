@@ -53,7 +53,7 @@ Semantic search is only needed for **large skill catalogs** where keyword matchi
 - Rust MCP build: `--features embeddings`
 - Falls back from BM25 when semantic confidence is low
 
-Embeddings are **pre-computed per-skill at compile time** and merged at install time. The MCP server performs ONNX inference only for the query, matching it against pre-loaded intent vectors.
+Embeddings are **pre-computed per-skill at compile time** and downloaded optionally at install time. The MCP server scans per-skill `intents.json` files across the ontology tree at startup, performing ONNX inference only for the query.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -64,7 +64,7 @@ Embeddings are **pre-computed per-skill at compile time** and merged at install 
 │       │                                                          │
 │       ├──► ontoskill.ttl (existing)                             │
 │       │                                                          │
-│       └──► intents.json          # MANDATORY per-skill file     │
+│       └──► intents.json          # Optional per-skill file      │
 │            Pre-computed 384-dim embeddings (L2-normalized)      │
 │                                                                  │
 │  ontocore export-embeddings      # ONE-TIME: global ONNX model  │
@@ -75,14 +75,20 @@ Embeddings are **pre-computed per-skill at compile time** and merged at install 
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                   INSTALL-TIME (JS CLI)                          │
+│                   INSTALL-TIME (CLI)                             │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  ontoskills install <package>                                    │
 │       │                                                          │
+│       └──► Installs ontoskill.ttl + package.json                │
+│                                                                  │
+│  ontoskills install <package> --with-embeddings                  │
+│       │                                                          │
 │       ├──► Download model.onnx + tokenizer.json (once, cached)  │
-│       ├──► Download per-skill intents.json                       │
-│       └──► mergeEmbeddings() → system/embeddings/intents.json   │
+│       └──► Download per-skill intents.json                       │
+│                                                                  │
+│  MCP server scans per-skill intents.json at startup              │
+│  (no centralized merge step needed)                              │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -159,22 +165,19 @@ ontoskills export-embeddings --ontology-root ./ontoskills --output-dir ./embeddi
 
 This creates the global model artifacts (`model.onnx` + `tokenizer.json`) that the MCP server uses for query inference. Published once to the registry by the maintainer.
 
-### Install + merge (JS CLI)
+### Install + optional embeddings
 
 ```bash
-ontoskills install obra/superpowers/test-driven-development
+ontoskills install obra/superpowers
 ```
 
-The CLI:
-1. Downloads `model.onnx` + `tokenizer.json` (once, cached)
-2. Downloads per-skill `intents.json` files
-3. Merges all installed intents into `system/embeddings/intents.json`
-
-Opt out of embeddings with `--no-embeddings`:
+By default, installs only `ontoskill.ttl` + `package.json` (no embeddings). To include per-skill embedding files for semantic search:
 
 ```bash
-ontoskills install obra/superpowers/test-driven-development --no-embeddings
+ontoskills install obra/superpowers --with-embeddings
 ```
+
+The CLI downloads per-skill `intents.json` files alongside the skill TTLs. The MCP server discovers them automatically at startup by scanning the ontology tree — no centralized merge step needed.
 
 ### MCP Tool: search (semantic mode)
 
@@ -271,12 +274,11 @@ A compact JSON schema describing available classes and properties:
 │   │   ├── index.enabled.ttl
 │   │   └── embeddings/
 │   │       ├── model.onnx           # Global ONNX model (~90MB)
-│   │       ├── tokenizer.json       # HuggingFace tokenizer
-│   │       └── intents.json         # MERGED from all installed skills
+│   │       └── tokenizer.json       # HuggingFace tokenizer
 │   └── author/
 │       └── <author>/<pkg>/<skill>/
 │           ├── ontoskill.ttl
-│           └── intents.json         # Per-skill pre-computed embeddings
+│           └── intents.json         # Per-skill pre-computed embeddings (optional)
 ```
 
 **Source code:**
@@ -288,13 +290,11 @@ core/
 
 mcp/
 ├── src/
-│   ├── embeddings.rs            # Rust embedding engine (ONNX inference)
+│   ├── embeddings.rs            # Rust embedding engine (ONNX inference + per-skill scan)
+│   ├── bm25_engine.rs           # BM25 keyword search (always available)
+│   ├── catalog.rs               # Catalog with trust tier quality multiplier
 │   ├── schema.rs                # Schema resource
 │   └── main.rs                  # MCP tool handlers
-
-cli/
-├── lib/
-│   └── registry.js              # mergeEmbeddings() at install time
 ```
 
 ---

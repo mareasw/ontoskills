@@ -100,7 +100,7 @@ ontoskills install obra/superpowers/test-driven-development
 
 | 标志 | 含义 |
 |------|------|
-| `--no-embeddings` | 跳过下载嵌入文件（model.onnx、intents.json）|
+| `--with-embeddings` | 下载每技能嵌入文件（intents.json）用于语义搜索 |
 
 ### `enable <package-id>`
 
@@ -306,12 +306,11 @@ ontoskills uninstall --all
 │   │   ├── index.enabled.ttl  # 已启用技能清单
 │   │   └── embeddings/        # 语义搜索产物
 │   │       ├── model.onnx     # ONNX 嵌入模型 (~90MB)
-│   │       ├── tokenizer.json # HuggingFace 分词器
-│   │       └── intents.json   # 合并的意图嵌入
+│   │       └── tokenizer.json # HuggingFace 分词器
 │   └── author/            # 已安装的技能包
 │       └── <author>/<pkg>/<skill>/
 │           ├── ontoskill.ttl
-│           └── intents.json   # 每技能预计算的嵌入
+│           └── intents.json   # 每技能嵌入（可选，使用 --with-embeddings）
 ├── skills/                # 源技能
 │   └── author/            # 导入的仓库
 └── state/                 # 锁定文件和元数据

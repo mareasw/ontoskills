@@ -56,7 +56,7 @@ BM25 是默认的搜索引擎，始终可用。它在启动时从 Catalog 已加
 
 ## 语义搜索架构（可选）
 
-嵌入在**编译时按技能预计算**，并在安装时合并。MCP 服务器仅对查询执行 ONNX 推理，将其与预加载的意图向量进行匹配。
+嵌入在**编译时按技能预计算**，安装时可选下载。MCP 服务器在启动时扫描本体树中的每技能 `intents.json` 文件，仅对查询执行 ONNX 推理。
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -67,7 +67,7 @@ BM25 是默认的搜索引擎，始终可用。它在启动时从 Catalog 已加
 │       │                                                          │
 │       ├──► ontoskill.ttl (现有)                                  │
 │       │                                                          │
-│       └──► intents.json          # 每技能必需文件               │
+│       └──► intents.json          # 可选每技能文件               │
 │            预计算的 384 维嵌入 (L2 归一化)                       │
 │                                                                  │
 │  ontocore export-embeddings      # 一次性：全局 ONNX 模型       │
@@ -78,14 +78,20 @@ BM25 是默认的搜索引擎，始终可用。它在启动时从 Catalog 已加
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                   安装时 (JS CLI)                                │
+│                   安装时 (CLI)                                   │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  ontoskills install <package>                                    │
 │       │                                                          │
+│       └──► 安装 ontoskill.ttl + package.json                    │
+│                                                                  │
+│  ontoskills install <package> --with-embeddings                  │
+│       │                                                          │
 │       ├──► 下载 model.onnx + tokenizer.json（一次，缓存）       │
-│       ├──► 下载每技能 intents.json                               │
-│       └──► mergeEmbeddings() → system/embeddings/intents.json   │
+│       └──► 下载每技能 intents.json                               │
+│                                                                  │
+│  MCP 服务器启动时自动扫描每技能 intents.json                    │
+│  （无需集中合并步骤）                                            │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -164,22 +170,19 @@ ontoskills export-embeddings --ontology-root ./ontoskills --output-dir ./embeddi
 
 这会创建全局模型产物（`model.onnx` + `tokenizer.json`），MCP 服务器使用它们进行查询推理。由维护者一次性发布到注册表。
 
-### 安装 + 合并 (JS CLI)
+### 安装 + 可选嵌入
 
 ```bash
-ontoskills install obra/superpowers/test-driven-development
+ontoskills install obra/superpowers
 ```
 
-CLI 会：
-1. 下载 `model.onnx` + `tokenizer.json`（一次，缓存）
-2. 下载每技能 `intents.json` 文件
-3. 将所有已安装的意图合并到 `system/embeddings/intents.json`
-
-使用 `--no-embeddings` 跳过嵌入：
+默认仅安装 `ontoskill.ttl` + `package.json`（不包含嵌入）。如需包含每技能嵌入文件用于语义搜索：
 
 ```bash
-ontoskills install obra/superpowers/test-driven-development --no-embeddings
+ontoskills install obra/superpowers --with-embeddings
 ```
+
+CLI 会下载每技能 `intents.json` 文件到技能目录。MCP 服务器启动时自动扫描本体树发现它们 — 无需集中合并步骤。
 
 ### MCP 工具：search（BM25 默认模式）
 
@@ -297,12 +300,11 @@ ontoskills install obra/superpowers/test-driven-development --no-embeddings
 │   │   ├── index.enabled.ttl
 │   │   └── embeddings/
 │   │       ├── model.onnx           # 全局 ONNX 模型 (~90MB)
-│   │       ├── tokenizer.json       # HuggingFace 分词器
-│   │       └── intents.json         # 从所有已安装技能合并
+│   │       └── tokenizer.json       # HuggingFace 分词器
 │   └── author/
 │       └── <author>/<pkg>/<skill>/
 │           ├── ontoskill.ttl
-│           └── intents.json         # 每技能预计算的嵌入
+│           └── intents.json         # 每技能嵌入（可选，使用 --with-embeddings）
 ```
 
 **源代码：**
@@ -314,13 +316,11 @@ core/
 
 mcp/
 ├── src/
-│   ├── embeddings.rs            # Rust 嵌入引擎（ONNX 推理）
+│   ├── embeddings.rs            # Rust 嵌入引擎（ONNX 推理 + 每技能扫描）
+│   ├── bm25_engine.rs           # BM25 关键词搜索（始终可用）
+│   ├── catalog.rs               # 带信任层级质量乘数的目录
 │   ├── schema.rs                # 模式资源
 │   └── main.rs                  # MCP 工具处理器
-
-cli/
-├── lib/
-│   └── registry.js              # 安装时的 mergeEmbeddings()
 ```
 
 ---

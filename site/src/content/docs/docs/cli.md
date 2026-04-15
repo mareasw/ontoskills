@@ -100,7 +100,7 @@ The package ID supports multi-level resolution:
 
 | Flag | Meaning |
 |------|---------|
-| `--no-embeddings` | Skip downloading embedding files (model.onnx, intents.json) |
+| `--with-embeddings` | Download per-skill embedding files (intents.json) for semantic search |
 
 ### `enable <package-id>`
 
@@ -306,12 +306,11 @@ ontoskills uninstall --all
 │   │   ├── index.enabled.ttl  # Enabled skills manifest
 │   │   └── embeddings/        # Semantic search artifacts
 │   │       ├── model.onnx     # ONNX embedding model (~90MB)
-│   │       ├── tokenizer.json # HuggingFace tokenizer
-│   │       └── intents.json   # Merged intent embeddings
+│   │       └── tokenizer.json # HuggingFace tokenizer
 │   └── author/            # Installed skill packages
 │       └── <author>/<pkg>/<skill>/
 │           ├── ontoskill.ttl
-│           └── intents.json   # Per-skill pre-computed embeddings
+│           └── intents.json   # Per-skill embeddings (optional, with --with-embeddings)
 ├── skills/                # Source skills
 │   └── author/            # Imported repositories
 └── state/                 # Lockfiles and metadata
