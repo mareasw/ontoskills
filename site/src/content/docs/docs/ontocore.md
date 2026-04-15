@@ -29,14 +29,18 @@ This creates a managed compiler runtime under:
 Requirements:
 - **Python** 3.10+
 - **Anthropic API key** (set `ANTHROPIC_API_KEY` env var)
-- **sentence-transformers** (mandatory — install with `pip install sentence-transformers`)
+
+> **Optional:** Install `ontocore[embeddings]` to enable per-skill embedding generation for semantic search (recommended for large skill catalogs):
+> ```bash
+> pip install ontocore[embeddings]
+> ```
 
 ---
 
 ## The compilation pipeline
 
 ```
-SKILL.md → [Extract] → [Security] → [Serialize] → [SHACL] → [Embed] → ontoskill.ttl + intents.json
+SKILL.md → [Extract] → [Security] → [Serialize] → [SHACL] → [Embed (opt)] → ontoskill.ttl + intents.json
 ```
 
 | Stage | What Happens |
@@ -45,10 +49,10 @@ SKILL.md → [Extract] → [Security] → [Serialize] → [SHACL] → [Embed] �
 | **Security** | Regex + LLM review for malicious content |
 | **Serialize** | Pydantic models → RDF triples |
 | **Validate** | SHACL shapes check logical validity |
-| **Embed** | Generate per-skill intent embeddings (384-dim, L2-normalized) |
+| **Embed** | Per-skill intent embeddings (384-dim, L2-normalized) — optional, requires `ontocore[embeddings]` |
 | **Write** | Atomic write with backup |
 
-If any stage fails, the skill is **not written**. The SHACL gatekeeper enforces constitutional rules. The embedding stage is optional — install with `pip install ontocore[embeddings]` to generate per-skill semantic search vectors. When the extra is not installed, embedding generation is skipped with a warning.
+If any stage fails, the skill is **not written**. The SHACL gatekeeper enforces constitutional rules. The embedding stage is optional — skipped with a warning when `ontocore[embeddings]` is not installed.
 
 ---
 

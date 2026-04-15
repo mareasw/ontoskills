@@ -205,7 +205,7 @@ ONTOMCP_ONTOLOGY_ROOT=/path/to/ontology-root
 
 **ONNX Runtime** (optional, for large skill catalogs):
 ```bash
-ORT_DYLIB_PATH=/path/to/onnxruntime/lib
+ORT_DYLIB_PATH=/path/to/directory-containing-libonnxruntime
 ```
 
 ---

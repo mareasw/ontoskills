@@ -7,7 +7,7 @@ sidebar:
 
 A skill is not just code — it's **structured knowledge**. OntoCore extracts this knowledge and compiles it into a queryable ontology.
 
-> **Note:** Embedding generation is a mandatory step in the compilation pipeline. Per-skill vector embeddings are produced for semantic intent search.
+> **Note:** Embedding generation is an optional step in the compilation pipeline. Install `ontocore[embeddings]` to produce per-skill vector embeddings for semantic intent search. When not installed, embedding generation is skipped with a warning — BM25 keyword search remains available in the MCP runtime.
 
 ---
 
