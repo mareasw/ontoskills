@@ -106,8 +106,12 @@ ontoskills install core
 
 Requirements:
 - **Python** 3.10+
-- **sentence-transformers** (installed automatically with OntoCore)
 - `ANTHROPIC_API_KEY` environment variable set
+
+> **Optional:** Install `ontocore[embeddings]` to enable semantic embedding generation during compilation (recommended for large skill catalogs):
+> ```bash
+> pip install ontocore[embeddings]
+> ```
 
 ```bash
 export ANTHROPIC_API_KEY="your-key-here"

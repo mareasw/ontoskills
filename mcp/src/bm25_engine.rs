@@ -20,7 +20,7 @@ pub struct Bm25Match {
     pub qualified_id: String,
     /// BM25 score * quality multiplier
     pub score: f32,
-    /// Which field matched best: "intent", "alias", or "nature"
+    /// Always "keyword" — BM25 matches across the whole document
     pub matched_by: String,
     /// Skill intents
     pub intents: Vec<String>,
