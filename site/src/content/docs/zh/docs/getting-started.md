@@ -108,7 +108,11 @@ ontoskills install core
 系统要求：
 - **Python** 3.10+
 - 设置 `ANTHROPIC_API_KEY` 环境变量
-- （可选）`sentence-transformers` 用于语义搜索嵌入：`pip install sentence-transformers`
+
+> **可选：** 安装 `ontocore[embeddings]` 以启用编译期间的语义嵌入生成（推荐用于大型技能目录）：
+> ```bash
+> pip install ontocore[embeddings]
+> ```
 
 ```bash
 export ANTHROPIC_API_KEY="你的-key"
