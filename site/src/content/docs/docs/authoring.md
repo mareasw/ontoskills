@@ -446,7 +446,7 @@ ontoskills init-core
 ontoskills compile my-skill
 ```
 
-> **Note:** Compilation requires the `sentence-transformers` Python package for embedding generation. It is installed automatically with OntoCore.
+> **Note:** Embedding generation is optional. Install with `pip install ontocore[embeddings]` to produce semantic search vectors alongside each compiled skill. Without it, compilation succeeds but embeddings are skipped.
 
 ### What happens during compilation
 

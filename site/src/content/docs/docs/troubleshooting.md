@@ -260,10 +260,20 @@ Ensure `~/.ontoskills/bin` is in your PATH, or use the full path in your MCP con
 The MCP server uses ONNX Runtime for semantic search. If the library is not in your system path:
 
 ```bash
-# Find the library (installed via pip)
-python3 -c "import onnxruntime; import os; print(os.path.join(os.path.dirname(onnxruntime.__file__), 'capi', 'libonnxruntime.so'))"
+# Find the library (installed via pip) — platform-agnostic
+python3 -c "import onnxruntime; import os; print(os.path.join(os.path.dirname(onnxruntime.__file__), 'capi'))"
+```
 
-# Set the path
+Then set the path to the shared library inside that directory:
+
+| Platform | Library name |
+|----------|-------------|
+| Linux | `libonnxruntime.so` |
+| macOS | `libonnxruntime.dylib` |
+| Windows | `onnxruntime.dll` |
+
+```bash
+# Set the path (example for Linux)
 export ORT_DYLIB_PATH=/path/to/libonnxruntime.so
 ```
 
