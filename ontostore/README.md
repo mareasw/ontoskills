@@ -22,7 +22,7 @@
   <img src="https://img.shields.io/badge/packages-16-blue?style=for-the-badge" alt="16 Packages">
   <img src="https://img.shields.io/badge/skills-409-green?style=for-the-badge" alt="409 Skills">
   <img src="https://img.shields.io/badge/format-OWL%202%20RDF%2FTurtle-green?style=for-the-badge&logo=w3c" alt="OWL 2">
-  <img src="https://img.shields.io/badge/trust-verified%20%2B%20community-purple?style=for-the-badge" alt="Trust Tiers">
+  <img src="https://img.shields.io/badge/search-BM25%20%2B%20semantic-9cf?style=for-the-badge" alt="BM25 + Semantic Search">
   <a href="#license">
     <img src="https://img.shields.io/badge/license-MIT-orange?style=for-the-badge" alt="MIT License">
   </a>
@@ -79,13 +79,37 @@ Every package declares a trust tier that affects search ranking and visibility:
 
 ---
 
+## Skill Discovery
+
+Installed skills are discoverable by the OntoMCP server through two search engines:
+
+### BM25 Keyword Search (default, always available)
+
+Every installed skill is searchable via **BM25 keyword matching** — no extra dependencies, no model downloads. The BM25 index is built in-memory at server startup from skill intents, aliases, and descriptions.
+
+- Zero setup — works out of the box after `ontoskills install`
+- English stemming and stop words
+- Results ranked by keyword relevance × trust-tier quality multiplier
+
+### Semantic Search (optional)
+
+For large skill catalogs where keyword matching may miss relevant results, OntoStore provides pre-computed embeddings. Install them with `--with-embeddings`:
+
+```bash
+ontoskills install obra/superpowers --with-embeddings
+```
+
+When available, the MCP server uses ONNX inference for semantic similarity matching. BM25 remains the default; semantic search is used only when embeddings are installed.
+
+---
+
 ## Registry Structure
 
 ```
 ontostore/
 ├── index.json                         # Registry index (packages list + embedding model)
 ├── embeddings/
-│   └── tokenizer.json                 # Shared tokenizer for semantic search
+│   └── tokenizer.json                 # Shared tokenizer (for semantic search)
 ├── packages/
 │   ├── anthropics/
 │   │   ├── claude-code/
@@ -158,7 +182,7 @@ Each package has a manifest declaring its skills, modules, and metadata:
 # Install a single package
 ontoskills install obra/superpowers
 
-# Install with semantic search embeddings
+# Install with semantic search embeddings (optional)
 ontoskills install obra/superpowers --with-embeddings
 
 # Install all packages from an author
@@ -198,18 +222,6 @@ Fork this repository, add your package under `packages/<author>/<package>/`, upd
 - `package.json` must conform to the package manifest schema
 - Skill IDs must be unique across the registry
 - Trust tier will be set to `community` by default; `verified` requires review
-
----
-
-## Semantic Search
-
-OntoStore ships optional pre-computed embeddings for semantic skill discovery. To use them:
-
-1. Install with `--with-embeddings` to download per-skill `intents.json` files
-2. The MCP server scans these files at startup for semantic matching
-3. BM25 keyword search is always available as fallback
-
-Embeddings use `sentence-transformers/all-MiniLM-L6-v2` (384-dim, L2-normalized).
 
 ---
 
