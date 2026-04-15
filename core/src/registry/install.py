@@ -76,6 +76,7 @@ def install_package_from_directory(
     root: Path | None = None,
     trust_tier: TrustTier | None = None,
     source_kind: SourceKind = "ontology",
+    with_embeddings: bool = False,
 ) -> InstalledPackageState:
     """Install a package from a local directory."""
     base = ensure_registry_layout(root)
@@ -95,7 +96,8 @@ def install_package_from_directory(
         )
     else:
         package_state = _install_ontology_package(
-            package_dir, manifest, install_root, effective_trust, source_kind
+            package_dir, manifest, install_root, effective_trust, source_kind,
+            with_embeddings=with_embeddings,
         )
 
     lock = load_registry_lock(base)
@@ -111,6 +113,7 @@ def _install_ontology_package(
     install_root: Path,
     trust_tier: TrustTier,
     source_kind: SourceKind,
+    with_embeddings: bool = False,
 ) -> InstalledPackageState:
     """Copy ontology package files and create state."""
     copied_modules = []
@@ -121,6 +124,15 @@ def _install_ontology_package(
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
         copied_modules.append(destination)
+
+    # Optionally copy embedding files
+    if with_embeddings and manifest.embedding_files:
+        for ef_rel in manifest.embedding_files:
+            source = package_dir / ef_rel
+            if source.exists():
+                destination = install_root / ef_rel
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, destination)
 
     copied_manifest = install_root / "package.json"
     shutil.copy2(package_dir / "package.json", copied_manifest)
@@ -360,6 +372,7 @@ def install_package_from_manifest_ref(
     root: Path | None = None,
     trust_tier: TrustTier | None = None,
     source_kind: SourceKind = "ontology",
+    with_embeddings: bool = False,
 ) -> InstalledPackageState:
     """Install a package from a manifest URL or file path."""
     parsed = urlparse(manifest_ref)
@@ -392,17 +405,36 @@ def install_package_from_manifest_ref(
             else:
                 shutil.copy2(Path(manifest_ref).parent / relative, destination)
 
+        # Optionally download embedding files
+        if with_embeddings and manifest.embedding_files:
+            for ef_rel in manifest.embedding_files:
+                destination = package_dir / ef_rel
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    if parsed.scheme in ("http", "https", "file"):
+                        ef_url = urljoin(manifest_ref, ef_rel)
+                        with urlopen(ef_url) as resp:
+                            destination.write_bytes(resp.read())
+                    else:
+                        src = Path(manifest_ref).parent / ef_rel
+                        if src.exists():
+                            shutil.copy2(src, destination)
+                except Exception:
+                    pass  # Non-fatal — embeddings may not be available
+
         return install_package_from_directory(
             package_dir,
             root=root,
             trust_tier=trust_tier or manifest.trust_tier,
             source_kind=source_kind,
+            with_embeddings=with_embeddings,
         )
 
 
 def install_package_from_sources(
     package_id: str,
     root: Path | None = None,
+    with_embeddings: bool = False,
 ) -> InstalledPackageState:
     """Install a package from configured registry sources."""
     source, package = resolve_package_from_sources(package_id, root=root)
@@ -413,6 +445,7 @@ def install_package_from_sources(
         root=root,
         trust_tier=effective_trust,
         source_kind=package.source_kind or source.source_kind,
+        with_embeddings=with_embeddings,
     )
 
 
@@ -420,6 +453,7 @@ def install_author(
     author_name: str,
     packages: list,
     root: Path | None = None,
+    with_embeddings: bool = False,
 ) -> list[InstalledPackageState]:
     """Install all packages from an author.
 
@@ -427,6 +461,7 @@ def install_author(
         author_name: Author name (e.g., "anthropics")
         packages: List of RegistryPackageEntry objects for this author
         root: Ontology root path
+        with_embeddings: Download per-skill embedding files
 
     Returns:
         List of installed package states
@@ -442,6 +477,7 @@ def install_author(
             root=base,
             trust_tier=effective_trust,
             source_kind=package_entry.source_kind or source.source_kind,
+            with_embeddings=with_embeddings,
         )
         results.append(pkg_state)
     return results

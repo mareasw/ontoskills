@@ -58,8 +58,9 @@ def import_source_repo_cmd(ctx, repo_ref, package_id, trust_tier, ontology_root_
 @click.command('install')
 @click.argument('package_ref')
 @click.option('-o', '--ontology-root', 'ontology_root_arg', default=None, type=click.Path(path_type=Path))
+@click.option('--with-embeddings', is_flag=True, help='Download per-skill embedding files for semantic search')
 @click.pass_context
-def install_cmd(ctx, package_ref, ontology_root_arg):
+def install_cmd(ctx, package_ref, ontology_root_arg, with_embeddings):
     """Install packages by reference.
 
     Supports author-level (anthropics), package-level (anthropics/financial-services-plugin),
@@ -123,12 +124,12 @@ def install_cmd(ctx, package_ref, ontology_root_arg):
         raise SystemExit(1)
 
     if isinstance(target, AuthorTarget):
-        results = install_author(target.author, target.packages, root=root)
+        results = install_author(target.author, target.packages, root=root, with_embeddings=with_embeddings)
         total_skills = sum(len(pkg.skills) for pkg in results)
         console.print(f"[green]Installed author {target.author}: {len(results)} package(s), {total_skills} skill(s)[/green]")
 
     elif isinstance(target, PackageTarget):
-        package = install_package_from_sources(target.package.package_id, root=root)
+        package = install_package_from_sources(target.package.package_id, root=root, with_embeddings=with_embeddings)
         console.print(f"[green]Installed {package.package_id}: {len(package.skills)} skill(s)[/green]")
 
     # NOTE: SkillTarget is not reachable here because the 3+ segment guard
