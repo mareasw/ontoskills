@@ -68,10 +68,10 @@ ontoskills install obra/superpowers/test-driven-development
 
 Downloads compiled `.ttl` from the store and places it in `~/.ontoskills/ontologies/`.
 
-To install without downloading embedding artifacts:
+To also download semantic search embedding artifacts:
 
 ```bash
-ontoskills install obra/superpowers/test-driven-development --no-embeddings
+ontoskills install obra/superpowers/test-driven-development --with-embeddings
 ```
 
 Install resolution supports three levels:

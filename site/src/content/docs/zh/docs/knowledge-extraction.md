@@ -180,15 +180,15 @@ ontoskills/
 
 ---
 
-## 嵌入生成
+## 嵌入生成（可选）
 
-编译期间，OntoCore 会为技能描述和意图生成向量嵌入（**必需步骤**），用于语义搜索（`search` 工具的语义模式）。嵌入生成需要安装 `sentence-transformers` 包：
+编译期间，OntoCore 可以为技能描述和意图生成向量嵌入（**可选步骤**），用于语义搜索（`search` 工具的语义模式）。嵌入生成需要安装 `ontocore[embeddings]` 额外包：
 
 ```bash
-pip install sentence-transformers
+pip install ontocore[embeddings]
 ```
 
-如果未安装，编译将失败并提示缺少依赖。
+如果未安装，编译将跳过嵌入生成并显示警告。BM25 关键词搜索在 MCP 运行时始终可用。
 
 ---
 

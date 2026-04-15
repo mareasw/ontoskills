@@ -56,10 +56,10 @@ ontoskills install mareasw
 ontoskills install mareasw/greeting/hello
 ```
 
-使用 `--no-embeddings` 跳过嵌入生成：
+要同时安装语义搜索嵌入文件：
 
 ```bash
-ontoskills install mareasw/greeting/hello --no-embeddings
+ontoskills install mareasw/greeting/hello --with-embeddings
 ```
 
 如果之前禁用了技能并想重新启用：

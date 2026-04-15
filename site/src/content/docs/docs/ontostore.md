@@ -60,10 +60,10 @@ If you previously disabled a skill and want to re-enable it:
 ontoskills enable mareasw/greeting/hello
 ```
 
-To install without generating embeddings:
+To install with semantic search embeddings:
 
 ```bash
-ontoskills install mareasw/greeting/hello --no-embeddings
+ontoskills install mareasw/greeting/hello --with-embeddings
 ```
 
 ## Official vs third-party

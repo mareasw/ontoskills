@@ -26,7 +26,7 @@ ontoskills install mareasw/greeting/hello
 
 技能安装后自动启用。
 
-**包 ID 格式：** `owner/repo/skill`
+**包 ID 格式：** `author/package/skill`
 
 支持多层级安装：
 
@@ -81,10 +81,10 @@ ontoskills install obra/superpowers/test-driven-development
 
 从商店下载已编译的 `.ttl` 并放入 `~/.ontoskills/ontologies/`。
 
-使用 `--no-embeddings` 跳过下载语义搜索产物：
+要同时下载语义搜索嵌入文件，使用 `--with-embeddings`：
 
 ```bash
-ontoskills install obra/superpowers/test-driven-development --no-embeddings
+ontoskills install obra/superpowers/test-driven-development --with-embeddings
 ```
 
 ### 启用 / 禁用
@@ -206,10 +206,10 @@ ontoskills rebuild-index
 export ORT_DYLIB_PATH=/path/to/onnxruntime/libonnxruntime.so
 ```
 
-或者使用 `--no-embeddings` 跳过下载语义搜索产物：
+或者要同时下载语义搜索嵌入文件，使用 `--with-embeddings`：
 
 ```bash
-ontoskills install obra/superpowers/test-driven-development --no-embeddings
+ontoskills install obra/superpowers/test-driven-development --with-embeddings
 ```
 
 ---
