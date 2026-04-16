@@ -61,6 +61,9 @@ const i18n = {
     setupMcpCommand: 'npx ontoskills install mcp',
     setupSkillCommand: 'npx ontoskills install obra/superpowers',
     setupDocs: 'Read the docs',
+    noDeps: 'No dependencies',
+    viewPackageGraph: 'View package graph',
+    backToSkillGraph: '← Back to skill graph',
   },
   zh: {
     searchPlaceholder: '按本体技能、意图或描述搜索...',
@@ -113,6 +116,9 @@ const i18n = {
     setupMcpCommand: 'npx ontoskills install mcp',
     setupSkillCommand: 'npx ontoskills install obra/superpowers',
     setupDocs: '阅读文档',
+    noDeps: '无依赖',
+    viewPackageGraph: '查看包图谱',
+    backToSkillGraph: '← 返回技能图谱',
   },
 };
 
@@ -218,6 +224,11 @@ const prefix = lang === 'zh' ? '/zh/ontostore' : '/ontostore';
   .breadcrumb a:hover { color: #52c7e8; }
 </style>
 
+<script>
+  // Vite-processed: imports Three.js module and exposes graph creation via window
+  import './KnowledgeGraph3D.js';
+</script>
+
 <script define:vars={{ rootId, storeIndexUrl: OFFICIAL_STORE_INDEX_URL, storeRepoUrl: OFFICIAL_STORE_REPO_URL, i18n: t, prefix, lang }} is:inline>
 const skillsKey = `ontoskills-skills-${rootId}`;
 const abortKey = `ontoskills-abort-${rootId}`;
@@ -303,6 +314,30 @@ const copyCmd = (cmd, uid) => `
       <svg class="w-4 h-4 text-[#8a8a8a] hover:text-[#85f496] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
     </button>
   </div>`;
+
+const buildGraphData = (skillList, highlightId) => {
+  const nodes = [];
+  const edges = [];
+  const idSet = new Set(skillList.map(s => s.skillId));
+  for (const skill of skillList) {
+    nodes.push({
+      id: skill.skillId,
+      label: skill.skillId,
+      category: skill.category,
+      qualifiedId: skill.qualifiedId,
+      isHighlighted: skill.skillId === highlightId,
+    });
+    for (const dep of skill.dependsOn) {
+      if (idSet.has(dep)) edges.push({ source: skill.skillId, target: dep });
+    }
+  }
+  return { nodes, edges };
+};
+
+const packageHasDeps = (skillList) => {
+  const idSet = new Set(skillList.map(s => s.skillId));
+  return skillList.some(s => s.dependsOn.some(d => idSet.has(d)));
+};
 
 const renderCard = (skill) => {
   const cat = skill.category ? `<span class="px-2.5 py-0.5 rounded-full bg-white/5 text-xs text-[#8a8a8a]">${esc(skill.category)}</span>` : '';
@@ -455,6 +490,8 @@ const renderPackageView = (skills, pkgId, pkgs, container) => {
   const modules = rawPkg?.modules || [];
   const tree = buildTree(modules);
   const installCmd = `npx ontoskills install ${pkgId}`;
+  const hasPkgDeps = packageHasDeps(pkgSkills);
+  const pkgGraphData = hasPkgDeps ? buildGraphData(pkgSkills) : null;
 
   let html = `
     <div class="breadcrumb flex items-center gap-2 text-sm mb-8">
@@ -476,6 +513,10 @@ const renderPackageView = (skills, pkgId, pkgs, container) => {
       </div>
       ${copyCmd(installCmd, 'pkgInstall')}
     </div>
+    ${hasPkgDeps ? `<div class="section-panel mb-6">
+      <h3>${i18n.knowledgeGraph}</h3>
+      <div id="graph-mount" class="rounded-lg overflow-hidden" style="min-height:350px"></div>
+    </div>` : ''}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div class="lg:col-span-2">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -490,9 +531,26 @@ const renderPackageView = (skills, pkgId, pkgs, container) => {
       </div>
     </div>`;
   container.innerHTML = html;
-};
 
-const renderSkillView = (skills, pkgId, skillId, pkgs, container) => {
+  // Mount 3D graph for package view
+  if (hasPkgDeps) {
+    requestAnimationFrame(() => {
+      const mountEl = document.getElementById('graph-mount');
+      if (mountEl && window.__ontoskills_create_graph) {
+        window.__ontoskills_create_graph(mountEl, {
+          nodes: pkgGraphData.nodes,
+          edges: pkgGraphData.edges,
+          prefix,
+          onNavigate: (qid) => {
+            const href = `${prefix}/${qid}`;
+            history.pushState(null, '', href);
+            route();
+          },
+        });
+      }
+    });
+  }
+};
   const skill = skills.find(s => s.packageId === pkgId && s.skillId === skillId);
   if (!skill) { container.innerHTML = `<div class="text-center py-20"><p class="text-[#d4d4d4] text-lg">${i18n.noMatch}</p></div>`; return; }
   const author = pkgId.split('/')[0];
@@ -501,6 +559,32 @@ const renderSkillView = (skills, pkgId, skillId, pkgs, container) => {
   const modules = rawPkg?.modules || [];
   const skillModules = modules.filter(m => m.startsWith(skillId + '/') || m === `${skillId}/ontoskill.ttl`);
   const tree = buildTree(skillModules.length ? skillModules : modules.filter(m => m.startsWith(skillId)));
+
+  // Graph data
+  const pkgSkills = skills.filter(s => s.packageId === pkgId);
+  const hasPkgDeps = packageHasDeps(pkgSkills);
+  const depIds = new Set([skill.skillId, ...skill.dependsOn]);
+  const graphSkills = pkgSkills.filter(s => depIds.has(s.skillId));
+  const graphData = buildGraphData(graphSkills, skill.skillId);
+
+  let graphSection;
+  if (graphSkills.length > 1) {
+    graphSection = `
+      <div class="section-panel">
+        <h3>${i18n.knowledgeGraph}</h3>
+        <div id="graph-mount" class="rounded-lg overflow-hidden" style="min-height:300px"></div>
+        ${hasPkgDeps ? `<div class="mt-2"><button type="button" data-action="show-pkg-graph" data-pkg-id="${esc(pkgId)}" data-skill-id="${esc(skillId)}" class="text-xs text-[#52c7e8] hover:underline">${i18n.viewPackageGraph} →</button></div>` : ''}
+      </div>`;
+  } else {
+    graphSection = `
+      <div class="section-panel">
+        <h3>${i18n.knowledgeGraph}</h3>
+        <div class="flex items-center justify-center py-8">
+          <div class="w-10 h-10 rounded-full bg-[#52c7e8]/20 border border-[#52c7e8]"></div>
+          <span class="ml-3 text-sm text-[#8a8a8a]">${i18n.noDeps}</span>
+        </div>
+      </div>`;
+  }
 
   let html = `
     <div class="breadcrumb flex items-center gap-2 text-sm mb-8">
@@ -518,7 +602,7 @@ const renderSkillView = (skills, pkgId, skillId, pkgs, container) => {
           ${skill.category ? `<span class="px-2.5 py-1 rounded-full bg-white/5 text-xs text-[#8a8a8a]">${esc(skill.category)}</span>` : ''}
         </div>
         <code class="text-sm text-[#8a8a8a] font-mono">${esc(skill.qualifiedId)}</code>
-        <p class="mt-3 text-base text-[#d4d4d4] leading-relaxed max-w-3xl">${esc(skill.description)}</p>
+        <p class="mt-3 text-base text-[#d4d4d4] leading-relaxed">${esc(skill.description)}</p>
       </div>
       ${copyCmd(skill.installCommand, 'skillInstall')}
     </div>
@@ -540,13 +624,27 @@ const renderSkillView = (skills, pkgId, skillId, pkgs, container) => {
       <div class="space-y-4">
         ${skill.aliases.length ? `<div class="section-panel"><h3>Aliases</h3>
           <div class="flex flex-wrap gap-2">${skill.aliases.map(a => `<span class="px-2.5 py-1 rounded-full bg-white/5 text-sm text-[#8a8a8a]">${esc(a)}</span>`).join('')}</div></div>` : ''}
-        <div class="section-panel opacity-50"><h3>${i18n.knowledgeGraph}</h3>
-          <div class="flex flex-col items-center justify-center py-8 text-center">
-            <svg class="w-10 h-10 mb-3 text-[#8a8a8a]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-            <p class="text-sm text-[#8a8a8a]">${i18n.comingSoon}</p></div></div>
+        ${graphSection}
       </div>
     </div>`;
   container.innerHTML = html;
+
+  // Mount 3D graph
+  requestAnimationFrame(() => {
+    const mountEl = document.getElementById('graph-mount');
+    if (mountEl && window.__ontoskills_create_graph) {
+      window.__ontoskills_create_graph(mountEl, {
+        nodes: graphData.nodes,
+        edges: graphData.edges,
+        prefix,
+        onNavigate: (qid) => {
+          const href = `${prefix}/${qid}`;
+          history.pushState(null, '', href);
+          route();
+        },
+      });
+    }
+  });
 };
 
 // ─── ROUTER ────────────────────────────────────────────────
@@ -573,6 +671,9 @@ const init = () => {
   };
 
   const route = () => {
+    // Cleanup previous 3D graph
+    window.__ontoskills_dispose_graph?.();
+
     const path = window.location.pathname.replace(/\/$/, '');
     const storePath = path.replace(prefix, '').replace(/^\//, '');
     const segments = storePath ? storePath.split('/') : [];
@@ -635,6 +736,49 @@ const init = () => {
       if (svg) svg.outerHTML = '<svg class="w-4 h-4 text-red-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>';
       setTimeout(() => { const s = btn.querySelector('svg'); if (s) s.outerHTML = orig; }, 1500);
     });
+  }, { signal });
+
+  // Graph view toggle (delegated)
+  root.addEventListener('click', (e) => {
+    const pkgBtn = e.target.closest('[data-action="show-pkg-graph"]');
+    const skillBtn = e.target.closest('[data-action="show-skill-graph"]');
+    if (!pkgBtn && !skillBtn) return;
+    e.stopPropagation();
+    const pkgId = pkgBtn?.dataset.pkgId || skillBtn?.dataset.pkgId;
+    const skillId = pkgBtn?.dataset.skillId || skillBtn?.dataset.skillId;
+    if (!pkgId || !skillId) return;
+
+    const pkgSkills = skills.filter(s => s.packageId === pkgId);
+    const graphData = pkgBtn
+      ? buildGraphData(pkgSkills, skillId)
+      : buildGraphData(pkgSkills.filter(s => new Set([skillId, ...skills.find(sk => sk.skillId === skillId && sk.packageId === pkgId)?.dependsOn || []]).has(s.skillId)), skillId);
+
+    const mountEl = document.getElementById('graph-mount');
+    if (mountEl && window.__ontoskills_create_graph) {
+      window.__ontoskills_dispose_graph?.();
+      mountEl.innerHTML = '';
+      window.__ontoskills_create_graph(mountEl, {
+        nodes: graphData.nodes,
+        edges: graphData.edges,
+        prefix,
+        onNavigate: (qid) => {
+          history.pushState(null, '', `${prefix}/${qid}`);
+          route();
+        },
+      });
+    }
+
+    // Toggle button text
+    const btnWrap = pkgBtn || skillBtn;
+    if (pkgBtn) {
+      btnWrap.outerHTML = `<button type="button" data-action="show-skill-graph" data-pkg-id="${esc(pkgId)}" data-skill-id="${esc(skillId)}" class="text-xs text-[#52c7e8] hover:underline">${i18n.backToSkillGraph}</button>`;
+    } else {
+      const depSkill = skills.find(s => s.skillId === skillId && s.packageId === pkgId);
+      const depIds = new Set([skillId, ...(depSkill?.dependsOn || [])]);
+      const graphSkills = pkgSkills.filter(s => depIds.has(s.skillId));
+      const hasPkgDepsVal = packageHasDeps(pkgSkills);
+      btnWrap.outerHTML = hasPkgDepsVal ? `<button type="button" data-action="show-pkg-graph" data-pkg-id="${esc(pkgId)}" data-skill-id="${esc(skillId)}" class="text-xs text-[#52c7e8] hover:underline">${i18n.viewPackageGraph} →</button>` : '';
+    }
   }, { signal });
 
   const wireGrid = () => {
