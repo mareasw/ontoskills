@@ -137,17 +137,17 @@ const t = i18n[lang];
 
       <!-- Filter Bar -->
       <div data-role="filters" class="border-b border-white/10 px-4 sm:px-6 py-3 flex flex-wrap items-center gap-3 bg-black/20">
-        <select data-filter="author" class="store-filter-select">
+        <select data-filter="author" class="store-filter-select" aria-label={t.author}>
           <option value="">{t.allAuthors}</option>
         </select>
-        <select data-filter="category" class="store-filter-select">
+        <select data-filter="category" class="store-filter-select" aria-label={t.category}>
           <option value="">{t.allCategories}</option>
         </select>
-        <select data-filter="trustTier" class="store-filter-select">
+        <select data-filter="trustTier" class="store-filter-select" aria-label={t.trustTier}>
           <option value="">{t.allTiers}</option>
         </select>
         <div class="ml-auto">
-          <select data-filter="sort" class="store-filter-select">
+          <select data-filter="sort" class="store-filter-select" aria-label={t.sort}>
             <option value="az">{t.sortAZ}</option>
             <option value="za">{t.sortZA}</option>
           </select>
@@ -591,7 +591,11 @@ const t = i18n[lang];
       const svg = target.querySelector('svg');
       const originalHtml = svg?.outerHTML || '';
 
-      navigator.clipboard.writeText(command).then(() => {
+      const writeText = navigator.clipboard?.writeText?.bind(navigator.clipboard);
+      const copyPromise = writeText
+        ? writeText(command)
+        : Promise.reject(new Error('Clipboard API unavailable'));
+      copyPromise.then(() => {
         if (svg) {
           svg.outerHTML = '<svg class="w-3 h-3 text-green-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>';
         }
