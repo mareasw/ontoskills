@@ -1,4 +1,6 @@
 mod catalog;
+mod bm25_engine;
+#[cfg(feature = "embeddings")]
 mod embeddings;
 mod schema;
 
@@ -10,6 +12,8 @@ use catalog::{
     Catalog, CatalogError, EpistemicQueryParams, EvaluateExecutionPlanParams, SearchSkillsParams,
     SkillType,
 };
+use bm25_engine::Bm25Engine;
+#[cfg(feature = "embeddings")]
 use embeddings::EmbeddingEngine;
 use schema::get_schema_resource;
 use serde::Deserialize;
@@ -39,11 +43,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ontology_root = parse_ontology_root();
     let catalog = Catalog::load(&ontology_root)?;
 
-    // Load embedding engine (optional - may not exist)
-    let embeddings_dir = ontology_root.join("system").join("embeddings");
-    let mut embedding_engine: Option<EmbeddingEngine> =
-        if embeddings_dir.exists() {
-            match EmbeddingEngine::load(&embeddings_dir) {
+    // Build BM25 engine (always available — in-memory from Catalog data)
+    let bm25_engine = Bm25Engine::from_catalog(&catalog).unwrap_or_else(|e| {
+        eprintln!("[ontomcp] Warning: Failed to build BM25 engine: {}", e);
+        std::process::exit(1);
+    });
+    eprintln!("[ontomcp] BM25 search engine ready");
+
+    // Load embedding engine (optional - requires feature flag + model files)
+    #[cfg(feature = "embeddings")]
+    let mut embedding_engine: Option<EmbeddingEngine> = {
+        let embeddings_dir = ontology_root.join("system").join("embeddings");
+        if embeddings_dir.join("model.onnx").exists() {
+            match EmbeddingEngine::load(&embeddings_dir, ontology_root) {
                 Ok(engine) => {
                     eprintln!("[ontomcp] Loaded embedding engine with {} intents",
                         engine.intent_count());
@@ -55,9 +67,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         } else {
-            eprintln!("[ontomcp] No embeddings found at {:?}", embeddings_dir);
+            eprintln!("[ontomcp] No embedding model found — using BM25 only");
             None
-        };
+        }
+    };
+
+    #[cfg(not(feature = "embeddings"))]
+    let mut embedding_engine: Option<()> = None;
+
+    // Wire trust tiers from catalog into embedding engine for hybrid scoring
+    #[cfg(feature = "embeddings")]
+    if let Some(ref mut engine) = embedding_engine {
+        let tiers = catalog.trust_tier_map();
+        engine.set_trust_tiers(tiers);
+    }
 
     let stdin = io::stdin();
     let stdout = io::stdout();
@@ -225,7 +248,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "tools/call" => {
                 ensure_initialized(&mut writer, wire_mode, &request, initialized)?;
-                let result = handle_tool_call(&catalog, embedding_engine.as_mut(), request.params.unwrap_or(Value::Null));
+                let result = handle_tool_call(&catalog, &bm25_engine, embedding_engine.as_mut(), request.params.unwrap_or(Value::Null));
                 match result {
                     Ok(result) => respond_ok(&mut writer, wire_mode, request.id, result)?,
                     Err(err) => respond_error(&mut writer, wire_mode, request.id, -32602, &err)?,
@@ -305,11 +328,9 @@ fn discover_ontology_root() -> Option<PathBuf> {
 }
 
 fn has_ontology_data(path: &PathBuf) -> bool {
-    // Check for primary manifest files
-    path.join("index.ttl").exists()
-        || path.join("system").join("index.enabled.ttl").exists()
-        // Backward compatibility: check for root-level index.enabled.ttl
-        || path.join("index.enabled.ttl").exists()
+    // Check for manifest files in system/
+    path.join("system").join("index.enabled.ttl").exists()
+        || path.join("system").join("index.ttl").exists()
         // Also check for any .ttl files recursively as a fallback
         || contains_ttl_recursive(path, 3)
 }
@@ -384,7 +405,9 @@ fn ensure_initialized(
 
 fn handle_tool_call(
     catalog: &Catalog,
-    embedding_engine: Option<&mut EmbeddingEngine>,
+    bm25_engine: &Bm25Engine,
+    #[cfg(feature = "embeddings")] embedding_engine: Option<&mut EmbeddingEngine>,
+    #[cfg(not(feature = "embeddings"))] _embedding_engine: Option<&mut ()>,
     params: Value,
 ) -> Result<Value, String> {
     let tool_name = params
@@ -397,41 +420,79 @@ fn handle_tool_call(
         .unwrap_or_else(|| json!({}));
 
     let structured = match tool_name {
-        "search_skills" => {
-            let params = SearchSkillsParams {
-                intent: optional_string(&arguments, "intent"),
-                requires_state: optional_string(&arguments, "requires_state"),
-                yields_state: optional_string(&arguments, "yields_state"),
-                skill_type: optional_skill_type(&arguments, "skill_type")?,
-                limit: optional_usize(&arguments, "limit").unwrap_or(25),
-            };
-            json!(catalog.search_skills(params).map_err(public_error)?)
-        }
-        "search_intents" => {
-            let engine = embedding_engine
-                .ok_or_else(|| "Embeddings not available. Run 'ontoskills export-embeddings' first.".to_string())?;
+        "search" => {
+            // Dispatch based on which parameters are provided:
+            // - query → semantic search if embeddings available, otherwise BM25
+            // - alias → alias resolution
+            // - otherwise → structured skill search
+            // query and alias are mutually exclusive.
+            let has_query = arguments.get("query").and_then(Value::as_str).is_some();
+            let has_alias = arguments.get("alias").and_then(Value::as_str).is_some();
 
-            let query = arguments
-                .get("query")
-                .and_then(Value::as_str)
-                .ok_or_else(|| "query required".to_string())?;
-            let top_k = arguments
-                .get("top_k")
-                .and_then(Value::as_u64)
-                .unwrap_or(5) as usize;
+            if has_query && has_alias {
+                return Err("Parameters 'query' and 'alias' are mutually exclusive. Provide one or the other.".to_string());
+            }
 
-            let matches = engine
-                .search(query, top_k)
-                .map_err(|e| format!("Search failed: {}", e))?;
+            if has_query {
+                let query = arguments
+                    .get("query")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| "query required".to_string())?;
+                let top_k = arguments
+                    .get("top_k")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(5) as usize;
 
-            json!({
-                "query": query,
-                "matches": matches.iter().map(|m| json!({
-                    "intent": m.intent,
-                    "score": m.score,
-                    "skills": m.skills
-                })).collect::<Vec<_>>()
-            })
+                // Prefer semantic search when embeddings are available
+                #[cfg(feature = "embeddings")]
+                if let Some(engine) = embedding_engine {
+                    let matches = engine
+                        .search(query, top_k)
+                        .map_err(|e| format!("Search failed: {}", e))?;
+                    if !matches.is_empty() {
+                        return Ok(json!({
+                            "mode": "semantic",
+                            "query": query,
+                            "matches": matches.iter().map(|m| json!({
+                                "intent": m.intent,
+                                "score": m.score,
+                                "skills": m.skills
+                            })).collect::<Vec<_>>()
+                        }));
+                    }
+                }
+
+                // Fallback: BM25 keyword search (always available)
+                let bm25_results = bm25_engine.search(query, top_k);
+                json!({
+                    "mode": "bm25",
+                    "query": query,
+                    "results": bm25_results.iter().map(|m| json!({
+                        "skill_id": m.skill_id,
+                        "qualified_id": m.qualified_id,
+                        "score": m.score,
+                        "matched_by": m.matched_by,
+                        "intents": m.intents,
+                        "aliases": m.aliases,
+                        "trust_tier": m.trust_tier
+                    })).collect::<Vec<_>>()
+                })
+            } else if has_alias {
+                let alias = required_string(&arguments, "alias")?;
+                let skills = catalog.resolve_alias(&alias).map_err(public_error)?;
+                json!({ "mode": "alias", "alias": alias, "skills": skills })
+            } else {
+                let params = SearchSkillsParams {
+                    intent: optional_string(&arguments, "intent"),
+                    requires_state: optional_string(&arguments, "requires_state"),
+                    yields_state: optional_string(&arguments, "yields_state"),
+                    skill_type: optional_skill_type(&arguments, "skill_type")?,
+                    category: optional_string(&arguments, "category"),
+                    is_user_invocable: optional_bool(&arguments, "is_user_invocable"),
+                    limit: optional_usize(&arguments, "limit").unwrap_or(25),
+                };
+                json!({ "mode": "structured", "skills": catalog.search_skills(params).map_err(public_error)? })
+            }
         }
         "get_skill_context" => {
             let skill_id = required_string(&arguments, "skill_id")?;
@@ -659,36 +720,22 @@ fn respond_error(
 fn tool_definitions() -> Vec<Value> {
     vec![
         tool(
-            "search_skills",
-            "Discover skills with optional filters for intent, required state, yielded state, and skill type.",
+            "search",
+            "Search skills by keyword query, alias, or structured filters. If 'query' is provided, uses semantic search when embeddings are available, otherwise falls back to BM25 keyword search. If 'alias' is provided, resolves the alias to matching skills. Otherwise, filters skills by intent, state, type, category, and user-invocability.",
             json!({
                 "type": "object",
                 "properties": {
-                    "intent": { "type": "string" },
+                    "query": { "type": "string", "description": "Natural language query for semantic intent search (e.g., 'create a pdf document')" },
+                    "alias": { "type": "string", "description": "Alias to resolve (case-insensitive)" },
+                    "top_k": { "type": "integer", "description": "Number of semantic results (default 5)", "default": 5 },
+                    "intent": { "type": "string", "description": "Filter by resolved intent" },
                     "requires_state": { "type": "string", "description": "State URI or oc:StateName compact value." },
                     "yields_state": { "type": "string", "description": "State URI or oc:StateName compact value." },
                     "skill_type": { "type": "string", "enum": ["executable", "declarative"] },
+                    "category": { "type": "string", "description": "Filter by skill category (e.g., automation, document, marketing)." },
+                    "is_user_invocable": { "type": "boolean", "description": "Filter by whether the skill is directly invocable by users." },
                     "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
                 }
-            }),
-        ),
-        tool(
-            "search_intents",
-            "Search for intents semantically matching a natural language query. Returns top matches with similarity scores.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Natural language query (e.g., 'create a pdf document')"
-                    },
-                    "top_k": {
-                        "type": "integer",
-                        "description": "Number of results to return",
-                        "default": 5
-                    }
-                },
-                "required": ["query"]
             }),
         ),
         tool(

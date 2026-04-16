@@ -93,8 +93,11 @@ pub struct SkillSummary {
     pub skill_type: SkillType,
     pub nature: String,
     pub intents: Vec<String>,
+    pub aliases: Vec<String>,
     pub requires_state: Vec<String>,
     pub yields_state: Vec<String>,
+    pub category: Option<String>,
+    pub is_user_invocable: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -111,6 +114,8 @@ pub struct SkillSearchResult {
     pub requires_state: Vec<String>,
     pub yields_state: Vec<String>,
     pub matched_by: Vec<String>,
+    pub category: Option<String>,
+    pub is_user_invocable: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -208,6 +213,8 @@ pub struct SearchSkillsParams {
     pub requires_state: Option<String>,
     pub yields_state: Option<String>,
     pub skill_type: Option<SkillType>,
+    pub category: Option<String>,
+    pub is_user_invocable: Option<bool>,
     pub limit: usize,
 }
 
@@ -314,7 +321,7 @@ impl Catalog {
         let base_uri =
             env::var("ONTOSKILLS_BASE_URI").unwrap_or_else(|_| DEFAULT_BASE_URI.to_string());
         let enabled_manifest = ontology_root.join("system").join("index.enabled.ttl");
-        let default_manifest = ontology_root.join("index.ttl");
+        let default_manifest = ontology_root.join("system").join("index.ttl");
 
         if enabled_manifest.exists() {
             let mut visited = HashSet::new();
@@ -387,6 +394,18 @@ impl Catalog {
                 }
             }
 
+            if let Some(filter_category) = &params.category {
+                if skill.category.as_deref() != Some(filter_category.as_str()) {
+                    continue;
+                }
+            }
+
+            if let Some(filter_invocable) = params.is_user_invocable {
+                if skill.is_user_invocable.unwrap_or(true) != filter_invocable {
+                    continue;
+                }
+            }
+
             let mut matched_by = Vec::new();
 
             if let Some(intent) = params.intent.as_deref() {
@@ -438,6 +457,8 @@ impl Catalog {
                 requires_state: skill.requires_state,
                 yields_state: skill.yields_state,
                 matched_by,
+                category: skill.category,
+                is_user_invocable: skill.is_user_invocable,
             });
 
             if results.len() >= params.limit {
@@ -653,6 +674,9 @@ impl Catalog {
         let mut skills = Vec::new();
         for record in &self.skill_index {
             let details = self.get_skill(&record.qualified_id)?;
+            let category = self.get_optional_literal_for_uri(&record.uri, "oc:hasCategory")?;
+            let is_user_invocable =
+                self.get_optional_bool_for_uri(&record.uri, "oc:isUserInvocable")?;
             skills.push(SkillSummary {
                 id: details.id,
                 qualified_id: details.qualified_id,
@@ -663,8 +687,11 @@ impl Catalog {
                 skill_type: details.skill_type,
                 nature: details.nature,
                 intents: details.intents,
+                aliases: details.aliases,
                 requires_state: details.requires_state,
                 yields_state: details.yields_state,
+                category,
+                is_user_invocable,
             });
         }
 
@@ -682,6 +709,9 @@ impl Catalog {
             {
                 continue;
             }
+            let category = self.get_optional_literal_for_uri(&record.uri, "oc:hasCategory")?;
+            let is_user_invocable =
+                self.get_optional_bool_for_uri(&record.uri, "oc:isUserInvocable")?;
             skills.push(SkillSummary {
                 id: details.id,
                 qualified_id: details.qualified_id,
@@ -692,8 +722,11 @@ impl Catalog {
                 skill_type: details.skill_type,
                 nature: details.nature,
                 intents: details.intents,
+                aliases: details.aliases,
                 requires_state: details.requires_state,
                 yields_state: details.yields_state,
+                category,
+                is_user_invocable,
             });
         }
         skills.sort_by(|left, right| left.qualified_id.cmp(&right.qualified_id));
@@ -759,7 +792,7 @@ impl Catalog {
             differentia: scalar.optional_literal("differentia"),
             intents: self.list_literal_values(&skill_uri, "oc:resolvesIntent")?,
             requirements: self.get_requirements_for_uri(&skill_uri)?,
-            depends_on: self.get_related_skill_ids(&skill_uri, "oc:dependsOn")?,
+            depends_on: self.get_related_skill_ids(&skill_uri, "oc:dependsOnSkill")?,
             extends: self.get_related_skill_ids(&skill_uri, "oc:extends")?,
             contradicts: self.get_related_skill_ids(&skill_uri, "oc:contradicts")?,
             requires_state: self.get_related_state_values(&skill_uri, "oc:requiresState")?,
@@ -818,6 +851,77 @@ impl Catalog {
     ) -> Result<Vec<SkillSummary>, CatalogError> {
         let state_uri = self.expand_state_value(state)?;
         self.find_skills_by_state_relation("oc:yieldsState", &state_uri)
+    }
+
+    pub fn resolve_alias(&self, alias: &str) -> Result<Vec<SkillSummary>, CatalogError> {
+        // Validate alias: only allow alphanumeric, dash, underscore, space
+        if !alias.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == ' ') {
+            return Err(CatalogError::InvalidInput(
+                format!("Alias contains invalid characters: '{}'. Only alphanumeric, dash, underscore, and space are allowed.", alias)
+            ));
+        }
+
+        let mut results = Vec::new();
+        let escaped = alias
+            .to_ascii_lowercase()
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"");
+        let query = format!(
+            r#"
+            PREFIX oc: <https://ontoskills.sh/ontology#>
+            PREFIX dcterms: <http://purl.org/dc/terms/>
+            SELECT ?skill ?skillId ?aliasValue
+            WHERE {{
+                ?skill a oc:Skill ;
+                       dcterms:identifier ?skillId ;
+                       oc:hasAlias ?aliasValue .
+                FILTER(LCASE(?aliasValue) = "{}")
+            }}
+            "#,
+            escaped
+        );
+
+        for row in self.select_rows(&query)? {
+            if let Some(skill_id) = row.optional_literal("skillId") {
+                if let Ok(skill) = self.get_skill(&skill_id) {
+                    let category =
+                        self.get_optional_literal_for_uri(&skill.uri, "oc:hasCategory")?;
+                    let is_user_invocable =
+                        self.get_optional_bool_for_uri(&skill.uri, "oc:isUserInvocable")?;
+                    results.push(SkillSummary {
+                        id: skill.id,
+                        qualified_id: skill.qualified_id,
+                        package_id: skill.package_id,
+                        trust_tier: skill.trust_tier,
+                        version: skill.version,
+                        source: skill.source,
+                        skill_type: skill.skill_type,
+                        nature: skill.nature,
+                        intents: skill.intents,
+                        aliases: skill.aliases,
+                        requires_state: skill.requires_state,
+                        yields_state: skill.yields_state,
+                        category,
+                        is_user_invocable,
+                    });
+                }
+            }
+        }
+        results.sort_by(|left, right| left.qualified_id.cmp(&right.qualified_id));
+        Ok(results)
+    }
+
+    /// Build a map of skill ID → trust tier for hybrid scoring.
+    #[cfg(feature = "embeddings")]
+    pub fn trust_tier_map(&self) -> HashMap<String, String> {
+        // NOTE: keyed by short id to match the skill identifiers stored in
+        // intents.json (exported by the Python compiler). Short ids are unique
+        // within a single compiled package; cross-package collisions are
+        // unlikely in practice because each package has its own catalog scope.
+        self.skill_index
+            .iter()
+            .map(|r| (r.id.clone(), r.trust_tier.clone()))
+            .collect()
     }
 
     fn get_knowledge_nodes(
@@ -1032,6 +1136,9 @@ impl Catalog {
             if !matches {
                 continue;
             }
+            let category = self.get_optional_literal_for_uri(&record.uri, "oc:hasCategory")?;
+            let is_user_invocable =
+                self.get_optional_bool_for_uri(&record.uri, "oc:isUserInvocable")?;
             results.push(SkillSummary {
                 id: details.id,
                 qualified_id: details.qualified_id,
@@ -1042,8 +1149,11 @@ impl Catalog {
                 skill_type: details.skill_type,
                 nature: details.nature,
                 intents: details.intents,
+                aliases: details.aliases,
                 requires_state: details.requires_state,
                 yields_state: details.yields_state,
+                category,
+                is_user_invocable,
             });
         }
         results.sort_by(|left, right| left.qualified_id.cmp(&right.qualified_id));
@@ -1107,6 +1217,36 @@ impl Catalog {
             }
         }
         Ok(values)
+    }
+
+    fn get_optional_literal_for_uri(
+        &self,
+        skill_uri: &str,
+        predicate: &str,
+    ) -> Result<Option<String>, CatalogError> {
+        let query = format!(
+            r#"
+            PREFIX oc: <https://ontoskills.sh/ontology#>
+            SELECT ?value WHERE {{
+                <{skill_uri}> {predicate} ?value .
+            }}
+            LIMIT 1
+        "#
+        );
+        Ok(self
+            .select_rows(&query)?
+            .into_iter()
+            .next()
+            .and_then(|row| row.optional_literal("value")))
+    }
+
+    fn get_optional_bool_for_uri(
+        &self,
+        skill_uri: &str,
+        predicate: &str,
+    ) -> Result<Option<bool>, CatalogError> {
+        let literal = self.get_optional_literal_for_uri(skill_uri, predicate)?;
+        Ok(literal.and_then(|v| v.parse::<bool>().ok()))
     }
 
     fn get_related_state_values(
@@ -1480,11 +1620,11 @@ fn build_skill_record(
         .ok()
         .and_then(|path| path.components().next().map(|c| c.as_os_str().to_string_lossy().to_string()));
     let trust_tier = match rel.as_deref() {
-        Some("vendor") => "verified",
+        Some("author") => "verified",
         _ => "local",
     }
     .to_string();
-    let package_id = if let Ok(relative) = module_path.strip_prefix(ontology_root.join("vendor")) {
+    let package_id = if let Ok(relative) = module_path.strip_prefix(ontology_root.join("author")) {
         relative
             .components()
             .next()
@@ -1675,9 +1815,9 @@ fn validate_skill_id(skill_id: &str) -> Result<(), CatalogError> {
 
 fn trust_rank(trust_tier: &str) -> usize {
     match trust_tier {
-        "local" => 0,
-        "verified" => 1,
-        "trusted" => 2,
+        "official" => 0,
+        "local" => 1,
+        "verified" => 2,
         "community" => 3,
         _ => 4,
     }
@@ -1756,6 +1896,19 @@ fn normalize_identifier(value: &str) -> String {
 
 fn eq_ignore_case(left: &str, right: &str) -> bool {
     left.eq_ignore_ascii_case(right)
+}
+
+/// Quality multiplier based on trust tier for search scoring.
+///
+/// Shared between BM25 and embedding engines to keep tiers consistent.
+pub fn quality_multiplier(trust_tier: &str) -> f32 {
+    match trust_tier {
+        "official" => 1.2,
+        "local" => 1.0,
+        "verified" => 1.0,
+        "community" => 0.8,
+        _ => 1.0,
+    }
 }
 
 #[cfg(test)]
@@ -1909,10 +2062,10 @@ oc:skill_disabled a oc:Skill, oc:DeclarativeSkill ;
 
     fn write_ambiguous_registry(root: &Path) {
         fs::create_dir_all(root.join("system")).unwrap();
-        fs::create_dir_all(root.join("vendor").join("marea/office").join("skills")).unwrap();
+        fs::create_dir_all(root.join("author").join("marea/office").join("skills")).unwrap();
         fs::create_dir_all(root.join("xlsx")).unwrap();
         fs::write(
-            root.join("vendor").join("marea/office").join("skills").join("xlsx.ttl"),
+            root.join("author").join("marea/office").join("skills").join("xlsx.ttl"),
             format!(
                 r#"
 @prefix oc: <{base}> .
@@ -1963,7 +2116,7 @@ oc:skill_xlsx_local a oc:Skill, oc:ExecutableSkill ;
             .replace(
                 "__MODULE__",
                 &root
-                    .join("vendor")
+                    .join("author")
                     .join("marea/office")
                     .join("skills")
                     .join("xlsx.ttl")
@@ -1982,7 +2135,7 @@ oc:skill_xlsx_local a oc:Skill, oc:ExecutableSkill ;
     owl:imports <file://{local}> .
 "#,
                 verified = root
-                    .join("vendor")
+                    .join("author")
                     .join("marea/office")
                     .join("skills")
                     .join("xlsx.ttl")
@@ -2030,6 +2183,8 @@ oc:skill_xlsx_local a oc:Skill, oc:ExecutableSkill ;
                 requires_state: None,
                 yields_state: None,
                 skill_type: None,
+                category: None,
+                is_user_invocable: None,
                 limit: 10,
             })
             .unwrap();

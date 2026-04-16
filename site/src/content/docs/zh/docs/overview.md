@@ -34,7 +34,7 @@ OntoSkills 使用 **描述逻辑 (OWL 2)** 将技能转换为形式化本体：
 | 操作 | 读取文件 | 本体查询 |
 |------|----------|----------|
 | 按意图查找技能 | O(n) 文本扫描 | O(1) 索引查找 |
-| 检查依赖关系 | 解析每个文件 | 沿 `dependsOn` 边遍历 |
+| 检查依赖关系 | 解析每个文件 | 沿 `dependsOnSkill` 边遍历 |
 | 检测冲突 | 比较所有配对 | 单次 SPARQL 查询 |
 
 **对于 100 个技能：** ~500KB 文本扫描 → ~1KB 查询
@@ -50,8 +50,9 @@ OntoSkills 使用 **描述逻辑 (OWL 2)** 将技能转换为形式化本体：
 1. **提取** — Claude 读取 SKILL.md 并提取结构化知识
 2. **验证** — 安全管道检查恶意内容
 3. **序列化** — Pydantic 模型 → RDF 三元组
-4. **校验** — SHACL 守门员确保逻辑有效性
-5. **写入** — 编译后的 `.ttl` 文件到 `ontoskills/`
+4. **嵌入** — 向量嵌入生成（可选，需要 `ontocore[embeddings]`）
+5. **校验** — SHACL 守门员确保逻辑有效性
+6. **写入** — 编译后的 `.ttl` 文件到 `ontoskills/`
 
 ### 运行时
 
@@ -88,7 +89,7 @@ OntoSkills 使用 **描述逻辑 (OWL 2)** 将技能转换为形式化本体：
 - **知识节点**：认知知识（每个技能 8-12 个节点）
 - **执行负载**：可选的要执行的代码
 - **状态转换**：`requiresState`、`yieldsState`、`handlesFailure`
-- **溯源**：`generatedBy` 证明（使用的 LLM 模型）
+- **溯源**：`generatedBy` 证明（使用的 LLM 模型，可选）
 
 ---
 
@@ -98,7 +99,7 @@ OntoSkills 使用 **描述逻辑 (OWL 2)** 将技能转换为形式化本体：
 |------|------|------|
 | **ontoskills** | CLI | 面向用户的安装器和管理器 |
 | **OntoCore** | Python | `SKILL.md` 源文件的技能编译器 |
-| **OntoMCP** | Rust | 具有 5 个语义工具的 MCP 服务器（含 search_intents） |
+| **OntoMCP** | Rust | 具有 4 个工具的 MCP 服务器（search、get_skill_context、evaluate_execution_plan、query_epistemic_rules） |
 | **OntoStore** | GitHub 仓库 | 官方编译技能商店 |
 | `skills/` | Markdown | 人工编写的源技能 |
 | `ontoskills/` | Turtle | 编译后的本体产物 |

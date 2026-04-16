@@ -4,6 +4,49 @@ All notable changes to ontomcp (Rust MCP Server) will be documented in this file
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.11.0] - 2026-04-15
+
+### Added
+
+- **Per-skill `intents.json` scanning** — Embedding engine scans the entire ontology tree for per-skill `intents.json` files instead of requiring a centralized file
+- **Backward-compatible centralized loading** — Still loads `system/embeddings/intents.json` if present, then merges per-skill files on top
+- **BM25 keyword search engine** — In-memory BM25 index built from Catalog data (intents, aliases, nature) at startup. Always available, no additional files on disk
+- **Hybrid search dispatch** — Semantic search is preferred when embeddings are available (ONNX). BM25 is used as fallback when embeddings are not installed or return no results
+- **Search response `mode` field** — Responses include `"mode": "bm25"` or `"mode": "semantic"` to indicate which engine produced the results
+- **`aliases` in SkillSummary** — `list_skills()` and `find_skills_by_intent()` now include skill aliases
+
+### Changed
+
+- **Per-skill embedding architecture** — `EmbeddingEngine::load()` now takes `ontology_root` as second argument for tree-wide scanning
+- **Embedding initialization guard** — Checks for `model.onnx` instead of directory existence to avoid loading without model files
+- **BM25 is the default search** — The `search` tool with `query` parameter now uses BM25 by default instead of requiring ONNX embeddings
+- **Embeddings are optional** — `ort`, `tokenizers`, `ndarray` are behind `embeddings` feature flag in Cargo.toml. Default build has zero ML dependencies
+- **`sentence-transformers` is optional** — Moved from mandatory to `[project.optional-dependencies] embeddings` in OntoCore's pyproject.toml
+- **Compile without embeddings** — `ontocore compile` skips embedding generation when `sentence-transformers` is not installed, prints a warning instead of failing
+- **Trust tier scoring** — BM25 results use the same quality multipliers as the embedding engine (official: 1.2, local/verified: 1.0, community: 0.8)
+
+### Removed
+
+- **Mandatory ONNX Runtime** — No longer required for default installation. Only needed when `--features embeddings` is enabled
+
+## [0.10.0] - 2026-04-14
+
+### Added
+
+- **Unified `search` tool** — Smart dispatch: `query` → semantic intent search, `alias` → alias resolution, otherwise → structured skill search (consolidated from 6 tools to 4)
+- **Hybrid scoring** — Semantic search results ranked by cosine similarity × trust-tier quality multiplier (official: 1.2, local/verified: 1.0, community: 0.8)
+- **Query safety truncation** — Defensive 512-byte cap on search queries
+- **ONNX embedding engine** — Full pipeline: `model.onnx` + `tokenizer.json` + `intents.json` with mean pooling, L2 normalization, and adaptive cutoff
+- **E2E test** — `mcp/tests/e2e_search.sh` validates compile → merge → ONNX export → JSON-RPC search
+
+### Changed
+
+- **Trust tiers from catalog** — `trust_tier_map()` wired into embedding engine at startup for hybrid scoring
+- **Version aligned** — OntoMCP 0.11.0 matches OntoCore 0.11.0
+- **`dependsOnSkill` in JS** — `extractSkillInfo()` regex updated to match `oc:dependsOnSkill`
+- **JS install fix** — `installSkill()` now correctly parses `author/package/skill` refs (was splitting at first `/`)
+- **vendor→author rename** — Catalog path resolution uses `ontologies/author/` (was `ontologies/vendor/`). E2E test updated. Hybrid scoring table uses "author skills" terminology
+
 ## [0.9.1] - 2026-03-24
 
 ### Added

@@ -34,7 +34,7 @@ OntoSkills transforms skills into formal ontologies with **Description Logics (O
 | Operation | Reading Files | Ontology Query |
 |-----------|---------------|----------------|
 | Find skill by intent | O(n) text scan | O(1) indexed lookup |
-| Check dependencies | Parse each file | Follow `dependsOn` edges |
+| Check dependencies | Parse each file | Follow `dependsOnSkill` edges |
 | Detect conflicts | Compare all pairs | Single SPARQL query |
 
 **For 100 skills:** ~500KB text scan → ~1KB query
@@ -88,7 +88,7 @@ Every skill is extracted with:
 - **Knowledge Nodes**: Epistemic knowledge (8-12 nodes per skill)
 - **Execution Payload**: Optional code to execute
 - **State Transitions**: `requiresState`, `yieldsState`, `handlesFailure`
-- **Provenance**: `generatedBy` attestation (LLM model used)
+- **Provenance**: `generatedBy` attestation (LLM model used, optional)
 
 ---
 
@@ -98,7 +98,7 @@ Every skill is extracted with:
 |-----------|----------|-------------|
 | **ontoskills** | CLI | User-facing installer and manager |
 | **OntoCore** | Python | Skill compiler for `SKILL.md` sources |
-| **OntoMCP** | Rust | MCP server with 5 semantic tools (incl. search_intents) |
+| **OntoMCP** | Rust | MCP server with 4 tools (search, get_skill_context, evaluate_execution_plan, query_epistemic_rules) |
 | **OntoStore** | GitHub repo | Official compiled skill store |
 | `skills/` | Markdown | Human-authored source skills |
 | `ontoskills/` | Turtle | Compiled ontology artifacts |

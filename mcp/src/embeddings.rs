@@ -8,8 +8,11 @@ use ndarray::{Array1, Array2};
 use ort::session::Session;
 use ort::value::TensorRef;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::Path;
 use tokenizers::Tokenizer;
+
+use crate::catalog::quality_multiplier;
 
 /// Pre-computed intent embedding entry.
 #[derive(Debug, Deserialize)]
@@ -28,15 +31,41 @@ struct IntentsFile {
     intents: Vec<IntentEntry>,
 }
 
+/// Parsed intents from a single file.
+struct LoadedIntents {
+    dimension: usize,
+    intents: Vec<(String, Array1<f32>, Vec<String>)>,
+}
+
 /// Search result for intent matching.
 #[derive(Debug, Serialize, Clone)]
 pub struct IntentMatch {
     /// The intent string (e.g., "create_pdf")
     pub intent: String,
-    /// Cosine similarity score
+    /// Hybrid score (cosine similarity * quality_multiplier)
     pub score: f32,
     /// Skills that resolve this intent
     pub skills: Vec<String>,
+}
+
+/// Maximum query length in bytes before safety truncation.
+/// Defensive limit to prevent crashes from extremely long LLM-generated queries.
+/// The ONNX tokenizer handles its own token-level truncation, but this prevents
+/// pathological inputs from consuming excessive memory.
+const MAX_QUERY_BYTES: usize = 512;
+
+/// Truncate query to a safe maximum byte length.
+/// Trusts the LLM to provide concise, targeted queries — this is purely defensive.
+fn safety_truncate(query: &str) -> &str {
+    if query.len() <= MAX_QUERY_BYTES {
+        return query;
+    }
+    // Find a safe char boundary to avoid panicking on multi-byte UTF-8
+    let mut end = MAX_QUERY_BYTES;
+    while end > 0 && !query.is_char_boundary(end) {
+        end -= 1;
+    }
+    &query[..end]
 }
 
 /// Embedding engine for semantic intent search.
@@ -47,19 +76,22 @@ pub struct EmbeddingEngine {
     session: Session,
     tokenizer: Tokenizer,
     intents: Vec<(String, Array1<f32>, Vec<String>)>,
+    trust_tiers: HashMap<String, String>,
     dimension: usize,
     input_names: Vec<String>,
 }
 
 impl EmbeddingEngine {
-    /// Load engine from embedding directory.
+    /// Load engine from embedding directory and scan ontology tree for per-skill intents.
     ///
     /// # Arguments
-    /// * `embeddings_dir` - Directory containing model.onnx, tokenizer.json, and intents.json
+    /// * `embeddings_dir` - Directory containing model.onnx and tokenizer.json
+    /// * `ontology_root` - Root of installed ontology tree to scan for per-skill intents.json
     ///
     /// # Errors
-    /// Returns error if any required file is missing or invalid.
-    pub fn load(embeddings_dir: &Path) -> Result<Self> {
+    /// Returns error if model or tokenizer is missing/invalid.
+    /// Missing intents files are not fatal — engine loads with zero intents.
+    pub fn load(embeddings_dir: &Path, ontology_root: &Path) -> Result<Self> {
         // Load ONNX model
         let model_path = embeddings_dir.join("model.onnx");
         if !model_path.exists() {
@@ -113,40 +145,98 @@ impl EmbeddingEngine {
         let tokenizer = Tokenizer::from_file(&tokenizer_path)
             .map_err(|e| anyhow::anyhow!("Failed to load tokenizer: {}", e))?;
 
-        // Load pre-computed intents
-        let intents_path = embeddings_dir.join("intents.json");
-        if !intents_path.exists() {
-            anyhow::bail!("Intents file not found at {:?}", intents_path);
+        // Scan ontology tree for per-skill intents.json files
+        let mut intents: Vec<(String, Array1<f32>, Vec<String>)> = Vec::new();
+        let mut dimension: usize = 0;
+
+        // 1. Load centralized intents.json if present (backward compat)
+        let centralized = embeddings_dir.join("intents.json");
+        if centralized.exists() {
+            if let Ok(loaded) = Self::load_intents_file(&centralized) {
+                dimension = loaded.dimension;
+                intents.extend(loaded.intents);
+            }
         }
 
-        let intents_file: IntentsFile =
-            serde_json::from_str(&std::fs::read_to_string(&intents_path)?)?;
-
-        let dimension = intents_file.dimension;
-        let mut intents: Vec<(String, Array1<f32>, Vec<String>)> = Vec::new();
-
-        for entry in intents_file.intents {
-            // Validate embedding dimension matches expected
-            if entry.embedding.len() != dimension {
-                anyhow::bail!(
-                    "Intent '{}' has embedding dimension {} but expected {}",
-                    entry.intent,
-                    entry.embedding.len(),
-                    dimension
-                );
+        // 2. Scan per-skill intents.json across ontology tree
+        if let Ok(entries) = std::fs::read_dir(ontology_root) {
+            for entry in entries.flatten() {
+                if entry.path().is_dir() {
+                    Self::scan_intents_recursive(&entry.path(), &mut intents, &mut dimension);
+                }
             }
-            // Normalize embedding for cosine similarity (in case intents.json wasn't normalized)
-            let emb = normalize_embedding(&Array1::from_vec(entry.embedding));
-            intents.push((entry.intent, emb, entry.skills));
+        }
+
+        if intents.is_empty() {
+            eprintln!("Warning: No intent embeddings found — semantic search will return no results");
         }
 
         Ok(Self {
             session,
             tokenizer,
             intents,
-            dimension,
+            trust_tiers: HashMap::new(),
+            dimension: if dimension == 0 { 384 } else { dimension },
             input_names,
         })
+    }
+
+    /// Recursively scan a directory tree for intents.json files.
+    fn scan_intents_recursive(
+        dir: &Path,
+        intents: &mut Vec<(String, Array1<f32>, Vec<String>)>,
+        dimension: &mut usize,
+    ) {
+        // Skip system/embeddings directory (already loaded above)
+        if dir.ends_with("system") || dir.ends_with("embeddings") {
+            return;
+        }
+
+        let intents_path = dir.join("intents.json");
+        if intents_path.exists() {
+            if let Ok(loaded) = Self::load_intents_file(&intents_path) {
+                if *dimension == 0 {
+                    *dimension = loaded.dimension;
+                }
+                intents.extend(loaded.intents);
+            }
+        }
+
+        // Recurse into subdirectories
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() && !path.ends_with("system") && !path.ends_with("embeddings") {
+                    Self::scan_intents_recursive(&path, intents, dimension);
+                }
+            }
+        }
+    }
+
+    /// Load an intents.json file and return parsed entries.
+    fn load_intents_file(path: &Path) -> Result<LoadedIntents> {
+        let content = std::fs::read_to_string(path)?;
+        let file: IntentsFile = serde_json::from_str(&content)?;
+        let dimension = file.dimension;
+        let mut entries = Vec::new();
+
+        for entry in file.intents {
+            if entry.embedding.len() != dimension {
+                continue; // Skip mismatched dimensions
+            }
+            let emb = normalize_embedding(&Array1::from_vec(entry.embedding));
+            entries.push((entry.intent, emb, entry.skills));
+        }
+
+        Ok(LoadedIntents { dimension, intents: entries })
+    }
+
+    /// Set trust tier mapping for hybrid scoring.
+    ///
+    /// Maps skill IDs to their trust tier (e.g., "verified", "community").
+    /// Used by `search()` to apply quality multipliers to cosine similarity scores.
+    pub fn set_trust_tiers(&mut self, tiers: HashMap<String, String>) {
+        self.trust_tiers = tiers;
     }
 
     /// Tokenize a query string for ONNX inference.
@@ -326,18 +416,31 @@ impl EmbeddingEngine {
             return Ok(Vec::new());
         }
 
+        // Safety truncation: trust the LLM query but cap defensively
+        let query = safety_truncate(query);
+
         // Tokenize query
         let (input_ids, attention_mask) = self.tokenize(query)?;
 
         // Get query embedding via ONNX inference
         let query_embedding = self.infer_embedding(&input_ids, &attention_mask)?;
 
-        // Compute cosine similarity with all intents
+        // Compute cosine similarity with all intents, applying hybrid scoring
         let mut scores: Vec<(f32, &str, &Vec<String>)> = self
             .intents
             .iter()
             .map(|(intent, emb, skills)| {
-                let score = Self::cosine_similarity(&query_embedding, emb);
+                let cosine = Self::cosine_similarity(&query_embedding, emb);
+                // Use the best multiplier among all skills for this intent
+                let multiplier = if skills.is_empty() {
+                    1.0 // neutral for intents with no associated skills
+                } else {
+                    skills
+                        .iter()
+                        .map(|s| quality_multiplier(self.trust_tiers.get(s).map(|t| t.as_str()).unwrap_or("verified")))
+                        .fold(0.0f32, f32::max)
+                };
+                let score = cosine * multiplier;
                 (score, intent.as_str(), skills)
             })
             .collect();
@@ -519,7 +622,7 @@ mod tests {
 
     #[test]
     fn test_embedding_engine_load_missing_files() {
-        let result = EmbeddingEngine::load(Path::new("/nonexistent"));
+        let result = EmbeddingEngine::load(Path::new("/nonexistent"), Path::new("/nonexistent"));
         assert!(result.is_err());
     }
 
@@ -685,5 +788,85 @@ mod tests {
             (0.85, "a", &empty),
         ];
         assert_eq!(adaptive_cutoff(&scores, 0.4, 0.15), 1);
+    }
+
+    // Tests for safety_truncate
+    #[test]
+    fn test_safety_truncate_short_query_unchanged() {
+        assert_eq!(safety_truncate("create a PDF"), "create a PDF");
+    }
+
+    #[test]
+    fn test_safety_truncate_exact_limit_unchanged() {
+        let query: String = "a".repeat(512);
+        assert_eq!(safety_truncate(&query).len(), 512);
+    }
+
+    #[test]
+    fn test_safety_truncate_long_query_truncated() {
+        let query: String = "a".repeat(1000);
+        let truncated = safety_truncate(&query);
+        assert_eq!(truncated.len(), 512);
+    }
+
+    #[test]
+    fn test_safety_truncate_preserves_utf8_boundary() {
+        // Multi-byte UTF-8: each 'é' is 2 bytes
+        let query: String = "é".repeat(300); // 600 bytes
+        let truncated = safety_truncate(&query);
+        // Should truncate to a valid UTF-8 boundary (≤512 bytes)
+        assert!(truncated.len() <= 512);
+        assert!(truncated.chars().all(|c| c == 'é'));
+    }
+
+    #[test]
+    fn test_safety_truncate_empty_query() {
+        assert_eq!(safety_truncate(""), "");
+    }
+
+    // Tests for quality_multiplier
+    #[test]
+    fn test_quality_multiplier_local() {
+        assert!((quality_multiplier("local") - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_quality_multiplier_official() {
+        assert!((quality_multiplier("official") - 1.2).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_quality_multiplier_verified() {
+        assert!((quality_multiplier("verified") - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_quality_multiplier_community() {
+        assert!((quality_multiplier("community") - 0.8).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_quality_multiplier_unknown() {
+        assert!((quality_multiplier("unknown") - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_quality_multiplier_official_beats_community() {
+        // An official skill with cosine 0.80 beats community with 0.90:
+        // official:  0.80 * 1.2 = 0.96
+        // community: 0.90 * 0.8 = 0.72
+        let official_score = 0.80 * quality_multiplier("official");
+        let community_score = 0.90 * quality_multiplier("community");
+        assert!(official_score > community_score);
+    }
+
+    #[test]
+    fn test_quality_multiplier_verified_beats_community() {
+        // A verified skill with cosine 0.80 beats community with 0.90:
+        // verified:  0.80 * 1.0 = 0.80
+        // community: 0.90 * 0.8 = 0.72
+        let verified_score = 0.80 * quality_multiplier("verified");
+        let community_score = 0.90 * quality_multiplier("community");
+        assert!(verified_score > community_score);
     }
 }

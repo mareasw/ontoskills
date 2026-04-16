@@ -33,8 +33,16 @@ OntoStore installs use qualified ids:
 Examples:
 
 - `mareasw/greeting/hello`
-- `mareasw/office/xlsx`
-- `mareasw/office/docx`
+- `obra/superpowers/test-driven-development`
+- `obra/superpowers/systematic-debugging`
+
+Install resolution supports three levels:
+
+| Level | Example | Behavior |
+|-------|---------|----------|
+| Full | `obra/superpowers/test-driven-development` | Installs the exact skill |
+| Package | `obra/superpowers` | Installs all skills in the package |
+| Skill name | `test-driven-development` | Resolves the best match across stores |
 
 ## Install flow
 
@@ -50,6 +58,12 @@ If you previously disabled a skill and want to re-enable it:
 
 ```bash
 ontoskills enable mareasw/greeting/hello
+```
+
+To install with semantic search embeddings:
+
+```bash
+ontoskills install mareasw/greeting/hello --with-embeddings
 ```
 
 ## Official vs third-party

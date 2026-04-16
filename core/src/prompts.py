@@ -22,8 +22,10 @@ and extract their essential structure using the Knowledge Architecture framework
 - implements: Realizes abstraction
 - exemplifies: Instance of pattern
 
-When you emit `depends_on`, `extends`, or `contradicts`, ALWAYS use canonical skill ids only
-(e.g. `office`, `docx`, `pptx`, `xlsx`, `pdf`), never prose labels, never file paths, never URIs.
+When you emit `depends_on`, `extends`, or `contradicts`, ONLY use skill IDs from the
+KNOWN SKILLS IN THIS PACKAGE section below. Cross-package references are NOT supported —
+omit them. If a referenced skill is not listed, omit the reference entirely — never invent,
+fabricate, or guess skill IDs. Never use prose labels, file paths, or URIs as relation targets.
 
 Use `extends` only for genuine specialization/inheritance:
 - Child skill builds on a broader parent skill and should inherit its epistemic rules
@@ -83,6 +85,14 @@ If you cannot identify at least one intent, the skill is incomplete and you shou
 5. Call extract_skill with the structured data (including at least one intent)
 
 Be thorough but concise. Focus on the essential nature of the skill.
+
+## CRITICAL: DO NOT FABRICATE
+
+You MUST only extract information that is explicitly present in the skill files.
+- Do NOT invent execution payloads, scripts, or command templates that don't exist in the files
+- Do NOT fabricate file paths, tool names, or configuration values
+- If the skill does NOT contain scripts, leave `executable_scripts` and `execution_payload` empty
+- If you are unsure whether something exists, leave it out rather than guessing
 
 ## EPISTEMIC KNOWLEDGE EXTRACTION (EXPECTED)
 
@@ -167,9 +177,44 @@ Identify reference files from the directory structure that support progressive d
 
 Reference files are loaded only when needed, not at skill activation.
 
+## METADATA EXTRACTION (NEW FIELDS)
+
+When analyzing a skill, extract these metadata fields **only if explicitly present** in the frontmatter or skill files:
+
+### category (string, optional)
+Extract the skill category if specified in frontmatter. Common values:
+- "automation" — automates a tool/service (Jira, Slack, email)
+- "document" — creates/modifies documents (PDF, DOCX, PPTX)
+- "marketing" — marketing tasks (SEO, ads, content)
+- "finance" — financial analysis, modeling
+- "development" — software development tools
+- "research" — research, analysis, synthesis
+- "productivity" — general productivity workflows
+
+### is_user_invocable (boolean, default true)
+Extract this if explicitly stated in frontmatter. Defaults to true.
+- Most skills are user-invocable (true)
+- Set to false if the skill is purely a dependency, internal helper, or sub-agent spec
+
+### allowed_tools (list of strings, optional)
+If the skill body mentions specific tools the agent should use (e.g., Bash, Read, Write, Edit, Glob, Grep),
+extract them as allowed_tools.
+
+### depends_on (list of strings, optional)
+If the skill body explicitly references other skills as prerequisites, extract their canonical IDs.
+Do NOT infer dependencies from general mentions — only explicit dependencies.
+
+### argument_hint (string, optional)
+If the skill expects a specific argument format (e.g., "query", "repo-url", "file-path"),
+extract it as argument_hint.
+
 ## EXECUTABLE SCRIPTS
 
-For scripts in `scripts/` or similar directories, identify:
+Only extract scripts that ACTUALLY EXIST in the skill directory. Do NOT invent
+script paths, commands, or payloads. If no scripts directory is present, leave all
+script fields empty.
+
+For scripts found in `scripts/` or similar directories, identify:
 - `executor`: "python" | "bash" | "node" | "other"
 - `execution_intent`:
   - `"execute"`: Script should be run for side effects

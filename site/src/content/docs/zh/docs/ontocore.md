@@ -30,12 +30,17 @@ ontoskills install core
 - **Python** 3.10+
 - **Anthropic API key**（设置 `ANTHROPIC_API_KEY` 环境变量）
 
+> **可选：** 安装 `ontocore[embeddings]` 以启用每技能嵌入生成，用于语义搜索（大型技能目录推荐）：
+> ```bash
+> pip install ontocore[embeddings]
+> ```
+
 ---
 
 ## 编译流水线
 
 ```
-SKILL.md → [提取] → [安全检查] → [序列化] → [SHACL] → ontoskill.ttl
+SKILL.md → [提取] → [安全检查] → [序列化] → [SHACL] → [嵌入] → ontoskill.ttl + intents.json
 ```
 
 | 阶段 | 发生什么 |
@@ -44,9 +49,10 @@ SKILL.md → [提取] → [安全检查] → [序列化] → [SHACL] → ontoski
 | **安全检查** | 正则表达式 + LLM 审查恶意内容 |
 | **序列化** | Pydantic 模型 → RDF 三元组 |
 | **验证** | SHACL 形状检查逻辑有效性 |
+| **嵌入** | 生成每技能意图嵌入（384 维，L2 归一化）|
 | **写入** | 带备份的原子写入 |
 
-如果任何阶段失败，技能**不会被写入**。SHACL 守门员强制执行宪法规则。
+如果任何阶段失败，技能**不会被写入**。SHACL 守门员强制执行宪法规则。嵌入阶段是可选的 — 通过 `pip install ontocore[embeddings]` 安装以生成每技能语义搜索向量。未安装时，嵌入生成会被跳过并显示警告。
 
 ---
 
@@ -153,7 +159,8 @@ ontoskills/
 ├── system/
 │   └── index.enabled.ttl    # 为 MCP 启用的技能
 └── <skill-path>/
-    └── ontoskill.ttl        # 单个技能模块
+    ├── ontoskill.ttl        # 单个技能模块
+    └── intents.json         # 预计算的意图嵌入（可选）
 ```
 
 ### 核心本体
@@ -169,7 +176,7 @@ ontoskills/
 `core.ttl` 定义：
 
 - `oc:Skill`、`oc:ExecutableSkill`、`oc:DeclarativeSkill`
-- 属性：`dependsOn`、`extends`、`contradicts`、`resolvesIntent` 等
+- 属性：`dependsOnSkill`、`extends`、`contradicts`、`resolvesIntent` 等
 - 知识节点类：`oc:Heuristic`、`oc:AntiPattern` 等
 - 前置条件/后置条件的状态类
 
@@ -219,8 +226,8 @@ OntoCore 是**缓存感知**的：
 
 | 约束 | 规则 |
 |------|------|
-| `resolvesIntent` | 必需（至少 1 个）|
-| `generatedBy` | 必需（恰好 1 个）|
+| `resolvesIntent` | 必需（至少 1 个）— 也用于语义搜索嵌入 |
+| `generatedBy` | 可选（证明）|
 | `requiresState` | 必须是有效的 IRI |
 | `yieldsState` | 必须是有效的 IRI |
 | `handlesFailure` | 必须是有效的 IRI |
@@ -254,6 +261,7 @@ OntoCore 是**缓存感知**的：
 | `ANTHROPIC_API_KEY` | Anthropic API key | 必需 |
 | `ANTHROPIC_BASE_URL` | API 基础 URL | `https://api.anthropic.com` |
 | `SECURITY_MODEL` | 安全审查模型 | `claude-opus-4-6` |
+| `DEFAULT_SKILLS_AUTHOR` | 无包结构的技能的默认作者 | `local` |
 
 ---
 

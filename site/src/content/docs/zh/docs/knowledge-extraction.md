@@ -21,7 +21,7 @@ sidebar:
 | **知识节点** | `oc:impartsKnowledge` | 认知知识（每个技能 8-12 个）|
 | **状态转换** | `oc:requiresState`、`oc:yieldsState`、`oc:handlesFailure` | 前置条件、结果、错误处理 |
 | **执行负载** | `oc:hasPayload` | 可选的要执行的代码 |
-| **溯源** | `oc:generatedBy` | 证明（哪个 LLM 编译的）|
+| **溯源** | `oc:generatedBy` | 证明（哪个 LLM 编译的，可选）|
 
 ### 组件
 
@@ -177,6 +177,18 @@ ontoskills/
 - **更新**技能 → 替换 `.ttl` 文件
 
 全局本体通过**添加**而非修改来增长。
+
+---
+
+## 嵌入生成（可选）
+
+编译期间，OntoCore 可以为技能描述和意图生成向量嵌入（**可选步骤**），用于语义搜索（`search` 工具的语义模式）。嵌入生成需要安装 `ontocore[embeddings]` 额外包：
+
+```bash
+pip install ontocore[embeddings]
+```
+
+如果未安装，编译将跳过嵌入生成并显示警告。BM25 关键词搜索在 MCP 运行时始终可用。
 
 ---
 

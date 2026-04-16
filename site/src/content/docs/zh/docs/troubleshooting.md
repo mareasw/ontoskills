@@ -161,6 +161,25 @@ ontoskills compile my-skill -v
 当用户想从 PDF 文件提取文本时使用此技能。
 ```
 
+### "Skipping embedding generation"
+
+嵌入生成是可选的。未安装 `sentence-transformers` 时编译器会跳过并显示警告。要启用语义搜索向量：
+
+```bash
+pip install ontocore[embeddings]
+```
+
+### "Skill has no declared intents"
+
+每个技能必须声明至少一个意图用于语义搜索。在 SKILL.md 中添加意图部分：
+
+```markdown
+## 何时使用
+
+- edit spreadsheet
+- perform calculation
+```
+
 ---
 
 ## 导入问题
@@ -235,6 +254,30 @@ MCP 服务器可能启动缓慢。检查：
   "command": "/home/user/.ontoskills/bin/ontomcp"
 }
 ```
+
+### "ONNX Runtime shared library not found"
+
+MCP 服务器使用 ONNX Runtime 进行语义搜索。如果库不在系统路径中：
+
+```bash
+# 查找库目录（通过 pip 安装）— 跨平台
+python3 -c "import onnxruntime; import os; print(os.path.join(os.path.dirname(onnxruntime.__file__), 'capi'))"
+```
+
+然后设置该目录中共享库的路径：
+
+| 平台 | 库名称 |
+|------|--------|
+| Linux | `libonnxruntime.so` |
+| macOS | `libonnxruntime.dylib` |
+| Windows | `onnxruntime.dll` |
+
+```bash
+# 设置路径（Linux 示例）
+export ORT_DYLIB_PATH=/path/to/libonnxruntime.so
+```
+
+添加到你的 shell 配置文件（`~/.bashrc`、`~/.zshrc`）以持久化。
 
 ---
 

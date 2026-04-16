@@ -26,9 +26,22 @@ ontoskills install mareasw/greeting/hello
 
 技能安装后自动启用。
 
-**包 ID 格式：** `owner/repo/skill`
+**包 ID 格式：** `author/package/skill`
 
-示例：`mareasw/office/xlsx`
+支持多层级安装：
+
+```bash
+# 安装单个技能
+ontoskills install obra/superpowers/test-driven-development
+
+# 安装整个包中的所有技能
+ontoskills install obra/superpowers
+
+# 安装某作者的所有包
+ontoskills install mareasw
+```
+
+示例：`obra/superpowers/test-driven-development`
 
 ### 第三方商店
 
@@ -52,8 +65,8 @@ ontoskills store list
 ontoskills import-source https://github.com/user/skill-repo
 ```
 
-- 克隆到 `~/.ontoskills/skills/vendor/`
-- 编译到 `~/.ontoskills/ontologies/vendor/`
+- 克隆到 `~/.ontoskills/skills/author/`
+- 编译到 `~/.ontoskills/ontologies/author/`
 - 需要安装 OntoCore 编译器
 
 ---
@@ -63,16 +76,22 @@ ontoskills import-source https://github.com/user/skill-repo
 ### 安装
 
 ```bash
-ontoskills install mareasw/office/xlsx
+ontoskills install obra/superpowers/test-driven-development
 ```
 
 从商店下载已编译的 `.ttl` 并放入 `~/.ontoskills/ontologies/`。
 
+要同时下载语义搜索嵌入文件，使用 `--with-embeddings`：
+
+```bash
+ontoskills install obra/superpowers/test-driven-development --with-embeddings
+```
+
 ### 启用 / 禁用
 
 ```bash
-ontoskills disable mareasw/office/xlsx
-ontoskills enable mareasw/office/xlsx
+ontoskills disable obra/superpowers/test-driven-development
+ontoskills enable obra/superpowers/test-driven-development
 ```
 
 技能安装后默认启用。使用 `disable` 可以从 OntoMCP 隐藏技能而不删除它。使用 `enable` 重新启用。
@@ -80,7 +99,7 @@ ontoskills enable mareasw/office/xlsx
 ### 更新
 
 ```bash
-ontoskills update mareasw/office/xlsx
+ontoskills update obra/superpowers/test-driven-development
 ```
 
 从商店获取最新版本。
@@ -88,7 +107,7 @@ ontoskills update mareasw/office/xlsx
 ### 移除
 
 ```bash
-ontoskills remove mareasw/office/xlsx
+ontoskills remove obra/superpowers/test-driven-development
 ```
 
 从本地存储删除包。
@@ -136,7 +155,7 @@ ontoskills rebuild-index
 │   │   └── index.enabled.ttl  # 已启用技能清单
 │   └── */ontoskill.ttl
 ├── skills/                 # 源技能
-│   └── vendor/             # 导入的仓库
+│   └── author/             # 导入的仓库
 └── state/                  # 元数据和锁
     ├── registry.sources.json
     └── registry.lock.json
@@ -157,7 +176,7 @@ ontoskills rebuild-index
 如果技能被禁用了，重新启用它：
 
 ```bash
-ontoskills enable mareasw/office/xlsx
+ontoskills enable obra/superpowers/test-driven-development
 ontoskills rebuild-index
 ```
 
@@ -177,6 +196,20 @@ ontoskills install core
 
 ```bash
 ontoskills rebuild-index
+```
+
+### "嵌入生成失败"
+
+如果 `sentence-transformers` 使用 ONNX Runtime 时出错，设置动态库路径：
+
+```bash
+export ORT_DYLIB_PATH=/path/to/onnxruntime/libonnxruntime.so
+```
+
+或者要同时下载语义搜索嵌入文件，使用 `--with-embeddings`：
+
+```bash
+ontoskills install obra/superpowers/test-driven-development --with-embeddings
 ```
 
 ---

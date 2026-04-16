@@ -35,13 +35,12 @@ oc:SkillShape
         sh:message "Ogni Skill deve avere almeno un resolvesIntent (intento risolto)" ;
     ] ;
 
-    # Every skill MUST have exactly one generatedBy attestation
+    # generatedBy is optional — migrated to system/index.json per-skill metadata
     sh:property [
         sh:path oc:generatedBy ;
-        sh:minCount 1 ;
         sh:maxCount 1 ;
         sh:datatype xsd:string ;
-        sh:message "Ogni Skill deve avere esattamente un generatedBy (modello LLM)" ;
+        sh:message "generatedBy, se presente, deve essere una stringa" ;
     ] ;
 
     # requiresState must be an IRI (novel states are allowed - MCP server resolves them)
@@ -70,6 +69,76 @@ oc:SkillShape
         sh:path oc:impartsKnowledge ;
         sh:class oc:KnowledgeNode ;
         sh:message "impartsKnowledge deve puntare a un KnowledgeNode" ;
+    ] ;
+
+    # New optional metadata properties (OntoCore refactoring)
+
+    sh:property [
+        sh:path oc:hasCategory ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "hasCategory, if present, must be a single string" ;
+    ] ;
+
+    sh:property [
+        sh:path oc:hasVersion ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "hasVersion, if present, must be a single string" ;
+    ] ;
+
+    sh:property [
+        sh:path oc:hasLicense ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "hasLicense, if present, must be a single string" ;
+    ] ;
+
+    sh:property [
+        sh:path oc:hasAuthor ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "hasAuthor, if present, must be a single string" ;
+    ] ;
+
+    sh:property [
+        sh:path oc:hasPackageName ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "hasPackageName, if present, must be a single string" ;
+    ] ;
+
+    sh:property [
+        sh:path oc:isUserInvocable ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:boolean ;
+        sh:message "isUserInvocable, if present, must be a boolean" ;
+    ] ;
+
+    sh:property [
+        sh:path oc:hasArgumentHint ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "hasArgumentHint, if present, must be a single string" ;
+    ] ;
+
+    sh:property [
+        sh:path oc:hasAllowedTool ;
+        sh:datatype xsd:string ;
+        sh:message "hasAllowedTool values must be strings" ;
+    ] ;
+
+    sh:property [
+        sh:path oc:hasAlias ;
+        sh:datatype xsd:string ;
+        sh:message "hasAlias values must be strings" ;
+    ] ;
+
+    # Skill-to-skill dependency (replaces ambiguous dependsOn)
+    sh:property [
+        sh:path oc:dependsOnSkill ;
+        sh:class oc:Skill ;
+        sh:message "dependsOnSkill must point to a Skill" ;
     ] ;
     .
 

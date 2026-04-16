@@ -17,7 +17,7 @@ OntoSkills 市场是已发布、已编译技能的安装界面。
 
 ```bash
 ontoskills search xlsx
-ontoskills install mareasw/office/xlsx
+ontoskills install obra/superpowers/test-driven-development
 ```
 
 技能安装后默认启用。
@@ -27,14 +27,24 @@ ontoskills install mareasw/office/xlsx
 市场安装使用限定 ID：
 
 ```text
-<package_id>/<skill_id>
+<author>/<package>/<skill>
 ```
 
-示例：
+支持多层级解析：
 
-- `mareasw/greeting/hello`
-- `mareasw/office/xlsx`
-- `mareasw/office/docx`
+- `mareasw/greeting/hello` — 作者/包/技能
+- `obra/superpowers/test-driven-development` — 作者/包/技能
+- `obra/superpowers/systematic-debugging` — 作者/包/技能
+
+你也可以在包级别或作者级别安装：
+
+```bash
+# 安装整个包中的所有技能
+ontoskills install obra/superpowers
+
+# 安装某作者的所有包
+ontoskills install mareasw
+```
 
 ## 安装流程
 
@@ -44,6 +54,12 @@ ontoskills install mareasw/office/xlsx
 
 ```bash
 ontoskills install mareasw/greeting/hello
+```
+
+要同时安装语义搜索嵌入文件：
+
+```bash
+ontoskills install mareasw/greeting/hello --with-embeddings
 ```
 
 如果之前禁用了技能并想重新启用：

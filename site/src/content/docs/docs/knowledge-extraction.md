@@ -7,6 +7,8 @@ sidebar:
 
 A skill is not just code — it's **structured knowledge**. OntoCore extracts this knowledge and compiles it into a queryable ontology.
 
+> **Note:** Embedding generation is an optional step in the compilation pipeline. Install `ontocore[embeddings]` to produce per-skill vector embeddings for semantic intent search. When not installed, embedding generation is skipped with a warning — BM25 keyword search remains available in the MCP runtime.
+
 ---
 
 ## What gets extracted
@@ -21,7 +23,7 @@ Every skill is compiled with:
 | **Knowledge Nodes** | `oc:impartsKnowledge` | Epistemic knowledge (8-12 per skill) |
 | **State Transitions** | `oc:requiresState`, `oc:yieldsState`, `oc:handlesFailure` | Preconditions, outcomes, error handling |
 | **Execution Payload** | `oc:hasPayload` | Optional code to execute |
-| **Provenance** | `oc:generatedBy` | Attestation (which LLM compiled it) |
+| **Provenance** | `oc:generatedBy` | Attestation (which LLM compiled it) (optional) |
 
 ### Components
 

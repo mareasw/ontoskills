@@ -45,7 +45,6 @@ def rebuild_index_cmd(ctx, ontology_root_arg):
     from . import setup_logging
     setup_logging(ctx.obj.get('verbose', False), ctx.obj.get('quiet', False))
     root = ontology_root_arg or Path(resolve_ontology_root(OUTPUT_DIR))
-    installed, enabled = rebuild_registry_indexes(root=root)
-    console.print("[green]Rebuilt indices[/green]")
-    console.print(f"  installed: {installed}")
+    enabled = rebuild_registry_indexes(root=root)
+    console.print("[green]Rebuilt enabled index[/green]")
     console.print(f"  enabled: {enabled}")

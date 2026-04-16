@@ -39,7 +39,10 @@ The interface. OntoMCP exposes OntoSkills via the Model Context Protocol, giving
 - [x] Rust MCP server with stdio transport
 - [x] Oxigraph in-memory graph store
 - [x] SPARQL 1.1 query interface
-- [x] 5 semantic tools (search_skills, get_skill_context, evaluate_execution_plan, query_epistemic_rules, search_intents)
+- [x] 4 tools (search, get_skill_context, evaluate_execution_plan, query_epistemic_rules)
+- [x] Per-skill pre-computed embeddings (optional, requires ontocore[embeddings])
+- [x] Embedding download at install time (--with-embeddings flag)
+- [x] Category and is_user_invocable search filters
 - [x] Claude Code integration
 
 ## Phase 4: OntoStore
@@ -48,6 +51,8 @@ The interface. OntoMCP exposes OntoSkills via the Model Context Protocol, giving
 
 The marketplace. OntoStore is a centralized repository where teams can publish, discover, and share ontologies.
 
+- [x] Per-package manifests with embedding file references
+- [x] Registry index with global embedding model declaration
 - [ ] Ontology store with search
 - [ ] Version management
 - [ ] Team collaboration features

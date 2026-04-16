@@ -4,10 +4,11 @@
   "description": "User-facing CLI for installing OntoMCP, OntoCore, and remote OntoSkills",
   "license": "MIT",
   "bin": {
-    "ontoskills": "bin/ontoskills.js"
+    "ontoskills": "cli/ontoskills.js"
   },
   "files": [
-    "bin/ontoskills.js",
+    "cli/ontoskills.js",
+    "cli/lib/",
     "README.md"
   ],
   "type": "commonjs",

@@ -8,19 +8,10 @@ from pathlib import Path
 from compiler.storage import generate_index_manifest
 
 from .models import InstalledPackageState, InstalledSkillState, RegistryLock
-from .paths import ensure_registry_layout, installed_index_path, enabled_index_path
+from .paths import ensure_registry_layout, enabled_index_path
 from .state import load_registry_lock, save_registry_lock, sync_local_package, _skill_relations
 
 logger = logging.getLogger(__name__)
-
-
-def iter_installed_skill_paths(lock: RegistryLock) -> list[Path]:
-    """Get all installed skill module paths."""
-    paths: list[Path] = []
-    for package in lock.packages.values():
-        for skill in package.skills:
-            paths.append(Path(skill.module_path).resolve())
-    return sorted(paths)
 
 
 def iter_enabled_skill_paths(lock: RegistryLock) -> list[Path]:
@@ -33,19 +24,17 @@ def iter_enabled_skill_paths(lock: RegistryLock) -> list[Path]:
     return sorted(paths)
 
 
-def rebuild_registry_indexes(root: Path | None = None) -> tuple[Path, Path]:
-    """Rebuild both installed and enabled index manifests."""
+def rebuild_registry_indexes(root: Path | None = None) -> Path:
+    """Rebuild enabled index manifest."""
     base = ensure_registry_layout(root)
     lock = load_registry_lock(base)
     lock = sync_local_package(lock, base)
     save_registry_lock(lock, base)
 
-    installed_paths = iter_installed_skill_paths(lock)
     enabled_paths = iter_enabled_skill_paths(lock)
 
-    generate_index_manifest(installed_paths, installed_index_path(base), output_base=base)
     generate_index_manifest(enabled_paths, enabled_index_path(base), output_base=base)
-    return installed_index_path(base), enabled_index_path(base)
+    return enabled_index_path(base)
 
 
 def _best_available_skill_id(
@@ -60,7 +49,7 @@ def _best_available_skill_id(
             if skill.skill_id == skill_id:
                 return preferred_package_id, skill
 
-    tier_rank = {"verified": 0, "trusted": 1, "community": 2, "local": 3}
+    tier_rank = {"official": 0, "local": 1, "verified": 2, "community": 3}
     candidates: list[tuple[int, str, InstalledSkillState]] = []
     for package_id, package in lock.packages.items():
         for skill in package.skills:

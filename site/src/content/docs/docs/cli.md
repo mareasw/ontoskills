@@ -87,10 +87,20 @@ Install a skill from OntoStore.
 
 ```bash
 ontoskills install mareasw/greeting/hello
-ontoskills install mareasw/office/xlsx
+ontoskills install obra/superpowers/test-driven-development
 ```
 
-The package ID format is: `owner/repo/skill`
+The package ID supports multi-level resolution:
+
+| Level | Example | Installs |
+|-------|---------|----------|
+| **Author** | `anthropics` | All packages from that author |
+| **Package** | `obra/superpowers` | All skills in that package |
+| **Skill** | `obra/superpowers/test-driven-development` | Single skill (with dependency check) |
+
+| Flag | Meaning |
+|------|---------|
+| `--with-embeddings` | Download per-skill embedding files (intents.json) for semantic search |
 
 ### `enable <package-id>`
 
@@ -158,7 +168,7 @@ Import a raw Git repository containing SKILL.md files.
 ontoskills import-source https://github.com/user/skill-repo
 ```
 
-Imported skills are stored under `~/.ontoskills/skills/vendor/` and compiled to `~/.ontoskills/ontologies/vendor/`.
+Imported skills are stored under `~/.ontoskills/skills/author/` and compiled to `~/.ontoskills/ontologies/author/`.
 
 ---
 
@@ -241,7 +251,7 @@ Update a component or skill.
 ```bash
 ontoskills update mcp
 ontoskills update core
-ontoskills update mareasw/office/xlsx
+ontoskills update obra/superpowers/test-driven-development
 ```
 
 ### `rebuild-index`
@@ -293,10 +303,16 @@ ontoskills uninstall --all
 │   ├── core.ttl
 │   ├── index.ttl
 │   ├── system/            # System-level files
-│   │   └── index.enabled.ttl  # Enabled skills manifest
-│   └── */ontoskill.ttl
+│   │   ├── index.enabled.ttl  # Enabled skills manifest
+│   │   └── embeddings/        # Semantic search artifacts
+│   │       ├── model.onnx     # ONNX embedding model (~90MB)
+│   │       └── tokenizer.json # HuggingFace tokenizer
+│   └── author/            # Installed skill packages
+│       └── <author>/<pkg>/<skill>/
+│           ├── ontoskill.ttl
+│           └── intents.json   # Per-skill embeddings (optional, with --with-embeddings)
 ├── skills/                # Source skills
-│   └── vendor/            # Imported repositories
+│   └── author/            # Imported repositories
 └── state/                 # Lockfiles and metadata
     ├── registry.sources.json
     └── registry.lock.json
