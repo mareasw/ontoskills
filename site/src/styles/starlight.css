@@ -105,6 +105,11 @@ header {
   border-inline-end: 1px solid var(--sl-color-border) !important;
 }
 
+/* Reduce sidebar right padding */
+.sidebar-pane nav {
+  padding-inline-end: 0.5rem !important;
+}
+
 .main-pane,
 .page {
   background: transparent !important;
