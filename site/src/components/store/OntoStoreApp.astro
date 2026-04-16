@@ -125,7 +125,7 @@ const prefix = lang === 'zh' ? '/zh/ontostore' : '/ontostore';
   <div data-role="view" class="min-h-[60vh]"></div>
 </div>
 
-<style>
+<style is:global>
   .store-filter-select {
     appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b8ba3' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
@@ -600,6 +600,9 @@ const init = () => {
     if (segments.length === 0) {
       renderStoreGrid(skills, meta, filters, view);
       wireGrid();
+      // Populate grid immediately (wireGrid sets up applyFilters but doesn't call it)
+      const applyEv = new Event('input', { bubbles: true });
+      root.querySelector('[data-role="search"]')?.dispatchEvent(applyEv);
     } else if (segments.length === 1) {
       renderAuthorView(skills, segments[0], view);
     } else if (segments.length === 2) {
