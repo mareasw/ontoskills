@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from rdflib import Graph, RDF, URIRef
 from rdflib.namespace import DCTERMS
 
-from compiler.config import CORE_ONTOLOGY_FILENAME, ONTOLOGY_SYSTEM_DIR, ONTOLOGY_VENDOR_DIR
+from compiler.config import CORE_ONTOLOGY_FILENAME, ONTOLOGY_SYSTEM_DIR, ONTOLOGY_AUTHOR_DIR
 from compiler.core_ontology import get_oc_namespace
 
 from .models import (
@@ -22,7 +22,6 @@ from .models import (
 )
 from .paths import (
     enabled_index_path,
-    installed_index_path,
     ontology_root,
     registry_lock_path,
     registry_sources_path,
@@ -71,26 +70,24 @@ def save_registry_lock(lock: RegistryLock, root: Path | None = None) -> None:
 
 
 def discover_local_skill_paths(root: Path | None = None) -> list[Path]:
-    """Discover all skill TTL files (including sub-skill modules).
+    """Discover parent skill TTL files only (ontoskill.ttl).
 
     Sub-skills are compiled as auxiliary .ttl files (e.g., planning.ttl),
-    that should be included in the discovery, not just ontoskill.ttl.
+    but are NOT standalone installable units — they are accessible
+    through the parent skill's oc:extends relationship.
+    Only the parent skill (ontoskill.ttl) appears in the registry.
     """
     base = ontology_root() if root is None else Path(root).resolve()
     excluded = {
         system_dir(base),
-        base / Path(ONTOLOGY_VENDOR_DIR).name,
+        base / Path(ONTOLOGY_AUTHOR_DIR).name,
         base / "official",
         base / "community",
     }
-    system_files = {CORE_ONTOLOGY_FILENAME, "index.ttl", "index.enabled.ttl", "index.installed.ttl"}
     paths: list[Path] = []
-    for path in base.rglob("*.ttl"):
+    for path in base.rglob("ontoskill.ttl"):
         # Skip if in excluded directories
         if any(parent == path.parent or parent in path.parents for parent in excluded):
-            continue
-        # Skip system files
-        if path.name in system_files:
             continue
         paths.append(path.resolve())
     return sorted(paths)
@@ -153,7 +150,7 @@ def _skill_relations(module_path: Path) -> tuple[str | None, set[str]]:
 
     skill_id_literal = graph.value(skill_subject, DCTERMS.identifier)
     relations: set[str] = set()
-    for predicate in (oc.extends, oc.dependsOn):
+    for predicate in (oc.extends, oc.dependsOnSkill, oc.dependsOn):
         for target in graph.objects(skill_subject, predicate):
             target_id = graph.value(target, DCTERMS.identifier)
             if target_id:

@@ -11,6 +11,9 @@ from compiler.env import load_local_env
 
 load_local_env()
 
+# Compiler version (must match pyproject.toml)
+COMPILER_VERSION = "0.11.0"
+
 
 # Project root (parent of core/ directory where this file lives)
 # Now we're in src/, so we need to go up two levels to get to core/, then one more to project root
@@ -39,8 +42,8 @@ OUTPUT_DIR = os.getenv(
     ONTOLOGY_ROOT
 )
 ONTOLOGY_SYSTEM_DIR = str(Path(ONTOLOGY_ROOT) / 'system')
-SKILLS_VENDOR_DIR = str(Path(SKILLS_DIR) / 'vendor')
-ONTOLOGY_VENDOR_DIR = str(Path(ONTOLOGY_ROOT) / 'vendor')
+SKILLS_AUTHOR_DIR = str(Path(SKILLS_DIR) / 'author')
+ONTOLOGY_AUTHOR_DIR = str(Path(ONTOLOGY_ROOT) / 'author')
 
 
 def resolve_ontology_root(path: str | Path) -> Path:
@@ -57,6 +60,9 @@ def resolve_ontology_root(path: str | Path) -> Path:
 # Anthropic API model configurations
 ANTHROPIC_MODEL = os.getenv('ANTHROPIC_MODEL', 'claude-opus-4-6')
 SECURITY_MODEL = os.getenv('SECURITY_MODEL', 'claude-opus-4-6')
+
+# Default author for skills without an author in directory structure
+DEFAULT_SKILLS_AUTHOR = os.environ.get('DEFAULT_SKILLS_AUTHOR')
 
 # Processing limits
 MAX_ITERATIONS = 20

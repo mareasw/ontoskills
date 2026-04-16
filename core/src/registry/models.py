@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-TrustTier = Literal["verified", "trusted", "community", "local"]
+TrustTier = Literal["verified", "official", "community", "local"]
 SourceKind = Literal["ontology", "source"]
 
 
@@ -15,6 +15,10 @@ class PackageSkillManifest(BaseModel):
     path: str
     default_enabled: bool = False
     aliases: list[str] = Field(default_factory=list)
+    category: str | None = None
+    version: str | None = None
+    is_user_invocable: bool | None = None
+    depends_on_skills: list[str] = Field(default_factory=list)
 
 
 class PackageManifest(BaseModel):
@@ -26,6 +30,7 @@ class PackageManifest(BaseModel):
     checksum: str | None = None
     modules: list[str] = Field(default_factory=list)
     skills: list[PackageSkillManifest]
+    embedding_files: list[str] = Field(default_factory=list)
     source_root: str | None = None
     source_files: list[str] = Field(default_factory=list)
 
@@ -36,6 +41,10 @@ class InstalledSkillState(BaseModel):
     aliases: list[str] = Field(default_factory=list)
     enabled: bool = False
     default_enabled: bool = False
+    category: str | None = None
+    version: str | None = None
+    is_user_invocable: bool | None = None
+    depends_on_skills: list[str] = Field(default_factory=list)
 
 
 class InstalledPackageState(BaseModel):
@@ -67,10 +76,41 @@ class RegistrySources(BaseModel):
 
 class RegistryPackageEntry(BaseModel):
     package_id: str
-    manifest_url: str
+    manifest_path: str
     trust_tier: TrustTier | None = None
     source_kind: SourceKind = "ontology"
 
 
+class EmbeddingModelInfo(BaseModel):
+    """Global embedding model declaration for the registry."""
+    model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    dimension: int = 384
+    model_file: str = "model.onnx"
+    tokenizer_file: str = "tokenizer.json"
+
+
 class RegistryIndex(BaseModel):
     packages: list[RegistryPackageEntry] = Field(default_factory=list)
+    embedding_model: EmbeddingModelInfo = Field(default_factory=EmbeddingModelInfo)
+
+
+class AuthorTarget(BaseModel):
+    """Resolution result for an author-level install."""
+    author: str
+    packages: list[RegistryPackageEntry]
+
+
+class PackageTarget(BaseModel):
+    """Resolution result for a package-level install."""
+    package: RegistryPackageEntry
+
+
+class SkillTarget(BaseModel):
+    """Resolution result for a skill-level install."""
+    package: RegistryPackageEntry
+    skill_id: str
+    standalone: bool
+    sibling_deps: list[str] = Field(default_factory=list)
+
+
+InstallTarget = AuthorTarget | PackageTarget | SkillTarget

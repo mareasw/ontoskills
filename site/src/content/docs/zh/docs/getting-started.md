@@ -74,6 +74,8 @@ ontoskills install mareasw/greeting/hello
 ✓ 已安装 mareasw/greeting/hello
 ```
 
+> **注意：** 安装支持多层级限定 ID：`author/package/skill`。例如 `obra/superpowers/test-driven-development` 表示 `obra` 作者、`superpowers` 包、`test-driven-development` 技能。你可以使用 `ontoskills search <query>` 发现可用技能。
+
 ---
 
 ## 第三步：查询技能
@@ -106,6 +108,11 @@ ontoskills install core
 系统要求：
 - **Python** 3.10+
 - 设置 `ANTHROPIC_API_KEY` 环境变量
+
+> **可选：** 安装 `ontocore[embeddings]` 以启用编译期间的语义嵌入生成（推荐用于大型技能目录）：
+> ```bash
+> pip install ontocore[embeddings]
+> ```
 
 ```bash
 export ANTHROPIC_API_KEY="你的-key"

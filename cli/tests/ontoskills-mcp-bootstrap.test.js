@@ -6,7 +6,7 @@ const path = require("path");
 
 process.env.ONTOSKILLS_HOME = path.join(os.tmpdir(), `ontoskills-home-${process.pid}`);
 
-const cli = require("../bin/ontoskills.js");
+const cli = require("../ontoskills.js");
 
 test("parseMcpInstallArgs defaults to global runtime-only", () => {
   const parsed = cli.parseMcpInstallArgs([]);

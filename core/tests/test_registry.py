@@ -14,9 +14,9 @@ from compiler.registry import (
     install_package_from_sources,
     load_registry_lock,
     load_registry_sources,
-    ontology_vendor_dir,
+    ontology_author_dir,
     rebuild_registry_indexes,
-    skills_vendor_dir,
+    skills_author_dir,
 )
 
 
@@ -74,7 +74,7 @@ def test_install_enable_disable_package_rebuilds_indexes(tmp_path):
     package = install_package_from_directory(package_dir, root=root)
     lock = load_registry_lock(root)
     assert "marea/office" in lock.packages
-    assert Path(package.install_root) == ontology_vendor_dir(root) / "marea/office"
+    assert Path(package.install_root) == ontology_author_dir(root) / "marea/office"
     assert enabled_index_path(root).exists()
 
     enable_skills("marea/office", ["xlsx"], root=root)
@@ -87,8 +87,7 @@ def test_install_enable_disable_package_rebuilds_indexes(tmp_path):
     enabled = {skill.skill_id for skill in lock.packages["marea/office"].skills if skill.enabled}
     assert enabled == set()
 
-    installed_index, enabled_index = rebuild_registry_indexes(root)
-    assert installed_index.exists()
+    enabled_index = rebuild_registry_indexes(root)
     assert enabled_index.exists()
 
 
@@ -119,7 +118,7 @@ oc:skill_office a oc:Skill, oc:DeclarativeSkill ;
     assert local_skill.enabled is False
 
 
-def test_registry_install_from_file_index_uses_relative_manifest_and_vendor_layout(tmp_path):
+def test_registry_install_from_file_index_uses_relative_manifest_and_author_layout(tmp_path):
     root = tmp_path / "ontoskills"
     create_core_ontology(root / "core.ttl")
 
@@ -159,7 +158,7 @@ oc:skill_hello a oc:Skill, oc:DeclarativeSkill ;
                 "packages": [
                     {
                         "package_id": "marea/greeting",
-                        "manifest_url": "./packages/marea/greeting/package.json",
+                        "manifest_path": "packages/marea/greeting/package.json",
                         "trust_tier": "verified",
                         "source_kind": "ontology",
                     }
@@ -176,10 +175,10 @@ oc:skill_hello a oc:Skill, oc:DeclarativeSkill ;
 
     package = install_package_from_sources("marea/greeting", root=root)
     assert package.package_id == "marea/greeting"
-    assert Path(package.install_root) == ontology_vendor_dir(root) / "marea/greeting"
+    assert Path(package.install_root) == ontology_author_dir(root) / "marea/greeting"
 
 
-def test_import_source_repository_clones_to_skills_vendor_and_compiles_to_ontology_vendor(tmp_path):
+def test_import_source_repository_clones_to_skills_author_and_compiles_to_ontology_author(tmp_path):
     from unittest.mock import patch
 
     root = tmp_path / "ontoskills"
@@ -192,8 +191,8 @@ def test_import_source_repository_clones_to_skills_vendor_and_compiles_to_ontolo
     (repo_dir / "src" / "landing-page" / "SKILL.md").write_text("# Landing Page", encoding="utf-8")
 
     def fake_compile(source_root, compiled_root):
-        assert source_root == skills_vendor_dir(root) / "ui-ux-pro-max-skill"
-        assert compiled_root == ontology_vendor_dir(root) / "ui-ux-pro-max-skill"
+        assert source_root == skills_author_dir(root) / "ui-ux-pro-max-skill"
+        assert compiled_root == ontology_author_dir(root) / "ui-ux-pro-max-skill"
         (compiled_root / ".claude" / "skills" / "ui-ux-pro-max").mkdir(parents=True, exist_ok=True)
         (compiled_root / "src" / "landing-page").mkdir(parents=True, exist_ok=True)
         (compiled_root / ".claude" / "skills" / "ui-ux-pro-max" / "ontoskill.ttl").write_text(
@@ -223,8 +222,8 @@ oc:skill_landing_page a oc:Skill, oc:DeclarativeSkill ;
         package = import_source_repository(str(repo_dir), root=root, trust_tier="community")
 
     assert package.package_id == "ui-ux-pro-max-skill"
-    assert Path(package.install_root) == ontology_vendor_dir(root) / "ui-ux-pro-max-skill"
-    assert (skills_vendor_dir(root) / "ui-ux-pro-max-skill" / ".claude" / "skills" / "ui-ux-pro-max" / "SKILL.md").exists()
+    assert Path(package.install_root) == ontology_author_dir(root) / "ui-ux-pro-max-skill"
+    assert (skills_author_dir(root) / "ui-ux-pro-max-skill" / ".claude" / "skills" / "ui-ux-pro-max" / "SKILL.md").exists()
     assert sorted(skill.skill_id for skill in package.skills) == ["landing-page", "ui-ux-pro-max"]
     assert all(not skill.enabled for skill in package.skills)
 
@@ -259,7 +258,7 @@ oc:skill_ui_ux_pro_max a oc:Skill, oc:DeclarativeSkill ;
             encoding="utf-8",
         )
 
-    with patch("compiler.registry.compile_source_tree", side_effect=fake_compile):
+    with patch("compiler.registry.install.compile_source_tree", side_effect=fake_compile):
         package = import_source_repository(str(repo_dir), root=root, trust_tier="community")
 
     ttl_path = Path(package.install_root) / ".claude" / "skills" / "ui-ux-pro-max" / "ontoskill.ttl"
@@ -315,7 +314,7 @@ oc:skill_design a oc:Skill, oc:ExecutableSkill ;
             encoding="utf-8",
         )
 
-    with patch("compiler.registry.compile_source_tree", side_effect=fake_compile):
+    with patch("compiler.registry.install.compile_source_tree", side_effect=fake_compile):
         package = import_source_repository(str(repo_dir), root=root, trust_tier="community")
 
     design_system_ttl = Path(package.install_root) / ".claude" / "skills" / "design-system" / "ontoskill.ttl"

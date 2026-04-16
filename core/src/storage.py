@@ -10,6 +10,7 @@ Handles file I/O operations for skills and ontologies including:
 """
 
 import logging
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -21,7 +22,7 @@ from rdflib.namespace import DCTERMS, SKOS, PROV
 
 from compiler.schemas import ExtractedSkill
 from compiler.exceptions import OntologyLoadError, OntologyValidationError
-from compiler.config import BASE_URI, CORE_ONTOLOGY_FILENAME, CORE_ONTOLOGY_URL, SKILLS_DIR, OUTPUT_DIR, resolve_ontology_root
+from compiler.config import BASE_URI, COMPILER_VERSION, CORE_ONTOLOGY_FILENAME, CORE_ONTOLOGY_URL, SKILLS_DIR, OUTPUT_DIR, resolve_ontology_root
 from compiler.core_ontology import get_oc_namespace
 from compiler.serialization import serialize_skill
 from compiler.validator import validate_and_raise
@@ -395,7 +396,7 @@ def generate_index_manifest(
         output_base = Path(OUTPUT_DIR).resolve()
     else:
         output_base = output_base.resolve()
-    ontology_root = resolve_ontology_root(output_base)
+    ontology_root = output_base
 
     oc = get_oc_namespace()
     g = Graph()
@@ -445,7 +446,6 @@ SYSTEM_FILES = {
     CORE_ONTOLOGY_FILENAME,
     "index.ttl",
     "index.enabled.ttl",
-    "index.installed.ttl",
     "registry.lock.json",
     "registry.sources.json",
 }
@@ -473,7 +473,7 @@ def clean_orphaned_files(
         Count of orphaned files removed
     """
     orphans_removed = 0
-    protected_dirs = {"system", "vendor", "official", "community"}
+    protected_dirs = {"system", "author", "official", "community"}
 
     # Find all files in output directory
     for output_file in output_dir.rglob("*"):
@@ -519,3 +519,122 @@ def clean_orphaned_files(
         logger.info("No orphaned files found")
 
     return orphans_removed
+
+
+def generate_package_manifest(
+    package_id: str,
+    compiled_skills: list[dict],
+    output_dir: Path,
+    trust_tier: str | None = None,
+) -> None:
+    """Generate a per-package package.json manifest.
+
+    Produces a manifest compatible with the remote registry format,
+    listing all compiled skills with metadata, dependencies, and paths.
+
+    Args:
+        package_id: Qualified package ID (e.g., "anthropics/financial-services-plugin")
+        compiled_skills: List of dicts with keys:
+            skill_id, path, description, category, intents, aliases,
+            depends_on_skills, default_enabled, modules
+        output_dir: The sub-package directory (e.g., ontostore/packages/anthropics/financial-services-plugin/)
+        trust_tier: Trust tier for the package (reads ONTOSKILLS_TRUST_TIER env var if None)
+    """
+    import json
+
+    if trust_tier is None:
+        trust_tier = os.environ.get("ONTOSKILLS_TRUST_TIER", "community")
+
+    modules = set()
+    embedding_files = []
+    skills = []
+    for entry in compiled_skills:
+        rel_path = entry.get("path", f"{entry['skill_id']}/ontoskill.ttl")
+        skill_data = {
+            "id": entry["skill_id"],
+            "path": rel_path,
+            "default_enabled": entry.get("default_enabled", True),
+            "aliases": entry.get("aliases", []),
+            "description": entry.get("description", ""),
+            "category": entry.get("category"),
+            "intents": entry.get("intents", []),
+            "depends_on_skills": entry.get("depends_on_skills", []),
+        }
+        skills.append(skill_data)
+        modules.add(rel_path)
+        for mod in entry.get("modules", []):
+            modules.add(mod)
+        if "embedding_file" in entry and entry["embedding_file"]:
+            embedding_files.append(entry["embedding_file"])
+
+    manifest = {
+        "package_id": package_id,
+        "version": COMPILER_VERSION,
+        "trust_tier": trust_tier,
+        "source_kind": "ontology",
+        "modules": sorted(modules),
+        "embedding_files": sorted(embedding_files),
+        "skills": skills,
+    }
+
+    manifest_path = output_dir / "package.json"
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    logger.info(f"Generated package manifest for {package_id} with {len(skills)} skill(s) at {manifest_path}")
+
+
+def generate_registry_index(
+    packages: list[dict],
+    index_path: Path,
+) -> None:
+    """Generate the root index.json listing all packages with manifest pointers.
+
+    Implements merge/upsert:
+    - Existing packages are updated by package_id
+    - New packages are appended
+    - Removed packages are preserved (not deleted)
+
+    Args:
+        packages: List of dicts with keys:
+            package_id, manifest_path, trust_tier, source_kind
+        index_path: Path to root index.json
+    """
+    import json
+
+    registry: dict = {"packages": []}
+    if index_path.exists():
+        try:
+            registry = json.loads(index_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    existing: dict[str, dict] = {p["package_id"]: p for p in registry.get("packages", [])}
+
+    for pkg_entry in packages:
+        pkg_data = {
+            "package_id": pkg_entry["package_id"],
+            "manifest_path": pkg_entry["manifest_path"],
+            "trust_tier": pkg_entry.get("trust_tier", "community"),
+            "source_kind": pkg_entry.get("source_kind", "ontology"),
+        }
+        existing[pkg_entry["package_id"]] = pkg_data
+
+    registry["packages"] = sorted(existing.values(), key=lambda p: p["package_id"])
+
+    # Always include embedding model declaration
+    if "embedding_model" not in registry:
+        registry["embedding_model"] = {
+            "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+            "dimension": 384,
+            "model_file": "model.onnx",
+            "tokenizer_file": "tokenizer.json",
+        }
+
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index_path.write_text(
+        json.dumps(registry, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    logger.info(f"Updated registry index with {len(registry['packages'])} package(s) at {index_path}")

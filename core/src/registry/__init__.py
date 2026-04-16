@@ -29,10 +29,9 @@ from .paths import (
     ontology_root,
     skills_root,
     system_dir,
-    skills_vendor_dir,
-    ontology_vendor_dir,
+    skills_author_dir,
+    ontology_author_dir,
     enabled_index_path,
-    installed_index_path,
     registry_lock_path,
     registry_sources_path,
     ensure_registry_layout,
@@ -51,7 +50,6 @@ from .state import (
 
 # Index
 from .index import (
-    iter_installed_skill_paths,
     iter_enabled_skill_paths,
     rebuild_registry_indexes,
     enable_skills,
@@ -70,6 +68,19 @@ from .install import (
     resolve_package_from_sources,
     install_package_from_manifest_ref,
     install_package_from_sources,
+    install_author,
+    install_single_skill,
+)
+
+# Resolve
+from .resolve import (
+    resolve_install_ref,
+    is_standalone_skill,
+    NotFoundError,
+    AmbiguousRefError,
+    AuthorTarget,
+    PackageTarget,
+    SkillTarget,
 )
 
 # Compile
@@ -100,10 +111,9 @@ __all__ = [
     "ontology_root",
     "skills_root",
     "system_dir",
-    "skills_vendor_dir",
-    "ontology_vendor_dir",
+    "skills_author_dir",
+    "ontology_author_dir",
     "enabled_index_path",
-    "installed_index_path",
     "registry_lock_path",
     "registry_sources_path",
     "ensure_registry_layout",
@@ -116,7 +126,6 @@ __all__ = [
     "discover_local_skill_paths",
     "sync_local_package",
     # Index
-    "iter_installed_skill_paths",
     "iter_enabled_skill_paths",
     "rebuild_registry_indexes",
     "enable_skills",
@@ -132,6 +141,16 @@ __all__ = [
     "resolve_package_from_sources",
     "install_package_from_manifest_ref",
     "install_package_from_sources",
+    "install_author",
+    "install_single_skill",
+    # Resolve
+    "resolve_install_ref",
+    "is_standalone_skill",
+    "NotFoundError",
+    "AmbiguousRefError",
+    "AuthorTarget",
+    "PackageTarget",
+    "SkillTarget",
     # Compile
     "compile_source_tree",
     "rewrite_compiled_payload_paths",

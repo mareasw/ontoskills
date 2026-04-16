@@ -310,8 +310,8 @@ def test_serialize_skill_relations_use_skill_uris():
     serialize_skill(g, skill)
     skill_uri = skill_uri_for_id(skill.id)
 
-    assert (skill_uri, oc.dependsOn, skill_uri_for_id("docx")) in g
-    assert (skill_uri, oc.dependsOn, skill_uri_for_id("xlsx")) in g
+    assert (skill_uri, oc.dependsOnSkill, skill_uri_for_id("docx")) in g
+    assert (skill_uri, oc.dependsOnSkill, skill_uri_for_id("xlsx")) in g
     assert (skill_uri, oc.extends, skill_uri_for_id("toolkit")) in g
     assert (skill_uri, oc.contradicts, skill_uri_for_id("legacy-office")) in g
 

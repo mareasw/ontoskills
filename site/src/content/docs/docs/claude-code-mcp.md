@@ -64,7 +64,7 @@ Status: ✓ Connected
 
 Once connected, Claude Code can call:
 
-- `search_skills`
+- `search` — search by semantic query, alias, or structured filters
 - `get_skill_context`
 - `evaluate_execution_plan`
 - `query_epistemic_rules`

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from rdflib import Graph, Namespace, RDF, OWL, Literal, URIRef, BNode
-from rdflib.namespace import DCTERMS, SKOS, PROV
+from rdflib.namespace import DCTERMS, SKOS, PROV, XSD
 
 from compiler.schemas import ExtractedSkill, FileInfo
 from compiler.exceptions import OntologyValidationError
@@ -130,8 +130,9 @@ def serialize_skill(
         graph.add((skill_uri, oc.hasRequirement, req_uri))
 
     # Relations - serialize as object properties to stable skill URIs
+    # Use oc:dependsOnSkill for skill-to-skill dependencies (OntoCore refactoring)
     for dep in skill.depends_on:
-        graph.add((skill_uri, oc.dependsOn, relation_uri_for_value(dep)))
+        graph.add((skill_uri, oc.dependsOnSkill, relation_uri_for_value(dep)))
 
     # Inject deterministic extends if provided (sub-skills)
     parent_uri = None
@@ -168,9 +169,7 @@ def serialize_skill(
             state_ref = oc[state_name]
             graph.add((skill_uri, oc.handlesFailure, state_ref))
 
-    # LLM attestation
-    if skill.generated_by and skill.generated_by != "unknown":
-        graph.add((skill_uri, oc.generatedBy, Literal(skill.generated_by)))
+    # LLM attestation removed — migrated to system/index.json per-skill metadata
 
     # Execution payload
     if skill.execution_payload:
@@ -191,8 +190,9 @@ def serialize_skill(
         kn_hash = hashlib.sha256(f"{kn.node_type}:{kn.directive_content}".encode()).hexdigest()[:8]
         kn_uri = oc[f"kn_{kn_hash}"]
 
-        # Add the knowledge node type as class
+        # Add the knowledge node type as class (SHACL requires explicit KnowledgeNode type)
         graph.add((kn_uri, RDF.type, oc[kn.node_type]))
+        graph.add((kn_uri, RDF.type, oc.KnowledgeNode))
         graph.add((kn_uri, oc.directiveContent, Literal(kn.directive_content)))
         graph.add((kn_uri, oc.appliesToContext, Literal(kn.applies_to_context)))
         graph.add((kn_uri, oc.hasRationale, Literal(kn.has_rationale)))
@@ -322,6 +322,30 @@ def serialize_skill(
         graph.add((skill_uri, oc.hasName, Literal(skill.frontmatter.name)))
         graph.add((skill_uri, oc.hasDescription, Literal(skill.frontmatter.description)))
 
+    # === New Metadata Properties (OntoCore refactoring) ===
+
+    if hasattr(skill, 'category') and skill.category:
+        graph.add((skill_uri, oc.hasCategory, Literal(skill.category)))
+
+    # version, license, author belong in package.json manifest, not ontology TTL
+
+    if hasattr(skill, 'package_name') and skill.package_name:
+        graph.add((skill_uri, oc.hasPackageName, Literal(skill.package_name)))
+
+    if hasattr(skill, 'is_user_invocable'):
+        # Use typed boolean literal for xsd:boolean range
+        graph.add((skill_uri, oc.isUserInvocable, Literal(skill.is_user_invocable, datatype=XSD.boolean)))
+
+    if hasattr(skill, 'argument_hint') and skill.argument_hint:
+        graph.add((skill_uri, oc.hasArgumentHint, Literal(skill.argument_hint)))
+
+    # Repeatable properties — one triple per value
+    for tool in getattr(skill, 'allowed_tools', []):
+        graph.add((skill_uri, oc.hasAllowedTool, Literal(tool)))
+
+    for alias in getattr(skill, 'aliases', []):
+        graph.add((skill_uri, oc.hasAlias, Literal(alias)))
+
 
 def serialize_skill_to_module(
     skill: ExtractedSkill,
@@ -363,7 +387,7 @@ def serialize_skill_to_module(
     else:
         output_base = Path(output_base).resolve()
 
-    core_ontology_path = resolve_ontology_root(output_base) / CORE_ONTOLOGY_FILENAME
+    core_ontology_path = output_base / CORE_ONTOLOGY_FILENAME
     if core_ontology_path.exists():
         g.add((URIRef(BASE_URI.rstrip('#')), OWL.imports, URIRef(CORE_ONTOLOGY_URL)))
 

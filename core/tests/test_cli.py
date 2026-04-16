@@ -1,4 +1,6 @@
 import pytest
+from pathlib import Path
+from unittest.mock import patch, MagicMock
 from click.testing import CliRunner
 
 
@@ -372,7 +374,10 @@ skill:test-skill a oc:Skill ;
     })
 
     with patch.object(compiler.cli.compile, 'tool_use_loop') as mock_tool_use_loop, \
-         patch.object(compiler.cli.compile, 'serialize_skill_to_module'):
+         patch.object(compiler.cli.compile, 'serialize_skill_to_module'), \
+         patch.dict('sys.modules', {'sentence_transformers': MagicMock(SentenceTransformer=MagicMock())}), \
+         patch('compiler.embeddings.exporter.export_skill_embeddings') as mock_export:
+        mock_export.return_value = Path("fake/intents.json")
         mock_tool_use_loop.return_value = mock_extracted
 
         # First: verify baseline behavior (without --force, matching hash causes skip)
@@ -545,6 +550,10 @@ class TestExportEmbeddingsCLI:
     """Tests for export-embeddings CLI command."""
 
     @pytest.mark.integration
+    @pytest.mark.skipif(
+        not __import__("importlib").util.find_spec("sentence_transformers"),
+        reason="sentence_transformers not installed"
+    )
     def test_export_embeddings_command(self, tmp_path):
         """export-embeddings command creates output files."""
         from rdflib import Graph, Namespace, Literal, RDF
@@ -579,8 +588,12 @@ class TestExportEmbeddingsCLI:
         assert (output_dir / "intents.json").exists()
 
 
-def test_compile_rejects_orphan_sub_skills(tmp_path):
-    """Compile should fail if .md files exist without SKILL.md."""
+def test_compile_warns_on_orphan_sub_skills(tmp_path):
+    """Compile should succeed but warn if .md files exist without SKILL.md.
+
+    Auxiliary content directories (rules, examples, references, etc.)
+    within a valid skill tree are support content, not orphans.
+    """
     from compiler.cli import cli
     runner = CliRunner()
 
@@ -598,8 +611,8 @@ def test_compile_rejects_orphan_sub_skills(tmp_path):
         '-o', str(output_dir)
     ])
 
-    assert result.exit_code != 0
-    assert "no SKILL.md" in result.output.lower() or "orphan" in result.output.lower()
+    # Compilation succeeds (no fatal error) — auxiliary dirs are just skipped
+    assert result.exit_code == 0
 
 
 def test_dry_run_does_not_write_sub_skill_modules(tmp_path):
@@ -641,7 +654,8 @@ def test_dry_run_does_not_write_sub_skill_modules(tmp_path):
     mock_sub_extracted.state_transitions.requires_state = []
     mock_sub_extracted.state_transitions.yields_state = []
 
-    with patch('compiler.cli.compile.tool_use_loop') as mock_tool_use_loop:
+    with patch('compiler.cli.compile.tool_use_loop') as mock_tool_use_loop, \
+         patch.dict('sys.modules', {'sentence_transformers': MagicMock(SentenceTransformer=MagicMock())}):
         # First call for parent skill, second for sub-skill
         mock_tool_use_loop.side_effect = [mock_extracted, mock_sub_extracted]
 

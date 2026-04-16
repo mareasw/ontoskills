@@ -30,12 +30,17 @@ Requirements:
 - **Python** 3.10+
 - **Anthropic API key** (set `ANTHROPIC_API_KEY` env var)
 
+> **Optional:** Install `ontocore[embeddings]` to enable per-skill embedding generation for semantic search (recommended for large skill catalogs):
+> ```bash
+> pip install ontocore[embeddings]
+> ```
+
 ---
 
 ## The compilation pipeline
 
 ```
-SKILL.md → [Extract] → [Security] → [Serialize] → [SHACL] → ontoskill.ttl
+SKILL.md → [Extract] → [Security] → [Serialize] → [SHACL] → [Embed (opt)] → ontoskill.ttl + intents.json
 ```
 
 | Stage | What Happens |
@@ -44,9 +49,10 @@ SKILL.md → [Extract] → [Security] → [Serialize] → [SHACL] → ontoskill.
 | **Security** | Regex + LLM review for malicious content |
 | **Serialize** | Pydantic models → RDF triples |
 | **Validate** | SHACL shapes check logical validity |
+| **Embed** | Per-skill intent embeddings (384-dim, L2-normalized) — optional, requires `ontocore[embeddings]` |
 | **Write** | Atomic write with backup |
 
-If any stage fails, the skill is **not written**. The SHACL gatekeeper enforces constitutional rules.
+If any stage fails, the skill is **not written**. The SHACL gatekeeper enforces constitutional rules. The embedding stage is optional — skipped with a warning when `ontocore[embeddings]` is not installed.
 
 ---
 
@@ -153,7 +159,8 @@ ontoskills/
 ├── system/
 │   └── index.enabled.ttl    # Skills enabled for MCP
 └── <skill-path>/
-    └── ontoskill.ttl        # Individual skill module
+    ├── ontoskill.ttl        # Individual skill module
+    └── intents.json         # Pre-computed intent embeddings (optional)
 ```
 
 ### The core ontology
@@ -169,7 +176,7 @@ Compiled skill modules reference the core via `owl:imports <https://ontoskills.s
 `core.ttl` defines:
 
 - `oc:Skill`, `oc:ExecutableSkill`, `oc:DeclarativeSkill`
-- Properties: `dependsOn`, `extends`, `contradicts`, `resolvesIntent`, etc.
+- Properties: `dependsOnSkill`, `extends`, `contradicts`, `resolvesIntent`, etc.
 - Knowledge node classes: `oc:Heuristic`, `oc:AntiPattern`, etc.
 - State classes for preconditions/postconditions
 
@@ -219,8 +226,8 @@ Every skill must pass SHACL validation before being written. The constitutional 
 
 | Constraint | Rule |
 |------------|------|
-| `resolvesIntent` | Required (at least 1) |
-| `generatedBy` | Required (exactly 1) |
+| `resolvesIntent` | Required (at least 1) — also needed for semantic search embeddings |
+| `generatedBy` | Optional (attestation) |
 | `requiresState` | Must be valid IRI |
 | `yieldsState` | Must be valid IRI |
 | `handlesFailure` | Must be valid IRI |
@@ -254,6 +261,7 @@ See [Skill Authoring](/docs/authoring/) for practical guidance on writing skills
 | `ANTHROPIC_API_KEY` | Anthropic API key | Required |
 | `ANTHROPIC_BASE_URL` | API base URL | `https://api.anthropic.com` |
 | `SECURITY_MODEL` | Model for security review | `claude-opus-4-6` |
+| `DEFAULT_SKILLS_AUTHOR` | Default author for skills with no package structure | `local` |
 
 ---
 

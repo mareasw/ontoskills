@@ -106,10 +106,27 @@ class ExtractedSkill(BaseModel):
     provenance: str | None = None
     knowledge_nodes: list[KnowledgeNode] = Field(default_factory=list)
 
+    # New metadata fields (OntoCore refactoring)
+    category: str | None = None
+    version: str | None = None
+    license: str | None = None
+    author: str | None = None
+    package_name: str | None = None
+    is_user_invocable: bool = True
+    argument_hint: str | None = None
+    allowed_tools: list[str] = Field(default_factory=list)
+    aliases: list[str] = Field(default_factory=list)
+
     @field_validator('depends_on', 'extends', 'contradicts')
     @classmethod
     def validate_skill_relation_ids(cls, values: list[str]) -> list[str]:
-        """Validate relation targets as canonical skill ids or explicit URIs."""
+        """Validate and normalize relation targets.
+
+        Accepts: bare skill ids ("office"), qualified ("author/package/skill"),
+        or URIs. All non-URI references are normalized to the bare skill ID
+        (last segment), which is what the serialization layer expects for
+        building correct oc:skill_ URIs.
+        """
         import re
 
         pattern = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
@@ -121,12 +138,26 @@ class ExtractedSkill(BaseModel):
             if candidate.startswith(("http://", "https://", "oc:")):
                 normalized.append(candidate)
                 continue
-            if not pattern.match(candidate):
-                raise ValueError(
-                    f"Invalid skill relation '{value}'. Use canonical skill ids like 'office' or 'docx-review'."
-                )
-            normalized.append(candidate)
+            parts = candidate.split('/')
+            # Validate all segments look like valid identifiers
+            for part in parts:
+                if not pattern.match(part):
+                    raise ValueError(
+                        f"Invalid skill relation '{value}'. Use canonical skill ids like 'office' or 'docx-review'."
+                    )
+            # Always normalize to bare skill ID (last segment)
+            normalized.append(parts[-1])
         return normalized
+
+    @field_validator('is_user_invocable', mode='before')
+    @classmethod
+    def coerce_is_user_invocable(cls, v: Any) -> bool:
+        """Coerce string values to boolean for TTL serialization correctness."""
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            return v.lower() in ('true', 'yes', '1')
+        return bool(v)
 
     @model_validator(mode='before')
     @classmethod
@@ -223,17 +254,28 @@ class Frontmatter(BaseModel):
     @field_validator('name')
     @classmethod
     def validate_name(cls, v: str) -> str:
-        if len(v) > 64:
-            raise ValueError(f"Skill name exceeds 64 characters: {len(v)}")
-        if not re.match(r'^[a-z0-9]+(?:-[a-z0-9]+)*$', v):
-            raise ValueError("Skill name must be lowercase alphanumeric with single hyphens (no leading/trailing/repeated hyphens)")
-        # Check for OntoSkills reserved words anywhere in the skill name
-        reserved = ('ontoskills', 'marea', 'mareasw', 'core', 'system', 'index')
-        segments = v.lower().split('-')
-        for word in reserved:
-            if word in segments:
-                raise ValueError(f"Reserved word '{word}' not allowed in skill name")
-        return v
+        # Convert scope prefix separator (e.g., "ckm:banner-design" → "ckm-banner-design")
+        if ':' in v:
+            v = v.replace(':', '-', 1)
+
+        # Auto-normalize: lowercase, spaces/underscores → hyphens, collapse repeated hyphens
+        normalized = v.lower().strip()
+        normalized = re.sub(r'[\s_]+', '-', normalized)
+        normalized = re.sub(r'[^a-z0-9-]', '-', normalized)
+        normalized = re.sub(r'-+', '-', normalized)
+        normalized = normalized.strip('-')
+
+        if not normalized:
+            raise ValueError("Skill name is empty after normalization")
+        if len(normalized) > 64:
+            raise ValueError(f"Skill name exceeds 64 characters: {len(normalized)}")
+
+        # Block only if the FULL name is a reserved word (not a compound like "system-design")
+        fully_reserved = ('ontoskills', 'index')
+        if normalized in fully_reserved:
+            raise ValueError(f"Skill name '{normalized}' is a reserved identifier")
+
+        return normalized
 
     @field_validator('description')
     @classmethod

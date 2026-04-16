@@ -72,6 +72,15 @@ Skills behave differently across models:
 ---
 name: pdf-processing
 description: Extracts text and tables from PDF files. Use when working with PDFs, forms, or document extraction.
+category: document
+is_user_invocable: true
+aliases:
+  - pdf
+  - pdf-extraction
+argument_hint: "file_path"
+allowed_tools:
+  - read_file
+  - write_file
 ---
 ```
 
@@ -437,12 +446,15 @@ ontoskills init-core
 ontoskills compile my-skill
 ```
 
+> **Note:** Embedding generation is optional. Install with `pip install ontocore[embeddings]` to produce semantic search vectors alongside each compiled skill. Without it, compilation succeeds but embeddings are skipped.
+
 ### What happens during compilation
 
 1. **Parsing**: Extracts structure from markdown
 2. **LLM Extraction**: Identifies knowledge nodes using Claude
-3. **SHACL Validation**: Verifies required fields exist
-4. **RDF Generation**: Produces `ontoskill.ttl`
+3. **Embed**: Generates per-skill vector embeddings for semantic search
+4. **SHACL Validation**: Verifies required fields exist
+5. **RDF Generation**: Produces `ontoskill.ttl`
 
 ### Common validation errors
 
@@ -463,7 +475,7 @@ The compiler validates skills against constitutional SHACL shapes defined in `co
 
 **Every skill must have:**
 - At least one `resolvesIntent` — what user intent this skill solves
-- Exactly one `generatedBy` — which LLM produced this skill (auto-filled)
+- Optional `generatedBy` — which LLM produced this skill (0 or 1)
 
 **State fields must be valid IRIs:**
 - `requiresState` — preconditions (e.g., `oc:FileExists`)

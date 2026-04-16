@@ -1,6 +1,6 @@
 [project]
 name = "ontocore"
-version = "0.10.0"
+version = "0.11.0"
 description = "OntoCore — Neuro-symbolic skill compiler. Compiles SKILL.md into validated OWL 2 ontologies."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -33,9 +33,8 @@ dev = [
     "mypy>=1.0.0",
 ]
 embeddings = [
-    # Required for semantic intent discovery (ontocore export-embeddings)
+    # Per-skill embedding generation at compile time + ONNX export
     "sentence-transformers>=2.2.0",
-    "transformers>=4.30.0",
     "optimum>=1.12.0",
     "onnx>=1.15.0",
     "onnxruntime>=1.16.0",

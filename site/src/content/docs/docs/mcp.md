@@ -55,11 +55,17 @@ ONTOMCP_ONTOLOGY_ROOT=~/.ontoskills/ontologies
 
 ## Tool reference
 
-OntoMCP exposes **5 tools** for skill discovery and reasoning.
+OntoMCP exposes **4 tools** for skill discovery and reasoning.
 
-### `search_skills`
+### `search`
 
-Discover skills with optional filters.
+Search skills by semantic query, alias, or structured filters. The tool dispatches based on the parameters provided:
+
+- **`query`** provided → BM25 keyword search (with optional semantic fallback for large catalogs)
+- **`alias`** provided → alias resolution
+- Otherwise → structured skill search with filters
+
+#### Structured skill search
 
 ```json
 {
@@ -67,6 +73,8 @@ Discover skills with optional filters.
   "requires_state": "oc:DocumentCreated",
   "yields_state": "oc:PdfGenerated",
   "skill_type": "executable",
+  "category": "document",
+  "is_user_invocable": true,
   "limit": 25
 }
 ```
@@ -77,6 +85,8 @@ Discover skills with optional filters.
 | `requires_state` | string | Filter by required state (URI or `oc:StateName`) |
 | `yields_state` | string | Filter by yielded state (URI or `oc:StateName`) |
 | `skill_type` | string | `executable` or `declarative` |
+| `category` | string | Filter by skill category (e.g., `automation`, `document`, `marketing`) |
+| `is_user_invocable` | boolean | Filter by whether the skill is directly invocable by users |
 | `limit` | integer | Max results (1-100, default 25) |
 
 **Example response:**
@@ -86,22 +96,20 @@ Discover skills with optional filters.
   "skills": [
     {
       "id": "pdf",
-      "qualified_id": "mareasw/office/pdf",
-      "nature": "A skill that creates PDF documents",
-      "intents": ["create_pdf", "export_pdf"],
-      "requires_state": ["oc:ContentReady"],
-      "yields_state": ["oc:PdfGenerated"]
+      "qualified_id": "obra/superpowers/test-driven-development",
+      "nature": "A skill for test-driven development",
+      "intents": ["write tests first", "practice TDD"],
+      "requires_state": ["oc:CodeReady"],
+      "yields_state": ["oc:TestsPassing"]
     }
   ],
   "total": 1
 }
 ```
 
----
+#### Semantic intent search
 
-### `search_intents`
-
-Search for intents semantically matching a natural language query. Requires embeddings to be exported first.
+When the `query` parameter is provided, the search tool uses **BM25** as the default search engine. BM25 is an in-memory keyword ranking algorithm that operates directly on Catalog data — it is always available and requires no additional dependencies.
 
 ```json
 {
@@ -115,27 +123,79 @@ Search for intents semantically matching a natural language query. Requires embe
 | `query` | string | **Required.** Natural language query |
 | `top_k` | integer | Number of results (default 5) |
 
-**Example response:**
+**BM25 response example** (default mode):
 
 ```json
 {
   "query": "create a pdf document",
-  "matches": [
+  "mode": "bm25",
+  "results": [
     {
-      "intent": "create_pdf",
+      "skill_id": "pdf",
+      "qualified_id": "obra/superpowers/test-driven-development",
       "score": 0.92,
-      "skills": ["mareasw/office/pdf", "mareasw/documents/pdf-generator"]
-    },
-    {
-      "intent": "export_to_pdf",
-      "score": 0.85,
-      "skills": ["mareasw/office/export"]
+      "matched_by": "intent",
+      "intents": ["create_pdf", "export_to_pdf"],
+      "aliases": ["pdf"],
+      "trust_tier": "core"
     }
   ]
 }
 ```
 
-**Note:** Requires running `ontoskills export-embeddings` first. If embeddings are not available, the tool returns an error.
+**Semantic fallback** (optional, for large catalogs):
+
+Semantic search is an optional enhancement for large skill catalogs where keyword matching alone may not capture nuanced queries. It requires compiling with `--features embeddings` and having embedding files present (`ontoskills export-embeddings`).
+
+When BM25 confidence is below the fallback threshold (0.4) and embeddings are available, the server automatically falls back to semantic search:
+
+```json
+{
+  "query": "generate a report with charts and export it",
+  "mode": "semantic",
+  "results": [
+    {
+      "skill_id": "pdf",
+      "qualified_id": "obra/superpowers/test-driven-development",
+      "score": 0.88,
+      "matched_by": "embedding_similarity",
+      "intents": ["create_pdf", "export_to_pdf"],
+      "aliases": ["pdf"],
+      "trust_tier": "core"
+    }
+  ]
+}
+```
+
+Semantic results use **hybrid scoring** (cosine similarity x trust-tier quality multiplier) so higher-trust skills rank above community contributions even with slightly lower raw similarity.
+
+#### Alias resolution
+
+```json
+{
+  "alias": "pdf"
+}
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `alias` | string | **Required.** Alias to resolve (case-insensitive) |
+
+**Example response:**
+
+```json
+{
+  "alias": "pdf",
+  "skills": [
+    {
+      "id": "test-driven-development",
+      "qualified_id": "obra/superpowers/test-driven-development",
+      "nature": "A skill for test-driven development",
+      "intents": ["write tests first", "practice TDD"]
+    }
+  ]
+}
+```
 
 ---
 
@@ -152,21 +212,21 @@ Fetch the full execution context for a skill, including requirements, transition
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `skill_id` | string | **Required.** Short id (`pdf`) or qualified (`mareasw/office/pdf`) |
+| `skill_id` | string | **Required.** Short id (`test-driven-development`) or qualified (`obra/superpowers/test-driven-development`) |
 | `include_inherited_knowledge` | boolean | Include knowledge from extended skills (default true) |
 
 **Example response:**
 
 ```json
 {
-  "id": "pdf",
-  "qualified_id": "mareasw/office/pdf",
-  "nature": "A skill that creates PDF documents from content",
-  "genus": "DocumentGenerator",
-  "differentia": "outputs PDF format",
-  "intents": ["create_pdf", "export_pdf"],
-  "requires_state": ["oc:ContentReady"],
-  "yields_state": ["oc:PdfGenerated"],
+  "id": "test-driven-development",
+  "qualified_id": "obra/superpowers/test-driven-development",
+  "nature": "A skill for test-driven development",
+  "genus": "Development",
+  "differentia": "writes tests first",
+  "intents": ["write tests first", "practice TDD"],
+  "requires_state": ["oc:CodeReady"],
+  "yields_state": ["oc:TestsPassing"],
   "handles_failure": ["oc:PdfGenerationFailed"],
   "requirements": [
     {"type": "Tool", "value": "wkhtmltopdf", "optional": false}
@@ -308,12 +368,20 @@ Query normalized knowledge nodes with guided filters.
 ┌─────────────────────────────────────────────────────────────┐
 │                       OntoMCP                                │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │   Catalog   │  │  Embeddings │  │   SPARQL Engine     │  │
-│  │   (Rust)    │  │  (Optional) │  │   (Oxigraph)        │  │
+│  │   Catalog   │  │ BM25 Engine │  │   SPARQL Engine     │  │
+│  │   (Rust)    │  │  (in-memory)│  │   (Oxigraph)        │  │
 │  └──────┬──────┘  └──────┬──────┘  └──────────┬──────────┘  │
-└─────────┼────────────────┼───────────────────┼─────────────┘
-          │                │                   │
-          ▼                ▼                   ▼
+│         └─────────┐      │                    │             │
+│                   ▼      │                    │             │
+│          ┌─────────────┐ │                    │             │
+│          │  Embeddings │ │                    │             │
+│          │(ONNX/Intents│ │                    │             │
+│          │  optional,  │ │                    │             │
+│          │large catalogs│ │                   │             │
+│          └─────────────┘ │                    │             │
+└─────────────────────────┼────────────────────┼─────────────┘
+                          │                    │
+                          ▼                    ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    ontologies/                               │
 │  ├── index.ttl                                              │
@@ -372,13 +440,19 @@ ontoskills compile
 
 ### "Embeddings not available"
 
-The `search_intents` tool requires pre-computed embeddings:
+Search always works with **BM25** (keyword search). Semantic search is optional and only available when compiled with `--features embeddings` and embedding files are present.
+
+If you want semantic search for large catalogs and the ONNX Runtime shared library is missing, set `ORT_DYLIB_PATH`:
+
+```bash
+export ORT_DYLIB_PATH=/path/to/libonnxruntime.so
+```
+
+To generate embedding files:
 
 ```bash
 ontoskills export-embeddings
 ```
-
-This creates `~/.ontoskills/ontologies/system/embeddings/`.
 
 ### "Server not initialized"
 
@@ -400,3 +474,4 @@ Check logs for errors:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ONTOMCP_ONTOLOGY_ROOT` | Ontology directory | `~/.ontoskills/ontologies` |
+| `ORT_DYLIB_PATH` | Path to ONNX Runtime shared library (optional — only for semantic search on large catalogs) | Auto-detected |

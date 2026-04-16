@@ -7,9 +7,9 @@ from pathlib import Path
 from compiler.config import (
     ONTOLOGY_ROOT,
     ONTOLOGY_SYSTEM_DIR,
-    ONTOLOGY_VENDOR_DIR,
+    ONTOLOGY_AUTHOR_DIR,
     SKILLS_DIR,
-    SKILLS_VENDOR_DIR,
+    SKILLS_AUTHOR_DIR,
 )
 
 
@@ -32,16 +32,16 @@ def system_dir(root: Path | None = None) -> Path:
     return base / Path(ONTOLOGY_SYSTEM_DIR).name
 
 
-def skills_vendor_dir(root: Path | None = None) -> Path:
-    """Get the skills vendor directory."""
+def skills_author_dir(root: Path | None = None) -> Path:
+    """Get the skills author directory."""
     base = skills_root(root)
-    return base / Path(SKILLS_VENDOR_DIR).name
+    return base / Path(SKILLS_AUTHOR_DIR).name
 
 
-def ontology_vendor_dir(root: Path | None = None) -> Path:
-    """Get the ontology vendor directory."""
+def ontology_author_dir(root: Path | None = None) -> Path:
+    """Get the ontology author directory."""
     base = ontology_root() if root is None else Path(root).resolve()
-    return base / Path(ONTOLOGY_VENDOR_DIR).name
+    return base / Path(ONTOLOGY_AUTHOR_DIR).name
 
 
 def enabled_index_path(root: Path | None = None) -> Path:
@@ -49,27 +49,29 @@ def enabled_index_path(root: Path | None = None) -> Path:
     return system_dir(root) / "index.enabled.ttl"
 
 
-def installed_index_path(root: Path | None = None) -> Path:
-    """Get the path to the installed skills index."""
-    return system_dir(root) / "index.installed.ttl"
+def state_dir(root: Path | None = None) -> Path:
+    """Get the state directory (sibling of ontology root).
+
+    Matches the JS CLI layout: ~/.ontoskills/state/
+    """
+    base = ontology_root() if root is None else Path(root).resolve()
+    return base.parent / "state"
 
 
 def registry_lock_path(root: Path | None = None) -> Path:
     """Get the path to the registry lock file."""
-    return system_dir(root) / "registry.lock.json"
+    return state_dir(root) / "registry.lock.json"
 
 
 def registry_sources_path(root: Path | None = None) -> Path:
     """Get the path to the registry sources configuration."""
-    return system_dir(root) / "registry.sources.json"
+    return state_dir(root) / "registry.sources.json"
 
 
 def ensure_registry_layout(root: Path | None = None) -> Path:
-    """Ensure all required directories exist and return the ontology root."""
+    """Ensure required directories exist and return the ontology root."""
     base = ontology_root() if root is None else Path(root).resolve()
     base.mkdir(parents=True, exist_ok=True)
-    skills_root(base).mkdir(parents=True, exist_ok=True)
-    skills_vendor_dir(base).mkdir(parents=True, exist_ok=True)
     system_dir(base).mkdir(parents=True, exist_ok=True)
-    ontology_vendor_dir(base).mkdir(parents=True, exist_ok=True)
+    state_dir(base).mkdir(parents=True, exist_ok=True)
     return base

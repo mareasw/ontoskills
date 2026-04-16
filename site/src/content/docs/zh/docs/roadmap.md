@@ -39,7 +39,10 @@ sidebar:
 - [x] 具有 stdio 传输的 Rust MCP 服务器
 - [x] Oxigraph 内存图存储
 - [x] SPARQL 1.1 查询接口
-- [x] 5 个语义工具（search_skills、get_skill_context、evaluate_execution_plan、query_epistemic_rules、search_intents）
+- [x] 4 个工具（search、get_skill_context、evaluate_execution_plan、query_epistemic_rules）
+- [x] 每技能预计算的嵌入（可选，需要 ontocore[embeddings]）
+- [x] 安装时下载嵌入（--with-embeddings 标志）
+- [x] 类别和 is_user_invocable 搜索过滤器
 - [x] Claude Code 集成
 
 ## 阶段 4：OntoStore
@@ -48,6 +51,8 @@ sidebar:
 
 市场。OntoStore 是一个集中式仓库，团队可以在其中发布、发现和共享本体。
 
+- [x] 带嵌入文件引用的每包清单
+- [x] 带全局嵌入模型声明的注册表索引
 - [ ] 具有搜索功能的本体商店
 - [ ] 版本管理
 - [ ] 团队协作功能

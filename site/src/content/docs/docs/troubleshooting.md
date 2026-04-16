@@ -161,6 +161,25 @@ Ensure your skill has a "When To Use" or similar section:
 Use this skill when the user wants to extract text from PDF files.
 ```
 
+### "Skipping embedding generation"
+
+Embedding generation is optional. The compiler skips it with a warning when `sentence-transformers` is not installed. To enable semantic search vectors:
+
+```bash
+pip install ontocore[embeddings]
+```
+
+### "Skill has no declared intents"
+
+Every skill must declare at least one intent for semantic search. Add an intents section to your SKILL.md:
+
+```markdown
+## When To Use
+
+- edit spreadsheet
+- perform calculation
+```
+
 ---
 
 ## Import issues
@@ -235,6 +254,30 @@ Ensure `~/.ontoskills/bin` is in your PATH, or use the full path in your MCP con
   "command": "/home/user/.ontoskills/bin/ontomcp"
 }
 ```
+
+### "ONNX Runtime shared library not found"
+
+The MCP server uses ONNX Runtime for semantic search. If the library is not in your system path:
+
+```bash
+# Find the library (installed via pip) — platform-agnostic
+python3 -c "import onnxruntime; import os; print(os.path.join(os.path.dirname(onnxruntime.__file__), 'capi'))"
+```
+
+Then set the path to the shared library inside that directory:
+
+| Platform | Library name |
+|----------|-------------|
+| Linux | `libonnxruntime.so` |
+| macOS | `libonnxruntime.dylib` |
+| Windows | `onnxruntime.dll` |
+
+```bash
+# Set the path (example for Linux)
+export ORT_DYLIB_PATH=/path/to/libonnxruntime.so
+```
+
+Add to your shell profile (`~/.bashrc`, `~/.zshrc`) to persist.
 
 ---
 

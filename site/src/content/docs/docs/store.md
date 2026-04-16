@@ -26,9 +26,9 @@ ontoskills install mareasw/greeting/hello
 
 Skills are automatically enabled on install.
 
-**Package ID format:** `owner/repo/skill`
+**Package ID format:** `author/package/skill`
 
-Example: `mareasw/office/xlsx`
+Example: `obra/superpowers/test-driven-development`
 
 ### Third-party stores
 
@@ -52,8 +52,8 @@ Raw repositories with `SKILL.md` files, compiled locally.
 ontoskills import-source https://github.com/user/skill-repo
 ```
 
-- Cloned to `~/.ontoskills/skills/vendor/`
-- Compiled to `~/.ontoskills/ontologies/vendor/`
+- Cloned to `~/.ontoskills/skills/author/`
+- Compiled to `~/.ontoskills/ontologies/author/`
 - Requires OntoCore compiler installed
 
 ---
@@ -63,16 +63,30 @@ ontoskills import-source https://github.com/user/skill-repo
 ### Install
 
 ```bash
-ontoskills install mareasw/office/xlsx
+ontoskills install obra/superpowers/test-driven-development
 ```
 
 Downloads compiled `.ttl` from the store and places it in `~/.ontoskills/ontologies/`.
 
+To also download semantic search embedding artifacts:
+
+```bash
+ontoskills install obra/superpowers/test-driven-development --with-embeddings
+```
+
+Install resolution supports three levels:
+
+| Level | Example | Behavior |
+|-------|---------|----------|
+| Author | `anthropics` | Installs all packages from that author |
+| Package | `anthropics/claude-code` | Installs all skills in the package |
+| Full | `anthropics/claude-code/agent-development` | Installs the exact skill |
+
 ### Enable / Disable
 
 ```bash
-ontoskills disable mareasw/office/xlsx
-ontoskills enable mareasw/office/xlsx
+ontoskills disable obra/superpowers/test-driven-development
+ontoskills enable obra/superpowers/test-driven-development
 ```
 
 Skills are enabled by default on install. Use `disable` to hide a skill from OntoMCP without removing it. Use `enable` to re-enable.
@@ -80,7 +94,7 @@ Skills are enabled by default on install. Use `disable` to hide a skill from Ont
 ### Update
 
 ```bash
-ontoskills update mareasw/office/xlsx
+ontoskills update obra/superpowers/test-driven-development
 ```
 
 Fetches the latest version from the store.
@@ -88,7 +102,7 @@ Fetches the latest version from the store.
 ### Remove
 
 ```bash
-ontoskills remove mareasw/office/xlsx
+ontoskills remove obra/superpowers/test-driven-development
 ```
 
 Deletes the package from local storage.
@@ -136,7 +150,7 @@ Regenerates `~/.ontoskills/ontologies/system/index.enabled.ttl` from all enabled
 │   │   └── index.enabled.ttl  # Enabled skills manifest
 │   └── */ontoskill.ttl
 ├── skills/                 # Source skills
-│   └── vendor/             # Imported repositories
+│   └── author/             # Imported repositories
 └── state/                  # Metadata and locks
     ├── registry.sources.json
     └── registry.lock.json
@@ -152,9 +166,9 @@ Stores serve a static `index.json`:
 {
   "packages": [
     {
-      "package_id": "mareasw/office",
-      "manifest_url": "./packages/mareasw/office/package.json",
-      "trust_tier": "verified"
+      "package_id": "obra/superpowers",
+      "manifest_path": "packages/obra/superpowers/package.json",
+      "trust_tier": "official"
     }
   ]
 }
@@ -175,7 +189,7 @@ Stores serve a static `index.json`:
 If a skill was disabled, re-enable it:
 
 ```bash
-ontoskills enable mareasw/office/xlsx
+ontoskills enable obra/superpowers/test-driven-development
 ontoskills rebuild-index
 ```
 
@@ -188,6 +202,16 @@ ontoskills install core
 ```
 
 Then retry the import.
+
+### "ONNX Runtime error"
+
+If you see errors about ONNX Runtime native libraries, set the path to the shared library file:
+
+```bash
+export ORT_DYLIB_PATH=/path/to/libonnxruntime.so
+```
+
+This is only needed when built with `--features embeddings` for semantic search.
 
 ### "Index corrupted"
 

@@ -10,7 +10,7 @@ sidebar:
 ```mermaid
 flowchart LR
     MD["SKILL.md"] --> LLM["Claude"] --> PYD["Pydantic"] --> SEC["Security"] --> RDF["RDF"] --> SHACL["SHACL"]
-    SHACL -->|"PASS"| TTL["ontoskill.ttl"] --> MCP["OntoMCP"] <--> AGENT["Agent"]
+    SHACL -->|"PASS"| TTL["ontoskill.ttl"] --> EMBED["Embed (opt)"] --> MCP["OntoMCP"] <--> AGENT["Agent"]
     SHACL -->|"FAIL"| FAIL["❌ Block"]
 
     style MD fill:#6dc9ee,stroke:#2a2a3e,color:#0d0d14
@@ -18,6 +18,7 @@ flowchart LR
     style PYD fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
     style SEC fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
     style RDF fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
+    style EMBED fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
     style SHACL fill:#e91e63,stroke:#2a2a3e,color:#f0f0f5
     style TTL fill:#9763e1,stroke:#2a2a3e,color:#f0f0f5
     style MCP fill:#92eff4,stroke:#2a2a3e,color:#0d0d14
@@ -34,6 +35,7 @@ flowchart LR
 | **Serialize** | ExtractedSkill | RDF Graph | Pydantic → RDF triples |
 | **Validate** | RDF Graph | ValidationResult | SHACL shapes check validity |
 | **Write** | RDF Graph | .ttl file | Atomic write with backup |
+| **Embed** | .ttl file | Embeddings | Per-skill vector embeddings (optional, requires ontocore[embeddings]) |
 
 ---
 
@@ -60,7 +62,7 @@ The classification is **automatic** — you don't specify it. If a skill has cod
 
 ```mermaid
 flowchart LR
-    A["dependsOn<br/>━━━━━━━━━━<br/>AsymmetricProperty<br/>A needs B"] --> UC1["Prerequisites<br/>━━━━━━━━━━<br/>Install before run"]
+    A["dependsOnSkill<br/>━━━━━━━━━━<br/>AsymmetricProperty<br/>A needs B"] --> UC1["Prerequisites<br/>━━━━━━━━━━<br/>Install before run"]
     B["extends<br/>━━━━━━━━━━<br/>TransitiveProperty<br/>A → B → C"] --> UC2["Inheritance<br/>━━━━━━━━━━<br/>Override behavior"]
     C["contradicts<br/>━━━━━━━━━━<br/>SymmetricProperty<br/>A ↔ B"] --> UC3["Conflicts<br/>━━━━━━━━━━<br/>Mutually exclusive"]
     D["implements<br/>━━━━━━━━━━<br/>Interface<br/>compliance"] --> UC4["Contracts<br/>━━━━━━━━━━<br/>Guaranteed API"]
@@ -75,11 +77,19 @@ flowchart LR
 
 | Property | Type | Semantics |
 |----------|------|-----------|
-| `dependsOn` | Asymmetric | A needs B, but B doesn't need A |
+| `dependsOnSkill` | Asymmetric | A needs B, but B doesn't need A |
 | `extends` | Transitive | If A extends B and B extends C, then A extends C |
 | `contradicts` | Symmetric | If A contradicts B, then B contradicts A |
 | `implements` | Irreflexive | A cannot implement itself |
 | `exemplifies` | Irreflexive | A cannot exemplify itself |
+
+### Metadata fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `category` | Optional string | Skill category for grouping (e.g., `document`, `data`, `devops`) |
+| `is_user_invocable` | Optional boolean | Whether the skill can be directly invoked by a user (default: true) |
+| `aliases` | Optional list | Alternative names for the skill |
 
 ---
 
@@ -90,7 +100,7 @@ Every skill must pass SHACL validation before being written. The constitutional 
 | Constraint | Rule | Error |
 |------------|------|-------|
 | `resolvesIntent` | Required (min 1) | Skill must resolve at least one intent |
-| `generatedBy` | Required (exactly 1) | Skill must have attestation |
+| `generatedBy` | Optional | Skill attestation (which LLM compiled it) |
 | `requiresState` | Must be IRI | Must be a valid state URI |
 | `yieldsState` | Must be IRI | Must be a valid state URI |
 | `handlesFailure` | Must be IRI | Must be a valid state URI |
@@ -182,7 +192,7 @@ The user-facing `ontoskills` CLI is responsible for:
 
 - installing `ontomcp`
 - installing `ontocore`
-- importing raw source repositories into `skills/vendor/`
+- importing raw source repositories into `skills/author/`
 - installing compiled packages from OntoStore or third-party stores
 - enabling and disabling skills before they reach the MCP runtime
 
@@ -192,4 +202,4 @@ OntoStore is published as a static GitHub repository and is built in by default.
 
 - Official packages are available immediately after install
 - Third-party stores are added explicitly with `store add-source`
-- Raw source repositories are compiled locally before being installed into `ontoskills/vendor/`
+- Raw source repositories are compiled locally before being installed into `ontoskills/author/`

@@ -169,7 +169,10 @@ def tool_use_loop(
     skill_dir: Path,
     skill_hash: str,
     skill_id: str,
-    parent_context: dict | None = None
+    parent_context: dict | None = None,
+    skill_registry: "SkillRegistry | None" = None,
+    preloaded_content: str | None = None,
+    preloaded_file_tree: str | None = None,
 ) -> ExtractedSkill:
     """
     Orchestrates the tool-use conversation with Claude.
@@ -182,6 +185,9 @@ def tool_use_loop(
             - filename: The markdown filename being extracted
             - parent_skill_id: The Qualified ID of the parent skill
             - sibling_names: List of sibling sub-skill filenames
+        skill_registry: Optional SkillRegistry for known-skills context
+        preloaded_content: Optional SKILL.md content to inject directly
+        preloaded_file_tree: Optional file tree string to include
 
     Returns:
         ExtractedSkill with structured data
@@ -191,17 +197,38 @@ def tool_use_loop(
     """
     # Build system prompt with optional context augmentation
     system_prompt = SYSTEM_PROMPT
+    if skill_registry:
+        system_prompt = system_prompt + skill_registry.build_llm_context_section()
     if parent_context:
         context_augmentation = build_sub_skill_context_prompt(
             filename=parent_context.get("filename", "unknown.md"),
             parent_skill_id=parent_context.get("parent_skill_id", ""),
             sibling_names=parent_context.get("sibling_names")
         )
-        system_prompt = SYSTEM_PROMPT + context_augmentation
+        system_prompt = system_prompt + context_augmentation
 
-    messages = [{
-        "role": "user",
-        "content": f"""Analyze the skill in this directory and extract its structure.
+    # Build user message — direct content injection or tool-use discovery
+    if preloaded_content:
+        content_parts = [f"""Analyze the following skill and extract its structure.
+
+Skill ID: {skill_id}
+Content Hash: {skill_hash[:16]}...
+
+## FILE TREE
+
+```
+{preloaded_file_tree or '(not available)'}
+```
+
+## SKILL CONTENT
+
+{preloaded_content}
+
+---
+
+Submit your extraction using the extract_skill tool."""]
+    else:
+        content_parts = [f"""Analyze the skill in this directory and extract its structure.
 
 Directory: {skill_dir.name}
 Skill ID: {skill_id}
@@ -210,7 +237,11 @@ Content Hash: {skill_hash[:16]}...
 Use the available tools to:
 1. List and read the skill files
 2. Extract the structured data
-3. Submit with extract_skill"""
+3. Submit with extract_skill"""]
+
+    messages = [{
+        "role": "user",
+        "content": content_parts[0]
     }]
 
     for iteration in range(MAX_ITERATIONS):
