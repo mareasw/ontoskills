@@ -231,7 +231,7 @@ Fetch the full execution context for a skill, including requirements, transition
   "requirements": [
     {"type": "Tool", "value": "wkhtmltopdf", "optional": false}
   ],
-  "depends_on_skill": ["content-processor"],
+  "depends_on": ["content-processor"],
   "extends": ["document-base"],
   "execution_payload": {
     "executor": "shell",
