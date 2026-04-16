@@ -42,6 +42,7 @@ export default defineConfig({
         }
       ],
       components: {
+        Head: './src/components/Head.astro',
         PageTitle: './src/components/CustomPageTitle.astro',
       },
       defaultLocale: 'root',
