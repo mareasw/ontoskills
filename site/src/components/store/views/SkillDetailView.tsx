@@ -204,14 +204,10 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
                           key={cn.id || i}
                           className="px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.06] hover:border-white/[0.12] transition-colors"
                         >
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: getNodeColor(cn.category, cn.isHighlighted) }} />
-                            <span className="text-sm font-medium text-[#d4d4d4] break-words">{cn.value || cn.label}</span>
+                          <div className="flex items-start gap-2">
+                            <span className="w-2 h-2 rounded-full shrink-0 mt-1.5" style={{ background: getNodeColor(cn.category, cn.isHighlighted) }} />
+                            <p className="text-sm text-[#d4d4d4] break-words leading-relaxed">{cn.description || cn.value || cn.label}</p>
                           </div>
-                          {cn.description && (
-                            <p className="text-xs text-[#8a8a8a] ml-4 break-words leading-relaxed">{cn.description}</p>
-                          )}
-                          <code className="text-[10px] text-[#555] font-mono ml-4 block mt-1 break-all">{cn.qualifiedId || cn.id}</code>
                         </div>
                       ))}
                     </div>
