@@ -12,10 +12,10 @@ export function AuthorView({ loading, skills, authorId, t, prefix, navigate }: {
 
   return (
     <>
-      <div className="breadcrumb flex items-center gap-2 text-sm mb-8">
-        <a href={prefix} onClick={navClick(prefix, navigate)} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{t.storeLabel}</a>
+      <div className="breadcrumb flex flex-wrap items-center gap-1 text-sm mb-8" style={{ rowGap: '2px' }}>
+        <a href={prefix} onClick={navClick(prefix, navigate)} className="whitespace-nowrap text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{t.storeLabel}</a>
         <span className="text-[#8a8a8a]">/</span>
-        <span className="text-[#f5f5f5] font-medium">{authorId}</span>
+        <span className="text-[#f5f5f5] font-medium break-all">{authorId}</span>
       </div>
       <div className="mb-10">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
