@@ -21,6 +21,10 @@ export interface GraphNode {
   qualifiedId: string;
   isHighlighted: boolean;
   description?: string;
+  value?: string;
+  isCluster?: boolean;
+  clusterNodes?: GraphNode[];
+  count?: number;
 }
 
 export interface GraphEdge {
