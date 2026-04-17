@@ -35,8 +35,6 @@ export const CATEGORY_UI_COLORS: Record<string, { bg: string; text: string }> = 
   development:   { bg: 'bg-[#a8c034]/10', text: 'text-[#a8c034]' },
 };
 
-export const CATEGORY_DEFAULT = { bg: 'bg-[#52c7e8]/10', text: 'text-[#52c7e8]' };
-
 // ─── Stat pill colors ──────────────────────────────────────
 export const STAT_COLORS = {
   intents:      { icon: 'text-[#dba32c]', bg: 'bg-[#dba32c]/[0.07]', border: 'border-[#dba32c]/15' },
@@ -47,8 +45,34 @@ export const STAT_COLORS = {
   modules:      { icon: 'text-[#7b6ad8]', bg: 'bg-[#7b6ad8]/[0.07]', border: 'border-[#7b6ad8]/15' },
 };
 
+// Palette for unknown categories — hash-based assignment
+const CATEGORY_PALETTE = [
+  { bg: 'bg-[#e05252]/10', text: 'text-[#e05252]' },   // red
+  { bg: 'bg-[#e07a3a]/10', text: 'text-[#e07a3a]' },   // burnt orange
+  { bg: 'bg-[#dba32c]/10', text: 'text-[#dba32c]' },   // gold
+  { bg: 'bg-[#a8c034]/10', text: 'text-[#a8c034]' },   // yellow-green
+  { bg: 'bg-[#52bf5a]/10', text: 'text-[#52bf5a]' },   // green
+  { bg: 'bg-[#38c490]/10', text: 'text-[#38c490]' },   // teal-green
+  { bg: 'bg-[#36c5b8]/10', text: 'text-[#36c5b8]' },   // teal
+  { bg: 'bg-[#3bb8c9]/10', text: 'text-[#3bb8c9]' },   // cyan
+  { bg: 'bg-[#3da0d9]/10', text: 'text-[#3da0d9]' },   // blue
+  { bg: 'bg-[#5482d6]/10', text: 'text-[#5482d6]' },   // royal blue
+  { bg: 'bg-[#7b6ad8]/10', text: 'text-[#7b6ad8]' },   // indigo
+  { bg: 'bg-[#9d5cd5]/10', text: 'text-[#9d5cd5]' },   // purple
+  { bg: 'bg-[#c054c9]/10', text: 'text-[#c054c9]' },   // magenta
+  { bg: 'bg-[#d64f9f]/10', text: 'text-[#d64f9f]' },   // hot pink
+  { bg: 'bg-[#d84d74]/10', text: 'text-[#d84d74]' },   // rose
+];
+
+function hashCategory(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
 export function getCategoryColor(category: string): { bg: string; text: string } {
-  return CATEGORY_UI_COLORS[category] || CATEGORY_DEFAULT;
+  if (CATEGORY_UI_COLORS[category]) return CATEGORY_UI_COLORS[category];
+  return CATEGORY_PALETTE[hashCategory(category) % CATEGORY_PALETTE.length];
 }
 
 export function getTierColor(tier: string) {
