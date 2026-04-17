@@ -63,8 +63,9 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
     finally { setLoadingKnowledge(false); }
   }, [pkgId, treeModules, skillId, knowledgeData]);
 
-  const openGraph = useCallback(() => {
-    if (graphMode === 'knowledge' && !knowledgeData) {
+  const openGraph = useCallback((mode?: 'files' | 'knowledge') => {
+    const m = mode || graphMode;
+    if (m === 'knowledge' && !knowledgeData) {
       loadKnowledgeGraph().then(() => setShowGraph(true));
     } else {
       setShowGraph(true);
@@ -336,14 +337,14 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
           <span className="text-white/10 mx-0.5">|</span>
 
           <button
-            onClick={() => { setGraphMode('files'); openGraph(); }}
+            onClick={() => { setGraphMode('files'); openGraph('files'); }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#52c7e8]/[0.06] border border-[#52c7e8]/20 text-xs font-medium text-[#52c7e8] hover:bg-[#52c7e8]/[0.12] transition-all cursor-pointer"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
             {t.fileGraph}
           </button>
           <button
-            onClick={() => { setGraphMode('knowledge'); openGraph(); }}
+            onClick={() => { setGraphMode('knowledge'); openGraph('knowledge'); }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#52c7e8]/[0.06] border border-[#52c7e8]/20 text-xs font-medium text-[#52c7e8] hover:bg-[#52c7e8]/[0.12] transition-all cursor-pointer"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
