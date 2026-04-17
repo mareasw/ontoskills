@@ -91,6 +91,12 @@ const translations = {
     copied: 'Copied!',
     loadMore: 'Load more',
     remaining: 'remaining',
+    aliases: 'Aliases',
+    fileGraph: 'File Graph',
+    knowledgeMap: 'Knowledge Map',
+    openGraph: 'Open 3D Graph',
+    loadingGraph: 'Parsing TTL files…',
+    graphError: 'Failed to load graph data.',
   },
   zh: {
     searchPlaceholder: '按本体技能、意图或描述搜索...',
@@ -144,6 +150,12 @@ const translations = {
     copied: '已复制!',
     loadMore: '加载更多',
     remaining: '剩余',
+    aliases: '别名',
+    fileGraph: '文件图谱',
+    knowledgeMap: '知识图谱',
+    openGraph: '打开 3D 图谱',
+    loadingGraph: '正在解析 TTL 文件…',
+    graphError: '加载图谱数据失败。',
   },
 };
 
@@ -194,66 +206,191 @@ function packageHasDeps(skillList: Skill[]) {
   return skillList.some(s => s.dependsOn.some(d => idSet.has(d)));
 }
 
+const TTL_BASE = STORE_INDEX_URL.replace('index.json', 'packages/');
+
+function buildFileGraphData(modules: string[], skillId: string) {
+  const nodes: GraphNode[] = [];
+  const edges: GraphEdge[] = [];
+  const mainFile = `${skillId}/ontoskill.ttl`;
+  const skillModules = modules.filter(m => m.startsWith(skillId + '/'));
+
+  for (const m of skillModules) {
+    const fileName = m.split('/').pop() || m;
+    const isMain = m === mainFile;
+    nodes.push({
+      id: m,
+      label: fileName,
+      category: isMain ? 'main' : fileName.includes('test') ? 'test' : fileName.includes('prompt') ? 'prompt' : 'module',
+      qualifiedId: m,
+      isHighlighted: isMain,
+    });
+    if (!isMain && skillModules.includes(mainFile)) {
+      edges.push({ source: mainFile, target: m });
+    }
+  }
+  return { nodes, edges };
+}
+
+function parseTtlKnowledgeMap(ttlContent: string, skillId: string) {
+  const nodes: GraphNode[] = [];
+  const edges: GraphEdge[] = [];
+  const rootId = `skill:${skillId}`;
+  const seen = new Set<string>();
+
+  nodes.push({ id: rootId, label: skillId, category: 'skill', qualifiedId: skillId, isHighlighted: true });
+  seen.add(rootId);
+
+  const addNode = (id: string, label: string, category: string) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    nodes.push({ id, label, category, qualifiedId: id, isHighlighted: false });
+  };
+
+  // dependsOnSkill
+  for (const m of ttlContent.matchAll(/oc:dependsOnSkill\s+oc:skill_([^\s;,]+)/g)) {
+    const depId = `dep:${m[1]}`;
+    addNode(depId, m[1].replace(/_/g, '-'), 'dependency');
+    edges.push({ source: rootId, target: depId });
+  }
+
+  // Knowledge nodes — find all kn_ references from impartsKnowledge blocks (multi-line)
+  const knRefs = new Set<string>();
+  for (const m of ttlContent.matchAll(/oc:(kn_[a-f0-9]+)/g)) {
+    knRefs.add(m[1]);
+  }
+  for (const knId of knRefs) {
+    // Find the type declaration for this knowledge node
+    const typeMatch = ttlContent.match(new RegExp(`oc:${knId}\\s+a\\s+oc:KnowledgeNode(?:,\\s*oc:(\\w+))?`));
+    if (!typeMatch) continue; // Skip if not a KnowledgeNode declaration
+    const knType = typeMatch[1] || 'KnowledgeNode';
+    const ctxMatch = ttlContent.match(new RegExp(`oc:${knId}[\\s\\S]*?oc:appliesToContext\\s+"([^"]{0,50})"`));
+    const label = ctxMatch ? (ctxMatch[1].length > 30 ? ctxMatch[1].slice(0, 30) + '…' : ctxMatch[1]) : knType.replace(/([A-Z])/g, ' $1').trim();
+    addNode(knId, label, knType);
+    edges.push({ source: rootId, target: knId });
+  }
+
+  // States — multi-line support
+  for (const m of ttlContent.matchAll(/oc:(yieldsState|requiresState)\s+oc:(\w+)/g)) {
+    const stateId = `state:${m[2]}`;
+    addNode(stateId, m[2].replace(/([A-Z])/g, ' $1').trim(), m[1] === 'yieldsState' ? 'yield' : 'require');
+    edges.push({ source: rootId, target: stateId });
+  }
+  // Also capture states on continuation lines
+  for (const m of ttlContent.matchAll(/^\s+oc:(\w+)\s*[,;]$/gm)) {
+    const name = m[1];
+    if (/^[A-Z]/.test(name)) {
+      const stateId = `state:${name}`;
+      if (!seen.has(stateId)) {
+        addNode(stateId, name.replace(/([A-Z])/g, ' $1').trim(), 'yield');
+        edges.push({ source: rootId, target: stateId });
+      }
+    }
+  }
+
+  // Failure handlers — multi-line support
+  for (const m of ttlContent.matchAll(/oc:handlesFailure\s+oc:(\w+)/g)) {
+    const failId = `fail:${m[1]}`;
+    addNode(failId, m[1].replace(/([A-Z])/g, ' $1').trim(), 'failure');
+    edges.push({ source: rootId, target: failId });
+  }
+  for (const m of ttlContent.matchAll(/oc:handlesFailure\s+oc:(\w+)/g)) {
+    const failId = `fail:${m[1]}`;
+    if (!seen.has(failId)) {
+      addNode(failId, m[1].replace(/([A-Z])/g, ' $1').trim(), 'failure');
+      edges.push({ source: rootId, target: failId });
+    }
+  }
+
+  // Allowed tools
+  for (const m of ttlContent.matchAll(/oc:hasAllowedTool\s+"(\w+)"/g)) {
+    const toolId = `tool:${m[1]}`;
+    addNode(toolId, m[1], 'tool');
+    edges.push({ source: rootId, target: toolId });
+  }
+
+  return { nodes, edges };
+}
+
 function layoutForce3D(nodes: GraphNode[], edges: GraphEdge[]) {
   const positions: Record<string, { x: number; y: number; z: number }> = {};
   const n = nodes.length;
   if (!n) return positions;
-  const R = Math.max(n * 1.8, 8);
+  // Distribute nodes on a sphere surface
+  const R = 12;
   nodes.forEach((node, i) => {
-    const phi = Math.acos(-1 + (2 * i) / n);
-    const theta = Math.sqrt(n * Math.PI) * phi;
+    const phi = Math.acos(1 - (2 * (i + 0.5)) / n);
+    const theta = Math.PI * (1 + Math.sqrt(5)) * i;
     positions[node.id] = {
-      x: R * Math.cos(theta) * Math.sin(phi),
-      y: R * Math.sin(theta) * Math.sin(phi),
+      x: R * Math.sin(phi) * Math.cos(theta),
+      y: R * Math.sin(phi) * Math.sin(theta),
       z: R * Math.cos(phi),
     };
   });
-  const k = R * 1.2;
-  for (let iter = 0; iter < 180; iter++) {
-    const temp = 1 - iter / 180;
+  // Gentle force simulation — bounded to avoid NaN
+  for (let iter = 0; iter < 120; iter++) {
+    const cooling = 0.1 * (1 - iter / 120);
+    // Repulsion between all pairs
     for (let i = 0; i < n; i++) {
       for (let j = i + 1; j < n; j++) {
         const a = positions[nodes[i].id], b = positions[nodes[j].id];
         const dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
-        const dist = Math.max(Math.sqrt(dx * dx + dy * dy + dz * dz), 0.1);
-        const force = (k * k) / dist;
-        const fx = (dx / dist) * force * temp * 0.4;
-        const fy = (dy / dist) * force * temp * 0.4;
-        const fz = (dz / dist) * force * temp * 0.4;
-        a.x += fx; a.y += fy; a.z += fz;
-        b.x -= fx; b.y -= fy; b.z -= fz;
+        const dist2 = dx * dx + dy * dy + dz * dz;
+        const dist = Math.sqrt(Math.max(dist2, 0.01));
+        const f = cooling / dist;
+        a.x += dx * f; a.y += dy * f; a.z += dz * f;
+        b.x -= dx * f; b.y -= dy * f; b.z -= dz * f;
       }
     }
+    // Attraction along edges
     for (const e of edges) {
       const s = positions[e.source], t = positions[e.target];
       if (!s || !t) continue;
       const dx = t.x - s.x, dy = t.y - s.y, dz = t.z - s.z;
-      const dist = Math.max(Math.sqrt(dx * dx + dy * dy + dz * dz), 0.1);
-      const force = (dist * dist) / k;
-      const fx = (dx / dist) * force * temp * 0.2;
-      const fy = (dy / dist) * force * temp * 0.2;
-      const fz = (dz / dist) * force * temp * 0.2;
-      s.x += fx; s.y += fy; s.z += fz;
-      t.x -= fx; t.y -= fy; t.z -= fz;
+      const dist = Math.sqrt(Math.max(dx * dx + dy * dy + dz * dz, 0.01));
+      const f = dist * 0.05 * cooling;
+      s.x += (dx / dist) * f; s.y += (dy / dist) * f; s.z += (dz / dist) * f;
+      t.x -= (dx / dist) * f; t.y -= (dy / dist) * f; t.z -= (dz / dist) * f;
     }
+    // Clamp to sphere
     for (const node of nodes) {
       const p = positions[node.id];
-      p.x *= 0.98; p.y *= 0.98; p.z *= 0.98;
+      const d = Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
+      if (d > 25) { p.x *= 25 / d; p.y *= 25 / d; p.z *= 25 / d; }
     }
+  }
+  // Final NaN guard
+  for (const node of nodes) {
+    const p = positions[node.id];
+    if (!isFinite(p.x)) p.x = 0;
+    if (!isFinite(p.y)) p.y = 0;
+    if (!isFinite(p.z)) p.z = 0;
   }
   return positions;
 }
 
 // ─── 3D Graph Components ──────────────────────────────────
 
-function GraphNodeSphere({ node, position, onClick }: {
+function GraphNodeSphere({ node, position, onClick, fontSize = 0.55 }: {
   node: GraphNode;
   position: [number, number, number];
   onClick: (qualifiedId: string) => void;
+  fontSize?: number;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
   const color = node.isHighlighted ? '#52c7e8'
+    : node.category === 'main' ? '#52c7e8'
+    : node.category === 'prompt' ? '#85f496'
+    : node.category === 'test' ? '#fbbf24'
+    : node.category === 'module' ? '#6ed8c4'
+    : node.category === 'skill' ? '#52c7e8'
+    : node.category === 'dependency' ? '#92eff4'
+    : node.category === 'AntiPattern' ? '#f9a8d4'
+    : node.category === 'RecoveryTactic' ? '#85f496'
+    : node.category === 'failure' ? '#fbbf24'
+    : node.category === 'yield' ? '#6ed8c4'
+    : node.category === 'require' ? '#9763e1'
+    : node.category === 'tool' ? '#f9a8d4'
     : node.category === 'productivity' ? '#85f496'
     : node.category === 'development' ? '#52c7e8'
     : '#9763e1';
@@ -292,8 +429,8 @@ function GraphNodeSphere({ node, position, onClick }: {
       </mesh>
       <Text
         position={[0, -radius - 0.8, 0]}
-        fontSize={0.55}
-        color="#d4d4d4"
+        fontSize={fontSize}
+        color="#e0e0e0"
         anchorX="center"
         anchorY="top"
         font={undefined}
@@ -305,18 +442,15 @@ function GraphNodeSphere({ node, position, onClick }: {
 }
 
 function GraphEdgeLine({ start, end }: { start: [number, number, number]; end: [number, number, number] }) {
-  const mid: [number, number, number] = [
-    (start[0] + end[0]) / 2,
-    (start[1] + end[1]) / 2,
-    (start[2] + end[2]) / 2,
-  ];
+  // Guard against NaN positions
+  if (!start.every(isFinite) || !end.every(isFinite)) return null;
   return (
     <Line
       points={[start, end]}
-      color="white"
+      color="#ffffff"
       lineWidth={1}
       transparent
-      opacity={0.12}
+      opacity={0.15}
     />
   );
 }
@@ -337,6 +471,7 @@ function Scene({ nodes, edges, onNodeClick, autoRotate = true }: {
   autoRotate?: boolean;
 }) {
   const positions = useMemo(() => layoutForce3D(nodes, edges), [nodes, edges]);
+  const fontSize = nodes.length > 15 ? 0.4 : nodes.length > 8 ? 0.5 : 0.55;
 
   return (
     <>
@@ -353,13 +488,14 @@ function Scene({ nodes, edges, onNodeClick, autoRotate = true }: {
       />
       {nodes.map(n => {
         const p = positions[n.id];
-        if (!p) return null;
+        if (!p || !isFinite(p.x) || !isFinite(p.y) || !isFinite(p.z)) return null;
         return (
           <GraphNodeSphere
             key={n.id}
             node={n}
             position={[p.x, p.y, p.z]}
             onClick={onNodeClick}
+            fontSize={fontSize}
           />
         );
       })}
@@ -372,6 +508,14 @@ function Scene({ nodes, edges, onNodeClick, autoRotate = true }: {
   );
 }
 
+const CATEGORY_LABELS: Record<string, [string, string]> = {
+  skill: ['Skill', '#52c7e8'], main: ['ontoskill.ttl', '#52c7e8'], prompt: ['Prompt', '#85f496'],
+  test: ['Test', '#fbbf24'], module: ['Module', '#6ed8c4'], dependency: ['Depends on', '#92eff4'],
+  AntiPattern: ['Anti-pattern', '#f9a8d4'], RecoveryTactic: ['Recovery', '#85f496'],
+  failure: ['Failure', '#fbbf24'], yield: ['Yields', '#6ed8c4'], require: ['Requires', '#9763e1'],
+  tool: ['Tool', '#f9a8d4'],
+};
+
 function KnowledgeGraph3D({ nodes, edges, onNodeClick, height = 350 }: {
   nodes: GraphNode[];
   edges: GraphEdge[];
@@ -379,11 +523,29 @@ function KnowledgeGraph3D({ nodes, edges, onNodeClick, height = 350 }: {
   height?: number;
 }) {
   if (!nodes.length) return null;
+  const camDist = Math.max(nodes.length * 2.2, 30);
+  // Collect unique categories for legend
+  const cats = [...new Set(nodes.map(n => n.category))];
+  const legendItems = cats.map(c => CATEGORY_LABELS[c] || [c, '#9763e1']).filter(Boolean);
   return (
-    <div style={{ width: '100%', height, borderRadius: '0.5rem', overflow: 'hidden' }}>
-      <Canvas camera={{ position: [0, 0, 30], fov: 55 }} gl={{ alpha: true, antialias: true }}>
+    <div className="relative" style={{ width: '100%', height, borderRadius: '0.5rem', overflow: 'hidden', background: 'rgba(0,0,0,0.3)' }}>
+      <Canvas camera={{ position: [0, 0, camDist], fov: 55 }} gl={{ alpha: true, antialias: true }}>
         <Scene nodes={nodes} edges={edges} onNodeClick={onNodeClick} />
       </Canvas>
+      {/* Legend */}
+      {legendItems.length > 1 && (
+        <div className="absolute bottom-3 left-3 flex flex-wrap gap-x-3 gap-y-1">
+          {legendItems.map(([label, color], i) => (
+            <span key={i} className="flex items-center gap-1 text-[10px] text-[#8a8a8a]">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+              {label}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="absolute top-3 right-3 text-[10px] text-[#8a8a8a]">
+        {nodes.length} nodes · {edges.length} edges
+      </div>
     </div>
   );
 }
@@ -411,7 +573,7 @@ function CopyButton({ text, t }: { text: string; t: typeof translations.en }) {
     navigator.clipboard?.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    });
+    }).catch(() => {});
   };
   return (
     <button onClick={handleCopy} className="shrink-0 p-1.5 rounded hover:bg-white/5 opacity-40 hover:opacity-100 transition-opacity" title={t.copyToClipboard}>
@@ -439,6 +601,12 @@ export default function OntoStoreApp({ lang = 'en' }: { lang?: string }) {
   const t = translations[lang as keyof typeof translations] || translations.en;
   const prefix = lang === 'zh' ? '/zh/ontostore' : '/ontostore';
 
+  // Hide Astro loader placeholder on mount
+  useEffect(() => {
+    const el = document.getElementById('ontostore-loader');
+    if (el) el.remove();
+  }, []);
+
   const [skills, setSkills] = useState<Skill[]>([]);
   const [packages, setPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -449,8 +617,6 @@ export default function OntoStoreApp({ lang = 'en' }: { lang?: string }) {
   const [authorId, setAuthorId] = useState('');
   const [pkgId, setPkgId] = useState('');
   const [skillId, setSkillId] = useState('');
-  const [graphExpanded, setGraphExpanded] = useState(false);
-
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [filterAuthor, setFilterAuthor] = useState('');
@@ -517,7 +683,6 @@ export default function OntoStoreApp({ lang = 'en' }: { lang?: string }) {
       const path = window.location.pathname.replace(/\/$/, '');
       const storePath = path.replace(prefix, '').replace(/^\//, '');
       const segments = storePath ? storePath.split('/') : [];
-      setGraphExpanded(false);
       if (segments.length === 0) { setViewMode('store'); }
       else if (segments.length === 1) { setViewMode('author'); setAuthorId(segments[0]); }
       else if (segments.length === 2) { setViewMode('package'); setPkgId(segments.join('/')); }
@@ -586,26 +751,12 @@ function StoreView({ skills, filteredSkills, meta, t, prefix, navigate, searchQu
         <p className="text-base text-[#d4d4d4]">{t.allSkills}</p>
       </div>
 
-      {/* Get Started */}
-      <div className="section-panel mb-8">
-        <h3>{t.getStarted}</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <div>
-            <p className="text-sm text-[#f5f5f5] font-medium mb-2">{t.step1Title}</p>
-            <p className="text-xs text-[#8a8a8a] mb-3">{t.step1Desc}</p>
-            <InstallBar command={t.setupMcpCommand} t={t} id="gs1" />
-          </div>
-          <div>
-            <p className="text-sm text-[#f5f5f5] font-medium mb-2">{t.step2Title}</p>
-            <p className="text-xs text-[#8a8a8a] mb-3">{t.step2Desc}</p>
-            <InstallBar command={t.setupSkillCommand} t={t} id="gs2" />
-          </div>
-          <div>
-            <p className="text-sm text-[#f5f5f5] font-medium mb-2">{t.step3Title}</p>
-            <p className="text-xs text-[#8a8a8a] mb-3">{t.step3Desc}</p>
-            <div className="mt-4"><a href={docsLink} className="text-[#52c7e8] hover:underline text-sm">{t.setupDocs} →</a></div>
-          </div>
-        </div>
+      {/* Get Started — minimal */}
+      <div className="mb-8 inline-flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-lg bg-white/[0.02] border border-white/[0.06]">
+        <span className="text-sm text-[#8a8a8a] shrink-0">{t.getStarted}</span>
+        <InstallBar command={t.setupMcpCommand} t={t} id="gs1" />
+        <InstallBar command={t.setupSkillCommand} t={t} id="gs2" />
+        <a href={docsLink} className="text-sm text-[#52c7e8] hover:underline shrink-0">{t.setupDocs} →</a>
       </div>
 
       {/* Search + filters */}
@@ -615,19 +766,19 @@ function StoreView({ skills, filteredSkills, meta, t, prefix, navigate, searchQu
           <input className="w-full bg-white/[0.04] border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-sm text-[#f5f5f5] outline-none placeholder:text-[#8a8a8a] focus:border-[#52c7e8]/50 transition-colors" type="search" placeholder={t.searchPlaceholder} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <select value={filterAuthor} onChange={e => setFilterAuthor(e.target.value)} className="store-filter-select" aria-label={t.author}>
+          <select value={filterAuthor} onChange={e => setFilterAuthor(e.target.value)} className="bg-white/[0.04] border border-white/10 rounded-lg pl-2.5 pr-7 py-2 text-sm text-[#d4d4d4] outline-none cursor-pointer hover:border-white/20 focus:border-[#52c7e8]/50 transition-colors appearance-none bg-[length:12px] bg-[right_8px_center] bg-no-repeat" style={{ colorScheme: 'dark', backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")" }} aria-label={t.author}>
             <option value="">{t.allAuthors}</option>
             {meta.authors.map((a: string) => <option key={a} value={a}>{a}</option>)}
           </select>
-          <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="store-filter-select" aria-label={t.category}>
+          <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="bg-white/[0.04] border border-white/10 rounded-lg pl-2.5 pr-7 py-2 text-sm text-[#d4d4d4] outline-none cursor-pointer hover:border-white/20 focus:border-[#52c7e8]/50 transition-colors appearance-none bg-[length:12px] bg-[right_8px_center] bg-no-repeat" style={{ colorScheme: 'dark', backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")" }} aria-label={t.category}>
             <option value="">{t.allCategories}</option>
             {meta.categories.map((c: string) => <option key={c} value={c}>{c}</option>)}
           </select>
-          <select value={filterTier} onChange={e => setFilterTier(e.target.value)} className="store-filter-select" aria-label={t.trustTier}>
+          <select value={filterTier} onChange={e => setFilterTier(e.target.value)} className="bg-white/[0.04] border border-white/10 rounded-lg pl-2.5 pr-7 py-2 text-sm text-[#d4d4d4] outline-none cursor-pointer hover:border-white/20 focus:border-[#52c7e8]/50 transition-colors appearance-none bg-[length:12px] bg-[right_8px_center] bg-no-repeat" style={{ colorScheme: 'dark', backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")" }} aria-label={t.trustTier}>
             <option value="">{t.allTiers}</option>
             {meta.trustTiers.map((tier: string) => <option key={tier} value={tier}>{tier === 'official' ? t.official : tier === 'verified' ? t.verified : tier === 'community' ? t.community : tier}</option>)}
           </select>
-          <select value={filterSort} onChange={e => setFilterSort(e.target.value)} className="store-filter-select" aria-label={t.sort}>
+          <select value={filterSort} onChange={e => setFilterSort(e.target.value)} className="bg-white/[0.04] border border-white/10 rounded-lg pl-2.5 pr-7 py-2 text-sm text-[#d4d4d4] outline-none cursor-pointer hover:border-white/20 focus:border-[#52c7e8]/50 transition-colors appearance-none bg-[length:12px] bg-[right_8px_center] bg-no-repeat" style={{ colorScheme: 'dark', backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")" }} aria-label={t.sort}>
             <option value="az">{t.sortAZ}</option>
             <option value="za">{t.sortZA}</option>
           </select>
@@ -663,9 +814,10 @@ function StoreView({ skills, filteredSkills, meta, t, prefix, navigate, searchQu
 
 function SkillCard({ skill, t, prefix, navigate }: { skill: Skill; t: typeof translations.en; prefix: string; navigate: (href: string) => void }) {
   return (
-    <article
-      className="skill-card rounded-xl border border-white/[0.07] bg-white/[0.02] p-5 flex flex-col gap-3 cursor-pointer hover:border-[#52c7e8]/30 hover:bg-[#52c7e8]/[0.04] hover:-translate-y-0.5 hover:shadow-[0_6px_24px_rgba(0,0,0,0.3)] transition-all duration-200"
-      onClick={() => navigate(`${prefix}/${skill.qualifiedId}`)}
+    <a
+      href={`${prefix}/${skill.qualifiedId}`}
+      onClick={e => { e.preventDefault(); navigate(`${prefix}/${skill.qualifiedId}`); }}
+      className="skill-card block rounded-xl border border-white/[0.07] bg-white/[0.02] p-5 flex flex-col gap-3 cursor-pointer hover:border-[#52c7e8]/30 hover:bg-[#52c7e8]/[0.04] hover:-translate-y-0.5 hover:shadow-[0_6px_24px_rgba(0,0,0,0.3)] transition-all duration-200"
     >
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-base font-semibold text-[#f5f5f5] leading-tight">{skill.skillId}</h3>
@@ -678,7 +830,7 @@ function SkillCard({ skill, t, prefix, navigate }: { skill: Skill; t: typeof tra
         {skill.aliases.slice(0, 3).map(a => <span key={a} className="px-2 py-0.5 rounded-full bg-white/5 text-xs text-[#8a8a8a]">{a}</span>)}
       </div>
       <InstallBar command={skill.installCommand} t={t} id={`card-${skill.qualifiedId}`} />
-    </article>
+    </a>
   );
 }
 
@@ -696,12 +848,14 @@ function AuthorView({ skills, authorId, t, prefix, navigate }: { skills: Skill[]
         <span className="text-[#8a8a8a]">/</span>
         <span className="text-[#f5f5f5] font-medium">{authorId}</span>
       </div>
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-10">
-        <div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-[#f5f5f5] mb-2">{authorId}</h2>
-          <p className="text-sm text-[#8a8a8a]">{authorSkills.length} {t.totalSkills} · {Object.keys(pkgMap).length} {t.packages.toLowerCase()}</p>
+      <div className="mb-10">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-[#f5f5f5] mb-2">{authorId}</h2>
+            <p className="text-sm text-[#8a8a8a]">{authorSkills.length} {t.totalSkills} · {Object.keys(pkgMap).length} {t.packages.toLowerCase()}</p>
+          </div>
+          <InstallBar command={`npx ontoskills install ${authorId}/<package>`} t={t} id="authInstall" />
         </div>
-        <InstallBar command={`npx ontoskills install ${authorId}/<package>`} t={t} id="authInstall" />
       </div>
       {Object.entries(pkgMap).map(([pid, pkgSkills]) => {
         const tier = pkgSkills[0]?.trustTier || 'verified';
@@ -750,17 +904,19 @@ function PackageView({ skills, packages, pkgId, t, prefix, navigate }: { skills:
         <span className="text-[#8a8a8a]">/</span>
         <span className="text-[#f5f5f5] font-medium">{pkgName}</span>
       </div>
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <h2 className="text-2xl sm:text-3xl font-bold text-[#f5f5f5]">{pkgName}</h2>
-            <TrustBadge tier={tier} t={t} />
-            {ver && <span className="text-sm text-[#8a8a8a]">v{ver}</span>}
+      <div className="mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <h2 className="text-2xl sm:text-3xl font-bold text-[#f5f5f5]">{pkgName}</h2>
+              <TrustBadge tier={tier} t={t} />
+              {ver && <span className="text-sm text-[#8a8a8a]">v{ver}</span>}
+            </div>
+            <code className="text-sm text-[#8a8a8a] font-mono">{pkgId}</code>
+            <p className="text-sm text-[#8a8a8a] mt-1">{pkgSkills.length} {t.skills.toLowerCase()}</p>
           </div>
-          <code className="text-sm text-[#8a8a8a] font-mono">{pkgId}</code>
-          <p className="text-sm text-[#8a8a8a] mt-1">{pkgSkills.length} {t.skills.toLowerCase()}</p>
+          <InstallBar command={`npx ontoskills install ${pkgId}`} t={t} id="pkgInstall" />
         </div>
-        <InstallBar command={`npx ontoskills install ${pkgId}`} t={t} id="pkgInstall" />
       </div>
       {hasDeps && graphData && (
         <div className="section-panel mb-6">
@@ -791,7 +947,55 @@ function PackageView({ skills, packages, pkgId, t, prefix, navigate }: { skills:
 
 function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate, lang }: { skills: Skill[]; packages: any[]; pkgId: string; skillId: string; t: typeof translations.en; prefix: string; navigate: (href: string) => void; lang: string }) {
   const skill = skills.find(s => s.packageId === pkgId && s.skillId === skillId);
-  const [graphExpanded, setGraphExpanded] = useState(false);
+  const rawPkg = packages.find(p => p.package_id === pkgId);
+  const modules: string[] = rawPkg?.modules || [];
+  const skillModules = modules.filter(m => m.startsWith(skillId + '/') || m === `${skillId}/ontoskill.ttl`);
+  const treeModules = skillModules.length ? skillModules : modules.filter(m => m.startsWith(skillId));
+
+  // Graph state
+  const [showGraph, setShowGraph] = useState(false);
+  const [graphMode, setGraphMode] = useState<'files' | 'knowledge'>('files');
+  const [knowledgeData, setKnowledgeData] = useState<{ nodes: GraphNode[]; edges: GraphEdge[] } | null>(null);
+  const [loadingKnowledge, setLoadingKnowledge] = useState(false);
+  const [graphError, setGraphError] = useState(false);
+
+  const handleGraphNodeClick = useCallback((qualifiedId: string) => {
+    navigate(`${prefix}/${qualifiedId}`);
+  }, [navigate, prefix]);
+
+  // File graph — built synchronously from module list
+  const fileGraphData = useMemo(() => buildFileGraphData(treeModules, skillId), [treeModules, skillId]);
+
+  // Fetch TTL content and parse knowledge map
+  const loadKnowledgeGraph = useCallback(async () => {
+    if (knowledgeData) return;
+    setLoadingKnowledge(true);
+    setGraphError(false);
+    try {
+      const ttlBase = `${TTL_BASE}${pkgId}/`;
+      const ttlFiles = treeModules.filter(m => m.endsWith('.ttl'));
+      const contents: string[] = [];
+      await Promise.all(ttlFiles.map(async (f) => {
+        try {
+          const res = await fetch(ttlBase + f);
+          if (res.ok) contents.push(await res.text());
+        } catch { /* skip failed files */ }
+      }));
+      if (!contents.length) { setGraphError(true); return; }
+      setKnowledgeData(parseTtlKnowledgeMap(contents.join('\n'), skillId));
+    } catch { setGraphError(true); }
+    finally { setLoadingKnowledge(false); }
+  }, [pkgId, treeModules, skillId, knowledgeData]);
+
+  const openGraph = useCallback(() => {
+    if (graphMode === 'knowledge' && !knowledgeData) {
+      loadKnowledgeGraph().then(() => setShowGraph(true));
+    } else {
+      setShowGraph(true);
+    }
+  }, [graphMode, knowledgeData, loadKnowledgeGraph]);
+
+  const activeGraphData = graphMode === 'files' ? fileGraphData : knowledgeData;
 
   if (!skill) {
     return <div className="text-center py-20"><p className="text-[#d4d4d4] text-lg">{t.noMatch}</p></div>;
@@ -799,33 +1003,39 @@ function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate
 
   const author = pkgId.split('/')[0];
   const pkgName = pkgId.split('/').slice(1).join('/');
-  const rawPkg = packages.find(p => p.package_id === pkgId);
-  const modules: string[] = rawPkg?.modules || [];
-  const skillModules = modules.filter(m => m.startsWith(skillId + '/') || m === `${skillId}/ontoskill.ttl`);
-  const treeModules = skillModules.length ? skillModules : modules.filter(m => m.startsWith(skillId));
-
-  const pkgSkills = skills.filter(s => s.packageId === pkgId);
-  const hasPkgDeps = packageHasDeps(pkgSkills);
-
-  // Graph data: skill view or expanded package view
-  const graphData = useMemo(() => {
-    if (graphExpanded) return buildGraphData(pkgSkills, skillId);
-    const depIds = new Set([skillId, ...skill.dependsOn]);
-    const graphSkills = pkgSkills.filter(s => depIds.has(s.skillId));
-    return buildGraphData(graphSkills, skillId);
-  }, [graphExpanded, pkgSkills, skillId, skill.dependsOn]);
-
-  const graphSkillsCount = useMemo(() => {
-    const depIds = new Set([skillId, ...skill.dependsOn]);
-    return pkgSkills.filter(s => depIds.has(s.skillId)).length;
-  }, [pkgSkills, skillId, skill.dependsOn]);
-
-  const handleGraphNodeClick = useCallback((qualifiedId: string) => {
-    navigate(`${prefix}/${qualifiedId}`);
-  }, [navigate, prefix]);
 
   return (
     <>
+      {/* Fullscreen 3D graph overlay */}
+      {showGraph && activeGraphData && (
+        <div className="fixed inset-0 z-50 bg-[#0d0d14]/95 backdrop-blur-sm flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+            <div className="flex items-center gap-4">
+              <h3 className="text-lg font-semibold text-[#f5f5f5]">{graphMode === 'files' ? t.fileGraph : t.knowledgeMap} — {skillId}</h3>
+              <div className="flex gap-1 bg-white/5 rounded-lg p-0.5">
+                <button onClick={() => { setGraphMode('files'); }} className={`px-3 py-1 rounded-md text-xs transition-colors ${graphMode === 'files' ? 'bg-[#52c7e8]/20 text-[#52c7e8]' : 'text-[#8a8a8a] hover:text-[#d4d4d4]'}`}>{t.fileGraph}</button>
+                <button onClick={async () => { setGraphMode('knowledge'); if (!knowledgeData) await loadKnowledgeGraph(); }} className={`px-3 py-1 rounded-md text-xs transition-colors ${graphMode === 'knowledge' ? 'bg-[#52c7e8]/20 text-[#52c7e8]' : 'text-[#8a8a8a] hover:text-[#d4d4d4]'}`}>{t.knowledgeMap}</button>
+              </div>
+            </div>
+            <button onClick={() => setShowGraph(false)} className="p-2 rounded-lg hover:bg-white/10 text-[#8a8a8a] hover:text-[#f5f5f5] transition-colors">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+          <div className="flex-1">
+            {loadingKnowledge ? (
+              <div className="flex items-center justify-center h-full gap-3">
+                <div className="w-5 h-5 border-2 border-[#52c7e8]/30 border-t-[#52c7e8] rounded-full animate-spin" />
+                <p className="text-[#8a8a8a] text-sm">{t.loadingGraph}</p>
+              </div>
+            ) : graphError ? (
+              <div className="flex items-center justify-center h-full"><p className="text-[#f9a8d4]">{t.graphError}</p></div>
+            ) : (
+              <KnowledgeGraph3D nodes={activeGraphData.nodes} edges={activeGraphData.edges} onNodeClick={(qid) => { setShowGraph(false); handleGraphNodeClick(qid); }} height={800} />
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="breadcrumb flex items-center gap-2 text-sm mb-8">
         <a href={prefix} onClick={e => { e.preventDefault(); navigate(prefix); }} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{t.storeLabel}</a>
         <span className="text-[#8a8a8a]">/</span>
@@ -835,18 +1045,20 @@ function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate
         <span className="text-[#8a8a8a]">/</span>
         <span className="text-[#f5f5f5] font-medium">{skillId}</span>
       </div>
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <h2 className="text-2xl sm:text-3xl font-bold text-[#f5f5f5]">{skillId}</h2>
-            <TrustBadge tier={skill.trustTier} t={t} />
-            {skill.version && <span className="text-sm text-[#8a8a8a]">v{skill.version}</span>}
-            {skill.category && <span className="px-2.5 py-1 rounded-full bg-white/5 text-xs text-[#8a8a8a]">{skill.category}</span>}
+      <div className="mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <h2 className="text-2xl sm:text-3xl font-bold text-[#f5f5f5]">{skillId}</h2>
+              <TrustBadge tier={skill.trustTier} t={t} />
+              {skill.version && <span className="text-sm text-[#8a8a8a]">v{skill.version}</span>}
+              {skill.category && <span className="px-2.5 py-1 rounded-full bg-white/5 text-xs text-[#8a8a8a]">{skill.category}</span>}
+            </div>
+            <code className="text-sm text-[#8a8a8a] font-mono">{skill.qualifiedId}</code>
           </div>
-          <code className="text-sm text-[#8a8a8a] font-mono">{skill.qualifiedId}</code>
-          <p className="mt-3 text-base text-[#d4d4d4] leading-relaxed">{skill.description}</p>
+          <InstallBar command={skill.installCommand} t={t} id="skillInstall" />
         </div>
-        <InstallBar command={skill.installCommand} t={t} id="skillInstall" />
+        <p className="text-base text-[#d4d4d4] leading-relaxed">{skill.description}</p>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -868,7 +1080,7 @@ function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate
               <h3>{t.dependencies}</h3>
               <div className="flex flex-wrap gap-2">
                 {skill.dependsOn.map(d => {
-                  const dep = skills.find(s => s.skillId === d);
+                  const dep = skills.find(s => s.packageId === pkgId && s.skillId === d);
                   const href = dep ? `${prefix}/${dep.qualifiedId}` : '#';
                   return (
                     <a key={d} href={href} onClick={e => { if (dep) { e.preventDefault(); navigate(`${prefix}/${dep.qualifiedId}`); } }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-sm text-[#d4d4d4] hover:text-[#52c7e8] hover:bg-white/10 transition-colors">
@@ -892,31 +1104,27 @@ function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate
         <div className="space-y-4">
           {skill.aliases.length > 0 && (
             <div className="section-panel">
-              <h3>Aliases</h3>
+              <h3>{t.aliases}</h3>
               <div className="flex flex-wrap gap-2">
                 {skill.aliases.map(a => <span key={a} className="px-2.5 py-1 rounded-full bg-white/5 text-sm text-[#8a8a8a]">{a}</span>)}
               </div>
             </div>
           )}
           <div className="section-panel">
-            <h3>{t.knowledgeGraph}</h3>
-            {graphSkillsCount > 1 ? (
-              <>
-                <KnowledgeGraph3D nodes={graphData.nodes} edges={graphData.edges} onNodeClick={handleGraphNodeClick} height={300} />
-                {hasPkgDeps && (
-                  <div className="mt-2">
-                    <button onClick={() => setGraphExpanded(!graphExpanded)} className="text-xs text-[#52c7e8] hover:underline">
-                      {graphExpanded ? t.backToSkillGraph : `${t.viewPackageGraph} →`}
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="flex items-center justify-center py-8">
-                <div className="w-10 h-10 rounded-full bg-[#52c7e8]/20 border border-[#52c7e8]" />
-                <span className="ml-3 text-sm text-[#8a8a8a]">{t.noDeps}</span>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="mb-0">{t.knowledgeGraph}</h3>
+              <div className="flex gap-1 bg-white/5 rounded-md p-0.5">
+                <button onClick={() => setGraphMode('files')} className={`px-2 py-0.5 rounded text-[10px] transition-colors ${graphMode === 'files' ? 'bg-[#52c7e8]/20 text-[#52c7e8]' : 'text-[#8a8a8a] hover:text-[#d4d4d4]'}`}>{t.fileGraph}</button>
+                <button onClick={() => setGraphMode('knowledge')} className={`px-2 py-0.5 rounded text-[10px] transition-colors ${graphMode === 'knowledge' ? 'bg-[#52c7e8]/20 text-[#52c7e8]' : 'text-[#8a8a8a] hover:text-[#d4d4d4]'}`}>{t.knowledgeMap}</button>
               </div>
-            )}
+            </div>
+            <button onClick={openGraph} className="w-full flex items-center justify-center gap-2 py-4 rounded-lg bg-white/[0.03] border border-white/10 hover:border-[#52c7e8]/30 hover:bg-[#52c7e8]/[0.04] transition-all group cursor-pointer">
+              <svg className="w-5 h-5 text-[#52c7e8] group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
+              <span className="text-sm text-[#d4d4d4] group-hover:text-[#52c7e8] transition-colors">{t.openGraph}</span>
+            </button>
+            <p className="text-xs text-[#8a8a8a] mt-2">
+              {graphMode === 'files' ? `${treeModules.length} TTL files` : `${knowledgeData?.nodes.length ?? '…'} nodes`}
+            </p>
           </div>
         </div>
       </div>
