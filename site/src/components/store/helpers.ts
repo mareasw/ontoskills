@@ -1,4 +1,5 @@
 import type { Skill, GraphNode, GraphEdge } from './types';
+import type { MouseEvent } from 'react';
 import { OFFICIAL_STORE_INDEX_URL } from '../../data/store';
 
 export const STORE_INDEX_URL = OFFICIAL_STORE_INDEX_URL;
@@ -47,8 +48,18 @@ export function packageHasDeps(skillList: Skill[]) {
   return skillList.some(s => s.dependsOn.some(d => idSet.has(d)));
 }
 
+function escRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function hashStr(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
 export function navClick(href: string, navigate: (href: string) => void) {
-  return (e: React.MouseEvent) => {
+  return (e: MouseEvent) => {
     if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
     navigate(href);
@@ -106,13 +117,13 @@ export function parseTtlKnowledgeMap(ttlContent: string, skillId: string) {
     knRefs.add(m[1]);
   }
   for (const knId of knRefs) {
-    const typeMatch = ttlContent.match(new RegExp(`oc:${knId}\\s+a\\s+oc:KnowledgeNode(?:,\\s*oc:(\\w+))?`));
+    const typeMatch = ttlContent.match(new RegExp(`oc:${escRegex(knId)}\\s+a\\s+oc:KnowledgeNode(?:,\\s*oc:(\\w+))?`));
     if (!typeMatch) continue;
     const knType = typeMatch[1] || 'KnowledgeNode';
-    const ctxMatch = ttlContent.match(new RegExp(`oc:${knId}[\\s\\S]*?oc:appliesToContext\\s+"([^"]+)"`));
+    const ctxMatch = ttlContent.match(new RegExp(`oc:${escRegex(knId)}[\\s\\S]*?oc:appliesToContext\\s+"([^"]+)"`));
     const fullContext = ctxMatch ? ctxMatch[1] : '';
     const label = fullContext.length > 40 ? fullContext.slice(0, 40) + '…' : fullContext || knType.replace(/([A-Z])/g, ' $1').trim();
-    const condMatch = ttlContent.match(new RegExp(`oc:${knId}[\\s\\S]*?oc:appliesToCondition\\s+"([^"]+)"`));
+    const condMatch = ttlContent.match(new RegExp(`oc:${escRegex(knId)}[\\s\\S]*?oc:appliesToCondition\\s+"([^"]+)"`));
     const description = [fullContext, condMatch?.[1]].filter(Boolean).join(' — ') || undefined;
     const knNode = addNode(knId, label, knType);
     if (knNode) knNode.description = description;
