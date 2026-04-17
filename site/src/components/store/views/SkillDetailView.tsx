@@ -1,15 +1,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { Skill, GraphNode, GraphEdge, Translations } from '../types';
+import type { Skill, PackageManifest, GraphNode, GraphEdge, Translations } from '../types';
 import { navClick, TTL_BASE, buildFileGraphData, parseTtlKnowledgeMap } from '../helpers';
 import { OFFICIAL_STORE_REPO_URL } from '../../../data/store';
 import { TrustBadge } from '../components/TrustBadge';
 import { InstallBar } from '../components/InstallBar';
 import { getCategoryColor, STAT_COLORS } from '../uiColors';
-import { FileTree } from '../components/FileTree';
 import { KnowledgeGraph3D } from '../graph/KnowledgeGraph3D';
 import { getNodeColor, getConnectedNodes, CATEGORY_LABELS, CATEGORY_DESCRIPTIONS } from '../graph/colors';
 
-export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate, lang }: { skills: Skill[]; packages: any[]; pkgId: string; skillId: string; t: Translations; prefix: string; navigate: (href: string) => void; lang: string }) {
+export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate, lang }: { skills: Skill[]; packages: PackageManifest[]; pkgId: string; skillId: string; t: Translations; prefix: string; navigate: (href: string) => void; lang: string }) {
   const skill = skills.find(s => s.packageId === pkgId && s.skillId === skillId);
   const rawPkg = packages.find(p => p.package_id === pkgId);
   const modules: string[] = rawPkg?.modules || [];
@@ -146,10 +145,9 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
                 edges={activeGraphData.edges}
                 onNodeClick={setSelectedNode}
                 onBackgroundClick={() => setSelectedNode(null)}
-                selectedNode={selectedNode}
                 highlightCategory={highlightCategory}
                 onHighlightCategory={setHighlightCategory}
-                height={window.innerHeight - 52}
+                height="calc(100vh - 52px)"
                 t={t}
                 hideLabels={!!selectedNode}
               />
@@ -181,38 +179,38 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
                 {/* Description / Value */}
                 {selectedNode.description && (
                   <div className="px-5 py-4 border-b border-white/[0.05]">
-                    <h3 className="text-xs uppercase tracking-widest text-[#8a8a8a] mb-2">Value</h3>
+                    <h3 className="text-xs uppercase tracking-widest text-[#8a8a8a] mb-2">{t.value}</h3>
                     <p className="text-sm text-[#d4d4d4] leading-relaxed break-words">{selectedNode.description}</p>
                   </div>
                 )}
 
                 {/* Properties */}
                 <div className="px-5 py-4 border-b border-white/[0.05]">
-                  <h3 className="text-xs uppercase tracking-widest text-[#8a8a8a] mb-3">Properties</h3>
+                  <h3 className="text-xs uppercase tracking-widest text-[#8a8a8a] mb-3">{t.properties}</h3>
                   <div className="space-y-2.5">
                     <div className="flex items-start gap-3">
-                      <span className="text-xs text-[#8a8a8a] shrink-0 w-14">Type</span>
+                      <span className="text-xs text-[#8a8a8a] shrink-0 w-14">{t.type}</span>
                       <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full" style={{ background: getNodeColor(selectedNode.category, selectedNode.isHighlighted) }} />
                         <span className="text-xs text-[#d4d4d4]">{CATEGORY_LABELS[selectedNode.category]?.[0] || selectedNode.category}</span>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <span className="text-xs text-[#8a8a8a] shrink-0 w-14">ID</span>
+                      <span className="text-xs text-[#8a8a8a] shrink-0 w-14">{t.id}</span>
                       <code className="text-xs text-[#d4d4d4] font-mono break-all leading-relaxed">{selectedNode.qualifiedId || selectedNode.id}</code>
                     </div>
                     {selectedNode.category === 'dependency' && (() => {
                       const depName = selectedNode.qualifiedId.replace(/^dep:/, '').replace(/_/g, '-');
                       return (
                         <div className="flex items-start gap-3">
-                          <span className="text-xs text-[#8a8a8a] shrink-0 w-14">Skill</span>
+                          <span className="text-xs text-[#8a8a8a] shrink-0 w-14">{t.skills.slice(0, -1)}</span>
                           <span className="text-xs text-[#d4d4d4]">{depName}</span>
                         </div>
                       );
                     })()}
                     {(['yield', 'require'].includes(selectedNode.category)) && selectedNode.description && (
                       <div className="flex items-start gap-3">
-                        <span className="text-xs text-[#8a8a8a] shrink-0 w-14">State</span>
+                        <span className="text-xs text-[#8a8a8a] shrink-0 w-14">{t.state}</span>
                         <span className="text-xs text-[#d4d4d4] break-words">{selectedNode.description}</span>
                       </div>
                     )}
@@ -221,10 +219,10 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
 
                 {/* Connected nodes */}
                 <div className="px-5 py-4 border-b border-white/[0.05]">
-                  <h3 className="text-xs uppercase tracking-widest text-[#8a8a8a] mb-3">Connected to</h3>
+                  <h3 className="text-xs uppercase tracking-widest text-[#8a8a8a] mb-3">{t.connectedTo}</h3>
                   {(() => {
                     const connected = getConnectedNodes(selectedNode, activeGraphData.edges, activeGraphData.nodes);
-                    if (!connected.length) return <p className="text-xs text-[#666]">No connections</p>;
+                    if (!connected.length) return <p className="text-xs text-[#666]">{t.noConnections}</p>;
                     return (
                       <div className="flex flex-wrap gap-2">
                         {connected.map(n => (
@@ -254,7 +252,7 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
                           className="w-full py-2.5 rounded-lg bg-[#52c7e8]/10 text-[#52c7e8] text-sm font-medium hover:bg-[#52c7e8]/20 transition-colors flex items-center justify-center gap-2"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                          Open knowledge map
+                          {t.openKnowledgeMap}
                         </button>
                       )}
                       {depSkill && (
@@ -262,7 +260,7 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
                           onClick={() => { setShowGraph(false); setSelectedNode(null); navigate(`${prefix}/${depSkill.qualifiedId}`); }}
                           className="w-full py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.07] text-sm text-[#d4d4d4] hover:border-[#52c7e8]/30 hover:text-[#52c7e8] transition-colors"
                         >
-                          View skill →
+                          {t.viewSkill}
                         </button>
                       )}
                     </div>

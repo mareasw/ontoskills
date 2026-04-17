@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import type { Skill, Translations } from '../types';
+import type { Skill, PackageManifest, Translations } from '../types';
 import { navClick, buildGraphData, packageHasDeps } from '../helpers';
 import { OFFICIAL_STORE_REPO_URL } from '../../../data/store';
 import { TrustBadge } from '../components/TrustBadge';
@@ -8,7 +8,7 @@ import { STAT_COLORS } from '../uiColors';
 import { SkillCard } from './StoreView';
 import { KnowledgeGraph3D } from '../graph/KnowledgeGraph3D';
 
-export function PackageView({ loading, skills, packages, pkgId, t, prefix, navigate }: { loading: boolean; skills: Skill[]; packages: any[]; pkgId: string; t: Translations; prefix: string; navigate: (href: string) => void }) {
+export function PackageView({ loading, skills, packages, pkgId, t, prefix, navigate }: { loading: boolean; skills: Skill[]; packages: PackageManifest[]; pkgId: string; t: Translations; prefix: string; navigate: (href: string) => void }) {
   const [showPkgGraph, setShowPkgGraph] = useState(false);
   const pkgSkills = skills.filter(s => s.packageId === pkgId);
   const author = pkgId.split('/')[0];
@@ -110,7 +110,7 @@ export function PackageView({ loading, skills, packages, pkgId, t, prefix, navig
                   navigate(`${prefix}/${skill.qualifiedId}`);
                 }
               }}
-              height={window.innerHeight - 64}
+              height="calc(100vh - 52px)"
               t={t}
             />
           </div>

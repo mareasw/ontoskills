@@ -3,14 +3,14 @@ import { Canvas } from '@react-three/fiber';
 import type { GraphNode, GraphEdge, Translations } from '../types';
 import { getNodeColor, CATEGORY_LABELS, CATEGORY_DESCRIPTIONS } from './colors';
 import { Scene } from './Scene';
+import { GraphErrorBoundary } from '../components/GraphErrorBoundary';
 
-export function KnowledgeGraph3D({ nodes, edges, onNodeClick, onBackgroundClick, height = 350, selectedNode, highlightCategory, onHighlightCategory, t, hideLabels }: {
+export function KnowledgeGraph3D({ nodes, edges, onNodeClick, onBackgroundClick, height = 350, highlightCategory, onHighlightCategory, t, hideLabels }: {
   nodes: GraphNode[];
   edges: GraphEdge[];
   onNodeClick: (node: GraphNode) => void;
   onBackgroundClick?: () => void;
-  height?: number;
-  selectedNode?: GraphNode | null;
+  height?: number | string;
   highlightCategory?: string | null;
   onHighlightCategory?: (cat: string | null) => void;
   t: Translations;
@@ -25,6 +25,7 @@ export function KnowledgeGraph3D({ nodes, edges, onNodeClick, onBackgroundClick,
 
   return (
     <div className="relative" style={{ width: '100%', height, borderRadius: '0.5rem', overflow: 'hidden', background: 'rgba(0,0,0,0.3)', cursor: 'grab' }}>
+      <GraphErrorBoundary>
       <Canvas camera={{ position: [0, 0, camDist], fov: 55 }} gl={{ alpha: true, antialias: true }} onPointerMissed={onBackgroundClick}>
         <Scene
           nodes={nodes}
@@ -35,6 +36,7 @@ export function KnowledgeGraph3D({ nodes, edges, onNodeClick, onBackgroundClick,
           hideLabels={hideLabels}
         />
       </Canvas>
+      </GraphErrorBoundary>
       {cats.length > 1 && (
         <div className="absolute bottom-3 left-3 z-10 max-w-[calc(100%-3rem)]">
           <div className="rounded-lg border border-white/[0.08] bg-[#090909]/90 backdrop-blur-md overflow-hidden">
