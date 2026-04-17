@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Text, Line } from '@react-three/drei';
+import { OrbitControls, Line, Html } from '@react-three/drei';
 import * as THREE from 'three';
 
 // ─── Types ────────────────────────────────────────────────
@@ -370,41 +370,86 @@ function layoutForce3D(nodes: GraphNode[], edges: GraphEdge[]) {
 
 // ─── 3D Graph Components ──────────────────────────────────
 
-function GraphNodeSphere({ node, position, onClick, fontSize = 0.55 }: {
+function getNodeColor(category: string, isHighlighted: boolean): string {
+  if (isHighlighted) return '#52c7e8';
+  if (category === 'main') return '#52c7e8';
+  if (category === 'prompt') return '#85f496';
+  if (category === 'test') return '#fbbf24';
+  if (category === 'module') return '#6ed8c4';
+  if (category === 'skill') return '#52c7e8';
+  if (category === 'dependency') return '#92eff4';
+  if (category === 'AntiPattern') return '#f9a8d4';
+  if (category === 'RecoveryTactic') return '#85f496';
+  if (category === 'failure') return '#fbbf24';
+  if (category === 'yield') return '#6ed8c4';
+  if (category === 'require') return '#9763e1';
+  if (category === 'tool') return '#f9a8d4';
+  if (category === 'productivity') return '#85f496';
+  if (category === 'development') return '#52c7e8';
+  return '#9763e1';
+}
+
+function getConnectedNodes(node: GraphNode, edges: GraphEdge[], allNodes: GraphNode[]): GraphNode[] {
+  const ids = new Set<string>();
+  for (const e of edges) {
+    if (e.source === node.id) ids.add(e.target);
+    if (e.target === node.id) ids.add(e.source);
+  }
+  return allNodes.filter(n => ids.has(n.id));
+}
+
+function GraphNodeSphere({ node, position, onClick, dimmed = false }: {
   node: GraphNode;
   position: [number, number, number];
-  onClick: (qualifiedId: string) => void;
-  fontSize?: number;
+  onClick: (node: GraphNode) => void;
+  dimmed?: boolean;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
-  const color = node.isHighlighted ? '#52c7e8'
-    : node.category === 'main' ? '#52c7e8'
-    : node.category === 'prompt' ? '#85f496'
-    : node.category === 'test' ? '#fbbf24'
-    : node.category === 'module' ? '#6ed8c4'
-    : node.category === 'skill' ? '#52c7e8'
-    : node.category === 'dependency' ? '#92eff4'
-    : node.category === 'AntiPattern' ? '#f9a8d4'
-    : node.category === 'RecoveryTactic' ? '#85f496'
-    : node.category === 'failure' ? '#fbbf24'
-    : node.category === 'yield' ? '#6ed8c4'
-    : node.category === 'require' ? '#9763e1'
-    : node.category === 'tool' ? '#f9a8d4'
-    : node.category === 'productivity' ? '#85f496'
-    : node.category === 'development' ? '#52c7e8'
-    : '#9763e1';
+  const color = getNodeColor(node.category, node.isHighlighted);
   const radius = node.isHighlighted ? 1.4 : 0.9;
+  const isExplorable = ['prompt', 'test', 'module'].includes(node.category) && node.qualifiedId.endsWith('.ttl');
+  const categoryLabel = CATEGORY_LABELS[node.category]?.[0] || node.category;
 
   useFrame(() => {
-    if (meshRef.current) {
-      meshRef.current.scale.setScalar(1);
-    }
+    if (meshRef.current) meshRef.current.scale.setScalar(1);
   });
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: '12px',
+    fontWeight: 600,
+    fontFamily: "'Inter Variable', 'Inter', system-ui, sans-serif",
+    color: dimmed ? 'rgba(224,224,224,0.12)' : '#e0e0e0',
+    background: 'rgba(9, 9, 9, 0.75)',
+    padding: '3px 8px',
+    borderRadius: '4px',
+    border: '1px solid rgba(255,255,255,0.06)',
+    backdropFilter: 'blur(4px)',
+    WebkitBackdropFilter: 'blur(4px)',
+    whiteSpace: 'nowrap' as const,
+    userSelect: 'none',
+    textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+    maxWidth: '180px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    transition: 'opacity 0.3s',
+    opacity: dimmed ? 0.12 : 1,
+  };
+
+  const tooltipStyle: React.CSSProperties = {
+    background: 'rgba(9, 9, 9, 0.95)',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '8px',
+    padding: '8px 12px',
+    whiteSpace: 'nowrap' as const,
+    pointerEvents: 'none',
+  };
 
   return (
     <group position={position}>
-      {node.isHighlighted && (
+      {node.isHighlighted && !dimmed && (
         <mesh>
           <sphereGeometry args={[radius * 2.5, 32, 32]} />
           <meshBasicMaterial color={color} transparent opacity={0.08} />
@@ -412,7 +457,7 @@ function GraphNodeSphere({ node, position, onClick, fontSize = 0.55 }: {
       )}
       <mesh
         ref={meshRef}
-        onClick={(e) => { e.stopPropagation(); onClick(node.qualifiedId); }}
+        onClick={(e) => { e.stopPropagation(); onClick(node); }}
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = 'default'; }}
       >
@@ -420,37 +465,57 @@ function GraphNodeSphere({ node, position, onClick, fontSize = 0.55 }: {
         <meshStandardMaterial
           color={color}
           emissive={color}
-          emissiveIntensity={hovered ? 0.6 : node.isHighlighted ? 0.4 : 0.15}
+          emissiveIntensity={hovered && !dimmed ? 0.6 : node.isHighlighted && !dimmed ? 0.4 : 0.15}
           roughness={0.3}
           metalness={0.2}
           transparent
-          opacity={0.9}
+          opacity={dimmed ? 0.12 : 0.9}
         />
       </mesh>
-      <Text
-        position={[0, -radius - 0.8, 0]}
-        fontSize={fontSize}
-        color="#e0e0e0"
-        anchorX="center"
-        anchorY="top"
-        font={undefined}
+      {/* Label below node */}
+      <Html
+        position={[0, -(radius + 0.5), 0]}
+        center
+        style={{ pointerEvents: 'none' }}
+        zIndexRange={[50, 0]}
       >
-        {node.label}
-      </Text>
+        <div style={labelStyle}>{node.label}</div>
+      </Html>
+      {/* Hover tooltip above node */}
+      {hovered && !dimmed && (
+        <Html position={[0, radius + 1.2, 0]} center style={{ pointerEvents: 'none' }} zIndexRange={[100, 0]}>
+          <div style={tooltipStyle}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, display: 'inline-block' }} />
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#f5f5f5' }}>{node.label}</span>
+            </div>
+            <span style={{ fontSize: '10px', color: '#8a8a8a', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              {categoryLabel}
+            </span>
+            {isExplorable && (
+              <div style={{ fontSize: '10px', color: '#52c7e8', marginTop: '6px' }}>Click to explore →</div>
+            )}
+          </div>
+        </Html>
+      )}
     </group>
   );
 }
 
-function GraphEdgeLine({ start, end }: { start: [number, number, number]; end: [number, number, number] }) {
-  // Guard against NaN positions
+function GraphEdgeLine({ start, end, sourceColor, targetColor }: { start: [number, number, number]; end: [number, number, number]; sourceColor?: string; targetColor?: string }) {
   if (!start.every(isFinite) || !end.every(isFinite)) return null;
+  const colors = useMemo(() => {
+    const c1 = new THREE.Color(sourceColor || '#ffffff');
+    const c2 = new THREE.Color(targetColor || '#ffffff');
+    return new Float32Array([c1.r, c1.g, c1.b, c2.r, c2.g, c2.b]);
+  }, [sourceColor, targetColor]);
   return (
     <Line
       points={[start, end]}
-      color="#ffffff"
-      lineWidth={1}
+      vertexColors={colors}
+      lineWidth={1.5}
       transparent
-      opacity={0.15}
+      opacity={0.25}
     />
   );
 }
@@ -464,45 +529,91 @@ function AutoRotate() {
   return null;
 }
 
-function Scene({ nodes, edges, onNodeClick, autoRotate = true }: {
+function CameraFocus({ target, active }: { target: [number, number, number]; active: boolean }) {
+  const { camera } = useThree();
+  const targetVec = useRef(new THREE.Vector3(...target));
+  targetVec.current.set(...target);
+  useFrame(() => {
+    if (!active) return;
+    const desired = new THREE.Vector3(target[0] + 14, target[1] + 10, target[2] + 14);
+    camera.position.lerp(desired, 0.04);
+    camera.lookAt(targetVec.current);
+  });
+  return null;
+}
+
+function BackgroundParticles() {
+  const count = 150;
+  const positions = useMemo(() => {
+    const arr = new Float32Array(count * 3);
+    for (let i = 0; i < count * 3; i++) arr[i] = (Math.random() - 0.5) * 120;
+    return arr;
+  }, []);
+  return (
+    <points>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" count={count} array={positions} itemSize={3} />
+      </bufferGeometry>
+      <pointsMaterial color="#52c7e8" size={0.08} transparent opacity={0.2} blending={THREE.AdditiveBlending} depthWrite={false} />
+    </points>
+  );
+}
+
+function Scene({ nodes, edges, onNodeClick, autoRotate = true, highlightCategory, focusNodeId }: {
   nodes: GraphNode[];
   edges: GraphEdge[];
-  onNodeClick: (qualifiedId: string) => void;
+  onNodeClick: (node: GraphNode) => void;
   autoRotate?: boolean;
+  highlightCategory?: string | null;
+  focusNodeId?: string | null;
 }) {
   const positions = useMemo(() => layoutForce3D(nodes, edges), [nodes, edges]);
-  const fontSize = nodes.length > 15 ? 0.4 : nodes.length > 8 ? 0.5 : 0.55;
+  const focusNode = focusNodeId ? nodes.find(n => n.id === focusNodeId) : null;
+  const focusPos = focusNode ? positions[focusNode.id] : null;
 
   return (
     <>
       <ambientLight intensity={0.5} />
       <pointLight position={[20, 20, 20]} intensity={1.5} color="#52c7e8" />
       <pointLight position={[-20, -10, 15]} intensity={0.8} color="#85f496" />
-      {autoRotate && <AutoRotate />}
+      <BackgroundParticles />
+      {autoRotate && !focusNode && <AutoRotate />}
+      {focusPos && isFinite(focusPos.x) && <CameraFocus target={[focusPos.x, focusPos.y, focusPos.z]} active={!!focusNode} />}
       <OrbitControls
         enableDamping
         dampingFactor={0.08}
         autoRotate={false}
-        minDistance={10}
-        maxDistance={80}
+        minDistance={5}
+        maxDistance={100}
       />
       {nodes.map(n => {
         const p = positions[n.id];
         if (!p || !isFinite(p.x) || !isFinite(p.y) || !isFinite(p.z)) return null;
+        const dimmed = highlightCategory ? n.category !== highlightCategory : false;
         return (
           <GraphNodeSphere
             key={n.id}
             node={n}
             position={[p.x, p.y, p.z]}
             onClick={onNodeClick}
-            fontSize={fontSize}
+            dimmed={dimmed}
           />
         );
       })}
       {edges.map((e, i) => {
         const s = positions[e.source], t = positions[e.target];
         if (!s || !t) return null;
-        return <GraphEdgeLine key={i} start={[s.x, s.y, s.z]} end={[t.x, t.y, t.z]} />;
+        const sNode = nodes.find(n => n.id === e.source);
+        const tNode = nodes.find(n => n.id === e.target);
+        return (
+          <GraphEdgeLine
+            key={i}
+            start={[s.x, s.y, s.z]}
+            end={[t.x, t.y, t.z]}
+            sourceColor={sNode ? getNodeColor(sNode.category, sNode.isHighlighted) : '#ffffff'}
+            targetColor={tNode ? getNodeColor(tNode.category, tNode.isHighlighted) : '#ffffff'}
+          />
+        );
       })}
     </>
   );
@@ -516,35 +627,113 @@ const CATEGORY_LABELS: Record<string, [string, string]> = {
   tool: ['Tool', '#f9a8d4'],
 };
 
-function KnowledgeGraph3D({ nodes, edges, onNodeClick, height = 350 }: {
+const CATEGORY_DESCRIPTIONS: Record<string, string> = {
+  skill: 'The root skill definition',
+  main: 'Primary ontology file',
+  prompt: 'Prompt template definitions',
+  test: 'Test specifications',
+  module: 'Additional ontology modules',
+  dependency: 'Required skill dependencies',
+  AntiPattern: 'Common mistakes to avoid',
+  RecoveryTactic: 'Error recovery strategies',
+  failure: 'Known failure modes',
+  yield: 'States produced after execution',
+  require: 'States required before execution',
+  tool: 'Allowed tool integrations',
+};
+
+function KnowledgeGraph3D({ nodes, edges, onNodeClick, height = 350, selectedNode, highlightCategory, onHighlightCategory }: {
   nodes: GraphNode[];
   edges: GraphEdge[];
-  onNodeClick: (qualifiedId: string) => void;
+  onNodeClick: (node: GraphNode) => void;
   height?: number;
+  selectedNode?: GraphNode | null;
+  highlightCategory?: string | null;
+  onHighlightCategory?: (cat: string | null) => void;
 }) {
+  const [legendExpanded, setLegendExpanded] = useState(false);
+  const [shortcutsVisible, setShortcutsVisible] = useState(false);
+
   if (!nodes.length) return null;
   const camDist = Math.max(nodes.length * 2.2, 30);
-  // Collect unique categories for legend
   const cats = [...new Set(nodes.map(n => n.category))];
-  const legendItems = cats.map(c => CATEGORY_LABELS[c] || [c, '#9763e1']).filter(Boolean);
+
   return (
     <div className="relative" style={{ width: '100%', height, borderRadius: '0.5rem', overflow: 'hidden', background: 'rgba(0,0,0,0.3)' }}>
       <Canvas camera={{ position: [0, 0, camDist], fov: 55 }} gl={{ alpha: true, antialias: true }}>
-        <Scene nodes={nodes} edges={edges} onNodeClick={onNodeClick} />
+        <Scene
+          nodes={nodes}
+          edges={edges}
+          onNodeClick={onNodeClick}
+          highlightCategory={highlightCategory}
+          focusNodeId={selectedNode?.id}
+        />
       </Canvas>
-      {/* Legend */}
-      {legendItems.length > 1 && (
-        <div className="absolute bottom-3 left-3 flex flex-wrap gap-x-3 gap-y-1">
-          {legendItems.map(([label, color], i) => (
-            <span key={i} className="flex items-center gap-1 text-[10px] text-[#8a8a8a]">
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
-              {label}
-            </span>
-          ))}
+      {/* Expandable legend */}
+      {cats.length > 1 && (
+        <div className="absolute bottom-3 left-3 z-10">
+          <div className="rounded-lg border border-white/[0.08] bg-[#090909]/90 backdrop-blur-md overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2">
+              <span className="text-[10px] uppercase tracking-wider text-[#8a8a8a]">Legend</span>
+              {cats.map(c => {
+                const entry = CATEGORY_LABELS[c] || [c, '#9763e1'];
+                return (
+                  <button
+                    key={c}
+                    onClick={() => onHighlightCategory?.(highlightCategory === c ? null : c)}
+                    className={`w-4 h-4 rounded-full border-2 transition-all duration-150 ${highlightCategory === c ? 'scale-125 border-white/40' : 'border-transparent hover:scale-110'}`}
+                    style={{ background: entry[1] }}
+                    title={entry[0]}
+                  />
+                );
+              })}
+              <button onClick={() => setLegendExpanded(!legendExpanded)} className="ml-1 text-[#8a8a8a] hover:text-[#d4d4d4] transition-colors">
+                <svg className={`w-3.5 h-3.5 transition-transform ${legendExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+            </div>
+            {legendExpanded && (
+              <div className="border-t border-white/[0.06] px-3 py-2 space-y-1.5 max-h-48 overflow-y-auto">
+                {cats.map(c => {
+                  const entry = CATEGORY_LABELS[c] || [c, '#9763e1'];
+                  return (
+                    <div key={c} className="flex items-start gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full mt-0.5 shrink-0" style={{ background: entry[1] }} />
+                      <div>
+                        <span className="text-[11px] font-medium text-[#d4d4d4]">{entry[0]}</span>
+                        <p className="text-[10px] text-[#8a8a8a] leading-tight">{CATEGORY_DESCRIPTIONS[c] || ''}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
-      <div className="absolute top-3 right-3 text-[10px] text-[#8a8a8a]">
+      {/* Stats */}
+      <div className="absolute top-3 right-3 text-[10px] text-[#8a8a8a] z-10">
         {nodes.length} nodes · {edges.length} edges
+      </div>
+      {/* Keyboard shortcuts */}
+      <div className="absolute bottom-3 right-3 z-10">
+        <div className="relative">
+          <button
+            onClick={() => setShortcutsVisible(!shortcutsVisible)}
+            className="w-7 h-7 rounded-full bg-white/[0.04] border border-white/[0.08] text-[#8a8a8a] text-xs hover:bg-white/[0.08] hover:text-[#d4d4d4] transition-colors flex items-center justify-center"
+          >
+            ?
+          </button>
+          {shortcutsVisible && (
+            <div className="absolute bottom-9 right-0 w-44 rounded-lg bg-[#090909]/95 backdrop-blur-md border border-white/[0.08] p-3 text-[11px] text-[#8a8a8a] space-y-1.5">
+              <p className="text-[#d4d4d4] font-medium mb-1">Controls</p>
+              <p>Scroll = Zoom</p>
+              <p>Drag = Orbit</p>
+              <p>Right-drag = Pan</p>
+              <p>Click node = Details</p>
+              <p>Esc = Close</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -840,6 +1029,8 @@ function AuthorView({ skills, authorId, t, prefix, navigate }: { skills: Skill[]
   const authorSkills = skills.filter(s => s.author === authorId);
   const pkgMap: Record<string, Skill[]> = {};
   authorSkills.forEach(s => { pkgMap[s.packageId] = pkgMap[s.packageId] || []; pkgMap[s.packageId].push(s); });
+  const allCats = [...new Set(authorSkills.map(s => s.category).filter(Boolean))];
+  const tierCounts = authorSkills.reduce<Record<string, number>>((acc, s) => { acc[s.trustTier] = (acc[s.trustTier] || 0) + 1; return acc; }, {});
 
   return (
     <>
@@ -856,6 +1047,15 @@ function AuthorView({ skills, authorId, t, prefix, navigate }: { skills: Skill[]
           </div>
           <InstallBar command={`npx ontoskills install ${authorId}/<package>`} t={t} id="authInstall" />
         </div>
+        {/* Stats row */}
+        <div className="flex flex-wrap gap-3 mt-4">
+          {allCats.map(c => (
+            <span key={c} className="px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.07] text-xs text-[#d4d4d4]">{c}</span>
+          ))}
+          {Object.entries(tierCounts).map(([tier, count]) => (
+            <span key={tier} className="px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.07] text-xs text-[#8a8a8a]">{tier}: {count}</span>
+          ))}
+        </div>
       </div>
       {Object.entries(pkgMap).map(([pid, pkgSkills]) => {
         const tier = pkgSkills[0]?.trustTier || 'verified';
@@ -863,14 +1063,36 @@ function AuthorView({ skills, authorId, t, prefix, navigate }: { skills: Skill[]
         const pkgName = pid.split('/').slice(1).join('/');
         const cats = [...new Set(pkgSkills.map(s => s.category).filter(Boolean))];
         return (
-          <div key={pid} className="mb-8">
+          <div key={pid} className="mb-6 p-5 rounded-xl border border-white/[0.07] bg-white/[0.02] hover:border-white/[0.12] transition-colors">
             <div className="flex items-center gap-3 mb-3">
-              <h3 className="text-xl font-semibold text-[#f5f5f5] cursor-pointer hover:text-[#52c7e8] transition-colors" onClick={() => navigate(`${prefix}/${pid}`)}>{pkgName}</h3>
+              <a href={`${prefix}/${pid}`} onClick={e => { e.preventDefault(); navigate(`${prefix}/${pid}`); }} className="text-xl font-semibold text-[#f5f5f5] hover:text-[#52c7e8] transition-colors">{pkgName}</a>
               <TrustBadge tier={tier} t={t} />
               {ver && <span className="text-xs text-[#8a8a8a]">v{ver}</span>}
-              <span className="text-xs text-[#8a8a8a]">{pkgSkills.length} {t.skills.toLowerCase()}</span>
             </div>
-            <p className="text-sm text-[#8a8a8a] mb-4">{cats.join(', ') || '—'}</p>
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-sm text-[#8a8a8a]">{pkgSkills.length} {t.skills.toLowerCase()}</span>
+              <span className="text-[#8a8a8a]">·</span>
+              <div className="flex flex-wrap gap-1.5">
+                {cats.map(c => <span key={c} className="px-2 py-0.5 rounded-full bg-white/5 text-xs text-[#8a8a8a]">{c}</span>)}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {pkgSkills.slice(0, 6).map(s => (
+                <a
+                  key={s.qualifiedId}
+                  href={`${prefix}/${s.qualifiedId}`}
+                  onClick={e => { e.preventDefault(); navigate(`${prefix}/${s.qualifiedId}`); }}
+                  className="px-3 py-2 rounded-lg bg-white/[0.02] border border-white/[0.05] text-sm text-[#d4d4d4] hover:border-[#52c7e8]/30 hover:text-[#52c7e8] transition-colors truncate"
+                >
+                  {s.skillId}
+                </a>
+              ))}
+              {pkgSkills.length > 6 && (
+                <a href={`${prefix}/${pid}`} onClick={e => { e.preventDefault(); navigate(`${prefix}/${pid}`); }} className="px-3 py-2 rounded-lg bg-white/[0.02] border border-white/[0.05] text-sm text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">
+                  +{pkgSkills.length - 6} more
+                </a>
+              )}
+            </div>
           </div>
         );
       })}
@@ -891,9 +1113,10 @@ function PackageView({ skills, packages, pkgId, t, prefix, navigate }: { skills:
   const hasDeps = packageHasDeps(pkgSkills);
   const graphData = useMemo(() => hasDeps ? buildGraphData(pkgSkills) : null, [pkgSkills, hasDeps]);
 
-  const handleGraphNodeClick = useCallback((qualifiedId: string) => {
-    navigate(`${prefix}/${qualifiedId}`);
-  }, [navigate, prefix]);
+  const handleGraphNodeClick = useCallback((node: GraphNode) => {
+    const skill = skills.find(s => s.packageId === pkgId && s.skillId === node.id);
+    if (skill) navigate(`${prefix}/${skill.qualifiedId}`);
+  }, [navigate, prefix, pkgId, skills]);
 
   return (
     <>
@@ -913,7 +1136,12 @@ function PackageView({ skills, packages, pkgId, t, prefix, navigate }: { skills:
               {ver && <span className="text-sm text-[#8a8a8a]">v{ver}</span>}
             </div>
             <code className="text-sm text-[#8a8a8a] font-mono">{pkgId}</code>
-            <p className="text-sm text-[#8a8a8a] mt-1">{pkgSkills.length} {t.skills.toLowerCase()}</p>
+            <div className="flex items-center gap-3 mt-2">
+              <span className="text-sm text-[#8a8a8a]">{pkgSkills.length} {t.skills.toLowerCase()}</span>
+              <span className="text-[#8a8a8a]">·</span>
+              <span className="text-sm text-[#8a8a8a]">{modules.length} {t.files_other}</span>
+            </div>
+            {rawPkg?.description && <p className="text-sm text-[#d4d4d4] mt-3 leading-relaxed">{rawPkg.description}</p>}
           </div>
           <InstallBar command={`npx ontoskills install ${pkgId}`} t={t} id="pkgInstall" />
         </div>
@@ -958,10 +1186,11 @@ function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate
   const [knowledgeData, setKnowledgeData] = useState<{ nodes: GraphNode[]; edges: GraphEdge[] } | null>(null);
   const [loadingKnowledge, setLoadingKnowledge] = useState(false);
   const [graphError, setGraphError] = useState(false);
-
-  const handleGraphNodeClick = useCallback((qualifiedId: string) => {
-    navigate(`${prefix}/${qualifiedId}`);
-  }, [navigate, prefix]);
+  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [highlightCategory, setHighlightCategory] = useState<string | null>(null);
+  const [graphBreadcrumb, setGraphBreadcrumb] = useState<Array<{ label: string; fileId: string | null }>>([
+    { label: skillId, fileId: null },
+  ]);
 
   // File graph — built synchronously from module list
   const fileGraphData = useMemo(() => buildFileGraphData(treeModules, skillId), [treeModules, skillId]);
@@ -995,6 +1224,25 @@ function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate
     }
   }, [graphMode, knowledgeData, loadKnowledgeGraph]);
 
+  // Explore a secondary TTL file's knowledge map
+  const exploreSecondaryFile = useCallback(async (node: GraphNode) => {
+    const fileId = node.qualifiedId;
+    if (!fileId.endsWith('.ttl')) return;
+    setLoadingKnowledge(true);
+    setGraphError(false);
+    try {
+      const res = await fetch(`${TTL_BASE}${pkgId}/${fileId}`);
+      if (!res.ok) throw new Error(`Failed: ${res.status}`);
+      const content = await res.text();
+      const parsed = parseTtlKnowledgeMap(content, fileId.split('/').pop()!.replace('.ttl', ''));
+      setKnowledgeData(parsed);
+      setGraphMode('knowledge');
+      setGraphBreadcrumb(prev => [...prev, { label: node.label, fileId }]);
+      setSelectedNode(null);
+    } catch { setGraphError(true); }
+    finally { setLoadingKnowledge(false); }
+  }, [pkgId]);
+
   const activeGraphData = graphMode === 'files' ? fileGraphData : knowledgeData;
 
   if (!skill) {
@@ -1010,18 +1258,39 @@ function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate
       {showGraph && activeGraphData && (
         <div className="fixed inset-0 z-50 bg-[#0d0d14]/95 backdrop-blur-sm flex flex-col">
           <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-            <div className="flex items-center gap-4">
-              <h3 className="text-lg font-semibold text-[#f5f5f5]">{graphMode === 'files' ? t.fileGraph : t.knowledgeMap} — {skillId}</h3>
-              <div className="flex gap-1 bg-white/5 rounded-lg p-0.5">
-                <button onClick={() => { setGraphMode('files'); }} className={`px-3 py-1 rounded-md text-xs transition-colors ${graphMode === 'files' ? 'bg-[#52c7e8]/20 text-[#52c7e8]' : 'text-[#8a8a8a] hover:text-[#d4d4d4]'}`}>{t.fileGraph}</button>
-                <button onClick={async () => { setGraphMode('knowledge'); if (!knowledgeData) await loadKnowledgeGraph(); }} className={`px-3 py-1 rounded-md text-xs transition-colors ${graphMode === 'knowledge' ? 'bg-[#52c7e8]/20 text-[#52c7e8]' : 'text-[#8a8a8a] hover:text-[#d4d4d4]'}`}>{t.knowledgeMap}</button>
+            <div className="flex flex-col gap-1">
+              {/* Breadcrumb */}
+              <div className="flex items-center gap-1.5 text-xs">
+                {graphBreadcrumb.map((crumb, i) => (
+                  <span key={i} className="flex items-center gap-1.5">
+                    {i > 0 && <svg className="w-3 h-3 text-[#8a8a8a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>}
+                    <button
+                      onClick={() => {
+                        if (i < graphBreadcrumb.length - 1) {
+                          setGraphBreadcrumb(prev => prev.slice(0, i + 1));
+                          if (i === 0) setGraphMode('files');
+                        }
+                      }}
+                      className={`transition-colors ${i === graphBreadcrumb.length - 1 ? 'text-[#f5f5f5] font-medium' : 'text-[#8a8a8a] hover:text-[#52c7e8]'}`}
+                    >
+                      {crumb.label}
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex items-center gap-4">
+                <h3 className="text-lg font-semibold text-[#f5f5f5]">{graphMode === 'files' ? t.fileGraph : t.knowledgeMap}</h3>
+                <div className="flex gap-1 bg-white/5 rounded-lg p-0.5">
+                  <button onClick={() => setGraphMode('files')} className={`px-3 py-1 rounded-md text-xs transition-colors ${graphMode === 'files' ? 'bg-[#52c7e8]/20 text-[#52c7e8]' : 'text-[#8a8a8a] hover:text-[#d4d4d4]'}`}>{t.fileGraph}</button>
+                  <button onClick={async () => { setGraphMode('knowledge'); if (!knowledgeData) await loadKnowledgeGraph(); }} className={`px-3 py-1 rounded-md text-xs transition-colors ${graphMode === 'knowledge' ? 'bg-[#52c7e8]/20 text-[#52c7e8]' : 'text-[#8a8a8a] hover:text-[#d4d4d4]'}`}>{t.knowledgeMap}</button>
+                </div>
               </div>
             </div>
-            <button onClick={() => setShowGraph(false)} className="p-2 rounded-lg hover:bg-white/10 text-[#8a8a8a] hover:text-[#f5f5f5] transition-colors">
+            <button onClick={() => { setShowGraph(false); setSelectedNode(null); }} className="p-2 rounded-lg hover:bg-white/10 text-[#8a8a8a] hover:text-[#f5f5f5] transition-colors">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
-          <div className="flex-1">
+          <div className="flex-1 relative">
             {loadingKnowledge ? (
               <div className="flex items-center justify-center h-full gap-3">
                 <div className="w-5 h-5 border-2 border-[#52c7e8]/30 border-t-[#52c7e8] rounded-full animate-spin" />
@@ -1030,7 +1299,95 @@ function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate
             ) : graphError ? (
               <div className="flex items-center justify-center h-full"><p className="text-[#f9a8d4]">{t.graphError}</p></div>
             ) : (
-              <KnowledgeGraph3D nodes={activeGraphData.nodes} edges={activeGraphData.edges} onNodeClick={(qid) => { setShowGraph(false); handleGraphNodeClick(qid); }} height={800} />
+              <KnowledgeGraph3D
+                nodes={activeGraphData.nodes}
+                edges={activeGraphData.edges}
+                onNodeClick={setSelectedNode}
+                selectedNode={selectedNode}
+                highlightCategory={highlightCategory}
+                onHighlightCategory={setHighlightCategory}
+                height={window.innerHeight - 64}
+              />
+            )}
+            {/* Node detail panel */}
+            {selectedNode && (
+              <div className="absolute right-0 top-0 bottom-0 w-[340px] bg-[#0d0d14]/95 backdrop-blur-md border-l border-white/[0.08] overflow-y-auto z-20"
+                style={{ animation: 'slideIn 0.25s ease-out' }}
+              >
+                <div className="px-5 pt-5 pb-4 border-b border-white/[0.07]">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full" style={{ background: getNodeColor(selectedNode.category, selectedNode.isHighlighted) }} />
+                      <span className="text-[11px] uppercase tracking-widest text-[#8a8a8a]">
+                        {CATEGORY_LABELS[selectedNode.category]?.[0] || selectedNode.category}
+                      </span>
+                    </div>
+                    <button onClick={() => setSelectedNode(null)} className="p-1.5 rounded-lg hover:bg-white/10 text-[#8a8a8a] transition-colors">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                  <h2 className="text-lg font-bold text-[#f5f5f5]">{selectedNode.label}</h2>
+                  <code className="text-xs text-[#8a8a8a] font-mono mt-1 block break-all">{selectedNode.id}</code>
+                </div>
+
+                {/* Category description */}
+                {CATEGORY_DESCRIPTIONS[selectedNode.category] && (
+                  <div className="px-5 py-3 border-b border-white/[0.05]">
+                    <p className="text-sm text-[#d4d4d4]">{CATEGORY_DESCRIPTIONS[selectedNode.category]}</p>
+                  </div>
+                )}
+
+                {/* Connected nodes */}
+                <div className="px-5 py-4 border-b border-white/[0.05]">
+                  <h3 className="text-[11px] uppercase tracking-widest text-[#8a8a8a] mb-3">Connected to</h3>
+                  {(() => {
+                    const connected = getConnectedNodes(selectedNode, activeGraphData.edges, activeGraphData.nodes);
+                    if (!connected.length) return <p className="text-xs text-[#8a8a8a]">No connections</p>;
+                    return (
+                      <div className="flex flex-wrap gap-2">
+                        {connected.map(n => (
+                          <button
+                            key={n.id}
+                            onClick={() => setSelectedNode(n)}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.07] text-xs text-[#d4d4d4] hover:border-[#52c7e8]/30 hover:text-[#52c7e8] transition-colors"
+                          >
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: getNodeColor(n.category, n.isHighlighted) }} />
+                            {n.label}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Explore secondary file */}
+                {(['prompt', 'test', 'module'] as const).includes(selectedNode.category as any) && selectedNode.qualifiedId.endsWith('.ttl') && (
+                  <div className="px-5 py-4">
+                    <button
+                      onClick={() => exploreSecondaryFile(selectedNode)}
+                      className="w-full py-2.5 rounded-lg bg-[#52c7e8]/10 text-[#52c7e8] text-sm font-medium hover:bg-[#52c7e8]/20 transition-colors"
+                    >
+                      Explore this file's knowledge map →
+                    </button>
+                  </div>
+                )}
+
+                {/* Navigate to skill (if it's a dependency node) */}
+                {(() => {
+                  const depSkill = skills.find(s => s.packageId === pkgId && s.skillId === selectedNode.id);
+                  if (!depSkill) return null;
+                  return (
+                    <div className="px-5 py-4 border-t border-white/[0.05]">
+                      <button
+                        onClick={() => { setShowGraph(false); setSelectedNode(null); navigate(`${prefix}/${depSkill.qualifiedId}`); }}
+                        className="w-full py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.07] text-sm text-[#d4d4d4] hover:border-[#52c7e8]/30 hover:text-[#52c7e8] transition-colors"
+                      >
+                        View skill →
+                      </button>
+                    </div>
+                  );
+                })()}
+              </div>
             )}
           </div>
         </div>
@@ -1114,8 +1471,8 @@ function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate
             <div className="flex items-center justify-between mb-3">
               <h3 className="mb-0">{t.knowledgeGraph}</h3>
               <div className="flex gap-1 bg-white/5 rounded-md p-0.5">
-                <button onClick={() => setGraphMode('files')} className={`px-2 py-0.5 rounded text-[10px] transition-colors ${graphMode === 'files' ? 'bg-[#52c7e8]/20 text-[#52c7e8]' : 'text-[#8a8a8a] hover:text-[#d4d4d4]'}`}>{t.fileGraph}</button>
-                <button onClick={() => setGraphMode('knowledge')} className={`px-2 py-0.5 rounded text-[10px] transition-colors ${graphMode === 'knowledge' ? 'bg-[#52c7e8]/20 text-[#52c7e8]' : 'text-[#8a8a8a] hover:text-[#d4d4d4]'}`}>{t.knowledgeMap}</button>
+                <button onClick={() => setGraphMode('files')} className={`px-2.5 py-1 rounded text-xs transition-colors ${graphMode === 'files' ? 'bg-[#52c7e8]/20 text-[#52c7e8]' : 'text-[#8a8a8a] hover:text-[#d4d4d4]'}`}>{t.fileGraph}</button>
+                <button onClick={() => setGraphMode('knowledge')} className={`px-2.5 py-1 rounded text-xs transition-colors ${graphMode === 'knowledge' ? 'bg-[#52c7e8]/20 text-[#52c7e8]' : 'text-[#8a8a8a] hover:text-[#d4d4d4]'}`}>{t.knowledgeMap}</button>
               </div>
             </div>
             <button onClick={openGraph} className="w-full flex items-center justify-center gap-2 py-4 rounded-lg bg-white/[0.03] border border-white/10 hover:border-[#52c7e8]/30 hover:bg-[#52c7e8]/[0.04] transition-all group cursor-pointer">
