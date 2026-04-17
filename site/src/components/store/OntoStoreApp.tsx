@@ -170,7 +170,9 @@ const translations = {
 
 // ─── Helpers ──────────────────────────────────────────────
 
-const STORE_INDEX_URL = 'https://raw.githubusercontent.com/mareasw/ontostore/main/index.json';
+import { OFFICIAL_STORE_INDEX_URL } from '../../data/store';
+
+const STORE_INDEX_URL = OFFICIAL_STORE_INDEX_URL;
 
 function normSkill(pkg: any, skill: any): Skill {
   const qid = `${pkg.package_id}/${skill.id}`;
@@ -478,8 +480,8 @@ function GraphNodeSphere({ node, position, onClick, dimmed = false }: {
       <mesh
         ref={meshRef}
         onClick={(e) => { e.stopPropagation(); onClick(node); }}
-        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
-        onPointerOut={() => { setHovered(false); document.body.style.cursor = 'default'; }}
+        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
+        onPointerOut={() => { setHovered(false); }}
       >
         <sphereGeometry args={[radius, 32, 32]} />
         <meshStandardMaterial
@@ -688,7 +690,7 @@ function KnowledgeGraph3D({ nodes, edges, onNodeClick, height = 350, selectedNod
   const cats = [...new Set(nodes.map(n => n.category))];
 
   return (
-    <div className="relative" style={{ width: '100%', height, borderRadius: '0.5rem', overflow: 'hidden', background: 'rgba(0,0,0,0.3)' }}>
+    <div className="relative" style={{ width: '100%', height, borderRadius: '0.5rem', overflow: 'hidden', background: 'rgba(0,0,0,0.3)', cursor: 'grab' }}>
       <Canvas camera={{ position: [0, 0, camDist], fov: 55 }} gl={{ alpha: true, antialias: true }}>
         <Scene
           nodes={nodes}
@@ -1237,6 +1239,18 @@ function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate
 
   // Graph state
   const [showGraph, setShowGraph] = useState(false);
+
+  // Reset all graph state when navigating to a different skill
+  useEffect(() => {
+    setShowGraph(false);
+    setGraphMode('files');
+    setKnowledgeData(null);
+    setLoadingKnowledge(false);
+    setGraphError(false);
+    setSelectedNode(null);
+    setHighlightCategory(null);
+    setGraphBreadcrumb([{ label: skillId, fileId: null }]);
+  }, [pkgId, skillId]);
   const [graphMode, setGraphMode] = useState<'files' | 'knowledge'>('files');
   const [knowledgeData, setKnowledgeData] = useState<{ nodes: GraphNode[]; edges: GraphEdge[] } | null>(null);
   const [loadingKnowledge, setLoadingKnowledge] = useState(false);
