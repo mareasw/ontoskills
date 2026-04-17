@@ -15,8 +15,13 @@ export function GraphNodeSphere({ node, position, onClick, dimmed = false, hideL
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
   const color = getNodeColor(node.category, node.isHighlighted);
-  const radius = node.isHighlighted ? 1.4 : 0.9;
-  const isExplorable = ['main', 'prompt', 'test', 'module'].includes(node.category) && node.qualifiedId.endsWith('.ttl');
+  const isCluster = !!node.isCluster;
+  const clusterCount = node.count || 0;
+
+  const baseRadius = node.isHighlighted ? 1.4 : 0.9;
+  const radius = isCluster ? baseRadius * (1 + Math.min(clusterCount * 0.15, 0.8)) : baseRadius;
+
+  const isExplorable = !isCluster && ['main', 'prompt', 'test', 'module'].includes(node.category) && node.qualifiedId.endsWith('.ttl');
   const categoryLabel = CATEGORY_LABELS[node.category]?.[0] || node.category;
 
   const labelStyle: React.CSSProperties = {
@@ -76,6 +81,24 @@ export function GraphNodeSphere({ node, position, onClick, dimmed = false, hideL
           opacity={dimmed ? 0.12 : 0.9}
         />
       </mesh>
+      {/* Cluster count badge */}
+      {isCluster && !dimmed && (
+        <Html position={[0, radius + 0.3, 0]} center zIndexRange={[60, 0]}>
+          <div style={{
+            background: 'rgba(9, 9, 9, 0.85)',
+            border: `1px solid ${color}40`,
+            borderRadius: '10px',
+            padding: '1px 6px',
+            fontSize: '10px',
+            fontWeight: 700,
+            color,
+            lineHeight: '16px',
+            pointerEvents: 'none',
+          }}>
+            ×{clusterCount}
+          </div>
+        </Html>
+      )}
       {!hideLabel && (
         <Html
           position={[0, -(radius + 0.5), 0]}
@@ -91,7 +114,7 @@ export function GraphNodeSphere({ node, position, onClick, dimmed = false, hideL
         </Html>
       )}
       {hovered && !dimmed && (
-        <Html position={[0, radius + 1.2, 0]} center zIndexRange={[100, 0]}>
+        <Html position={[0, radius + (isCluster ? 1.4 : 1.2), 0]} center zIndexRange={[100, 0]}>
           <div
             onClick={() => onClick(node)}
             style={{ ...tooltipStyle, pointerEvents: 'auto', cursor: 'pointer' }}
@@ -100,11 +123,19 @@ export function GraphNodeSphere({ node, position, onClick, dimmed = false, hideL
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, display: 'inline-block' }} />
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#f5f5f5' }}>{node.label}</span>
             </div>
-            <span style={{ fontSize: '10px', color: '#8a8a8a', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-              {categoryLabel}
-            </span>
-            {isExplorable && (
-              <div style={{ fontSize: '10px', color: '#52c7e8', marginTop: '6px' }}>Click to explore →</div>
+            {isCluster ? (
+              <span style={{ fontSize: '10px', color, fontWeight: 500 }}>
+                {clusterCount} instances — click to expand
+              </span>
+            ) : (
+              <>
+                <span style={{ fontSize: '10px', color: '#8a8a8a', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                  {categoryLabel}
+                </span>
+                {isExplorable && (
+                  <div style={{ fontSize: '10px', color: '#52c7e8', marginTop: '6px' }}>Click to explore →</div>
+                )}
+              </>
             )}
           </div>
         </Html>
