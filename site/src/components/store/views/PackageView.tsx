@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { Skill, PackageManifest, Translations } from '../types';
 import { navClick, buildGraphData, packageHasDeps } from '../helpers';
 import { OFFICIAL_STORE_REPO_URL } from '../../../data/store';
@@ -10,6 +10,13 @@ import { KnowledgeGraph3D } from '../graph/KnowledgeGraph3D';
 
 export function PackageView({ loading, skills, packages, pkgId, t, prefix, navigate }: { loading: boolean; skills: Skill[]; packages: PackageManifest[]; pkgId: string; t: Translations; prefix: string; navigate: (href: string) => void }) {
   const [showPkgGraph, setShowPkgGraph] = useState(false);
+
+  useEffect(() => {
+    if (showPkgGraph) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+  }, [showPkgGraph]);
   const pkgSkills = skills.filter(s => s.packageId === pkgId);
   const author = pkgId.split('/')[0];
   const pkgName = pkgId.split('/').slice(1).join('/');
@@ -87,7 +94,7 @@ export function PackageView({ loading, skills, packages, pkgId, t, prefix, navig
 
       {/* Fullscreen package graph overlay */}
       {showPkgGraph && graphData && (
-        <div className="fixed inset-0 z-50 bg-[#090909] flex flex-col">
+        <div className="fixed inset-0 z-50 bg-[#090909] flex flex-col overflow-hidden">
           <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
             <div>
               <h3 className="text-lg font-semibold text-[#f5f5f5]">{t.knowledgeGraph} — {pkgName}</h3>

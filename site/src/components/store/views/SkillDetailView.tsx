@@ -19,6 +19,14 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
   // Graph state
   const [showGraph, setShowGraph] = useState(false);
 
+  // Lock body scroll when graph overlay is open
+  useEffect(() => {
+    if (showGraph) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+  }, [showGraph]);
+
   // Reset all graph state when navigating to a different skill
   useEffect(() => {
     setShowGraph(false);
@@ -112,7 +120,7 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
     <>
       {/* Fullscreen 3D graph overlay */}
       {showGraph && displayGraphData && (
-        <div className="fixed inset-0 z-50 bg-[#090909] flex flex-col">
+        <div className="fixed inset-0 z-50 bg-[#090909] flex flex-col overflow-hidden">
           <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-white/10 gap-3">
             <div className="flex flex-wrap items-center gap-2 min-w-0">
               {graphBreadcrumb.map((crumb, i) => (
