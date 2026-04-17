@@ -143,10 +143,10 @@ export default function OntoStoreApp({ lang = 'en' }: { lang?: string }) {
     <div className="ontoskills-store-root overflow-x-hidden pt-8 sm:pt-10">
       <div className="store-glow" />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative">
-        {viewMode === 'store' && <StoreView loading={loading} skills={skills} filteredSkills={filteredSkills} meta={meta} t={t} prefix={prefix} navigate={navigate} searchQuery={searchQuery} setSearchQuery={setSearchQuery} filterAuthor={filterAuthor} setFilterAuthor={setFilterAuthor} filterCategory={filterCategory} setFilterCategory={setFilterCategory} filterTier={filterTier} setFilterTier={setFilterTier} filterSort={filterSort} setFilterSort={setFilterSort} visibleCount={visibleCount} setVisibleCount={setVisibleCount} lang={lang} />}
+        {viewMode === 'store' && <StoreView loading={loading} filteredSkills={filteredSkills} meta={meta} t={t} prefix={prefix} navigate={navigate} searchQuery={searchQuery} setSearchQuery={setSearchQuery} filterAuthor={filterAuthor} setFilterAuthor={setFilterAuthor} filterCategory={filterCategory} setFilterCategory={setFilterCategory} filterTier={filterTier} setFilterTier={setFilterTier} filterSort={filterSort} setFilterSort={setFilterSort} visibleCount={visibleCount} setVisibleCount={setVisibleCount} lang={lang} />}
         {viewMode === 'author' && <AuthorView loading={loading} skills={skills} authorId={authorId} t={t} prefix={prefix} navigate={navigate} />}
         {viewMode === 'package' && <PackageView loading={loading} skills={skills} packages={packages} pkgId={pkgId} t={t} prefix={prefix} navigate={navigate} />}
-        {viewMode === 'skill' && <SkillDetailView skills={skills} packages={packages} pkgId={pkgId} skillId={skillId} t={t} prefix={prefix} navigate={navigate} lang={lang} />}
+        {viewMode === 'skill' && <SkillDetailView skills={skills} packages={packages} pkgId={pkgId} skillId={skillId} t={t} prefix={prefix} navigate={navigate} />}
       </div>
     </div>
   );

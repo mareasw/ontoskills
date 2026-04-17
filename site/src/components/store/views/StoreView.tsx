@@ -33,9 +33,8 @@ export function SkillCard({ skill, t, prefix, navigate }: { skill: Skill; t: Tra
   );
 }
 
-export function StoreView({ loading, skills, filteredSkills, meta, t, prefix, navigate, searchQuery, setSearchQuery, filterAuthor, setFilterAuthor, filterCategory, setFilterCategory, filterTier, setFilterTier, filterSort, setFilterSort, visibleCount, setVisibleCount, lang }: {
+export function StoreView({ loading, filteredSkills, meta, t, prefix, navigate, searchQuery, setSearchQuery, filterAuthor, setFilterAuthor, filterCategory, setFilterCategory, filterTier, setFilterTier, filterSort, setFilterSort, visibleCount, setVisibleCount, lang }: {
   loading: boolean;
-  skills: Skill[];
   filteredSkills: Skill[];
   meta: StoreMeta;
   t: Translations;

@@ -9,7 +9,7 @@ import { KnowledgeGraph3D } from '../graph/KnowledgeGraph3D';
 import { getNodeColor, getConnectedNodes, CATEGORY_LABELS, CATEGORY_DESCRIPTIONS } from '../graph/colors';
 import { clusterGraphData } from '../graph/clustering';
 
-export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate, lang }: { skills: Skill[]; packages: PackageManifest[]; pkgId: string; skillId: string; t: Translations; prefix: string; navigate: (href: string) => void; lang: string }) {
+export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate }: { skills: Skill[]; packages: PackageManifest[]; pkgId: string; skillId: string; t: Translations; prefix: string; navigate: (href: string) => void }) {
   const skill = skills.find(s => s.packageId === pkgId && s.skillId === skillId);
   const rawPkg = packages.find(p => p.package_id === pkgId);
   const modules: string[] = rawPkg?.modules || [];
@@ -117,7 +117,12 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
     <>
       {/* Fullscreen 3D graph overlay */}
       {showGraph && (graphMode === 'files' ? !!fileGraphData : true) && (
-        <div className="fixed inset-0 z-50 bg-[#090909] flex flex-col overflow-hidden">
+        <div
+          className="fixed inset-0 z-50 bg-[#090909] flex flex-col overflow-hidden"
+          onKeyDown={(e) => { if (e.key === 'Escape') { setShowGraph(false); setSelectedNode(null); } }}
+          tabIndex={-1}
+          ref={(el) => el?.focus()}
+        >
           <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-white/10 gap-3">
             <div className="flex flex-wrap items-center gap-2 min-w-0">
               {graphBreadcrumb.map((crumb, i) => (
