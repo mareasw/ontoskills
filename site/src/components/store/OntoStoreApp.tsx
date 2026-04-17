@@ -241,10 +241,12 @@ function parseTtlKnowledgeMap(ttlContent: string, skillId: string) {
   nodes.push({ id: rootId, label: skillId, category: 'skill', qualifiedId: skillId, isHighlighted: true });
   seen.add(rootId);
 
-  const addNode = (id: string, label: string, category: string) => {
-    if (seen.has(id)) return;
+  const addNode = (id: string, label: string, category: string): GraphNode | null => {
+    if (seen.has(id)) return null;
     seen.add(id);
-    nodes.push({ id, label, category, qualifiedId: id, isHighlighted: false });
+    const node: GraphNode = { id, label, category, qualifiedId: id, isHighlighted: false };
+    nodes.push(node);
+    return node;
   };
 
   // dependsOnSkill
@@ -271,9 +273,8 @@ function parseTtlKnowledgeMap(ttlContent: string, skillId: string) {
     // Extract appliesToCondition if present
     const condMatch = ttlContent.match(new RegExp(`oc:${knId}[\\s\\S]*?oc:appliesToCondition\\s+"([^"]+)"`));
     const description = [fullContext, condMatch?.[1]].filter(Boolean).join(' — ') || undefined;
-    addNode(knId, label, knType);
-    // Store description on the last added node
-    nodes[nodes.length - 1].description = description;
+    const knNode = addNode(knId, label, knType);
+    if (knNode) knNode.description = description;
     edges.push({ source: rootId, target: knId });
   }
 
@@ -281,8 +282,8 @@ function parseTtlKnowledgeMap(ttlContent: string, skillId: string) {
   for (const m of ttlContent.matchAll(/oc:(yieldsState|requiresState)\s+oc:(\w+)/g)) {
     const stateId = `state:${m[2]}`;
     const stateLabel = m[2].replace(/([A-Z])/g, ' $1').trim();
-    addNode(stateId, stateLabel, m[1] === 'yieldsState' ? 'yield' : 'require');
-    nodes[nodes.length - 1].description = m[1] === 'yieldsState' ? `Produced after ${stateLabel.toLowerCase()}` : `Required before execution`;
+    const stateNode = addNode(stateId, stateLabel, m[1] === 'yieldsState' ? 'yield' : 'require');
+    if (stateNode) stateNode.description = m[1] === 'yieldsState' ? `Produced after ${stateLabel.toLowerCase()}` : `Required before execution`;
     edges.push({ source: rootId, target: stateId });
   }
   // Also capture states on continuation lines
@@ -790,7 +791,7 @@ function CopyButton({ text, t }: { text: string; t: typeof translations.en }) {
     }).catch(() => {});
   };
   return (
-    <button onClick={handleCopy} className="shrink-0 p-1.5 rounded hover:bg-white/5 opacity-40 hover:opacity-100 transition-opacity" title={t.copyToClipboard}>
+    <button type="button" onClick={handleCopy} className="shrink-0 p-1.5 rounded hover:bg-white/5 opacity-40 hover:opacity-100 transition-opacity" title={t.copyToClipboard} aria-label={t.copyToClipboard}>
       {copied ? (
         <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
       ) : (
@@ -918,6 +919,12 @@ export default function OntoStoreApp({ lang = 'en' }: { lang?: string }) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  const navClick = useCallback((href: string) => (e: React.MouseEvent) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    navigate(href);
+  }, [navigate]);
+
   // Reset filters when view changes
   useEffect(() => {
     setVisibleCount(20);
@@ -1036,7 +1043,7 @@ function SkillCard({ skill, t, prefix, navigate }: { skill: Skill; t: typeof tra
   return (
     <a
       href={`${prefix}/${skill.qualifiedId}`}
-      onClick={e => { e.preventDefault(); navigate(`${prefix}/${skill.qualifiedId}`); }}
+      onClick={navClick(`${prefix}/${skill.qualifiedId}`)}
       className="skill-card block rounded-xl border border-white/[0.07] bg-white/[0.02] p-5 flex flex-col gap-3 cursor-pointer hover:border-[#52c7e8]/30 hover:bg-[#52c7e8]/[0.04] hover:-translate-y-0.5 hover:shadow-[0_6px_24px_rgba(0,0,0,0.3)] transition-all duration-200"
     >
       <div className="flex items-start justify-between gap-2">
@@ -1066,7 +1073,7 @@ function AuthorView({ loading, skills, authorId, t, prefix, navigate }: { loadin
   return (
     <>
       <div className="breadcrumb flex items-center gap-2 text-sm mb-8">
-        <a href={prefix} onClick={e => { e.preventDefault(); navigate(prefix); }} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{t.storeLabel}</a>
+        <a href={prefix} onClick={navClick(prefix)} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{t.storeLabel}</a>
         <span className="text-[#8a8a8a]">/</span>
         <span className="text-[#f5f5f5] font-medium">{authorId}</span>
       </div>
@@ -1101,7 +1108,7 @@ function AuthorView({ loading, skills, authorId, t, prefix, navigate }: { loadin
         return (
           <div key={pid} className="mb-6 p-5 rounded-xl border border-white/[0.07] bg-white/[0.02] hover:border-white/[0.12] transition-colors">
             <div className="flex items-center gap-3 mb-3">
-              <a href={`${prefix}/${pid}`} onClick={e => { e.preventDefault(); navigate(`${prefix}/${pid}`); }} className="text-xl font-semibold text-[#f5f5f5] hover:text-[#52c7e8] transition-colors">{pkgName}</a>
+              <a href={`${prefix}/${pid}`} onClick={navClick(`${prefix}/${pid}`)} className="text-xl font-semibold text-[#f5f5f5] hover:text-[#52c7e8] transition-colors">{pkgName}</a>
               <TrustBadge tier={tier} t={t} />
               {ver && <span className="text-xs text-[#8a8a8a]">v{ver}</span>}
             </div>
@@ -1117,14 +1124,14 @@ function AuthorView({ loading, skills, authorId, t, prefix, navigate }: { loadin
                 <a
                   key={s.qualifiedId}
                   href={`${prefix}/${s.qualifiedId}`}
-                  onClick={e => { e.preventDefault(); navigate(`${prefix}/${s.qualifiedId}`); }}
+                  onClick={navClick(`${prefix}/${s.qualifiedId}`)}
                   className="px-3 py-2 rounded-lg bg-white/[0.02] border border-white/[0.05] text-sm text-[#d4d4d4] hover:border-[#52c7e8]/30 hover:text-[#52c7e8] transition-colors truncate"
                 >
                   {s.skillId}
                 </a>
               ))}
               {pkgSkills.length > 6 && (
-                <a href={`${prefix}/${pid}`} onClick={e => { e.preventDefault(); navigate(`${prefix}/${pid}`); }} className="px-3 py-2 rounded-lg bg-white/[0.02] border border-white/[0.05] text-sm text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">
+                <a href={`${prefix}/${pid}`} onClick={navClick(`${prefix}/${pid}`)} className="px-3 py-2 rounded-lg bg-white/[0.02] border border-white/[0.05] text-sm text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">
                   +{pkgSkills.length - 6} more
                 </a>
               )}
@@ -1157,9 +1164,9 @@ function PackageView({ loading, skills, packages, pkgId, t, prefix, navigate }: 
   return (
     <>
       <div className="breadcrumb flex items-center gap-2 text-sm mb-8">
-        <a href={prefix} onClick={e => { e.preventDefault(); navigate(prefix); }} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{t.storeLabel}</a>
+        <a href={prefix} onClick={navClick(prefix)} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{t.storeLabel}</a>
         <span className="text-[#8a8a8a]">/</span>
-        <a href={`${prefix}/${author}`} onClick={e => { e.preventDefault(); navigate(`${prefix}/${author}`); }} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{author}</a>
+        <a href={`${prefix}/${author}`} onClick={navClick(`${prefix}/${author}`)} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{author}</a>
         <span className="text-[#8a8a8a]">/</span>
         <span className="text-[#f5f5f5] font-medium">{pkgName}</span>
       </div>
@@ -1473,11 +1480,11 @@ function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate
       )}
 
       <div className="breadcrumb flex items-center gap-2 text-sm mb-8">
-        <a href={prefix} onClick={e => { e.preventDefault(); navigate(prefix); }} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{t.storeLabel}</a>
+        <a href={prefix} onClick={navClick(prefix)} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{t.storeLabel}</a>
         <span className="text-[#8a8a8a]">/</span>
-        <a href={`${prefix}/${author}`} onClick={e => { e.preventDefault(); navigate(`${prefix}/${author}`); }} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{author}</a>
+        <a href={`${prefix}/${author}`} onClick={navClick(`${prefix}/${author}`)} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{author}</a>
         <span className="text-[#8a8a8a]">/</span>
-        <a href={`${prefix}/${pkgId}`} onClick={e => { e.preventDefault(); navigate(`${prefix}/${pkgId}`); }} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{pkgName}</a>
+        <a href={`${prefix}/${pkgId}`} onClick={navClick(`${prefix}/${pkgId}`)} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{pkgName}</a>
         <span className="text-[#8a8a8a]">/</span>
         <span className="text-[#f5f5f5] font-medium">{skillId}</span>
       </div>
@@ -1524,7 +1531,7 @@ function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate
                     </span>
                   );
                   return (
-                    <a key={d} href={`${prefix}/${dep.qualifiedId}`} onClick={e => { e.preventDefault(); navigate(`${prefix}/${dep.qualifiedId}`); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-sm text-[#d4d4d4] hover:text-[#52c7e8] hover:bg-white/10 transition-colors">
+                    <a key={d} href={`${prefix}/${dep.qualifiedId}`} onClick={navClick(`${prefix}/${dep.qualifiedId}`)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-sm text-[#d4d4d4] hover:text-[#52c7e8] hover:bg-white/10 transition-colors">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
                       {d}
                     </a>
