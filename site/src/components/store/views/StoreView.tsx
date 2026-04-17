@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import type { Skill, Translations } from '../types';
 import { navClick } from '../helpers';
+import { getCategoryColor } from '../uiColors';
 import { TrustBadge } from '../components/TrustBadge';
 import { InstallBar } from '../components/InstallBar';
 
 export function SkillCard({ skill, t, prefix, navigate }: { skill: Skill; t: Translations; prefix: string; navigate: (href: string) => void }) {
+  const catColor = skill.category ? getCategoryColor(skill.category) : null;
   return (
     <a
       href={`${prefix}/${skill.qualifiedId}`}
@@ -18,7 +20,7 @@ export function SkillCard({ skill, t, prefix, navigate }: { skill: Skill; t: Tra
       <code className="text-xs text-[#8a8a8a] font-mono">{skill.qualifiedId}</code>
       <p className="skill-desc text-sm text-[#d4d4d4] leading-relaxed flex-1">{skill.description}</p>
       <div className="flex flex-wrap gap-1.5">
-        {skill.category && <span className="px-2.5 py-0.5 rounded-full bg-white/5 text-xs text-[#8a8a8a]">{skill.category}</span>}
+        {skill.category && catColor && <span className={`px-2.5 py-0.5 rounded-full ${catColor.bg} ${catColor.text} text-xs font-medium`}>{skill.category}</span>}
         {skill.aliases.slice(0, 3).map(a => <span key={a} className="px-2 py-0.5 rounded-full bg-white/5 text-xs text-[#8a8a8a]">{a}</span>)}
       </div>
       <InstallBar command={skill.installCommand} t={t} id={`card-${skill.qualifiedId}`} />
