@@ -126,7 +126,7 @@ export default function OntoStoreApp({ lang = 'en' }: { lang?: string }) {
   }
 
   return (
-    <div className="ontoskills-store-root overflow-x-hidden">
+    <div className="ontoskills-store-root overflow-x-hidden pt-8 sm:pt-10">
       <div className="store-glow" />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative">
         {viewMode === 'store' && <StoreView loading={loading} skills={skills} filteredSkills={filteredSkills} meta={meta} t={t} prefix={prefix} navigate={navigate} searchQuery={searchQuery} setSearchQuery={setSearchQuery} filterAuthor={filterAuthor} setFilterAuthor={setFilterAuthor} filterCategory={filterCategory} setFilterCategory={setFilterCategory} filterTier={filterTier} setFilterTier={setFilterTier} filterSort={filterSort} setFilterSort={setFilterSort} visibleCount={visibleCount} setVisibleCount={setVisibleCount} lang={lang} />}
