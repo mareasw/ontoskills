@@ -504,15 +504,11 @@ function GraphNodeSphere({ node, position, onClick, dimmed = false }: {
 
 function GraphEdgeLine({ start, end, sourceColor, targetColor }: { start: [number, number, number]; end: [number, number, number]; sourceColor?: string; targetColor?: string }) {
   if (!start.every(isFinite) || !end.every(isFinite)) return null;
-  const colors = useMemo(() => {
-    const c1 = new THREE.Color(sourceColor || '#ffffff');
-    const c2 = new THREE.Color(targetColor || '#ffffff');
-    return new Float32Array([c1.r, c1.g, c1.b, c2.r, c2.g, c2.b]);
-  }, [sourceColor, targetColor]);
+  const midColor = sourceColor || targetColor || '#ffffff';
   return (
     <Line
       points={[start, end]}
-      vertexColors={colors}
+      color={midColor}
       lineWidth={1.5}
       transparent
       opacity={0.25}
@@ -900,10 +896,6 @@ export default function OntoStoreApp({ lang = 'en' }: { lang?: string }) {
 
   // ─── Render ───────────────────────────────────────────────
 
-  if (loading) {
-    return <div className="text-center py-20 text-[#8a8a8a]">{t.connecting}</div>;
-  }
-
   if (error) {
     return (
       <div className="text-center py-20">
@@ -917,9 +909,9 @@ export default function OntoStoreApp({ lang = 'en' }: { lang?: string }) {
     <div className="ontoskills-store-root overflow-x-hidden">
       <div className="store-glow" />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative">
-        {viewMode === 'store' && <StoreView skills={skills} filteredSkills={filteredSkills} meta={meta} t={t} prefix={prefix} navigate={navigate} searchQuery={searchQuery} setSearchQuery={setSearchQuery} filterAuthor={filterAuthor} setFilterAuthor={setFilterAuthor} filterCategory={filterCategory} setFilterCategory={setFilterCategory} filterTier={filterTier} setFilterTier={setFilterTier} filterSort={filterSort} setFilterSort={setFilterSort} visibleCount={visibleCount} setVisibleCount={setVisibleCount} lang={lang} />}
-        {viewMode === 'author' && <AuthorView skills={skills} authorId={authorId} t={t} prefix={prefix} navigate={navigate} />}
-        {viewMode === 'package' && <PackageView skills={skills} packages={packages} pkgId={pkgId} t={t} prefix={prefix} navigate={navigate} />}
+        {viewMode === 'store' && <StoreView loading={loading} skills={skills} filteredSkills={filteredSkills} meta={meta} t={t} prefix={prefix} navigate={navigate} searchQuery={searchQuery} setSearchQuery={setSearchQuery} filterAuthor={filterAuthor} setFilterAuthor={setFilterAuthor} filterCategory={filterCategory} setFilterCategory={setFilterCategory} filterTier={filterTier} setFilterTier={setFilterTier} filterSort={filterSort} setFilterSort={setFilterSort} visibleCount={visibleCount} setVisibleCount={setVisibleCount} lang={lang} />}
+        {viewMode === 'author' && <AuthorView loading={loading} skills={skills} authorId={authorId} t={t} prefix={prefix} navigate={navigate} />}
+        {viewMode === 'package' && <PackageView loading={loading} skills={skills} packages={packages} pkgId={pkgId} t={t} prefix={prefix} navigate={navigate} />}
         {viewMode === 'skill' && <SkillDetailView skills={skills} packages={packages} pkgId={pkgId} skillId={skillId} t={t} prefix={prefix} navigate={navigate} lang={lang} />}
       </div>
     </div>
@@ -928,7 +920,7 @@ export default function OntoStoreApp({ lang = 'en' }: { lang?: string }) {
 
 // ─── Store View ───────────────────────────────────────────
 
-function StoreView({ skills, filteredSkills, meta, t, prefix, navigate, searchQuery, setSearchQuery, filterAuthor, setFilterAuthor, filterCategory, setFilterCategory, filterTier, setFilterTier, filterSort, setFilterSort, visibleCount, setVisibleCount, lang }: any) {
+function StoreView({ loading, skills, filteredSkills, meta, t, prefix, navigate, searchQuery, setSearchQuery, filterAuthor, setFilterAuthor, filterCategory, setFilterCategory, filterTier, setFilterTier, filterSort, setFilterSort, visibleCount, setVisibleCount, lang }: any) {
   const docsLink = lang === 'zh' ? '/zh/docs/getting-started/' : '/docs/getting-started/';
   const visible = filteredSkills.slice(0, visibleCount);
   const remaining = filteredSkills.length - visibleCount;
@@ -976,7 +968,12 @@ function StoreView({ skills, filteredSkills, meta, t, prefix, navigate, searchQu
       </div>
 
       {/* Grid */}
-      {!filteredSkills.length ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-20 gap-3">
+          <div className="w-5 h-5 border-2 border-[#52c7e8]/30 border-t-[#52c7e8] rounded-full animate-spin"></div>
+          <p className="text-[#8a8a8a] text-sm">{t.connecting}</p>
+        </div>
+      ) : !filteredSkills.length ? (
         <div className="py-16 text-center">
           <p className="text-[#d4d4d4] mb-2">{t.noMatch}</p>
           <p className="text-sm text-[#8a8a8a]">{t.trySearch}</p>
@@ -1025,7 +1022,7 @@ function SkillCard({ skill, t, prefix, navigate }: { skill: Skill; t: typeof tra
 
 // ─── Author View ──────────────────────────────────────────
 
-function AuthorView({ skills, authorId, t, prefix, navigate }: { skills: Skill[]; authorId: string; t: typeof translations.en; prefix: string; navigate: (href: string) => void }) {
+function AuthorView({ loading, skills, authorId, t, prefix, navigate }: { loading: boolean; skills: Skill[]; authorId: string; t: typeof translations.en; prefix: string; navigate: (href: string) => void }) {
   const authorSkills = skills.filter(s => s.author === authorId);
   const pkgMap: Record<string, Skill[]> = {};
   authorSkills.forEach(s => { pkgMap[s.packageId] = pkgMap[s.packageId] || []; pkgMap[s.packageId].push(s); });
@@ -1057,7 +1054,12 @@ function AuthorView({ skills, authorId, t, prefix, navigate }: { skills: Skill[]
           ))}
         </div>
       </div>
-      {Object.entries(pkgMap).map(([pid, pkgSkills]) => {
+      {loading ? (
+        <div className="flex items-center justify-center py-16 gap-3">
+          <div className="w-5 h-5 border-2 border-[#52c7e8]/30 border-t-[#52c7e8] rounded-full animate-spin"></div>
+          <p className="text-[#8a8a8a] text-sm">{t.connecting}</p>
+        </div>
+      ) : Object.entries(pkgMap).map(([pid, pkgSkills]) => {
         const tier = pkgSkills[0]?.trustTier || 'verified';
         const ver = pkgSkills[0]?.version || '';
         const pkgName = pid.split('/').slice(1).join('/');
@@ -1102,7 +1104,7 @@ function AuthorView({ skills, authorId, t, prefix, navigate }: { skills: Skill[]
 
 // ─── Package View ─────────────────────────────────────────
 
-function PackageView({ skills, packages, pkgId, t, prefix, navigate }: { skills: Skill[]; packages: any[]; pkgId: string; t: typeof translations.en; prefix: string; navigate: (href: string) => void }) {
+function PackageView({ loading, skills, packages, pkgId, t, prefix, navigate }: { loading: boolean; skills: Skill[]; packages: any[]; pkgId: string; t: typeof translations.en; prefix: string; navigate: (href: string) => void }) {
   const pkgSkills = skills.filter(s => s.packageId === pkgId);
   const author = pkgId.split('/')[0];
   const pkgName = pkgId.split('/').slice(1).join('/');
@@ -1154,9 +1156,16 @@ function PackageView({ skills, packages, pkgId, t, prefix, navigate }: { skills:
       )}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {pkgSkills.map(s => <SkillCard key={s.qualifiedId} skill={s} t={t} prefix={prefix} navigate={navigate} />)}
-          </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-16 gap-3">
+              <div className="w-5 h-5 border-2 border-[#52c7e8]/30 border-t-[#52c7e8] rounded-full animate-spin"></div>
+              <p className="text-[#8a8a8a] text-sm">{t.connecting}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {pkgSkills.map(s => <SkillCard key={s.qualifiedId} skill={s} t={t} prefix={prefix} navigate={navigate} />)}
+            </div>
+          )}
         </div>
         <div className="space-y-4">
           <div className="section-panel">
