@@ -1,21 +1,64 @@
+/**
+ * Category color palette for 3D graph nodes.
+ *
+ * Design rules:
+ * - Colors are perceptually spaced (~30° hue separation) for maximum distinction
+ * - Saturation kept at 70–85% for vibrancy on dark backgrounds
+ * - Lightness kept at 60–70% for readability without eye strain
+ * - File categories (main/prompt/test/module) use warm tones
+ * - Semantic categories (anti-pattern/recovery/failure) use alert tones
+ * - State categories (yield/require/tool) use cool/muted tones
+ */
+
+// 16 hues spaced ~22.5° apart, high saturation, good lightness for dark bg
+const HUE_PALETTE = [
+  '#e05252', // 0°   red
+  '#e07a3a', // 25°  burnt orange
+  '#dba32c', // 45°  gold
+  '#a8c034', // 75°  yellow-green
+  '#52bf5a', // 130° green
+  '#38c490', // 160° teal-green
+  '#36c5b8', // 175° teal
+  '#3bb8c9', // 195° cyan
+  '#3da0d9', // 210° blue
+  '#5482d6', // 225° royal blue
+  '#7b6ad8', // 255° indigo
+  '#9d5cd5', // 275° purple
+  '#c054c9', // 295° magenta
+  '#d64f9f', // 320° hot pink
+  '#d84d74', // 340° rose
+  '#d85a5e', // 355° coral
+];
+
 export const CATEGORY_COLORS: Record<string, string> = {
-  skill:         '#52c7e8',
-  main:          '#818cf8',
-  prompt:        '#4ade80',
-  test:          '#fbbf24',
-  module:        '#f472b6',
-  dependency:    '#fb923c',
-  AntiPattern:   '#ef4444',
-  RecoveryTactic:'#e879f9',
-  failure:       '#a16207',
-  yield:         '#2dd4bf',
-  require:       '#a78bfa',
-  tool:          '#facc15',
-  productivity:  '#38bdf8',
-  development:   '#67e8f9',
+  // Skill root
+  skill:          '#e0e0e0', // bright neutral white — root node stands out
+
+  // File categories — warm family
+  main:           '#dba32c', // gold
+  prompt:         '#e07a3a', // burnt orange
+  test:           '#52bf5a', // green
+  module:         '#c054c9', // magenta
+
+  // Dependency
+  dependency:     '#3da0d9', // blue
+
+  // Semantic — alert family
+  AntiPattern:    '#e05252', // red
+  RecoveryTactic: '#36c5b8', // teal
+  failure:        '#d84d74', // rose
+
+  // State categories — cool/muted family
+  yield:          '#38c490', // teal-green
+  require:        '#7b6ad8', // indigo
+  tool:           '#e0e0e0', // neutral (same as skill, distinct by label)
+
+  // Domain categories
+  productivity:   '#5482d6', // royal blue
+  development:    '#a8c034', // yellow-green
 };
 
-export const PALETTE_FALLBACK = ['#f97316','#ec4899','#06b6d4','#84cc16','#d946ef','#14b8a6','#f43f5e','#0ea5e9','#eab308','#7c3aed','#10b981','#e11d48','#6366f1','#f59e0b','#22d3ee','#be123c'];
+export const PALETTE_FALLBACK = HUE_PALETTE;
 
 export function hashStr(s: string): number {
   let h = 0;
@@ -39,20 +82,20 @@ export function getConnectedNodes(node: import('../types').GraphNode, edges: imp
 }
 
 export const CATEGORY_LABELS: Record<string, [string, string]> = {
-  skill: ['Skill', CATEGORY_COLORS.skill],
-  main: ['ontoskill.ttl', CATEGORY_COLORS.main],
-  prompt: ['Prompt', CATEGORY_COLORS.prompt],
-  test: ['Test', CATEGORY_COLORS.test],
-  module: ['Module', CATEGORY_COLORS.module],
-  dependency: ['Depends on', CATEGORY_COLORS.dependency],
-  AntiPattern: ['Anti-pattern', CATEGORY_COLORS.AntiPattern],
-  RecoveryTactic: ['Recovery', CATEGORY_COLORS.RecoveryTactic],
-  failure: ['Failure', CATEGORY_COLORS.failure],
-  yield: ['Yields', CATEGORY_COLORS.yield],
-  require: ['Requires', CATEGORY_COLORS.require],
-  tool: ['Tool', CATEGORY_COLORS.tool],
-  productivity: ['Productivity', CATEGORY_COLORS.productivity],
-  development: ['Development', CATEGORY_COLORS.development],
+  skill:           ['Skill',          CATEGORY_COLORS.skill],
+  main:            ['ontoskill.ttl',  CATEGORY_COLORS.main],
+  prompt:          ['Prompt',         CATEGORY_COLORS.prompt],
+  test:            ['Test',           CATEGORY_COLORS.test],
+  module:          ['Module',         CATEGORY_COLORS.module],
+  dependency:      ['Depends on',     CATEGORY_COLORS.dependency],
+  AntiPattern:     ['Anti-pattern',   CATEGORY_COLORS.AntiPattern],
+  RecoveryTactic:  ['Recovery',       CATEGORY_COLORS.RecoveryTactic],
+  failure:         ['Failure',        CATEGORY_COLORS.failure],
+  yield:           ['Yields',         CATEGORY_COLORS.yield],
+  require:         ['Requires',       CATEGORY_COLORS.require],
+  tool:            ['Tool',           CATEGORY_COLORS.tool],
+  productivity:    ['Productivity',   CATEGORY_COLORS.productivity],
+  development:     ['Development',    CATEGORY_COLORS.development],
 };
 
 export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
