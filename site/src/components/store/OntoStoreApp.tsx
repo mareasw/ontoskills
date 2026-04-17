@@ -217,6 +217,14 @@ function packageHasDeps(skillList: Skill[]) {
   return skillList.some(s => s.dependsOn.some(d => idSet.has(d)));
 }
 
+function navClick(href: string, navigate: (href: string) => void) {
+  return (e: React.MouseEvent) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    navigate(href);
+  };
+}
+
 const TTL_BASE = STORE_INDEX_URL.replace('index.json', 'packages/');
 
 function buildFileGraphData(modules: string[], skillId: string) {
@@ -926,12 +934,6 @@ export default function OntoStoreApp({ lang = 'en' }: { lang?: string }) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  const navClick = useCallback((href: string) => (e: React.MouseEvent) => {
-    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-    e.preventDefault();
-    navigate(href);
-  }, [navigate]);
-
   // Reset filters when view changes
   useEffect(() => {
     setVisibleCount(20);
@@ -1050,7 +1052,7 @@ function SkillCard({ skill, t, prefix, navigate }: { skill: Skill; t: typeof tra
   return (
     <a
       href={`${prefix}/${skill.qualifiedId}`}
-      onClick={navClick(`${prefix}/${skill.qualifiedId}`)}
+      onClick={navClick(`${prefix}/${skill.qualifiedId}`, navigate)}
       className="skill-card block rounded-xl border border-white/[0.07] bg-white/[0.02] p-5 flex flex-col gap-3 cursor-pointer hover:border-[#52c7e8]/30 hover:bg-[#52c7e8]/[0.04] hover:-translate-y-0.5 hover:shadow-[0_6px_24px_rgba(0,0,0,0.3)] transition-all duration-200"
     >
       <div className="flex items-start justify-between gap-2">
@@ -1080,7 +1082,7 @@ function AuthorView({ loading, skills, authorId, t, prefix, navigate }: { loadin
   return (
     <>
       <div className="breadcrumb flex items-center gap-2 text-sm mb-8">
-        <a href={prefix} onClick={navClick(prefix)} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{t.storeLabel}</a>
+        <a href={prefix} onClick={navClick(prefix, navigate)} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{t.storeLabel}</a>
         <span className="text-[#8a8a8a]">/</span>
         <span className="text-[#f5f5f5] font-medium">{authorId}</span>
       </div>
@@ -1115,7 +1117,7 @@ function AuthorView({ loading, skills, authorId, t, prefix, navigate }: { loadin
         return (
           <div key={pid} className="mb-6 p-5 rounded-xl border border-white/[0.07] bg-white/[0.02] hover:border-white/[0.12] transition-colors">
             <div className="flex items-center gap-3 mb-3">
-              <a href={`${prefix}/${pid}`} onClick={navClick(`${prefix}/${pid}`)} className="text-xl font-semibold text-[#f5f5f5] hover:text-[#52c7e8] transition-colors">{pkgName}</a>
+              <a href={`${prefix}/${pid}`} onClick={navClick(`${prefix}/${pid}`, navigate)} className="text-xl font-semibold text-[#f5f5f5] hover:text-[#52c7e8] transition-colors">{pkgName}</a>
               <TrustBadge tier={tier} t={t} />
               {ver && <span className="text-xs text-[#8a8a8a]">v{ver}</span>}
             </div>
@@ -1131,14 +1133,14 @@ function AuthorView({ loading, skills, authorId, t, prefix, navigate }: { loadin
                 <a
                   key={s.qualifiedId}
                   href={`${prefix}/${s.qualifiedId}`}
-                  onClick={navClick(`${prefix}/${s.qualifiedId}`)}
+                  onClick={navClick(`${prefix}/${s.qualifiedId}`, navigate)}
                   className="px-3 py-2 rounded-lg bg-white/[0.02] border border-white/[0.05] text-sm text-[#d4d4d4] hover:border-[#52c7e8]/30 hover:text-[#52c7e8] transition-colors truncate"
                 >
                   {s.skillId}
                 </a>
               ))}
               {pkgSkills.length > 6 && (
-                <a href={`${prefix}/${pid}`} onClick={navClick(`${prefix}/${pid}`)} className="px-3 py-2 rounded-lg bg-white/[0.02] border border-white/[0.05] text-sm text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">
+                <a href={`${prefix}/${pid}`} onClick={navClick(`${prefix}/${pid}`, navigate)} className="px-3 py-2 rounded-lg bg-white/[0.02] border border-white/[0.05] text-sm text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">
                   +{pkgSkills.length - 6} more
                 </a>
               )}
@@ -1171,9 +1173,9 @@ function PackageView({ loading, skills, packages, pkgId, t, prefix, navigate }: 
   return (
     <>
       <div className="breadcrumb flex items-center gap-2 text-sm mb-8">
-        <a href={prefix} onClick={navClick(prefix)} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{t.storeLabel}</a>
+        <a href={prefix} onClick={navClick(prefix, navigate)} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{t.storeLabel}</a>
         <span className="text-[#8a8a8a]">/</span>
-        <a href={`${prefix}/${author}`} onClick={navClick(`${prefix}/${author}`)} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{author}</a>
+        <a href={`${prefix}/${author}`} onClick={navClick(`${prefix}/${author}`, navigate)} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{author}</a>
         <span className="text-[#8a8a8a]">/</span>
         <span className="text-[#f5f5f5] font-medium">{pkgName}</span>
       </div>
@@ -1500,11 +1502,11 @@ function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate
       )}
 
       <div className="breadcrumb flex items-center gap-2 text-sm mb-8">
-        <a href={prefix} onClick={navClick(prefix)} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{t.storeLabel}</a>
+        <a href={prefix} onClick={navClick(prefix, navigate)} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{t.storeLabel}</a>
         <span className="text-[#8a8a8a]">/</span>
-        <a href={`${prefix}/${author}`} onClick={navClick(`${prefix}/${author}`)} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{author}</a>
+        <a href={`${prefix}/${author}`} onClick={navClick(`${prefix}/${author}`, navigate)} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{author}</a>
         <span className="text-[#8a8a8a]">/</span>
-        <a href={`${prefix}/${pkgId}`} onClick={navClick(`${prefix}/${pkgId}`)} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{pkgName}</a>
+        <a href={`${prefix}/${pkgId}`} onClick={navClick(`${prefix}/${pkgId}`, navigate)} className="text-[#8a8a8a] hover:text-[#52c7e8] transition-colors">{pkgName}</a>
         <span className="text-[#8a8a8a]">/</span>
         <span className="text-[#f5f5f5] font-medium">{skillId}</span>
       </div>
@@ -1551,7 +1553,7 @@ function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate
                     </span>
                   );
                   return (
-                    <a key={d} href={`${prefix}/${dep.qualifiedId}`} onClick={navClick(`${prefix}/${dep.qualifiedId}`)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-sm text-[#d4d4d4] hover:text-[#52c7e8] hover:bg-white/10 transition-colors">
+                    <a key={d} href={`${prefix}/${dep.qualifiedId}`} onClick={navClick(`${prefix}/${dep.qualifiedId}`, navigate)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-sm text-[#d4d4d4] hover:text-[#52c7e8] hover:bg-white/10 transition-colors">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
                       {d}
                     </a>
