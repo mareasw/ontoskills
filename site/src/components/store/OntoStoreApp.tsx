@@ -1484,13 +1484,17 @@ function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate
                 <button onClick={() => setGraphMode('knowledge')} className={`px-2.5 py-1 rounded text-xs transition-colors ${graphMode === 'knowledge' ? 'bg-[#52c7e8]/20 text-[#52c7e8]' : 'text-[#8a8a8a] hover:text-[#d4d4d4]'}`}>{t.knowledgeMap}</button>
               </div>
             </div>
-            <button onClick={openGraph} className="w-full flex items-center justify-center gap-2 py-4 rounded-lg bg-white/[0.03] border border-white/10 hover:border-[#52c7e8]/30 hover:bg-[#52c7e8]/[0.04] transition-all group cursor-pointer">
-              <svg className="w-5 h-5 text-[#52c7e8] group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
-              <span className="text-sm text-[#d4d4d4] group-hover:text-[#52c7e8] transition-colors">{t.openGraph}</span>
-            </button>
-            <p className="text-xs text-[#8a8a8a] mt-2">
-              {graphMode === 'files' ? `${treeModules.length} TTL files` : `${knowledgeData?.nodes.length ?? '…'} nodes`}
+            <p className="text-sm text-[#8a8a8a] mb-3">
+              {graphMode === 'files'
+                ? `${treeModules.length} file${treeModules.length !== 1 ? 's' : ''} in this skill`
+                : knowledgeData
+                  ? `${knowledgeData.nodes.length} nodes · ${knowledgeData.edges.length} edges`
+                  : 'Parsed from TTL ontology data'}
             </p>
+            <button onClick={openGraph} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-lg bg-[#52c7e8]/[0.06] border border-[#52c7e8]/20 hover:bg-[#52c7e8]/[0.12] hover:border-[#52c7e8]/30 transition-all group cursor-pointer">
+              <svg className="w-4.5 h-4.5 text-[#52c7e8] group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
+              <span className="text-sm font-medium text-[#52c7e8] group-hover:text-[#f5f5f5] transition-colors">{t.openGraph}</span>
+            </button>
           </div>
         </div>
       </div>

@@ -5,7 +5,12 @@ import Footer from '../../../components/landing/Footer.astro';
 import OntoStoreApp from '../../../components/store/OntoStoreApp.astro';
 
 export function getStaticPaths() {
-  return [{ params: { slug: undefined } }];
+  return [
+    { params: { slug: undefined } },
+    { params: { slug: 'a' } },
+    { params: { slug: 'a/b' } },
+    { params: { slug: 'a/b/c' } },
+  ];
 }
 ---
 

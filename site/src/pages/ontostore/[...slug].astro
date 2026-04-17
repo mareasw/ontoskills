@@ -5,7 +5,14 @@ import Footer from '../../components/landing/Footer.astro';
 import OntoStoreApp from '../../components/store/OntoStoreApp.astro';
 
 export function getStaticPaths() {
-  return [{ params: { slug: undefined } }];
+  // Generate pages for all SPA sub-routes: root, author, package, skill
+  // The React component handles URL parsing client-side
+  return [
+    { params: { slug: undefined } },          // /ontostore/
+    { params: { slug: 'a' } },                // /ontostore/:author
+    { params: { slug: 'a/b' } },              // /ontostore/:author/:package
+    { params: { slug: 'a/b/c' } },            // /ontostore/:author/:package/:skill
+  ];
 }
 ---
 
