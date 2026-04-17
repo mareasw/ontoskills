@@ -35,6 +35,8 @@ export const CATEGORY_UI_COLORS: Record<string, { bg: string; text: string }> = 
   development:   { bg: 'bg-[#a8c034]/10', text: 'text-[#a8c034]' },
 };
 
+import { hashStr } from './helpers';
+
 // ─── Stat pill colors ──────────────────────────────────────
 export const STAT_COLORS = {
   intents:      { icon: 'text-[#dba32c]', bg: 'bg-[#dba32c]/[0.07]', border: 'border-[#dba32c]/15' },
@@ -64,15 +66,9 @@ const CATEGORY_PALETTE = [
   { bg: 'bg-[#d84d74]/10', text: 'text-[#d84d74]' },   // rose
 ];
 
-function hashCategory(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
-}
-
 export function getCategoryColor(category: string): { bg: string; text: string } {
   if (CATEGORY_UI_COLORS[category]) return CATEGORY_UI_COLORS[category];
-  return CATEGORY_PALETTE[hashCategory(category) % CATEGORY_PALETTE.length];
+  return CATEGORY_PALETTE[hashStr(category) % CATEGORY_PALETTE.length];
 }
 
 export function getTierColor(tier: string) {
