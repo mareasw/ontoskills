@@ -496,10 +496,13 @@ function GraphNodeSphere({ node, position, onClick, dimmed = false }: {
       >
         <div style={labelStyle}>{node.label}</div>
       </Html>
-      {/* Hover tooltip above node */}
+      {/* Hover tooltip above node — clickable to select node */}
       {hovered && !dimmed && (
-        <Html position={[0, radius + 1.2, 0]} center style={{ pointerEvents: 'none' }} zIndexRange={[100, 0]}>
-          <div style={tooltipStyle}>
+        <Html position={[0, radius + 1.2, 0]} center zIndexRange={[100, 0]}>
+          <div
+            onClick={() => onClick(node)}
+            style={{ ...tooltipStyle, pointerEvents: 'auto', cursor: 'pointer' }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, display: 'inline-block' }} />
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#f5f5f5' }}>{node.label}</span>
