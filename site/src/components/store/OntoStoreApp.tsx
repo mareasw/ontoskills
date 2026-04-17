@@ -381,25 +381,34 @@ function layoutForce3D(nodes: GraphNode[], edges: GraphEdge[]) {
 // ─── 3D Graph Components ──────────────────────────────────
 
 const CATEGORY_COLORS: Record<string, string> = {
-  skill: '#52c7e8',          // cyan
-  main: '#38bdf8',           // sky blue
-  prompt: '#85f496',         // green
-  test: '#fbbf24',           // amber
-  module: '#6ed8c4',         // teal
-  dependency: '#92eff4',     // light aqua
-  AntiPattern: '#f472b6',    // pink
-  RecoveryTactic: '#fb923c', // orange
-  failure: '#ef4444',        // red
-  yield: '#34d399',          // emerald
-  require: '#a78bfa',        // violet
-  tool: '#facc15',           // yellow
-  productivity: '#2dd4bf',   // cyan-teal
-  development: '#60a5fa',    // blue
+  skill:         '#52c7e8',
+  main:          '#818cf8',
+  prompt:        '#4ade80',
+  test:          '#fbbf24',
+  module:        '#f472b6',
+  dependency:    '#fb923c',
+  AntiPattern:   '#ef4444',
+  RecoveryTactic:'#e879f9',
+  failure:       '#a16207',
+  yield:         '#2dd4bf',
+  require:       '#a78bfa',
+  tool:          '#facc15',
+  productivity:  '#38bdf8',
+  development:   '#67e8f9',
 };
+
+const PALETTE_FALLBACK = ['#f97316','#ec4899','#06b6d4','#84cc16','#d946ef','#14b8a6','#f43f5e','#0ea5e9','#eab308','#7c3aed','#10b981','#e11d48','#6366f1','#f59e0b','#22d3ee','#be123c'];
+
+function hashStr(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
 
 function getNodeColor(category: string, isHighlighted: boolean): string {
   if (isHighlighted) return '#52c7e8';
-  return CATEGORY_COLORS[category] || '#9763e1';
+  if (CATEGORY_COLORS[category]) return CATEGORY_COLORS[category];
+  return PALETTE_FALLBACK[hashStr(category) % PALETTE_FALLBACK.length];
 }
 
 function getConnectedNodes(node: GraphNode, edges: GraphEdge[], allNodes: GraphNode[]): GraphNode[] {
@@ -694,14 +703,15 @@ function KnowledgeGraph3D({ nodes, edges, onNodeClick, height = 350, selectedNod
             <div className="flex items-center gap-3 px-4 py-2.5">
               <span className="text-xs uppercase tracking-wider text-[#8a8a8a]">Legend</span>
               {cats.map(c => {
-                const entry = CATEGORY_LABELS[c] || [c, '#9763e1'];
+                const color = getNodeColor(c, false);
+                const label = CATEGORY_LABELS[c]?.[0] || c;
                 return (
                   <button
                     key={c}
                     onClick={() => onHighlightCategory?.(highlightCategory === c ? null : c)}
                     className={`w-5 h-5 rounded-full border-2 transition-all duration-150 ${highlightCategory === c ? 'scale-125 border-white/40' : 'border-transparent hover:scale-110'}`}
-                    style={{ background: entry[1] }}
-                    title={entry[0]}
+                    style={{ background: color }}
+                    title={label}
                   />
                 );
               })}
@@ -710,14 +720,15 @@ function KnowledgeGraph3D({ nodes, edges, onNodeClick, height = 350, selectedNod
               </button>
             </div>
             {legendExpanded && (
-              <div className="border-t border-white/[0.06] px-4 py-3 space-y-2 max-h-56 overflow-y-auto">
+              <div className="border-t border-white/[0.06] px-4 py-3 space-y-2.5 max-h-[70vh] overflow-y-auto">
                 {cats.map(c => {
-                  const entry = CATEGORY_LABELS[c] || [c, '#9763e1'];
+                  const color = getNodeColor(c, false);
+                  const label = CATEGORY_LABELS[c]?.[0] || c;
                   return (
                     <div key={c} className="flex items-start gap-2.5">
-                      <span className="w-3 h-3 rounded-full mt-0.5 shrink-0" style={{ background: entry[1] }} />
+                      <span className="w-3.5 h-3.5 rounded-full mt-0.5 shrink-0" style={{ background: color }} />
                       <div>
-                        <span className="text-sm font-medium text-[#d4d4d4]">{entry[0]}</span>
+                        <span className="text-sm font-medium text-[#d4d4d4]">{label}</span>
                         <p className="text-xs text-[#8a8a8a] leading-relaxed">{CATEGORY_DESCRIPTIONS[c] || ''}</p>
                       </div>
                     </div>
