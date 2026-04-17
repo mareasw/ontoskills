@@ -241,7 +241,7 @@ a:hover {
   border-bottom: none;
 }
 
-/* Headings - cleaner, no borders */
+/* Headings (dark mode) - cleaner, no borders */
 :root[data-theme='dark'] .sl-markdown-content h1 {
   border-bottom: none;
   padding-bottom: 0;
