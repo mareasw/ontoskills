@@ -85,9 +85,15 @@ export default function OntoStoreApp({ lang = 'en' }: { lang?: string }) {
   useEffect(() => {
     const parse = () => {
       let path = window.location.pathname.replace(/\/$/, '');
+      // Check URL param redirect (?r=...) — set by 404 page for deep links
       try {
-        const saved = sessionStorage.getItem('ontostore:redirect');
-        if (saved) { sessionStorage.removeItem('ontostore:redirect'); history.replaceState(null, '', saved); path = saved.replace(/\/$/, ''); }
+        const params = new URLSearchParams(window.location.search);
+        const r = params.get('r');
+        if (r) {
+          const full = prefix + '/' + r.replace(/^\//, '');
+          history.replaceState(null, '', full);
+          path = full;
+        }
       } catch {}
       const storePath = path.replace(prefix, '').replace(/^\//, '');
       const segments = storePath ? storePath.split('/') : [];

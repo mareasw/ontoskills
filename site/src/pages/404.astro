@@ -29,11 +29,8 @@ import Footer from '../components/landing/Footer.astro';
     var p=window.location.pathname;
     if(/^\/(zh\/)?ontostore\//.test(p)&&p!=='/ontostore/'&&p!=='/zh/ontostore/'){
       var prefix=p.startsWith('/zh/')?'/zh':'';
-      var target=prefix+'/ontostore/';
-      try{
-        sessionStorage.setItem('ontostore:redirect',p+window.location.search+window.location.hash);
-      }catch(e){}
-      window.location.replace(target);
+      var sub=p.replace(/^\/(zh\/)?ontostore\/?/,'');
+      window.location.replace(prefix+'/ontostore/?r='+encodeURIComponent(sub));
     }
   })();
 </script>
