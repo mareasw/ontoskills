@@ -7,6 +7,7 @@ import { InstallBar } from '../components/InstallBar';
 import { getCategoryColor, STAT_COLORS } from '../uiColors';
 import { KnowledgeGraph3D } from '../graph/KnowledgeGraph3D';
 import { getNodeColor, getConnectedNodes, CATEGORY_LABELS, CATEGORY_DESCRIPTIONS } from '../graph/colors';
+import { clusterGraphData } from '../graph/clustering';
 
 export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate, lang }: { skills: Skill[]; packages: PackageManifest[]; pkgId: string; skillId: string; t: Translations; prefix: string; navigate: (href: string) => void; lang: string }) {
   const skill = skills.find(s => s.packageId === pkgId && s.skillId === skillId);
@@ -93,6 +94,13 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
 
   const activeGraphData = graphMode === 'files' ? fileGraphData : knowledgeData;
 
+  const clusteredKnowledgeData = useMemo(() => {
+    if (!knowledgeData) return null;
+    return clusterGraphData(knowledgeData.nodes, knowledgeData.edges);
+  }, [knowledgeData]);
+
+  const displayGraphData = graphMode === 'files' ? fileGraphData : clusteredKnowledgeData;
+
   if (!skill) {
     return <div className="text-center py-20"><p className="text-[#d4d4d4] text-lg">{t.noMatch}</p></div>;
   }
@@ -103,7 +111,7 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
   return (
     <>
       {/* Fullscreen 3D graph overlay */}
-      {showGraph && activeGraphData && (
+      {showGraph && displayGraphData && (
         <div className="fixed inset-0 z-50 bg-[#090909] flex flex-col">
           <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-white/10 gap-3">
             <div className="flex flex-wrap items-center gap-2 min-w-0">
@@ -142,8 +150,8 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
               <div className="flex items-center justify-center h-full"><p className="text-[#f9a8d4]">{t.graphError}</p></div>
             ) : (
               <KnowledgeGraph3D
-                nodes={activeGraphData.nodes}
-                edges={activeGraphData.edges}
+                nodes={displayGraphData.nodes}
+                edges={displayGraphData.edges}
                 onNodeClick={setSelectedNode}
                 onBackgroundClick={() => setSelectedNode(null)}
                 highlightCategory={highlightCategory}
@@ -155,7 +163,7 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
             )}
             {/* Node detail panel */}
             {selectedNode && (
-              <div className="absolute right-0 top-0 bottom-0 w-[360px] bg-[#0d0d14]/95 backdrop-blur-md border-l border-white/[0.08] overflow-y-auto z-20"
+              <div className="absolute sm:right-0 sm:top-0 sm:bottom-0 sm:left-auto sm:w-[360px] bottom-0 left-0 right-0 sm:max-h-none max-h-[60vh] bg-[#0d0d14]/95 backdrop-blur-md sm:border-l border-t border-white/[0.08] overflow-y-auto z-20"
                 style={{ animation: 'slideIn 0.25s ease-out' }}
               >
                 {/* Header */}
@@ -166,6 +174,11 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
                       <span className="text-xs uppercase tracking-widest text-[#8a8a8a]">
                         {CATEGORY_LABELS[selectedNode.category]?.[0] || selectedNode.category}
                       </span>
+                      {selectedNode.isCluster && selectedNode.count && (
+                        <span className="text-xs font-bold" style={{ color: getNodeColor(selectedNode.category, false) }}>
+                          ×{selectedNode.count}
+                        </span>
+                      )}
                     </div>
                     <button onClick={() => setSelectedNode(null)} className="p-1.5 rounded-lg hover:bg-white/10 text-[#8a8a8a] transition-colors">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -177,52 +190,89 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
                   )}
                 </div>
 
-                {/* Description / Value */}
-                {selectedNode.description && (
+                {/* Cluster: list all values */}
+                {selectedNode.isCluster && selectedNode.clusterNodes && (
+                  <div className="px-5 py-4 border-b border-white/[0.05]">
+                    <h3 className="text-xs uppercase tracking-widest text-[#8a8a8a] mb-3">{t.value}</h3>
+                    <div className="space-y-2">
+                      {selectedNode.clusterNodes.map((cn, i) => (
+                        <div
+                          key={cn.id || i}
+                          className="px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.06] hover:border-white/[0.12] transition-colors"
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: getNodeColor(cn.category, cn.isHighlighted) }} />
+                            <span className="text-sm font-medium text-[#d4d4d4] break-words">{cn.value || cn.label}</span>
+                          </div>
+                          {cn.description && (
+                            <p className="text-xs text-[#8a8a8a] ml-4 break-words leading-relaxed">{cn.description}</p>
+                          )}
+                          <code className="text-[10px] text-[#555] font-mono ml-4 block mt-1 break-all">{cn.qualifiedId || cn.id}</code>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Single node: description */}
+                {!selectedNode.isCluster && selectedNode.description && (
                   <div className="px-5 py-4 border-b border-white/[0.05]">
                     <h3 className="text-xs uppercase tracking-widest text-[#8a8a8a] mb-2">{t.value}</h3>
                     <p className="text-sm text-[#d4d4d4] leading-relaxed break-words">{selectedNode.description}</p>
+                    {selectedNode.value && (
+                      <p className="text-xs text-[#8a8a8a] mt-2">{selectedNode.value}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Single node: show value if different from label */}
+                {!selectedNode.isCluster && selectedNode.value && !selectedNode.description && (
+                  <div className="px-5 py-4 border-b border-white/[0.05]">
+                    <h3 className="text-xs uppercase tracking-widest text-[#8a8a8a] mb-2">{t.value}</h3>
+                    <p className="text-sm text-[#d4d4d4] leading-relaxed break-words">{selectedNode.value}</p>
                   </div>
                 )}
 
                 {/* Properties */}
-                <div className="px-5 py-4 border-b border-white/[0.05]">
-                  <h3 className="text-xs uppercase tracking-widest text-[#8a8a8a] mb-3">{t.properties}</h3>
-                  <div className="space-y-2.5">
-                    <div className="flex items-start gap-3">
-                      <span className="text-xs text-[#8a8a8a] shrink-0 w-14">{t.type}</span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full" style={{ background: getNodeColor(selectedNode.category, selectedNode.isHighlighted) }} />
-                        <span className="text-xs text-[#d4d4d4]">{CATEGORY_LABELS[selectedNode.category]?.[0] || selectedNode.category}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <span className="text-xs text-[#8a8a8a] shrink-0 w-14">{t.id}</span>
-                      <code className="text-xs text-[#d4d4d4] font-mono break-all leading-relaxed">{selectedNode.qualifiedId || selectedNode.id}</code>
-                    </div>
-                    {selectedNode.category === 'dependency' && (() => {
-                      const depName = selectedNode.qualifiedId.replace(/^dep:/, '').replace(/_/g, '-');
-                      return (
-                        <div className="flex items-start gap-3">
-                          <span className="text-xs text-[#8a8a8a] shrink-0 w-14">{t.skills.slice(0, -1)}</span>
-                          <span className="text-xs text-[#d4d4d4]">{depName}</span>
-                        </div>
-                      );
-                    })()}
-                    {(['yield', 'require'].includes(selectedNode.category)) && selectedNode.description && (
+                {!selectedNode.isCluster && (
+                  <div className="px-5 py-4 border-b border-white/[0.05]">
+                    <h3 className="text-xs uppercase tracking-widest text-[#8a8a8a] mb-3">{t.properties}</h3>
+                    <div className="space-y-2.5">
                       <div className="flex items-start gap-3">
-                        <span className="text-xs text-[#8a8a8a] shrink-0 w-14">{t.state}</span>
-                        <span className="text-xs text-[#d4d4d4] break-words">{selectedNode.description}</span>
+                        <span className="text-xs text-[#8a8a8a] shrink-0 w-14">{t.type}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full" style={{ background: getNodeColor(selectedNode.category, selectedNode.isHighlighted) }} />
+                          <span className="text-xs text-[#d4d4d4]">{CATEGORY_LABELS[selectedNode.category]?.[0] || selectedNode.category}</span>
+                        </div>
                       </div>
-                    )}
+                      <div className="flex items-start gap-3">
+                        <span className="text-xs text-[#8a8a8a] shrink-0 w-14">{t.id}</span>
+                        <code className="text-xs text-[#d4d4d4] font-mono break-all leading-relaxed">{selectedNode.qualifiedId || selectedNode.id}</code>
+                      </div>
+                      {selectedNode.category === 'dependency' && (() => {
+                        const depName = selectedNode.qualifiedId.replace(/^dep:/, '').replace(/_/g, '-');
+                        return (
+                          <div className="flex items-start gap-3">
+                            <span className="text-xs text-[#8a8a8a] shrink-0 w-14">{t.skills.slice(0, -1)}</span>
+                            <span className="text-xs text-[#d4d4d4]">{depName}</span>
+                          </div>
+                        );
+                      })()}
+                      {(['yield', 'require'].includes(selectedNode.category)) && selectedNode.description && (
+                        <div className="flex items-start gap-3">
+                          <span className="text-xs text-[#8a8a8a] shrink-0 w-14">{t.state}</span>
+                          <span className="text-xs text-[#d4d4d4] break-words">{selectedNode.description}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Connected nodes */}
                 <div className="px-5 py-4 border-b border-white/[0.05]">
                   <h3 className="text-xs uppercase tracking-widest text-[#8a8a8a] mb-3">{t.connectedTo}</h3>
                   {(() => {
-                    const connected = getConnectedNodes(selectedNode, activeGraphData.edges, activeGraphData.nodes);
+                    const connected = getConnectedNodes(selectedNode, displayGraphData.edges, displayGraphData.nodes);
                     if (!connected.length) return <p className="text-xs text-[#666]">{t.noConnections}</p>;
                     return (
                       <div className="flex flex-wrap gap-2">
@@ -234,6 +284,7 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
                           >
                             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: getNodeColor(n.category, n.isHighlighted) }} />
                             {n.label}
+                            {n.isCluster && n.count && <span className="text-[#8a8a8a]">×{n.count}</span>}
                           </button>
                         ))}
                       </div>
@@ -242,7 +293,7 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
                 </div>
 
                 {/* Actions: explore file / view skill */}
-                {(() => {
+                {!selectedNode.isCluster && (() => {
                   const isTtlFile = ['main', 'prompt', 'test', 'module'].includes(selectedNode.category) && selectedNode.qualifiedId.endsWith('.ttl');
                   const depSkill = skills.find(s => s.packageId === pkgId && s.skillId === selectedNode.id);
                   return (
