@@ -147,7 +147,7 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
                 onBackgroundClick={() => setSelectedNode(null)}
                 highlightCategory={highlightCategory}
                 onHighlightCategory={setHighlightCategory}
-                height="calc(100vh - 52px)"
+                height="100%"
                 t={t}
                 hideLabels={!!selectedNode}
               />

@@ -110,7 +110,7 @@ export function PackageView({ loading, skills, packages, pkgId, t, prefix, navig
                   navigate(`${prefix}/${skill.qualifiedId}`);
                 }
               }}
-              height="calc(100vh - 52px)"
+              height="100%"
               t={t}
             />
           </div>
