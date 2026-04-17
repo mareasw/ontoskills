@@ -173,10 +173,10 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
               >
                 {/* Header */}
                 <div className="px-5 pt-5 pb-4 border-b border-white/[0.07]">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="w-3 h-3 rounded-full" style={{ background: getNodeColor(selectedNode.category, selectedNode.isHighlighted) }} />
-                      <span className="text-xs uppercase tracking-widest text-[#8a8a8a]">
+                      <span className="text-sm font-semibold text-[#f5f5f5]">
                         {CATEGORY_LABELS[selectedNode.category]?.[0] || selectedNode.category}
                       </span>
                       {selectedNode.isCluster && selectedNode.count && (
@@ -189,9 +189,8 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                   </div>
-                  <h2 className="text-lg font-bold text-[#f5f5f5] break-words">{selectedNode.label}</h2>
                   {CATEGORY_DESCRIPTIONS[selectedNode.category] && (
-                    <p className="text-xs text-[#666] mt-1.5">{CATEGORY_DESCRIPTIONS[selectedNode.category]}</p>
+                    <p className="text-xs text-[#666] mt-2">{CATEGORY_DESCRIPTIONS[selectedNode.category]}</p>
                   )}
                 </div>
 
