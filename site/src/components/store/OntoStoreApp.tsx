@@ -297,18 +297,11 @@ function parseTtlKnowledgeMap(ttlContent: string, skillId: string) {
     }
   }
 
-  // Failure handlers — multi-line support
+  // Failure handlers
   for (const m of ttlContent.matchAll(/oc:handlesFailure\s+oc:(\w+)/g)) {
     const failId = `fail:${m[1]}`;
     addNode(failId, m[1].replace(/([A-Z])/g, ' $1').trim(), 'failure');
     edges.push({ source: rootId, target: failId });
-  }
-  for (const m of ttlContent.matchAll(/oc:handlesFailure\s+oc:(\w+)/g)) {
-    const failId = `fail:${m[1]}`;
-    if (!seen.has(failId)) {
-      addNode(failId, m[1].replace(/([A-Z])/g, ' $1').trim(), 'failure');
-      edges.push({ source: rootId, target: failId });
-    }
   }
 
   // Allowed tools
@@ -898,7 +891,12 @@ export default function OntoStoreApp({ lang = 'en' }: { lang?: string }) {
   // Route from URL
   useEffect(() => {
     const parse = () => {
-      const path = window.location.pathname.replace(/\/$/, '');
+      // Restore redirect path from 404 page (dev mode SPA fallback)
+      let path = window.location.pathname.replace(/\/$/, '');
+      try {
+        const saved = sessionStorage.getItem('ontostore:redirect');
+        if (saved) { sessionStorage.removeItem('ontostore:redirect'); history.replaceState(null, '', saved); path = saved.replace(/\/$/, ''); }
+      } catch {}
       const storePath = path.replace(prefix, '').replace(/^\//, '');
       const segments = storePath ? storePath.split('/') : [];
       if (segments.length === 0) { setViewMode('store'); }
@@ -1516,9 +1514,14 @@ function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate
               <div className="flex flex-wrap gap-2">
                 {skill.dependsOn.map(d => {
                   const dep = skills.find(s => s.packageId === pkgId && s.skillId === d);
-                  const href = dep ? `${prefix}/${dep.qualifiedId}` : '#';
+                  if (!dep) return (
+                    <span key={d} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.03] text-sm text-[#8a8a8a]">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
+                      {d}
+                    </span>
+                  );
                   return (
-                    <a key={d} href={href} onClick={e => { if (dep) { e.preventDefault(); navigate(`${prefix}/${dep.qualifiedId}`); } }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-sm text-[#d4d4d4] hover:text-[#52c7e8] hover:bg-white/10 transition-colors">
+                    <a key={d} href={`${prefix}/${dep.qualifiedId}`} onClick={e => { e.preventDefault(); navigate(`${prefix}/${dep.qualifiedId}`); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-sm text-[#d4d4d4] hover:text-[#52c7e8] hover:bg-white/10 transition-colors">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
                       {d}
                     </a>
@@ -1591,10 +1594,10 @@ function FileTree({ modules }: { modules: string[] }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const renderNode = (node: any, path: string = '', depth: number = 0): JSX.Element[] => {
-    const entries = Object.entries(node).sort(([_a, a]: [string, any], [_b, b]: [string, any]) => {
+    const entries = Object.entries(node).sort(([aName, a]: [string, any], [bName, b]: [string, any]) => {
       const aDir = !a.__file, bDir = !b.__file;
       if (aDir !== bDir) return aDir ? -1 : 1;
-      return 0;
+      return aName.localeCompare(bName);
     });
     const elements: JSX.Element[] = [];
     for (const [name, val] of entries) {
