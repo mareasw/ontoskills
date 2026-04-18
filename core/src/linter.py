@@ -149,22 +149,22 @@ def _check_circular_deps(g: Graph) -> list[LintIssue]:
 
     visited:   set[str] = set()
     rec_stack: set[str] = set()
+    rec_order: list[str] = []
     cycles:    set[str] = set()
 
-    def dfs(node: str) -> bool:
+    def dfs(node: str) -> None:
         visited.add(node)
         rec_stack.add(node)
+        rec_order.append(node)
         for neighbour in adj.get(node, set()):
             if neighbour not in visited:
-                if dfs(neighbour):
-                    cycles.add(node)
-                    return True
+                dfs(neighbour)
             elif neighbour in rec_stack:
-                cycles.add(node)
-                cycles.add(neighbour)
-                return True
+                # Collect only the nodes actually in the cycle
+                idx = rec_order.index(neighbour)
+                cycles.update(rec_order[idx:])
+        rec_order.pop()
         rec_stack.discard(node)
-        return False
 
     for skill in list(adj.keys()):
         if skill not in visited:

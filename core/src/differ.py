@@ -77,7 +77,8 @@ class DriftReport:
                     f'}}'
                 ),
                 action=(
-                    f"Remove or replace all oc:dependsOnSkill oc:{local} references. "
+                    f"Remove or replace all oc:dependsOnSkill (and legacy oc:dependsOn) "
+                    f"references to oc:{local}. "
                     f"Check if a replacement skill covers the same intents."
                 ),
             ))
