@@ -33,7 +33,9 @@ def lint_cmd(ttl_path: str, errors_only: bool, as_json: bool):
         issues = result.issues
 
     if not issues:
-        if not as_json:
+        if as_json:
+            click.echo("[]")
+        else:
             console.print("[bold green]✔ No issues found.[/]")
         sys.exit(0)
 
