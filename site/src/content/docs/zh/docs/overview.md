@@ -1,7 +1,6 @@
 ---
 title: OntoSkills 是什么？
 description: OntoSkills 架构、商店和运行时概述
-slug: zh-overview
 sidebar:
   order: 1
 ---

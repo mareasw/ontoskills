@@ -1,7 +1,6 @@
 ---
 title: MCP 运行时
 description: OntoMCP 运行时指南和工具参考
-slug: zh-mcp
 sidebar:
   order: 6
 ---

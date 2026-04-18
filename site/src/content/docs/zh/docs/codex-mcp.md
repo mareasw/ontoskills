@@ -1,7 +1,6 @@
 ---
 title: MCP 与 Codex
 description: 为基于 Codex 的本地工作流配置 OntoMCP
-slug: zh-codex-mcp
 sidebar:
   order: 12
 ---

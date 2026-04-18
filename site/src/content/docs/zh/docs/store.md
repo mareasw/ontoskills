@@ -1,7 +1,6 @@
 ---
 title: 商店
 description: OntoStore、第三方商店和包生命周期
-slug: zh-store
 sidebar:
   order: 14
 ---
