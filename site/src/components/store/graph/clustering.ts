@@ -24,13 +24,8 @@ export function clusterGraphData(nodes: GraphNode[], edges: GraphEdge[]): { node
 
     if (group.length === 1) {
       const node = group[0];
-      const mapped: GraphNode = {
-        ...node,
-        label: typeName,
-        value: node.label,
-      };
-      result.push(mapped);
-      idMap.set(node.id, mapped.id);
+      result.push(node);
+      idMap.set(node.id, node.id);
     } else {
       const clusterId = `cluster:${category}`;
       const mapped: GraphNode = {
