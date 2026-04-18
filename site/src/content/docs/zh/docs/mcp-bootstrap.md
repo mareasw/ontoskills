@@ -1,6 +1,7 @@
 ---
 title: MCP 引导
 description: 一条命令完成全局和项目级 AI 客户端的 MCP 设置
+slug: zh-mcp-bootstrap
 sidebar:
   order: 7
 ---
