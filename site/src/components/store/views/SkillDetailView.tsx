@@ -368,15 +368,15 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
           {skill.intents.length > 0 && (
             <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${STAT_COLORS.intents.bg} border ${STAT_COLORS.intents.border}`}>
-              <svg className={`w-3.5 h-3.5 ${STAT_COLORS.intents.icon}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-              <span className="text-xs text-[#d4d4d4]">{skill.intents.length} {skill.intents.length === 1 ? t.intent_one : t.intent_other}</span>
+              <svg className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${STAT_COLORS.intents.icon}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+              <span className="text-xs sm:text-sm text-[#d4d4d4]">{skill.intents.length} {skill.intents.length === 1 ? t.intent_one : t.intent_other}</span>
             </div>
           )}
           {skill.dependsOn.length > 0 && (
             <div className="relative group">
               <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${STAT_COLORS.dependencies.bg} border ${STAT_COLORS.dependencies.border}`}>
-                <svg className={`w-3.5 h-3.5 ${STAT_COLORS.dependencies.icon}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
-                <span className="text-xs text-[#d4d4d4]">{skill.dependsOn.length} {skill.dependsOn.length === 1 ? t.dependency_one : t.dependency_other}</span>
+                <svg className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${STAT_COLORS.dependencies.icon}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
+                <span className="text-xs sm:text-sm text-[#d4d4d4]">{skill.dependsOn.length} {skill.dependsOn.length === 1 ? t.dependency_one : t.dependency_other}</span>
                 <svg className="w-3 h-3 text-[#666] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
               </div>
               <div className="absolute top-full left-0 mt-1 z-50 min-w-[180px] max-w-[320px] rounded-lg bg-[#1a1a1a] border border-white/10 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 py-1.5">
@@ -400,14 +400,14 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
           )}
           {treeModules.length > 0 && (
             <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${STAT_COLORS.files.bg} border ${STAT_COLORS.files.border}`}>
-              <svg className={`w-3.5 h-3.5 ${STAT_COLORS.files.icon}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
-              <span className="text-xs text-[#d4d4d4]">{treeModules.length} {treeModules.length === 1 ? t.file_one : t.file_other}</span>
+              <svg className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${STAT_COLORS.files.icon}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+              <span className="text-xs sm:text-sm text-[#d4d4d4]">{treeModules.length} {treeModules.length === 1 ? t.file_one : t.file_other}</span>
             </div>
           )}
           {skill.aliases.length > 0 && (
             <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${STAT_COLORS.aliases.bg} border ${STAT_COLORS.aliases.border}`}>
-              <svg className={`w-3.5 h-3.5 ${STAT_COLORS.aliases.icon}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
-              <span className="text-xs text-[#d4d4d4]">{skill.aliases.length} {skill.aliases.length === 1 ? t.alias_one : t.alias_other}</span>
+              <svg className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${STAT_COLORS.aliases.icon}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+              <span className="text-xs sm:text-sm text-[#d4d4d4]">{skill.aliases.length} {skill.aliases.length === 1 ? t.alias_one : t.alias_other}</span>
             </div>
           )}
 
@@ -463,7 +463,7 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
             <h3 className="text-sm font-semibold text-[#8a8a8a] uppercase tracking-wider mb-3">{t.intents}</h3>
             <div className="flex flex-wrap gap-1.5">
               {skill.intents.map(intent => (
-                <span key={intent} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#dba32c]/[0.06] border border-[#dba32c]/20 text-sm text-[#d4d4d4]">
+                <span key={intent} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg bg-[#dba32c]/[0.06] border border-[#dba32c]/20 text-sm text-[#d4d4d4]">
                   <svg className="w-3 h-3 text-[#dba32c] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                   {intent}
                 </span>
@@ -568,7 +568,7 @@ function FileTreeLevel({ node, depth, onTtlClick, githubBase }: {
         >
           <Chevron open={open} />
           <FolderIcon open={open} />
-          <span className={`text-xs font-medium truncate ${open ? 'text-[#d4d4d4]' : 'text-[#8a8a8a]'}`}>{node.name}</span>
+          <span className={`text-xs sm:text-sm font-medium truncate ${open ? 'text-[#d4d4d4]' : 'text-[#8a8a8a]'}`}>{node.name}</span>
         </button>
       )}
       {(depth === 0 || open) && entries.map(child => {
@@ -588,7 +588,7 @@ function FileTreeLevel({ node, depth, onTtlClick, githubBase }: {
             style={{ paddingLeft }}
           >
             <FileIcon name={child.name} />
-            <span className="font-mono text-xs text-[#d4d4d4] group-hover:text-[#52c7e8] truncate">{child.name}</span>
+            <span className="font-mono text-xs sm:text-sm text-[#d4d4d4] group-hover:text-[#52c7e8] truncate">{child.name}</span>
             {isMain && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#52c7e8]/10 text-[#52c7e8] font-medium shrink-0">main</span>}
             <svg className="w-3 h-3 text-[#444] group-hover:text-[#52c7e8] shrink-0 ml-auto transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
           </button>
@@ -604,7 +604,7 @@ function FileTreeLevel({ node, depth, onTtlClick, githubBase }: {
             style={{ paddingLeft }}
           >
             <FileIcon name={child.name} />
-            <span className="font-mono text-xs text-[#666] group-hover:text-[#8a8a8a] truncate">{child.name}</span>
+            <span className="font-mono text-xs sm:text-sm text-[#666] group-hover:text-[#8a8a8a] truncate">{child.name}</span>
             <svg className="w-3 h-3 text-[#333] group-hover:text-[#666] shrink-0 ml-auto transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
           </a>
         );
