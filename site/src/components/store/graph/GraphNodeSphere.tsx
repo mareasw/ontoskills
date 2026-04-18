@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import type { GraphNode } from '../types';
@@ -26,7 +26,7 @@ export function GraphNodeSphere({ node, position, onClick, dimmed = false, hideL
   const isExplorable = !isCluster && ['main', 'prompt', 'test', 'module'].includes(node.category) && node.qualifiedId.endsWith('.ttl');
   const categoryLabel = CATEGORY_LABELS[node.category]?.[0] || node.category;
 
-  const labelStyle: React.CSSProperties = {
+  const labelStyle: CSSProperties = {
     fontSize: '12px',
     fontWeight: 600,
     fontFamily: "'Inter Variable', 'Inter', system-ui, sans-serif",
@@ -47,7 +47,7 @@ export function GraphNodeSphere({ node, position, onClick, dimmed = false, hideL
     opacity: dimmed ? 0.12 : 1,
   };
 
-  const tooltipStyle: React.CSSProperties = {
+  const tooltipStyle: CSSProperties = {
     background: 'rgba(9, 9, 9, 0.95)',
     backdropFilter: 'blur(8px)',
     WebkitBackdropFilter: 'blur(8px)',

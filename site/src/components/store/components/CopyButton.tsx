@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, type MouseEvent } from 'react';
 import type { Translations } from '../types';
 
 export function CopyButton({ text, t }: { text: string; t: Translations }) {
   const [copied, setCopied] = useState(false);
-  const handleCopy = (e: React.MouseEvent) => {
+  const handleCopy = (e: MouseEvent) => {
     e.stopPropagation();
     navigator.clipboard?.writeText(text).then(() => {
       setCopied(true);

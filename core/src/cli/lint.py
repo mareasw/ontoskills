@@ -20,7 +20,7 @@ SEVERITY_STYLE = {
 
 
 @click.command("lint")
-@click.argument("ttl_path", type=click.Path(exists=True))
+@click.argument("ttl_path", type=click.Path(exists=True, dir_okay=False))
 @click.option("--errors-only", is_flag=True, help="Only show errors")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def lint_cmd(ttl_path: str, errors_only: bool, as_json: bool):
