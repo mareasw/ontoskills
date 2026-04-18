@@ -80,6 +80,25 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
     }
   }, [graphMode, knowledgeData, loadKnowledgeGraph]);
 
+  // Open knowledge map for a single TTL file from the file tree
+  const openFileKnowledgeMap = useCallback(async (filePath: string) => {
+    if (!filePath.endsWith('.ttl')) return;
+    setLoadingKnowledge(true);
+    setGraphError(false);
+    setSelectedNode(null);
+    try {
+      const res = await fetch(`${TTL_BASE}${pkgId}/${filePath}`);
+      if (!res.ok) throw new Error(`Failed: ${res.status}`);
+      const content = await res.text();
+      const fileName = filePath.split('/').pop()!.replace('.ttl', '');
+      setKnowledgeData(parseTtlKnowledgeMap(content, fileName));
+      setGraphMode('knowledge');
+      setGraphBreadcrumb([{ label: skillId, fileId: null }, { label: fileName, fileId: filePath }]);
+      setShowGraph(true);
+    } catch { setGraphError(true); }
+    finally { setLoadingKnowledge(false); }
+  }, [pkgId, skillId]);
+
   // Explore a secondary TTL file's knowledge map
   const exploreSecondaryFile = useCallback(async (node: GraphNode) => {
     const fileId = node.qualifiedId;
@@ -406,6 +425,49 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
           </a>
         </div>
       </div>
+
+      {/* File tree */}
+      {treeModules.length > 0 && (
+        <div className="section-panel mt-5">
+          <h3 className="text-base font-semibold text-[#f5f5f5] mb-3">{t.fileTree}</h3>
+          <div className="space-y-1">
+            {treeModules.map(filePath => {
+              const fileName = filePath.split('/').pop() || filePath;
+              const isTtl = filePath.endsWith('.ttl');
+              const isMain = filePath === `${skillId}/ontoskill.ttl`;
+              const category = isMain ? 'main' : fileName.includes('test') ? 'test' : fileName.includes('prompt') ? 'prompt' : 'module';
+              const color = getNodeColor(category, isMain);
+              return (
+                <div key={filePath} className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/[0.03] transition-colors group">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm text-[#d4d4d4] font-medium truncate block">{fileName}</span>
+                    <span className="text-[11px] text-[#666] truncate block">{filePath}</span>
+                  </div>
+                  {isTtl ? (
+                    <button
+                      onClick={() => openFileKnowledgeMap(filePath)}
+                      className="shrink-0 px-2.5 py-1 rounded-md bg-[#52c7e8]/[0.06] border border-[#52c7e8]/20 text-[11px] font-medium text-[#52c7e8] hover:bg-[#52c7e8]/[0.12] transition-all opacity-60 group-hover:opacity-100"
+                    >
+                      {t.knowledgeMap}
+                    </button>
+                  ) : (
+                    <a
+                      href={`${TTL_BASE}${pkgId}/${filePath}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="shrink-0 px-2.5 py-1 rounded-md bg-white/[0.03] border border-white/[0.06] text-[11px] text-[#8a8a8a] hover:text-[#52c7e8] hover:border-[#52c7e8]/20 transition-colors opacity-60 group-hover:opacity-100"
+                    >
+                      {t.viewRaw}
+                    </a>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Content: intents, dependencies, aliases — two columns */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

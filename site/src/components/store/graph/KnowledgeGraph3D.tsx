@@ -20,7 +20,7 @@ export function KnowledgeGraph3D({ nodes, edges, onNodeClick, onBackgroundClick,
   const [shortcutsVisible, setShortcutsVisible] = useState(false);
 
   if (!nodes.length) return null;
-  const camDist = Math.max(nodes.length * 2.2, 30);
+  const camDist = Math.max(nodes.length * 3, 45);
   const cats = [...new Set(nodes.map(n => n.category))];
 
   return (

@@ -116,4 +116,5 @@ export type Translations = {
   viewSkill: string;
   clickToExplore: string;
   clusterInstances: string;
+  viewRaw: string;
 };

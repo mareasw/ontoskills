@@ -75,6 +75,7 @@ export const translations: Record<string, Translations> = {
     viewSkill: 'View skill →',
     clickToExplore: 'Click to explore →',
     clusterInstances: 'instances',
+    viewRaw: 'View raw',
   },
   zh: {
     searchPlaceholder: '按本体技能、意图或描述搜索...',
@@ -149,6 +150,7 @@ export const translations: Record<string, Translations> = {
     viewSkill: '查看技能 →',
     clickToExplore: '点击探索 →',
     clusterInstances: '个实例',
+    viewRaw: '查看原始',
     more: '更多',
   },
 };

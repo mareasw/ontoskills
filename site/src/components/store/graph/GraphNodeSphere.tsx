@@ -85,7 +85,7 @@ export function GraphNodeSphere({ node, position, onClick, dimmed = false, hideL
       </mesh>
       {/* Cluster count badge */}
       {isCluster && !dimmed && (
-        <Html position={[0, radius + 0.3, 0]} center zIndexRange={[60, 0]}>
+        <Html position={[0, radius + 0.3, 0]} center zIndexRange={[10, 0]}>
           <div style={{
             background: 'rgba(9, 9, 9, 0.85)',
             border: `1px solid ${color}40`,
@@ -105,7 +105,7 @@ export function GraphNodeSphere({ node, position, onClick, dimmed = false, hideL
         <Html
           position={[0, -(radius + 0.5), 0]}
           center
-          zIndexRange={[50, 0]}
+          zIndexRange={[5, 0]}
         >
           <div
             style={{ ...labelStyle, pointerEvents: 'auto', cursor: 'pointer' }}
@@ -116,7 +116,7 @@ export function GraphNodeSphere({ node, position, onClick, dimmed = false, hideL
         </Html>
       )}
       {hovered && !dimmed && (
-        <Html position={[0, radius + (isCluster ? 1.4 : 1.2), 0]} center zIndexRange={[100, 0]}>
+        <Html position={[0, radius + (isCluster ? 1.4 : 1.2), 0]} center zIndexRange={[15, 0]}>
           <div
             onClick={() => onClick(node)}
             style={{ ...tooltipStyle, pointerEvents: 'auto', cursor: 'pointer' }}
