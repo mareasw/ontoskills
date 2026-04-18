@@ -367,7 +367,6 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
                 const cc = getCategoryColor(skill.category);
                 return <span className={`px-2 py-0.5 rounded-full ${cc.bg} border border-white/[0.08] text-xs ${cc.text} font-medium`}>{skill.category}</span>;
               })()}
-              <code className="text-xs text-[#666] font-mono">{skill.qualifiedId}</code>
             </div>
           </div>
           <div className="shrink-0">
