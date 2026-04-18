@@ -132,4 +132,5 @@ export type Translations = {
   clickToExplore: string;
   clusterInstances: string;
   viewRaw: string;
+  officialStore: string;
 };

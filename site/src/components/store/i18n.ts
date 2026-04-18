@@ -91,6 +91,7 @@ export const translations: Record<string, Translations> = {
     clickToExplore: 'Click to explore →',
     clusterInstances: 'instances',
     viewRaw: 'View raw',
+    officialStore: 'Official Store',
   },
   zh: {
     searchPlaceholder: '按本体技能、意图或描述搜索...',
@@ -182,5 +183,6 @@ export const translations: Record<string, Translations> = {
     clusterInstances: '个实例',
     viewRaw: '查看原始',
     more: '更多',
+    officialStore: '官方商店',
   },
 };
