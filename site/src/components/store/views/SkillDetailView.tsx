@@ -1,13 +1,14 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import type { Skill, PackageManifest, GraphNode, GraphEdge, Translations } from '../types';
 import { navClick, TTL_BASE, buildFileGraphData, parseTtlKnowledgeMap } from '../helpers';
 import { OFFICIAL_STORE_REPO_URL } from '../../../data/store';
 import { TrustBadge } from '../components/TrustBadge';
 import { InstallBar } from '../components/InstallBar';
 import { getCategoryColor, STAT_COLORS } from '../uiColors';
-import { KnowledgeGraph3D } from '../graph/KnowledgeGraph3D';
 import { getNodeColor, getConnectedNodes, CATEGORY_LABELS, CATEGORY_DESCRIPTIONS } from '../graph/colors';
 import { clusterGraphData } from '../graph/clustering';
+
+const KnowledgeGraph3D = lazy(() => import('../graph/KnowledgeGraph3D').then(m => ({ default: m.KnowledgeGraph3D })));
 
 export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, navigate }: { skills: Skill[]; packages: PackageManifest[]; pkgId: string; skillId: string; t: Translations; prefix: string; navigate: (href: string) => void }) {
   const skill = skills.find(s => s.packageId === pkgId && s.skillId === skillId);
@@ -187,17 +188,19 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
             ) : graphError ? (
               <div className="flex items-center justify-center h-full"><p className="text-[#f9a8d4]">{t.graphError}</p></div>
             ) : (
-              <KnowledgeGraph3D
-                nodes={displayGraphData.nodes}
-                edges={displayGraphData.edges}
-                onNodeClick={setSelectedNode}
-                onBackgroundClick={() => setSelectedNode(null)}
-                highlightCategory={highlightCategory}
-                onHighlightCategory={setHighlightCategory}
-                height="100%"
-                t={t}
-                hideLabels={!!selectedNode}
-              />
+              <Suspense fallback={<GraphLoader t={t} />}>
+                <KnowledgeGraph3D
+                  nodes={displayGraphData.nodes}
+                  edges={displayGraphData.edges}
+                  onNodeClick={setSelectedNode}
+                  onBackgroundClick={() => setSelectedNode(null)}
+                  highlightCategory={highlightCategory}
+                  onHighlightCategory={setHighlightCategory}
+                  height="100%"
+                  t={t}
+                  hideLabels={!!selectedNode}
+                />
+              </Suspense>
             )}
             {/* Node detail panel */}
             {selectedNode && (
@@ -497,6 +500,23 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
         </div>
       )}
     </>
+  );
+}
+
+/** Loading screen shown while three.js chunk is being fetched */
+function GraphLoader({ t }: { t: Translations }) {
+  const [progress, setProgress] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setProgress(p => Math.min(p + Math.random() * 15, 90)), 400);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-4">
+      <div className="w-48 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+        <div className="h-full rounded-full bg-gradient-to-r from-[#52c7e8] to-[#85f496] transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
+      </div>
+      <p className="text-[#8a8a8a] text-sm">{t.loading3d}</p>
+    </div>
   );
 }
 

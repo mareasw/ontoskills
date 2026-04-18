@@ -116,6 +116,7 @@ export type Translations = {
   knowledgeMap: string;
   openGraph: string;
   loadingGraph: string;
+  loading3d: string;
   graphError: string;
   legend: string;
   controls: string;
