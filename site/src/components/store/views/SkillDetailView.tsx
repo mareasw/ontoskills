@@ -195,7 +195,7 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
               <div className="absolute sm:right-0 sm:top-0 sm:bottom-0 sm:left-auto sm:w-[360px] bottom-0 left-0 right-0 sm:max-h-none max-h-[60vh] bg-[#0d0d14]/95 backdrop-blur-md sm:border-l border-t border-white/[0.08] overflow-y-auto z-20"
                 style={{ animation: 'slideIn 0.25s ease-out' }}
               >
-                {/* Header */}
+                {/* Header — type + label */}
                 <div className="px-5 pt-5 pb-4 border-b border-white/[0.07]">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -213,8 +213,11 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                   </div>
-                  {CATEGORY_DESCRIPTIONS[selectedNode.category] && (
-                    <p className="text-xs text-[#666] mt-2">{CATEGORY_DESCRIPTIONS[selectedNode.category]}</p>
+                  {!selectedNode.isCluster && (
+                    <p className="text-sm text-[#d4d4d4] mt-2 break-words leading-relaxed">{selectedNode.label}</p>
+                  )}
+                  {selectedNode.isCluster && CATEGORY_DESCRIPTIONS[selectedNode.category] && (
+                    <p className="text-xs text-[#666] mt-1">{CATEGORY_DESCRIPTIONS[selectedNode.category]}</p>
                   )}
                 </div>
 
@@ -237,47 +240,38 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
                   </div>
                 )}
 
-                {/* Single node: value or description */}
-                {!selectedNode.isCluster && (selectedNode.description || selectedNode.value) && (
+                {/* Description — only for single nodes with extra info */}
+                {!selectedNode.isCluster && selectedNode.description && (
                   <div className="px-5 py-4 border-b border-white/[0.05]">
-                    <p className="text-sm text-[#d4d4d4] leading-relaxed break-words">{selectedNode.description || selectedNode.value}</p>
+                    <p className="text-sm text-[#d4d4d4] leading-relaxed break-words">{selectedNode.description}</p>
                   </div>
                 )}
 
-                {/* Properties */}
-                {!selectedNode.isCluster && (
-                  <div className="px-5 py-4 border-b border-white/[0.05]">
-                    <h3 className="text-xs uppercase tracking-widest text-[#8a8a8a] mb-3">{t.properties}</h3>
-                    <div className="space-y-2.5">
-                      <div className="flex items-start gap-3">
-                        <span className="text-xs text-[#8a8a8a] shrink-0 w-14">{t.type}</span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full" style={{ background: getNodeColor(selectedNode.category, selectedNode.isHighlighted) }} />
-                          <span className="text-xs text-[#d4d4d4]">{CATEGORY_LABELS[selectedNode.category]?.[0] || selectedNode.category}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <span className="text-xs text-[#8a8a8a] shrink-0 w-14">{t.id}</span>
-                        <code className="text-xs text-[#d4d4d4] font-mono break-all leading-relaxed">{selectedNode.qualifiedId || selectedNode.id}</code>
-                      </div>
-                      {selectedNode.category === 'dependency' && (() => {
-                        const depName = selectedNode.qualifiedId.replace(/^dep:/, '').replace(/_/g, '-');
-                        return (
+                {/* Category-specific details */}
+                {!selectedNode.isCluster && (() => {
+                  const rawId = selectedNode.qualifiedId || selectedNode.id;
+                  const depName = rawId.replace(/^dep:/, '').replace(/_/g, '-');
+                  const depSkill = skills.find(s => s.packageId === pkgId && s.skillId === depName);
+                  const show = selectedNode.category === 'dependency' || selectedNode.value;
+                  return show ? (
+                    <div className="px-5 py-4 border-b border-white/[0.05]">
+                      <div className="space-y-2.5">
+                        {selectedNode.category === 'dependency' && (
                           <div className="flex items-start gap-3">
                             <span className="text-xs text-[#8a8a8a] shrink-0 w-14">{t.skill_one}</span>
                             <span className="text-xs text-[#d4d4d4]">{depName}</span>
                           </div>
-                        );
-                      })()}
-                      {(['yield', 'require'].includes(selectedNode.category)) && selectedNode.description && (
-                        <div className="flex items-start gap-3">
-                          <span className="text-xs text-[#8a8a8a] shrink-0 w-14">{t.state}</span>
-                          <span className="text-xs text-[#d4d4d4] break-words">{selectedNode.description}</span>
-                        </div>
-                      )}
+                        )}
+                        {selectedNode.value && !selectedNode.description && (
+                          <div className="flex items-start gap-3">
+                            <span className="text-xs text-[#8a8a8a] shrink-0 w-14">{t.value}</span>
+                            <code className="text-xs text-[#d4d4d4] font-mono break-all leading-relaxed">{selectedNode.value}</code>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  ) : null;
+                })()}
 
                 {/* Connected nodes */}
                 <div className="px-5 py-4 border-b border-white/[0.05]">
@@ -347,8 +341,8 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
       </div>
 
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-3">
+      <div className="mb-10">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
           <div>
             <h2 className="text-2xl sm:text-3xl font-bold text-[#f5f5f5] tracking-tight mb-2">{skillId}</h2>
             <div className="flex flex-wrap items-center gap-2 mt-1">
@@ -368,44 +362,64 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
           </div>
         </div>
 
-        {skill.description && <p className="text-base text-[#d4d4d4] leading-relaxed mb-4">{skill.description}</p>}
+        {skill.description && <p className="text-base text-[#d4d4d4] leading-relaxed mb-5">{skill.description}</p>}
 
         {/* Action bar: stats pills + graph buttons + GitHub */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
           {skill.intents.length > 0 && (
             <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${STAT_COLORS.intents.bg} border ${STAT_COLORS.intents.border}`}>
               <svg className={`w-3.5 h-3.5 ${STAT_COLORS.intents.icon}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-              <span className="text-xs text-[#d4d4d4]">{skill.intents.length} {t.intents.toLowerCase()}</span>
+              <span className="text-xs text-[#d4d4d4]">{skill.intents.length} {skill.intents.length === 1 ? t.intent_one : t.intent_other}</span>
             </div>
           )}
           {skill.dependsOn.length > 0 && (
-            <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${STAT_COLORS.dependencies.bg} border ${STAT_COLORS.dependencies.border}`}>
-              <svg className={`w-3.5 h-3.5 ${STAT_COLORS.dependencies.icon}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
-              <span className="text-xs text-[#d4d4d4]">{skill.dependsOn.length} {t.dependencies.toLowerCase()}</span>
+            <div className="relative group">
+              <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${STAT_COLORS.dependencies.bg} border ${STAT_COLORS.dependencies.border}`}>
+                <svg className={`w-3.5 h-3.5 ${STAT_COLORS.dependencies.icon}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
+                <span className="text-xs text-[#d4d4d4]">{skill.dependsOn.length} {skill.dependsOn.length === 1 ? t.dependency_one : t.dependency_other}</span>
+                <svg className="w-3 h-3 text-[#666] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </div>
+              <div className="absolute top-full left-0 mt-1 z-50 min-w-[180px] max-w-[320px] rounded-lg bg-[#1a1a1a] border border-white/10 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 py-1.5">
+                {skill.dependsOn.map(d => {
+                  const dep = skills.find(s => s.packageId === pkgId && s.skillId === d);
+                  if (!dep) return (
+                    <div key={d} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#8a8a8a]">
+                      <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
+                      {d}
+                    </div>
+                  );
+                  return (
+                    <a key={d} href={`${prefix}/${dep.qualifiedId}`} onClick={navClick(`${prefix}/${dep.qualifiedId}`, navigate)} className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#d4d4d4] hover:text-[#52c7e8] hover:bg-white/5 transition-colors">
+                      <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
+                      {d}
+                    </a>
+                  );
+                })}
+              </div>
             </div>
           )}
           {treeModules.length > 0 && (
             <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${STAT_COLORS.files.bg} border ${STAT_COLORS.files.border}`}>
               <svg className={`w-3.5 h-3.5 ${STAT_COLORS.files.icon}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
-              <span className="text-xs text-[#d4d4d4]">{treeModules.length} {t.files_other}</span>
+              <span className="text-xs text-[#d4d4d4]">{treeModules.length} {treeModules.length === 1 ? t.file_one : t.file_other}</span>
             </div>
           )}
           {skill.aliases.length > 0 && (
             <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${STAT_COLORS.aliases.bg} border ${STAT_COLORS.aliases.border}`}>
               <svg className={`w-3.5 h-3.5 ${STAT_COLORS.aliases.icon}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
-              <span className="text-xs text-[#d4d4d4]">{skill.aliases.length} {t.aliases.toLowerCase()}</span>
+              <span className="text-xs text-[#d4d4d4]">{skill.aliases.length} {skill.aliases.length === 1 ? t.alias_one : t.alias_other}</span>
             </div>
           )}
 
-          <span className="text-white/10 mx-0.5">|</span>
-
-          <button
-            onClick={() => { setGraphMode('files'); openGraph('files'); }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#52c7e8]/[0.06] border border-[#52c7e8]/20 text-xs font-medium text-[#52c7e8] hover:bg-[#52c7e8]/[0.12] transition-all cursor-pointer"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
-            {t.fileGraph}
-          </button>
+          {treeModules.length > 1 && (
+            <button
+              onClick={() => { setGraphMode('files'); openGraph('files'); }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#52c7e8]/[0.06] border border-[#52c7e8]/20 text-xs font-medium text-[#52c7e8] hover:bg-[#52c7e8]/[0.12] transition-all cursor-pointer"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
+              {t.fileGraph}
+            </button>
+          )}
           <button
             onClick={() => { setGraphMode('knowledge'); openGraph('knowledge'); }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#52c7e8]/[0.06] border border-[#52c7e8]/20 text-xs font-medium text-[#52c7e8] hover:bg-[#52c7e8]/[0.12] transition-all cursor-pointer"
@@ -427,10 +441,10 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
       </div>
 
       {/* File tree + Intents side by side */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5">
+      <div className="flex flex-col md:flex-row flex-wrap gap-6 items-start">
         {/* File tree */}
         {treeModules.length > 0 && (
-          <div className="section-panel">
+          <div className="section-panel md:flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-[#8a8a8a] uppercase tracking-wider mb-3">{t.fileTree}</h3>
             <div className="space-y-0.5">
               <FileTreeNode
@@ -445,7 +459,7 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
         )}
         {/* Intents */}
         {skill.intents.length > 0 && (
-          <div className="section-panel">
+          <div className="section-panel md:flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-[#8a8a8a] uppercase tracking-wider mb-3">{t.intents}</h3>
             <div className="flex flex-wrap gap-1.5">
               {skill.intents.map(intent => (
@@ -459,43 +473,19 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
         )}
       </div>
 
-      {/* Dependencies + Aliases */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5">
-        {skill.dependsOn.length > 0 && (
-          <div className="section-panel">
-            <h3 className="text-sm font-semibold text-[#8a8a8a] uppercase tracking-wider mb-3">{t.dependencies}</h3>
-            <div className="flex flex-wrap gap-2">
-              {skill.dependsOn.map(d => {
-                const dep = skills.find(s => s.packageId === pkgId && s.skillId === d);
-                if (!dep) return (
-                  <span key={d} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.03] text-sm text-[#8a8a8a]">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
-                    {d}
-                  </span>
-                );
-                return (
-                  <a key={d} href={`${prefix}/${dep.qualifiedId}`} onClick={navClick(`${prefix}/${dep.qualifiedId}`, navigate)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-sm text-[#d4d4d4] hover:text-[#52c7e8] hover:bg-white/10 transition-colors">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
-                    {d}
-                  </a>
-                );
-              })}
-            </div>
+      {/* Aliases — full width */}
+      {skill.aliases.length > 0 && (
+        <div className="section-panel mt-6">
+          <h3 className="text-sm font-semibold text-[#8a8a8a] uppercase tracking-wider mb-3">{t.aliases}</h3>
+          <div className="flex flex-wrap gap-2">
+            {skill.aliases.map(a => (
+              <span key={a} className="px-3 py-1.5 rounded-lg bg-white/5 text-sm text-[#8a8a8a] border border-white/[0.06]">
+                {a}
+              </span>
+            ))}
           </div>
-        )}
-        {skill.aliases.length > 0 && (
-          <div className="section-panel">
-            <h3 className="text-sm font-semibold text-[#8a8a8a] uppercase tracking-wider mb-3">{t.aliases}</h3>
-            <div className="flex flex-wrap gap-2">
-              {skill.aliases.map(a => (
-                <span key={a} className="px-3 py-1.5 rounded-lg bg-white/5 text-sm text-[#8a8a8a] border border-white/[0.06]">
-                  {a}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
 }
@@ -526,10 +516,12 @@ interface TreeNode {
   isFile: boolean;
 }
 
-function buildTree(paths: string[]): TreeNode {
+function buildTree(originalPaths: string[], strippedPaths: string[]): TreeNode {
   const root: TreeNode = { name: '', children: new Map(), isFile: false };
-  for (const p of paths) {
-    const parts = p.split('/');
+  for (let j = 0; j < strippedPaths.length; j++) {
+    const stripped = strippedPaths[j];
+    const original = originalPaths[j];
+    const parts = stripped.split('/');
     let node = root;
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
@@ -537,7 +529,7 @@ function buildTree(paths: string[]): TreeNode {
       if (!node.children.has(part)) {
         node.children.set(part, {
           name: part,
-          fullPath: isFile ? p : undefined,
+          fullPath: isFile ? original : undefined,
           children: new Map(),
           isFile,
         });
@@ -635,7 +627,7 @@ function FileTreeNode({ paths, basePath, pkgId, onTtlClick, githubBase }: {
       if (p.startsWith(basePath + '/')) return p.slice(basePath.length + 1);
       return p;
     });
-    return buildTree(stripped);
+    return buildTree(paths, stripped);
   }, [paths, basePath]);
 
   return <FileTreeLevel node={tree} depth={0} onTtlClick={onTtlClick} githubBase={githubBase} />;
