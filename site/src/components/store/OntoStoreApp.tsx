@@ -53,33 +53,35 @@ export default function OntoStoreApp({ lang = 'en' }: { lang?: string }) {
   }, [skills, searchQuery, filterAuthor, filterCategory, filterTier, filterSort]);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
+    const signal = controller.signal;
     const load = async () => {
       try {
-        const res = await fetch(STORE_INDEX_URL, { mode: 'cors', headers: { Accept: 'application/json' } });
+        const res = await fetch(STORE_INDEX_URL, { mode: 'cors', headers: { Accept: 'application/json' }, signal });
         if (!res.ok) throw new Error(`Index failed: ${res.status}`);
         const data = await res.json();
         const results = await Promise.allSettled(
           (data.packages || []).map(async (entry: any) => {
             const url = new URL(entry.manifest_path, STORE_INDEX_URL).toString();
-            const r = await fetch(url, { mode: 'cors', headers: { Accept: 'application/json' } });
+            const r = await fetch(url, { mode: 'cors', headers: { Accept: 'application/json' }, signal });
             if (!r.ok) throw new Error(`Manifest failed: ${r.status}`);
             return r.json();
           })
         );
-        if (cancelled) return;
+        if (signal.aborted) return;
         const manifests = results.filter(r => r.status === 'fulfilled').map(r => (r as any).value);
         setPackages(manifests);
         const newSkills = manifests.flatMap(pkg => (pkg.skills || []).map((s: any) => normSkill(pkg, s)));
         newSkills.sort((a, b) => a.qualifiedId.localeCompare(b.qualifiedId));
         setSkills(newSkills);
         setLoading(false);
-      } catch {
-        if (!cancelled) { setError(true); setLoading(false); }
+      } catch (e) {
+        if (signal.aborted) return;
+        setError(true); setLoading(false);
       }
     };
     load();
-    return () => { cancelled = true; };
+    return () => { controller.abort(); };
   }, []);
 
   useEffect(() => {
@@ -110,7 +112,8 @@ export default function OntoStoreApp({ lang = 'en' }: { lang?: string }) {
   const navigate = useCallback((href: string) => {
     history.pushState(null, '', href);
     window.dispatchEvent(new PopStateEvent('popstate'));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
   }, []);
 
   useEffect(() => {
