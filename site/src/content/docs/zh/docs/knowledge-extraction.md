@@ -1,7 +1,6 @@
 ---
 title: 知识提取
 description: OntoCore 如何从技能中提取结构化知识
-slug: zh-knowledge-extraction
 sidebar:
   order: 9
 ---

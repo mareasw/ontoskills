@@ -1,7 +1,6 @@
 ---
 title: 架构
 description: OntoSkills 如何编译、存储和服务技能
-slug: zh-architecture
 sidebar:
   order: 3
 ---

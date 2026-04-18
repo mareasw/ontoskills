@@ -1,7 +1,6 @@
 ---
 title: 快速开始
 description: 安装 OntoSkills 并查询你的第一个技能
-slug: zh-getting-started
 sidebar:
   order: 2
 ---
