@@ -60,8 +60,8 @@ export const CATEGORY_COLORS: Record<string, string> = {
 
 export const PALETTE_FALLBACK = HUE_PALETTE;
 
-export { hashStr } from '../helpers';
 import { hashStr } from '../helpers';
+export { hashStr };
 
 export function getNodeColor(category: string, isHighlighted: boolean): string {
   if (isHighlighted) return '#52c7e8';

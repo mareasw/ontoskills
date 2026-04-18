@@ -94,7 +94,11 @@ export function PackageView({ loading, skills, packages, pkgId, t, prefix, navig
 
       {/* Fullscreen package graph overlay */}
       {showPkgGraph && graphData && (
-        <div className="fixed inset-0 z-50 bg-[#090909] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-[#090909] flex flex-col overflow-hidden"
+          onKeyDown={(e) => { if (e.key === 'Escape') setShowPkgGraph(false); }}
+          tabIndex={-1}
+          ref={(el) => { if (el && !el.contains(document.activeElement)) el.focus(); }}
+        >
           <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
             <div>
               <h3 className="text-lg font-semibold text-[#f5f5f5]">{t.knowledgeGraph} — {pkgName}</h3>
@@ -102,7 +106,7 @@ export function PackageView({ loading, skills, packages, pkgId, t, prefix, navig
                 {graphData.nodes.length} {t.nodes} · {graphData.edges.length} {t.edges}
               </p>
             </div>
-            <button onClick={() => setShowPkgGraph(false)} className="p-2 rounded-lg hover:bg-white/10 text-[#8a8a8a] hover:text-[#f5f5f5] transition-colors">
+            <button onClick={() => setShowPkgGraph(false)} className="p-2 rounded-lg hover:bg-white/10 text-[#8a8a8a] hover:text-[#f5f5f5] transition-colors" aria-label="Close">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
