@@ -28,7 +28,7 @@ export function normSkill(pkg: any, skill: any): Skill {
 export function buildGraphData(skillList: Skill[], highlightId: string | null = null) {
   const idSet = new Set(skillList.map(s => s.skillId));
   const nodes: GraphNode[] = skillList.map(s => ({
-    id: s.skillId,
+    id: s.qualifiedId,
     label: s.skillId,
     category: s.category,
     qualifiedId: s.qualifiedId,
@@ -37,7 +37,7 @@ export function buildGraphData(skillList: Skill[], highlightId: string | null = 
   const edges: GraphEdge[] = [];
   for (const s of skillList) {
     for (const d of s.dependsOn) {
-      if (d !== s.skillId && idSet.has(d)) edges.push({ source: s.skillId, target: d });
+      if (d !== s.skillId && idSet.has(d)) edges.push({ source: s.qualifiedId, target: `${s.packageId}/${d}` });
     }
   }
   return { nodes, edges };

@@ -123,7 +123,7 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
     return clusterGraphData(knowledgeData.nodes, knowledgeData.edges);
   }, [knowledgeData]);
 
-  const displayGraphData = graphMode === 'files' ? fileGraphData : clusteredKnowledgeData;
+  const displayGraphData = graphMode === 'files' ? fileGraphData : (clusteredKnowledgeData ?? null);
 
   if (!skill) {
     return <div className="text-center py-20"><p className="text-[#d4d4d4] text-lg">{t.noMatch}</p></div>;
@@ -277,6 +277,7 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
                 <div className="px-5 py-4 border-b border-white/[0.05]">
                   <h3 className="text-xs uppercase tracking-widest text-[#8a8a8a] mb-3">{t.connectedTo}</h3>
                   {(() => {
+                    if (!displayGraphData) return null;
                     const connected = getConnectedNodes(selectedNode, displayGraphData.edges, displayGraphData.nodes);
                     if (!connected.length) return <p className="text-xs text-[#666]">{t.noConnections}</p>;
                     return (
