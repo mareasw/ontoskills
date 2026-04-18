@@ -115,7 +115,7 @@ export function PackageView({ loading, skills, packages, pkgId, t, prefix, navig
               nodes={graphData.nodes}
               edges={graphData.edges}
               onNodeClick={(node) => {
-                const skill = skills.find(s => s.packageId === pkgId && s.skillId === node.id);
+                const skill = skills.find(s => s.packageId === pkgId && s.qualifiedId === node.id);
                 if (skill) {
                   setShowPkgGraph(false);
                   navigate(`${prefix}/${skill.qualifiedId}`);
