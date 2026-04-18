@@ -181,6 +181,21 @@ oc:StepC a oc:WorkflowStep ;
     assert any(i.code == "workflow-cycle" for i in result.issues)
 
 
+def test_circular_dep_no_false_positive_ancestor(tmp_path):
+    """A skill that depends on a cyclic node but is NOT part of the cycle should not be flagged."""
+    path = _write(tmp_path, """
+oc:E a oc:Skill ; oc:resolvesIntent "e" ; oc:dependsOnSkill oc:A .
+oc:A a oc:Skill ; oc:resolvesIntent "a" ; oc:dependsOnSkill oc:B .
+oc:B a oc:Skill ; oc:resolvesIntent "b" ; oc:dependsOnSkill oc:C .
+oc:C a oc:Skill ; oc:resolvesIntent "c" ; oc:dependsOnSkill oc:A .
+""")
+    result = lint_ontology(path)
+    cyclic = [i for i in result.issues if i.code == "circular-dep"]
+    cyclic_ids = {i.skill_id for i in cyclic}
+    # Only A, B, C are in the cycle — E is just an ancestor
+    assert cyclic_ids == {"A", "B", "C"}, f"False positive: {cyclic_ids}"
+
+
 def test_workflow_no_cycle_clean(tmp_path):
     """A workflow with valid step dependencies (no cycles) should be clean."""
     path = _write(tmp_path, """
