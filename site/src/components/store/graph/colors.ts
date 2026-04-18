@@ -40,8 +40,23 @@ export const CATEGORY_COLORS: Record<string, string> = {
   test:           '#52bf5a', // green
   module:         '#c054c9', // magenta
 
-  // Dependency
+  // Skill relationships
   dependency:     '#3da0d9', // blue
+  extends:        '#9d5cd5', // purple — inheritance
+  contradicts:    '#e05252', // red — conflict
+
+  // Skill properties
+  intent:         '#dba32c', // gold — matches intent UI
+  constraint:     '#e07a3a', // burnt orange — limits
+  tool:           '#e0e0e0', // neutral
+  requirement:    '#d84d74', // rose — prerequisites
+
+  // Composite objects
+  payload:        '#36c5b8', // teal — execution
+  referenceFile:  '#5482d6', // royal blue — documentation
+  script:         '#a8c034', // yellow-green — executable
+  workflow:       '#c054c9', // magenta — process
+  example:        '#52bf5a', // green — demonstration
 
   // Semantic — alert family
   AntiPattern:    '#e05252', // red
@@ -51,7 +66,6 @@ export const CATEGORY_COLORS: Record<string, string> = {
   // State categories — cool/muted family
   yield:          '#38c490', // teal-green
   require:        '#7b6ad8', // indigo
-  tool:           '#e0e0e0', // neutral (same as skill, distinct by label)
 
   // Domain categories
   productivity:   '#5482d6', // royal blue
@@ -85,12 +99,22 @@ export const CATEGORY_LABELS: Record<string, [string, string]> = {
   test:            ['Test',           CATEGORY_COLORS.test],
   module:          ['Module',         CATEGORY_COLORS.module],
   dependency:      ['Depends on',     CATEGORY_COLORS.dependency],
+  extends:         ['Extends',        CATEGORY_COLORS.extends],
+  contradicts:     ['Contradicts',    CATEGORY_COLORS.contradicts],
+  intent:          ['Intent',         CATEGORY_COLORS.intent],
+  constraint:      ['Constraint',     CATEGORY_COLORS.constraint],
+  tool:            ['Tool',           CATEGORY_COLORS.tool],
+  requirement:     ['Requirement',    CATEGORY_COLORS.requirement],
+  payload:         ['Payload',        CATEGORY_COLORS.payload],
+  referenceFile:   ['Reference',      CATEGORY_COLORS.referenceFile],
+  script:          ['Script',         CATEGORY_COLORS.script],
+  workflow:        ['Workflow',       CATEGORY_COLORS.workflow],
+  example:         ['Example',        CATEGORY_COLORS.example],
   AntiPattern:     ['Anti-pattern',   CATEGORY_COLORS.AntiPattern],
   RecoveryTactic:  ['Recovery',       CATEGORY_COLORS.RecoveryTactic],
   failure:         ['Failure',        CATEGORY_COLORS.failure],
   yield:           ['Yields',         CATEGORY_COLORS.yield],
   require:         ['Requires',       CATEGORY_COLORS.require],
-  tool:            ['Tool',           CATEGORY_COLORS.tool],
   productivity:    ['Productivity',   CATEGORY_COLORS.productivity],
   development:     ['Development',    CATEGORY_COLORS.development],
 };
@@ -102,10 +126,20 @@ export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   test: 'Test specifications',
   module: 'Additional ontology modules',
   dependency: 'Required skill dependencies',
+  extends: 'Skill inheritance (parent skill)',
+  contradicts: 'Mutually exclusive skill',
+  intent: 'User intents resolved by this skill',
+  constraint: 'Execution constraints or limitations',
+  tool: 'Allowed tool integrations',
+  requirement: 'Runtime requirements',
+  payload: 'Execution payload (code/script)',
+  referenceFile: 'Reference file for progressive disclosure',
+  script: 'Executable script',
+  workflow: 'Multi-step workflow',
+  example: 'Input/output example',
   AntiPattern: 'Common mistakes to avoid',
   RecoveryTactic: 'Error recovery strategies',
   failure: 'Known failure modes',
   yield: 'States produced after execution',
   require: 'States required before execution',
-  tool: 'Allowed tool integrations',
 };
