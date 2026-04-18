@@ -9,7 +9,7 @@ interface NodeDetailPanelProps {
   edges: GraphEdge[];
   allNodes: GraphNode[];
   t: Translations;
-  onSelectNode: (node: GraphNode) => void;
+  onSelectNode: (node: GraphNode | null) => void;
   onExploreFile: (node: GraphNode) => void;
   onNavigate: (href: string) => void;
   onCloseGraph: () => void;
