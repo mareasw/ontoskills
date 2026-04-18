@@ -63,7 +63,7 @@ export function StoreView({ loading, filteredSkills, meta, t, prefix, navigate, 
       <div className="mb-10">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] mb-4">
           <div className="w-1.5 h-1.5 rounded-full bg-[#22c55e] animate-pulse" />
-          <span className="text-[10px] uppercase tracking-[0.15em] text-[#8a8a8a] font-mono">{lang === 'zh' ? '官方商店' : 'Official Store'}</span>
+          <span className="text-[10px] uppercase tracking-[0.15em] text-[#8a8a8a] font-mono">{t.officialStore}</span>
         </div>
 
         <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-3">
