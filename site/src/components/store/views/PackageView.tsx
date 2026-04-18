@@ -1,9 +1,11 @@
 import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import type { Skill, PackageManifest, Translations } from '../types';
-import { navClick, buildGraphData, packageHasDeps } from '../helpers';
+import { navClick } from '../helpers';
+import { buildGraphData, packageHasDeps } from '../graph-builder';
 import { OFFICIAL_STORE_REPO_URL } from '../../../data/store';
 import { TrustBadge } from '../components/TrustBadge';
 import { InstallBar } from '../components/InstallBar';
+import { GraphLoader } from '../components/GraphLoader';
 import { STAT_COLORS } from '../uiColors';
 import { SkillCard } from './StoreView';
 
@@ -143,21 +145,5 @@ export function PackageView({ loading, skills, packages, pkgId, t, prefix, navig
         </div>
       )}
     </>
-  );
-}
-
-function GraphLoader({ t }: { t: Translations }) {
-  const [progress, setProgress] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setProgress(p => Math.min(p + Math.random() * 15, 90)), 400);
-    return () => clearInterval(id);
-  }, []);
-  return (
-    <div className="flex flex-col items-center justify-center h-full gap-4">
-      <div className="w-48 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-        <div className="h-full rounded-full bg-gradient-to-r from-[#52c7e8] to-[#85f496] transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
-      </div>
-      <p className="text-[#8a8a8a] text-sm">{t.loading3d}</p>
-    </div>
   );
 }
