@@ -1,6 +1,7 @@
 ---
 title: MCP 与 Claude Code
 description: 在 Claude Code 中注册和验证 OntoMCP
+slug: zh-claude-code-mcp
 sidebar:
   order: 11
 ---

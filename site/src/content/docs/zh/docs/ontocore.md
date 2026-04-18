@@ -1,6 +1,7 @@
 ---
 title: OntoCore 编译器
 description: 安装和使用 OntoCore 处理自定义源技能
+slug: zh-ontocore
 sidebar:
   order: 5
 ---

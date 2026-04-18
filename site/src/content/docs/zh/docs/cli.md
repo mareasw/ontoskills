@@ -1,6 +1,7 @@
 ---
 title: CLI 参考
 description: ontoskills CLI 完整命令参考
+slug: zh-cli
 sidebar:
   order: 10
 ---

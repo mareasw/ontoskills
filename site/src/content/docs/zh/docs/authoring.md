@@ -1,6 +1,7 @@
 ---
 title: 技能编写
 description: 编写有效的 SKILL.md 文件，编译为 Claude 可发现和使用的本体
+slug: zh-authoring
 sidebar:
   order: 4
 ---

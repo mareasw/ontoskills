@@ -1,6 +1,7 @@
 ---
 title: 意图发现
 description: 通过 BM25 关键词搜索和可选语义嵌入查找技能
+slug: zh-semantic-discovery
 sidebar:
   order: 8
 ---
