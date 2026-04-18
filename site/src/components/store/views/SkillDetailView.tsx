@@ -445,7 +445,7 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
       <div className="flex flex-col md:flex-row flex-wrap gap-6 items-start">
         {/* File tree */}
         {treeModules.length > 0 && (
-          <div className="section-panel md:flex-1 min-w-0">
+          <div className="section-panel md:w-2/5 min-w-0">
             <h3 className="text-sm font-semibold text-[#8a8a8a] uppercase tracking-wider mb-3">{t.fileTree}</h3>
             <div className="space-y-0.5">
               <FileTreeNode
