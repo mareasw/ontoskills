@@ -1,9 +1,13 @@
-import type { Skill, Translations } from '../types';
+import { useState } from 'react';
+import type { Skill, PackageManifest, Translations } from '../types';
 import { navClick } from '../helpers';
 import { TrustBadge } from '../components/TrustBadge';
 import { InstallBar } from '../components/InstallBar';
+import { GraphButton } from '../components/GraphButton';
+import { GraphExplorer } from '../graph/GraphExplorer';
 
-export function AuthorView({ loading, skills, authorId, t, prefix, navigate }: { loading: boolean; skills: Skill[]; authorId: string; t: Translations; prefix: string; navigate: (href: string) => void }) {
+export function AuthorView({ loading, skills, packages, authorId, t, prefix, navigate }: { loading: boolean; skills: Skill[]; packages: PackageManifest[]; authorId: string; t: Translations; prefix: string; navigate: (href: string) => void }) {
+  const [showGraph, setShowGraph] = useState(false);
   const authorSkills = skills.filter(s => s.author === authorId);
   const pkgMap: Record<string, Skill[]> = {};
   authorSkills.forEach(s => { pkgMap[s.packageId] = pkgMap[s.packageId] || []; pkgMap[s.packageId].push(s); });
@@ -33,6 +37,7 @@ export function AuthorView({ loading, skills, authorId, t, prefix, navigate }: {
           {Object.entries(tierCounts).map(([tier, count]) => (
             <span key={tier} className="px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.07] text-xs text-[#8a8a8a]">{tier}: {count}</span>
           ))}
+          <GraphButton label={t.exploreGraph} onClick={() => setShowGraph(true)} />
         </div>
       </div>
       {loading ? (
@@ -84,6 +89,17 @@ export function AuthorView({ loading, skills, authorId, t, prefix, navigate }: {
           </div>
         );
       })}
+      {showGraph && (
+        <GraphExplorer
+          skills={skills}
+          packages={packages}
+          initialLevel={{ type: 'author', authorId }}
+          t={t}
+          prefix={prefix}
+          navigate={navigate}
+          onClose={() => setShowGraph(false)}
+        />
+      )}
     </>
   );
 }
