@@ -14,7 +14,7 @@ import anthropic
 from anthropic import Anthropic
 
 from compiler.env import load_local_env
-from compiler.schemas import ExtractedSkill
+from compiler.schemas import ContentExtraction, ExtractedSkill
 from compiler.exceptions import ExtractionError
 from compiler.config import ANTHROPIC_MODEL, MAX_ITERATIONS, EXTRACTION_TIMEOUT
 from compiler.prompts import SYSTEM_PROMPT
@@ -173,6 +173,7 @@ def tool_use_loop(
     skill_registry: "SkillRegistry | None" = None,
     preloaded_content: str | None = None,
     preloaded_file_tree: str | None = None,
+    content_extraction: "ContentExtraction | None" = None,
 ) -> ExtractedSkill:
     """
     Orchestrates the tool-use conversation with Claude.
@@ -188,6 +189,7 @@ def tool_use_loop(
         skill_registry: Optional SkillRegistry for known-skills context
         preloaded_content: Optional SKILL.md content to inject directly
         preloaded_file_tree: Optional file tree string to include
+        content_extraction: Optional pre-parsed content blocks for LLM annotation
 
     Returns:
         ExtractedSkill with structured data
@@ -238,6 +240,63 @@ Use the available tools to:
 1. List and read the skill files
 2. Extract the structured data
 3. Submit with extract_skill"""]
+
+    # Inject pre-extracted content block summaries for LLM annotation
+    if content_extraction:
+        import json as _json
+        content_summary_parts = ["\n\n## PRE-EXTRACTED CONTENT BLOCKS\n"]
+
+        if content_extraction.code_blocks:
+            blocks_summary = [
+                {"index": i, "language": b.language, "lines": f"{b.source_line_start}-{b.source_line_end}"}
+                for i, b in enumerate(content_extraction.code_blocks)
+            ]
+            content_summary_parts.append(
+                f"### Code Blocks ({len(content_extraction.code_blocks)} found)\n"
+                f"{_json.dumps(blocks_summary)}\n"
+            )
+
+        if content_extraction.tables:
+            tables_summary = [
+                {"index": i, "rows": t.row_count, "caption": t.caption}
+                for i, t in enumerate(content_extraction.tables)
+            ]
+            content_summary_parts.append(
+                f"### Tables ({len(content_extraction.tables)} found)\n"
+                f"{_json.dumps(tables_summary)}\n"
+            )
+
+        if content_extraction.flowcharts:
+            flow_summary = [
+                {"index": i, "type": f.chart_type}
+                for i, f in enumerate(content_extraction.flowcharts)
+            ]
+            content_summary_parts.append(
+                f"### Flowcharts ({len(content_extraction.flowcharts)} found)\n"
+                f"{_json.dumps(flow_summary)}\n"
+            )
+
+        if content_extraction.procedures:
+            proc_summary = [
+                {"index": i, "steps": len(p.items)}
+                for i, p in enumerate(content_extraction.procedures)
+            ]
+            content_summary_parts.append(
+                f"### Ordered Procedures ({len(content_extraction.procedures)} found)\n"
+                f"{_json.dumps(proc_summary)}\n"
+            )
+
+        if content_extraction.templates:
+            tmpl_summary = [
+                {"index": i, "variables": t.detected_variables}
+                for i, t in enumerate(content_extraction.templates)
+            ]
+            content_summary_parts.append(
+                f"### Templates ({len(content_extraction.templates)} found)\n"
+                f"{_json.dumps(tmpl_summary)}\n"
+            )
+
+        content_parts[0] += "".join(content_summary_parts)
 
     messages = [{
         "role": "user",

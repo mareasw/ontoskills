@@ -238,4 +238,29 @@ Extract input/output example pairs for pattern matching:
 - `tags`: Optional categorization
 
 Examples help agents understand expected behavior patterns.
+
+## CONTENT BLOCK ANNOTATION
+
+The skill has been pre-parsed and contains structural content blocks listed below.
+For each block, provide a brief annotation. DO NOT rewrite or summarize the content blocks.
+
+### Code Examples
+For each code block, provide:
+- purpose: What this code does or demonstrates (1 sentence)
+- context: When an agent should reference this code (e.g., "when creating slides", "always")
+
+### Tables
+For each table, provide:
+- purpose: What this table represents or helps decide (1 sentence)
+
+### Flowcharts
+For each flowchart, provide:
+- description: What decision flow or process this diagram represents (1-2 sentences)
+
+### Templates
+For each template, provide:
+- templateType: "prompt" | "output" | "boilerplate" — what kind of template this is
+
+CRITICAL: Only annotate blocks that are listed in the PRE-EXTRACTED CONTENT BLOCKS section.
+Use the index number to match your annotation to the correct block.
 """
