@@ -89,6 +89,31 @@ class KnowledgeNode(BaseModel):
     severity_level: SeverityLevel | None = None  # Optional priority
 
 
+class CodeAnnotation(BaseModel):
+    """LLM annotation for a pre-extracted code block."""
+    index: int
+    purpose: str
+    context: str
+
+
+class TableAnnotation(BaseModel):
+    """LLM annotation for a pre-extracted table."""
+    index: int
+    purpose: str
+
+
+class FlowchartAnnotation(BaseModel):
+    """LLM annotation for a pre-extracted flowchart."""
+    index: int
+    description: str
+
+
+class TemplateAnnotation(BaseModel):
+    """LLM annotation for a pre-extracted template."""
+    index: int
+    template_type: Literal["prompt", "output", "boilerplate"]
+
+
 class ExtractedSkill(BaseModel):
     id: str
     hash: str
@@ -116,6 +141,13 @@ class ExtractedSkill(BaseModel):
     argument_hint: str | None = None
     allowed_tools: list[str] = Field(default_factory=list)
     aliases: list[str] = Field(default_factory=list)
+
+    # Content block annotations (Phase 2 LLM)
+    code_annotations: list[CodeAnnotation] = Field(default_factory=list)
+    table_annotations: list[TableAnnotation] = Field(default_factory=list)
+    flowchart_annotations: list[FlowchartAnnotation] = Field(default_factory=list)
+    template_annotations: list[TemplateAnnotation] = Field(default_factory=list)
+    workflows: list["Workflow"] = Field(default_factory=list)
 
     @field_validator('depends_on', 'extends', 'contradicts')
     @classmethod
@@ -417,4 +449,3 @@ class CompiledSkill(ExtractedSkill):
     reference_files: list[ReferenceFile] = Field(default_factory=list)
     executable_scripts: list[ExecutableScript] = Field(default_factory=list)
     examples: list[Example] = Field(default_factory=list)
-    workflows: list[Workflow] = Field(default_factory=list)
