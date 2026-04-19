@@ -351,6 +351,53 @@ class Workflow(BaseModel):
     steps: list[WorkflowStep]
 
 
+class CodeBlock(BaseModel):
+    """Inline code block extracted from markdown."""
+    language: str
+    content: str
+    source_line_start: int
+    source_line_end: int
+
+
+class MarkdownTable(BaseModel):
+    """Markdown table extracted via map slicing."""
+    markdown_source: str
+    caption: str | None
+    row_count: int
+
+
+class FlowchartBlock(BaseModel):
+    """Graphviz or Mermaid diagram extracted from markdown."""
+    source: str
+    chart_type: Literal["graphviz", "mermaid"]
+
+
+class ProcedureStep(BaseModel):
+    """Single step in an ordered procedure."""
+    text: str
+    position: int  # 1-based
+
+
+class OrderedProcedure(BaseModel):
+    """Ordered checklist/numbered list extracted from markdown."""
+    items: list[ProcedureStep]
+
+
+class TemplateBlock(BaseModel):
+    """Template with variable placeholders."""
+    content: str
+    detected_variables: list[str]
+
+
+class ContentExtraction(BaseModel):
+    """Result of Phase 1 structural content extraction from markdown."""
+    code_blocks: list[CodeBlock]
+    tables: list[MarkdownTable]
+    flowcharts: list[FlowchartBlock]
+    procedures: list[OrderedProcedure]
+    templates: list[TemplateBlock]
+
+
 # =============================================================================
 # Merged Model (Phase 1 + Phase 2)
 # =============================================================================
