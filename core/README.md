@@ -38,6 +38,7 @@ By combining the natural language understanding of LLMs with the deterministic f
 
 - **LLM Knowledge Extraction**: Extracts structured triples (Dependencies, Inputs, Intents, Operations) from markdown files.
 - **SHACL Validation**: Ensures the extracted semantic graph strictly adheres to the OntoSkills Core Ontology.
+- **Structural Content Preservation**: Extracts code examples, tables, flowcharts, templates, and ordered procedures from markdown — losslessly, via deterministic parsing.
 - **OWL 2 Compilation**: Outputs self-contained `.ttl` (Turtle) graphs ready for deterministic SPARQL querying.
 - **Local Registry Management**: Handles the installation, enabling, and indexing of distributed skills packages.
 - **Security Auditing**: Analyzes the graph for conflicting intents, missing dependencies, or shadowed skills.

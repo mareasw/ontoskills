@@ -4,6 +4,32 @@ All notable changes to OntoCore (Python package) will be documented in this file
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.12.0] - 2026-04-19
+
+### Added
+
+- **Structural content extraction** — `content_parser.py` using `markdown-it-py` extracts code blocks, tables, flowcharts, ordered procedures, and templates from SKILL.md via deterministic parsing (no LLM)
+- **4 new OWL classes** — `oc:CodeExample`, `oc:Table`, `oc:Flowchart`, `oc:Template` with full TBox axioms in core ontology
+- **`oc:stepOrder`** — Integer property on `oc:WorkflowStep` for linear procedure ordering
+- **Content block annotation** — LLM Phase 2 annotates pre-extracted blocks with purpose/context (no rewriting)
+- **`ContentExtraction` models** — `CodeBlock`, `MarkdownTable`, `FlowchartBlock`, `TemplateBlock`, `OrderedProcedure`, `ProcedureStep` in schemas.py
+- **Annotation models** — `CodeAnnotation`, `TableAnnotation`, `FlowchartAnnotation`, `TemplateAnnotation` on `ExtractedSkill`
+- **SHACL shapes** for CodeExample, Table, Flowchart, Template validation
+- **`markdown-it-py` + `mdit-py-plugins`** — New Python dependencies for CommonMark-compliant markdown parsing
+- **`ontomcp-driver` skill** — Plain SKILL.md teaching agents how to use the OntoSkills MCP server
+
+### Changed
+
+- **`workflows` field moved** from `CompiledSkill` to `ExtractedSkill` — fixes bug where LLM prompt asked for workflows but tool schema didn't include them
+- **Phase 1 pipeline** now includes structural content extraction via `content_parser.py`
+- **Serialization** supports content blocks with annotation merge-by-index
+- **Circular dependency guard** — `enrich_extracted_skill()` removes self-referencing depends_on
+
+### Fixed
+
+- **Workflows dropped by Pydantic** — `ExtractedSkill.model_json_schema()` now includes `workflows` field
+- **Self-referencing dependencies** — `depends_on` filtered to exclude the skill's own ID
+
 ## [0.11.0] - 2026-04-15
 
 ### Added
