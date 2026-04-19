@@ -12,15 +12,15 @@ const KnowledgeGraph3D = lazy(() => import('./KnowledgeGraph3D').then(m => ({ de
 export interface GraphExplorerProps {
   skills: Skill[];
   packages: PackageManifest[];
-  initialLevel: GraphLevel;
+  initialStack: GraphLevel[];
   t: Translations;
   prefix: string;
   navigate: (href: string) => void;
   onClose: () => void;
 }
 
-export function GraphExplorer({ skills, packages, initialLevel, t, prefix, navigate, onClose }: GraphExplorerProps) {
-  const [stack, setStack] = useState<GraphLevel[]>([initialLevel]);
+export function GraphExplorer({ skills, packages, initialStack, t, prefix, navigate, onClose }: GraphExplorerProps) {
+  const [stack, setStack] = useState<GraphLevel[]>(initialStack);
   const currentLevel = stack[stack.length - 1];
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [highlightCategory, setHighlightCategory] = useState<string | null>(null);
@@ -124,22 +124,10 @@ export function GraphExplorer({ skills, packages, initialLevel, t, prefix, navig
   else if (graphMode === 'files') displayData = fileGraphData;
   else displayData = clusteredKnowledgeData ?? null;
 
-  // --- onNodeClick per level ---
+  // --- onNodeClick: always open detail panel ---
   const handleNodeClick = useCallback((node: GraphNode) => {
-    if (node.id === 'author') { setSelectedNode(node); return; }
-    if (currentLevel.type === 'author' && node.category === 'package') {
-      pushLevel({ type: 'package', authorId: currentLevel.authorId, pkgId: node.qualifiedId });
-      return;
-    }
-    if (currentLevel.type === 'package') {
-      const skill = skills.find(s => s.packageId === currentLevel.pkgId && s.qualifiedId === node.id);
-      if (skill) {
-        pushLevel({ type: 'skill', pkgId: currentLevel.pkgId, skillId: skill.skillId, mode: 'files' });
-        return;
-      }
-    }
     setSelectedNode(node);
-  }, [currentLevel, skills, pushLevel]);
+  }, []);
 
   const handleExploreFile = useCallback(async (node: GraphNode) => {
     if (currentLevel.type !== 'skill') return;
@@ -229,7 +217,7 @@ export function GraphExplorer({ skills, packages, initialLevel, t, prefix, navig
           </Suspense>
         )}
         {selectedNode && displayData && (
-          <NodeDetailPanel node={selectedNode} skills={skills} pkgId={currentPkgId} prefix={prefix} edges={displayData.edges} allNodes={displayData.nodes} t={t} onSelectNode={setSelectedNode} onExploreFile={handleExploreFile} onNavigate={navigate} onCloseGraph={onClose} />
+          <NodeDetailPanel node={selectedNode} skills={skills} packages={packages} pkgId={currentPkgId} prefix={prefix} edges={displayData.edges} allNodes={displayData.nodes} currentLevel={currentLevel} t={t} onSelectNode={setSelectedNode} onExploreFile={handleExploreFile} onPushLevel={pushLevel} onNavigate={navigate} onCloseGraph={onClose} />
         )}
       </div>
     </div>

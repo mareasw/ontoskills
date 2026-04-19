@@ -93,7 +93,7 @@ export function AuthorView({ loading, skills, packages, authorId, t, prefix, nav
         <GraphExplorer
           skills={skills}
           packages={packages}
-          initialLevel={{ type: 'author', authorId }}
+          initialStack={[{ type: 'author', authorId }]}
           t={t}
           prefix={prefix}
           navigate={navigate}

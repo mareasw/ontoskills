@@ -33,7 +33,11 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
         <GraphExplorer
           skills={skills}
           packages={packages}
-          initialLevel={{ type: 'skill', pkgId, skillId, mode: 'files' }}
+          initialStack={[
+            { type: 'author', authorId: author },
+            { type: 'package', authorId: author, pkgId },
+            { type: 'skill', pkgId, skillId, mode: 'files' },
+          ]}
           t={t}
           prefix={prefix}
           navigate={navigate}
