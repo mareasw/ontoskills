@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import type { Skill, PackageManifest, Translations } from '../types';
 import { navClick } from '../helpers';
 import { OFFICIAL_STORE_REPO_URL } from '../../../data/store';
 import { TrustBadge } from '../components/TrustBadge';
 import { InstallBar } from '../components/InstallBar';
 import { GraphButton } from '../components/GraphButton';
-import { GraphExplorer } from '../graph/GraphExplorer';
 import { STAT_COLORS } from '../uiColors';
+
+const GraphExplorer = lazy(() => import('../graph/GraphExplorer').then(m => ({ default: m.GraphExplorer })));
 import { SkillCard } from './StoreView';
 
 export function PackageView({ loading, skills, packages, pkgId, t, prefix, navigate }: { loading: boolean; skills: Skill[]; packages: PackageManifest[]; pkgId: string; t: Translations; prefix: string; navigate: (href: string) => void }) {
@@ -89,18 +90,20 @@ export function PackageView({ loading, skills, packages, pkgId, t, prefix, navig
       )}
 
       {showGraph && (
-        <GraphExplorer
-          skills={skills}
-          packages={packages}
-          initialStack={[
-            { type: 'author', authorId: author },
-            { type: 'package', authorId: author, pkgId },
-          ]}
-          t={t}
-          prefix={prefix}
-          navigate={navigate}
-          onClose={() => setShowGraph(false)}
-        />
+        <Suspense fallback={<div className="fixed inset-0 z-50 bg-[#090909] flex items-center justify-center"><div className="w-6 h-6 border-2 border-[#52c7e8]/30 border-t-[#52c7e8] rounded-full animate-spin" /></div>}>
+          <GraphExplorer
+            skills={skills}
+            packages={packages}
+            initialStack={[
+              { type: 'author', authorId: author },
+              { type: 'package', authorId: author, pkgId },
+            ]}
+            t={t}
+            prefix={prefix}
+            navigate={navigate}
+            onClose={() => setShowGraph(false)}
+          />
+        </Suspense>
       )}
     </>
   );

@@ -34,7 +34,8 @@ export function Scene({ nodes, edges, onNodeClick, autoRotate = true, highlightC
       {focusPos && isFinite(focusPos.x) && <CameraFocus target={[focusPos.x, focusPos.y, focusPos.z]} active={!!focusNode} />}
       <OrbitControls
         enableDamping
-        dampingFactor={0.08}
+        dampingFactor={0.12}
+        rotateSpeed={0.5}
         autoRotate={false}
         minDistance={Math.max(3, R * 0.3)}
         maxDistance={Math.max(R * 6, 60)}
