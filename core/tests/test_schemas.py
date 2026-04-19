@@ -5,6 +5,10 @@ from compiler.schemas import (
     CodeBlock, MarkdownTable, FlowchartBlock, ProcedureStep,
     OrderedProcedure, TemplateBlock, ContentExtraction
 )
+from compiler.schemas import (
+    CodeAnnotation, TableAnnotation, FlowchartAnnotation,
+    TemplateAnnotation, CompiledSkill, Workflow, WorkflowStep,
+)
 
 
 def test_skill_type_computed_as_executable():
@@ -479,3 +483,75 @@ class TestContentExtractionModels:
         assert len(ce.code_blocks) == 1
         assert len(ce.flowcharts) == 1
         assert len(ce.procedures) == 1
+
+
+class TestAnnotationModels:
+    def test_code_annotation(self):
+        a = CodeAnnotation(index=0, purpose="Creates a presentation", context="when creating slides")
+        assert a.index == 0
+        assert a.purpose == "Creates a presentation"
+
+    def test_table_annotation(self):
+        a = TableAnnotation(index=0, purpose="Parameter reference")
+        assert a.index == 0
+
+    def test_flowchart_annotation(self):
+        a = FlowchartAnnotation(index=0, description="Decision flow for TDD cycle")
+        assert a.description == "Decision flow for TDD cycle"
+
+    def test_template_annotation(self):
+        a = TemplateAnnotation(index=0, template_type="prompt")
+        assert a.template_type == "prompt"
+
+    def test_extracted_skill_has_annotation_fields(self):
+        skill = ExtractedSkill(
+            id="test",
+            hash="abc",
+            nature="Test",
+            genus="Test",
+            differentia="test",
+            intents=["test"],
+            code_annotations=[CodeAnnotation(index=0, purpose="demo", context="always")],
+            table_annotations=[],
+            flowchart_annotations=[],
+            template_annotations=[],
+        )
+        assert len(skill.code_annotations) == 1
+        assert skill.code_annotations[0].purpose == "demo"
+
+    def test_extracted_skill_has_workflows(self):
+        """Verify workflows moved from CompiledSkill to ExtractedSkill (bug fix)."""
+        skill = ExtractedSkill(
+            id="test",
+            hash="abc",
+            nature="Test",
+            genus="Test",
+            differentia="test",
+            intents=["test"],
+            workflows=[Workflow(
+                workflow_id="main",
+                name="Main flow",
+                description="The main flow",
+                steps=[WorkflowStep(step_id="s1", description="Step 1")],
+            )],
+        )
+        assert len(skill.workflows) == 1
+        assert skill.workflows[0].workflow_id == "main"
+
+    def test_compiled_skill_inherits_workflows(self):
+        """CompiledSkill should still have workflows via inheritance."""
+        compiled = CompiledSkill(
+            id="test",
+            hash="abc",
+            nature="Test",
+            genus="Test",
+            differentia="test",
+            intents=["test"],
+            workflows=[Workflow(
+                workflow_id="inherited",
+                name="Inherited",
+                description="Test",
+                steps=[],
+            )],
+        )
+        assert len(compiled.workflows) == 1
