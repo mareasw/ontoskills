@@ -97,6 +97,11 @@ export const translations: Record<string, Translations> = {
     authorGraph: 'Author Graph',
     packageGraph: 'Package Graph',
     skillGraph: 'Skill Graph',
+    ctrlZoom: 'Scroll = Zoom',
+    ctrlOrbit: 'Drag = Orbit',
+    ctrlPan: 'Right-drag = Pan',
+    ctrlDetails: 'Click node = Details',
+    ctrlClose: 'Esc = Close',
   },
   zh: {
     searchPlaceholder: '按本体技能、意图或描述搜索...',
@@ -194,5 +199,10 @@ export const translations: Record<string, Translations> = {
     authorGraph: '作者图谱',
     packageGraph: '包图谱',
     skillGraph: '技能图谱',
+    ctrlZoom: '滚轮 = 缩放',
+    ctrlOrbit: '拖拽 = 旋转',
+    ctrlPan: '右键拖拽 = 平移',
+    ctrlDetails: '点击节点 = 详情',
+    ctrlClose: 'Esc = 关闭',
   },
 };
