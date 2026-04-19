@@ -20,8 +20,8 @@ export function layoutForce3D(nodes: GraphNode[], edges: GraphEdge[]) {
     };
   });
 
-  // Skip force simulation for large graphs (>100 nodes)
-  const iters = n > 100 ? 0 : Math.min(120, Math.max(30, Math.round(3000 / n)));
+  // Reduce iterations for larger graphs to prevent main-thread jank
+  const iters = n > 80 ? 0 : Math.min(100, Math.max(15, Math.round(2500 / n)));
   for (let iter = 0; iter < iters; iter++) {
     const cooling = 0.1 * (1 - iter / iters);
 
