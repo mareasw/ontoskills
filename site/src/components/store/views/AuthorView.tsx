@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import type { Skill, PackageManifest, Translations } from '../types';
 import { navClick } from '../helpers';
 import { TrustBadge } from '../components/TrustBadge';
 import { InstallBar } from '../components/InstallBar';
 import { GraphButton } from '../components/GraphButton';
-import { GraphExplorer } from '../graph/GraphExplorer';
+
+const GraphExplorer = lazy(() => import('../graph/GraphExplorer').then(m => ({ default: m.GraphExplorer })));
 
 export function AuthorView({ loading, skills, packages, authorId, t, prefix, navigate }: { loading: boolean; skills: Skill[]; packages: PackageManifest[]; authorId: string; t: Translations; prefix: string; navigate: (href: string) => void }) {
   const [showGraph, setShowGraph] = useState(false);
@@ -90,15 +91,17 @@ export function AuthorView({ loading, skills, packages, authorId, t, prefix, nav
         );
       })}
       {showGraph && (
-        <GraphExplorer
-          skills={skills}
-          packages={packages}
-          initialStack={[{ type: 'author', authorId }]}
-          t={t}
-          prefix={prefix}
-          navigate={navigate}
-          onClose={() => setShowGraph(false)}
-        />
+        <Suspense fallback={<div className="fixed inset-0 z-50 bg-[#090909] flex items-center justify-center"><div className="w-6 h-6 border-2 border-[#52c7e8]/30 border-t-[#52c7e8] rounded-full animate-spin" /></div>}>
+          <GraphExplorer
+            skills={skills}
+            packages={packages}
+            initialStack={[{ type: 'author', authorId }]}
+            t={t}
+            prefix={prefix}
+            navigate={navigate}
+            onClose={() => setShowGraph(false)}
+          />
+        </Suspense>
       )}
     </>
   );

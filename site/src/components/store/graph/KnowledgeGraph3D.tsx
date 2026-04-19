@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import type { GraphNode, GraphEdge, Translations } from '../types';
 import { getNodeColor, CATEGORY_LABELS, CATEGORY_DESCRIPTIONS } from './colors';
@@ -24,7 +24,7 @@ export function KnowledgeGraph3D({ nodes, edges, onNodeClick, onBackgroundClick,
   const viewH = typeof window !== 'undefined' ? window.innerHeight : 800;
   const fovScale = viewH < 600 ? 0.7 : viewH < 900 ? 0.85 : 1;
   const camDist = Math.max(R * 3 * fovScale, 25);
-  const cats = [...new Set(nodes.map(n => n.category))];
+  const cats = useMemo(() => [...new Set(nodes.map(n => n.category))], [nodes]);
 
   return (
     <div className="relative" style={{ width: '100%', height, borderRadius: '0.5rem', overflow: 'hidden', background: 'rgba(0,0,0,0.3)', cursor: 'grab' }}>

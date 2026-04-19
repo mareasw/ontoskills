@@ -75,6 +75,21 @@ export default function OntoStoreApp({ lang = 'en' }: { lang?: string }) {
   useEffect(() => {
     const controller = new AbortController();
     const signal = controller.signal;
+
+    // Try loading from localStorage cache for instant render
+    try {
+      const raw = localStorage.getItem('ontostore_data');
+      if (raw) {
+        const cached = JSON.parse(raw) as { skills: Skill[]; packages: PackageManifest[]; ts: number };
+        if (Date.now() - cached.ts < 3_600_000) {
+          setSkills(cached.skills);
+          setPackages(cached.packages);
+          setLoading(false);
+          return () => controller.abort();
+        }
+      }
+    } catch {}
+
     const load = async () => {
       try {
         const res = await fetch(STORE_INDEX_URL, { mode: 'cors', headers: { Accept: 'application/json' }, signal });
@@ -99,6 +114,9 @@ export default function OntoStoreApp({ lang = 'en' }: { lang?: string }) {
         newSkills.sort((a, b) => a.qualifiedId.localeCompare(b.qualifiedId));
         setSkills(newSkills);
         setLoading(false);
+        try {
+          localStorage.setItem('ontostore_data', JSON.stringify({ skills: newSkills, packages: manifests, ts: Date.now() }));
+        } catch {}
       } catch (e) {
         if (signal.aborted) return;
         setError(true); setLoading(false);

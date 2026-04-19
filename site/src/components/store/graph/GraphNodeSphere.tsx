@@ -1,10 +1,10 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, memo } from 'react';
 import { Html, Text, Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 import type { GraphNode } from '../types';
 import { getNodeColor, CATEGORY_LABELS } from './colors';
 
-export function GraphNodeSphere({ node, position, onClick, dimmed = false, hideLabel = false, clusterLabel, exploreLabel, lowDetail = false }: {
+export const GraphNodeSphere = memo(function GraphNodeSphere({ node, position, onClick, dimmed = false, hideLabel = false, clusterLabel, exploreLabel, lowDetail = false }: {
   node: GraphNode;
   position: [number, number, number];
   onClick: (node: GraphNode) => void;
@@ -125,4 +125,4 @@ export function GraphNodeSphere({ node, position, onClick, dimmed = false, hideL
       )}
     </group>
   );
-}
+});
