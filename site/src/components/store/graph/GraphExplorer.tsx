@@ -75,19 +75,20 @@ export function GraphExplorer({ skills, packages, initialStack, t, prefix, navig
     setHighlightCategory(null);
     setGraphError(false);
     if (currentLevel.type === 'skill') {
-      if (singleFile) {
-        setGraphMode('knowledge');
-        if (!knowledgeData) loadKnowledgeGraph();
-      } else {
-        setGraphMode(currentLevel.mode);
-        if (currentLevel.mode === 'knowledge' && !knowledgeData) {
-          loadKnowledgeGraph();
-        }
-      }
+      setGraphMode(singleFile ? 'knowledge' : currentLevel.mode);
     } else {
       setGraphMode('files');
     }
-  }, [currentLevel]);
+  }, [currentLevel, singleFile]);
+
+  // Load knowledge graph when mode requires it
+  useEffect(() => {
+    if (currentLevel.type !== 'skill') return;
+    const needsKnowledge = singleFile || currentLevel.mode === 'knowledge';
+    if (needsKnowledge && !knowledgeData && !loadingKnowledge) {
+      loadKnowledgeGraph();
+    }
+  }, [currentLevel, singleFile, knowledgeData, loadingKnowledge, loadKnowledgeGraph]);
 
   // Abort controller
   useEffect(() => {
@@ -103,6 +104,9 @@ export function GraphExplorer({ skills, packages, initialStack, t, prefix, navig
     return `${prefix}/${level.pkgId}/${level.skillId}`;
   }, [prefix]);
 
+  const stackRef = useRef(stack);
+  stackRef.current = stack;
+
   const pushLevel = useCallback((level: GraphLevel) => {
     setStack(prev => [...prev, level]);
     setKnowledgeData(null);
@@ -110,11 +114,11 @@ export function GraphExplorer({ skills, packages, initialStack, t, prefix, navig
   }, [levelToUrl]);
 
   const popToLevel = useCallback((index: number) => {
+    const target = stackRef.current[index];
     setStack(prev => prev.slice(0, index + 1));
     setKnowledgeData(null);
-    const target = stack[index];
     if (target) history.pushState(null, '', levelToUrl(target));
-  }, [stack, levelToUrl]);
+  }, [levelToUrl]);
 
   // --- Build graph data per level ---
   const authorGraphData = useMemo(() => {
@@ -250,20 +254,13 @@ export function GraphExplorer({ skills, packages, initialStack, t, prefix, navig
           <Suspense fallback={<GraphLoader t={t} />}>
             {displayData ? (
               <KnowledgeGraph3D nodes={displayData.nodes} edges={displayData.edges} onNodeClick={handleNodeClick} onBackgroundClick={() => setSelectedNode(null)} highlightCategory={highlightCategory} onHighlightCategory={setHighlightCategory} height="100%" t={t} hideLabels={!!selectedNode} />
-            ) : loadingKnowledge ? (
-              <div className="flex items-center justify-center h-full gap-3">
-                <div className="w-5 h-5 border-2 border-[#52c7e8]/30 border-t-[#52c7e8] rounded-full animate-spin" />
-                <p className="text-[#8a8a8a] text-sm">{t.loadingGraph}</p>
-              </div>
-            ) : graphError ? (
-              <div className="flex items-center justify-center h-full"><p className="text-[#f9a8d4]">{t.graphError}</p></div>
             ) : (
               <div className="flex items-center justify-center h-full"><p className="text-[#8a8a8a] text-sm">{t.graphError}</p></div>
             )}
           </Suspense>
         )}
         {selectedNode && displayData && (
-          <NodeDetailPanel node={selectedNode} skills={skills} packages={packages} pkgId={currentPkgId} prefix={prefix} edges={displayData.edges} allNodes={displayData.nodes} currentLevel={currentLevel} t={t} onSelectNode={setSelectedNode} onExploreFile={handleExploreFile} onPushLevel={pushLevel} onNavigate={navigate} onCloseGraph={onClose} />
+          <NodeDetailPanel node={selectedNode} skills={skills} pkgId={currentPkgId} prefix={prefix} edges={displayData.edges} allNodes={displayData.nodes} currentLevel={currentLevel} t={t} onSelectNode={setSelectedNode} onExploreFile={handleExploreFile} onPushLevel={pushLevel} onNavigate={navigate} onCloseGraph={onClose} />
         )}
       </div>
     </div>
