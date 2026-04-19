@@ -100,14 +100,17 @@ export function GraphExplorer({ skills, packages, initialStack, t, prefix, navig
     finally { setLoadingKnowledge(false); }
   }, [currentLevel, skillModules]);
 
+  const loadKnowledgeRef = useRef(loadKnowledgeGraph);
+  loadKnowledgeRef.current = loadKnowledgeGraph;
+
   // Load knowledge graph when mode requires it
   useEffect(() => {
     if (currentLevel.type !== 'skill') return;
     const needsKnowledge = singleFile || currentLevel.mode === 'knowledge';
     if (needsKnowledge && !knowledgeData && !loadingKnowledge) {
-      loadKnowledgeGraph();
+      loadKnowledgeRef.current();
     }
-  }, [currentLevel, singleFile, knowledgeData, loadingKnowledge, loadKnowledgeGraph]);
+  }, [currentLevel, singleFile, knowledgeData, loadingKnowledge]);
 
   // Abort controller
   useEffect(() => {
