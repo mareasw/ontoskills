@@ -50,7 +50,7 @@ export function buildAuthorGraphData(skillList: Skill[], authorId: string) {
   const authorSkills = skillList.filter(s => s.author === authorId);
   const pkgIds = [...new Set(authorSkills.map(s => s.packageId))];
   const nodes: GraphNode[] = [
-    { id: 'author', label: authorId, category: 'author', qualifiedId: authorId, isHighlighted: true },
+    { id: 'author', label: authorId, category: 'author', qualifiedId: authorId, isHighlighted: false },
   ];
   const edges: GraphEdge[] = [];
   for (const pid of pkgIds) {

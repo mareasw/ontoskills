@@ -92,7 +92,10 @@ export function PackageView({ loading, skills, packages, pkgId, t, prefix, navig
         <GraphExplorer
           skills={skills}
           packages={packages}
-          initialLevel={{ type: 'package', authorId: pkgId.split('/')[0], pkgId }}
+          initialStack={[
+            { type: 'author', authorId: author },
+            { type: 'package', authorId: author, pkgId },
+          ]}
           t={t}
           prefix={prefix}
           navigate={navigate}
