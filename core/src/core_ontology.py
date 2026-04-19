@@ -87,6 +87,125 @@ def _add_knowledge_rbox(g: Graph, oc: Namespace) -> None:
     g.add((chain_second, RDF.rest, RDF.nil))
 
 
+def _add_content_block_classes(g: Graph, oc: Namespace) -> None:
+    """Add content block classes and properties for structural content preservation."""
+
+    # ========== Content Block Classes ==========
+
+    g.add((oc.CodeExample, RDF.type, OWL.Class))
+    g.add((oc.CodeExample, RDFS.label, Literal("Code Example")))
+    g.add((oc.CodeExample, RDFS.comment, Literal(
+        "Inline code block extracted from skill markdown"
+    )))
+
+    g.add((oc.Table, RDF.type, OWL.Class))
+    g.add((oc.Table, RDFS.label, Literal("Table")))
+    g.add((oc.Table, RDFS.comment, Literal(
+        "Markdown table extracted from skill content"
+    )))
+
+    g.add((oc.Flowchart, RDF.type, OWL.Class))
+    g.add((oc.Flowchart, RDFS.label, Literal("Flowchart")))
+    g.add((oc.Flowchart, RDFS.comment, Literal(
+        "Graphviz or Mermaid diagram extracted from skill content"
+    )))
+
+    g.add((oc.Template, RDF.type, OWL.Class))
+    g.add((oc.Template, RDFS.label, Literal("Template")))
+    g.add((oc.Template, RDFS.comment, Literal(
+        "Reusable template with variable placeholders"
+    )))
+
+    # ========== Content Block Object Properties ==========
+
+    for prop_name, range_name, label, comment in [
+        ("hasCodeExample", "CodeExample", "has code example", "Links a skill to an inline code example"),
+        ("hasTable", "Table", "has table", "Links a skill to a markdown table"),
+        ("hasFlowchart", "Flowchart", "has flowchart", "Links a skill to a flowchart diagram"),
+        ("hasTemplate", "Template", "has template", "Links a skill to a reusable template"),
+    ]:
+        prop_uri = oc[prop_name]
+        range_class = oc[range_name]
+        g.add((prop_uri, RDF.type, OWL.ObjectProperty))
+        g.add((prop_uri, RDFS.domain, oc.Skill))
+        g.add((prop_uri, RDFS.range, range_class))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+
+    # ========== CodeExample Datatype Properties ==========
+
+    for prop_name, label, comment in [
+        ("codeLanguage", "code language", "Programming language of the code block"),
+        ("codeContent", "code content", "Full source code of the inline example"),
+        ("codePurpose", "code purpose", "LLM annotation: what this code does"),
+        ("codeContext", "code context", "LLM annotation: when to reference this code"),
+        ("sourceLocation", "source location", "Line range in original markdown"),
+    ]:
+        prop_uri = oc[prop_name]
+        g.add((prop_uri, RDF.type, OWL.DatatypeProperty))
+        g.add((prop_uri, RDFS.domain, oc.CodeExample))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+
+    # ========== Table Datatype Properties ==========
+
+    for prop_name, label, comment, has_range in [
+        ("tableCaption", "table caption", "Caption or title of the table", False),
+        ("tableMarkdown", "table markdown", "Original markdown source of the table", False),
+        ("tablePurpose", "table purpose", "LLM annotation: what this table represents", False),
+        ("rowCount", "row count", "Number of data rows in the table", True),
+    ]:
+        prop_uri = oc[prop_name]
+        g.add((prop_uri, RDF.type, OWL.DatatypeProperty))
+        g.add((prop_uri, RDFS.domain, oc.Table))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+        if has_range:
+            g.add((prop_uri, RDFS.range, XSD.integer))
+
+    # ========== Flowchart Datatype Properties ==========
+
+    for prop_name, label, comment in [
+        ("flowchartSource", "flowchart source", "Original graphviz or mermaid source"),
+        ("flowchartType", "flowchart type", "Diagram type: graphviz or mermaid"),
+        ("flowchartDescription", "flowchart description", "LLM annotation: what decision flow this represents"),
+    ]:
+        prop_uri = oc[prop_name]
+        g.add((prop_uri, RDF.type, OWL.DatatypeProperty))
+        g.add((prop_uri, RDFS.domain, oc.Flowchart))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+
+    # ========== Template Datatype Properties ==========
+
+    for prop_name, label, comment in [
+        ("templateContent", "template content", "Full template source text"),
+        ("templateType", "template type", "Kind of template: prompt, output, or boilerplate"),
+    ]:
+        prop_uri = oc[prop_name]
+        g.add((prop_uri, RDF.type, OWL.DatatypeProperty))
+        g.add((prop_uri, RDFS.domain, oc.Template))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+
+    g.add((oc.templateVariables, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.templateVariables, RDFS.domain, oc.Template))
+    g.add((oc.templateVariables, RDFS.label, Literal("template variables")))
+    g.add((oc.templateVariables, RDFS.comment, Literal(
+        "Variable placeholder name (repeatable)"
+    )))
+
+    # ========== stepOrder for WorkflowStep ==========
+
+    g.add((oc.stepOrder, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.stepOrder, RDFS.domain, oc.WorkflowStep))
+    g.add((oc.stepOrder, RDFS.range, XSD.integer))
+    g.add((oc.stepOrder, RDFS.label, Literal("step order")))
+    g.add((oc.stepOrder, RDFS.comment, Literal(
+        "Position of this step in a linear procedure (1-based)"
+    )))
+
+
 def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
     """
     Create the core OntoSkills ontology (TBox) with state transition system.
@@ -233,6 +352,9 @@ def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
 
     # Add RBox axioms for knowledge inheritance
     _add_knowledge_rbox(g, oc)
+
+    # Add content block classes and properties
+    _add_content_block_classes(g, oc)
 
     # ========== State Transition Properties ==========
 
