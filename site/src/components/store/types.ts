@@ -144,4 +144,9 @@ export type Translations = {
   authorGraph: string;
   packageGraph: string;
   skillGraph: string;
+  ctrlZoom: string;
+  ctrlOrbit: string;
+  ctrlPan: string;
+  ctrlDetails: string;
+  ctrlClose: string;
 };

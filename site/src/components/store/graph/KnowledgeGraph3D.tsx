@@ -96,11 +96,11 @@ export function KnowledgeGraph3D({ nodes, edges, onNodeClick, onBackgroundClick,
           {shortcutsVisible && (
             <div className="absolute bottom-9 right-0 w-44 rounded-lg bg-[#090909]/95 backdrop-blur-md border border-white/[0.08] p-3 text-[11px] text-[#8a8a8a] space-y-1.5">
               <p className="text-[#d4d4d4] font-medium mb-1">{t.controls}</p>
-              <p>Scroll = Zoom</p>
-              <p>Drag = Orbit</p>
-              <p>Right-drag = Pan</p>
-              <p>Click node = Details</p>
-              <p>Esc = Close</p>
+              <p>{t.ctrlZoom}</p>
+              <p>{t.ctrlOrbit}</p>
+              <p>{t.ctrlPan}</p>
+              <p>{t.ctrlDetails}</p>
+              <p>{t.ctrlClose}</p>
             </div>
           )}
         </div>
