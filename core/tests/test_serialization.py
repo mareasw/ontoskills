@@ -6,7 +6,7 @@ Tests for serialize_skill(), serialize_skill_to_module(), and related functions.
 
 import pytest
 from pathlib import Path
-from rdflib import Graph, RDF, OWL
+from rdflib import Graph, RDF, OWL, Literal
 
 from compiler.serialization import (
     serialize_skill,
@@ -14,6 +14,11 @@ from compiler.serialization import (
     skill_uri_for_id,
 )
 from compiler.schemas import ExtractedSkill, Requirement, ExecutionPayload, StateTransition
+from compiler.schemas import (
+    ContentExtraction, CodeBlock, MarkdownTable, FlowchartBlock,
+    TemplateBlock, CodeAnnotation, TableAnnotation, FlowchartAnnotation,
+    TemplateAnnotation,
+)
 from compiler.core_ontology import get_oc_namespace
 
 
@@ -454,3 +459,90 @@ def test_serialize_skill_to_module_with_extends(tmp_path):
     content = output_path.read_text()
     assert "oc:extends" in content
     assert "brainstorming" in content
+
+
+class TestContentBlockSerialization:
+    def _make_skill_with_content(self, **overrides):
+        defaults = dict(
+            id="content-skill",
+            hash="abc123",
+            nature="A skill with content blocks",
+            genus="Test",
+            differentia="content blocks",
+            intents=["test content"],
+            generated_by="test",
+        )
+        defaults.update(overrides)
+        return ExtractedSkill(**defaults)
+
+    def test_code_example_serialization(self):
+        skill = self._make_skill_with_content(
+            code_annotations=[CodeAnnotation(index=0, purpose="Demo code", context="always")],
+        )
+        content_extraction = ContentExtraction(
+            code_blocks=[CodeBlock(language="python", content="print('hi')", source_line_start=3, source_line_end=4)],
+            tables=[], flowcharts=[], procedures=[], templates=[],
+        )
+        graph = Graph()
+        oc = get_oc_namespace()
+        serialize_skill(graph, skill, content_extraction=content_extraction)
+
+        code_nodes = list(graph.subjects(RDF.type, oc.CodeExample))
+        assert len(code_nodes) == 1
+        assert (code_nodes[0], oc.codeLanguage, Literal("python")) in graph
+        assert (code_nodes[0], oc.codeContent, Literal("print('hi')")) in graph
+        assert (code_nodes[0], oc.codePurpose, Literal("Demo code")) in graph
+
+    def test_table_serialization(self):
+        skill = self._make_skill_with_content(
+            table_annotations=[TableAnnotation(index=0, purpose="Parameter reference")],
+        )
+        content_extraction = ContentExtraction(
+            code_blocks=[],
+            tables=[MarkdownTable(markdown_source="| a | b |\n|---|---|\n| 1 | 2 |", caption="Test", row_count=1)],
+            flowcharts=[], procedures=[], templates=[],
+        )
+        graph = Graph()
+        oc = get_oc_namespace()
+        serialize_skill(graph, skill, content_extraction=content_extraction)
+
+        table_nodes = list(graph.subjects(RDF.type, oc.Table))
+        assert len(table_nodes) == 1
+        assert (table_nodes[0], oc.tableMarkdown, Literal("| a | b |\n|---|---|\n| 1 | 2 |")) in graph
+        assert (table_nodes[0], oc.tablePurpose, Literal("Parameter reference")) in graph
+
+    def test_flowchart_serialization(self):
+        skill = self._make_skill_with_content(
+            flowchart_annotations=[FlowchartAnnotation(index=0, description="Decision flow")],
+        )
+        content_extraction = ContentExtraction(
+            code_blocks=[], tables=[],
+            flowcharts=[FlowchartBlock(source="digraph { A -> B }", chart_type="graphviz")],
+            procedures=[], templates=[],
+        )
+        graph = Graph()
+        oc = get_oc_namespace()
+        serialize_skill(graph, skill, content_extraction=content_extraction)
+
+        flow_nodes = list(graph.subjects(RDF.type, oc.Flowchart))
+        assert len(flow_nodes) == 1
+        assert (flow_nodes[0], oc.flowchartType, Literal("graphviz")) in graph
+        assert (flow_nodes[0], oc.flowchartDescription, Literal("Decision flow")) in graph
+
+    def test_template_serialization(self):
+        skill = self._make_skill_with_content(
+            template_annotations=[TemplateAnnotation(index=0, template_type="prompt")],
+        )
+        content_extraction = ContentExtraction(
+            code_blocks=[], tables=[], flowcharts=[],
+            procedures=[],
+            templates=[TemplateBlock(content="Hello {name}", detected_variables=["name"])],
+        )
+        graph = Graph()
+        oc = get_oc_namespace()
+        serialize_skill(graph, skill, content_extraction=content_extraction)
+
+        tmpl_nodes = list(graph.subjects(RDF.type, oc.Template))
+        assert len(tmpl_nodes) == 1
+        assert (tmpl_nodes[0], oc.templateType, Literal("prompt")) in graph
+        assert (tmpl_nodes[0], oc.templateVariables, Literal("name")) in graph
