@@ -19,6 +19,7 @@ export function Scene({ nodes, edges, onNodeClick, autoRotate = true, highlightC
   exploreLabel?: string;
 }) {
   const positions = useMemo(() => layoutForce3D(nodes, edges), [nodes, edges]);
+  const R = 5 + Math.sqrt(nodes.length) * 4;
   const focusNode = focusNodeId ? nodes.find(n => n.id === focusNodeId) : null;
   const focusPos = focusNode ? positions[focusNode.id] : null;
 
@@ -34,8 +35,8 @@ export function Scene({ nodes, edges, onNodeClick, autoRotate = true, highlightC
         enableDamping
         dampingFactor={0.08}
         autoRotate={false}
-        minDistance={5}
-        maxDistance={100}
+        minDistance={Math.max(3, R * 0.3)}
+        maxDistance={Math.max(R * 6, 60)}
       />
       {nodes.map(n => {
         const p = positions[n.id];
