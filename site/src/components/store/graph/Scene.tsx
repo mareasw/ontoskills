@@ -65,7 +65,7 @@ export function Scene({ nodes, edges, onNodeClick, autoRotate = true, highlightC
         const tNode = nodes.find(n => n.id === e.target);
         return (
           <GraphEdgeLine
-            key={`${e.source}->${e.target}`}
+            key={i}
             start={[s.x, s.y, s.z]}
             end={[t.x, t.y, t.z]}
             sourceColor={sNode ? getNodeColor(sNode.category, sNode.isHighlighted) : '#ffffff'}
