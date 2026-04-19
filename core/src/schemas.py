@@ -327,62 +327,6 @@ class FileInfo(BaseModel):
     mime_type: str
 
 
-class DirectoryScan(BaseModel):
-    """Phase 1 output - all filesystem metadata."""
-    frontmatter: Frontmatter
-    skill_id: str
-    qualified_id: str
-    content_hash: str
-    provenance_path: str
-    files: list[FileInfo]
-    skill_md_content: str
-    file_tree: str  # Formatted string for LLM context
-
-
-# =============================================================================
-# Phase 2 Models (LLM Extraction)
-# =============================================================================
-
-class ReferenceFile(BaseModel):
-    """Reference file identified by LLM for progressive disclosure."""
-    relative_path: str
-    purpose: Literal["api-reference", "examples", "guide", "domain-specific", "other"]
-
-
-class ExecutableScript(BaseModel):
-    """Executable script identified by LLM."""
-    relative_path: str
-    executor: Literal["python", "bash", "node", "other"]
-    execution_intent: Literal["execute", "read_only"] = "execute"
-    command_template: str | None = None
-    requirements: list[str] = Field(default_factory=list)  # Plain tool names: ["pypdf", "pdfplumber"]
-    produces_output: str | None = None
-
-
-class Example(BaseModel):
-    """Input/output example pair for pattern matching."""
-    name: str
-    input_description: str
-    output_example: str
-    tags: list[str] = Field(default_factory=list)
-
-
-class WorkflowStep(BaseModel):
-    """Single workflow step."""
-    step_id: str
-    description: str
-    expected_outcome: str | None = None
-    depends_on: list[str] = Field(default_factory=list)
-
-
-class Workflow(BaseModel):
-    """Sequential workflow with dependencies."""
-    workflow_id: str
-    name: str
-    description: str
-    steps: list[WorkflowStep]
-
-
 class CodeBlock(BaseModel):
     """Inline code block extracted from markdown."""
     language: str
@@ -430,6 +374,63 @@ class ContentExtraction(BaseModel):
     templates: list[TemplateBlock]
 
 
+class DirectoryScan(BaseModel):
+    """Phase 1 output - all filesystem metadata."""
+    frontmatter: Frontmatter
+    skill_id: str
+    qualified_id: str
+    content_hash: str
+    provenance_path: str
+    files: list[FileInfo]
+    skill_md_content: str
+    file_tree: str  # Formatted string for LLM context
+    content_extraction: ContentExtraction
+
+
+# =============================================================================
+# Phase 2 Models (LLM Extraction)
+# =============================================================================
+
+class ReferenceFile(BaseModel):
+    """Reference file identified by LLM for progressive disclosure."""
+    relative_path: str
+    purpose: Literal["api-reference", "examples", "guide", "domain-specific", "other"]
+
+
+class ExecutableScript(BaseModel):
+    """Executable script identified by LLM."""
+    relative_path: str
+    executor: Literal["python", "bash", "node", "other"]
+    execution_intent: Literal["execute", "read_only"] = "execute"
+    command_template: str | None = None
+    requirements: list[str] = Field(default_factory=list)  # Plain tool names: ["pypdf", "pdfplumber"]
+    produces_output: str | None = None
+
+
+class Example(BaseModel):
+    """Input/output example pair for pattern matching."""
+    name: str
+    input_description: str
+    output_example: str
+    tags: list[str] = Field(default_factory=list)
+
+
+class WorkflowStep(BaseModel):
+    """Single workflow step."""
+    step_id: str
+    description: str
+    expected_outcome: str | None = None
+    depends_on: list[str] = Field(default_factory=list)
+
+
+class Workflow(BaseModel):
+    """Sequential workflow with dependencies."""
+    workflow_id: str
+    name: str
+    description: str
+    steps: list[WorkflowStep]
+
+
 # =============================================================================
 # Merged Model (Phase 1 + Phase 2)
 # =============================================================================
@@ -449,3 +450,4 @@ class CompiledSkill(ExtractedSkill):
     reference_files: list[ReferenceFile] = Field(default_factory=list)
     executable_scripts: list[ExecutableScript] = Field(default_factory=list)
     examples: list[Example] = Field(default_factory=list)
+    content_extraction: ContentExtraction | None = None

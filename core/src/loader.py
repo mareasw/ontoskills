@@ -16,6 +16,7 @@ import yaml
 
 from compiler.schemas import Frontmatter, FileInfo, DirectoryScan
 from compiler.extractor import resolve_package_id, generate_qualified_skill_id
+from compiler.content_parser import extract_structural_content
 
 
 class LoaderError(Exception):
@@ -298,6 +299,9 @@ def scan_skill_directory(skill_dir: Path, package_id: str | None = None) -> Dire
                        for f in files]
     file_tree = "\n".join(file_tree_lines)
 
+    # Phase 1: Extract structural content from markdown
+    content_extraction = extract_structural_content(content)
+
     return DirectoryScan(
         frontmatter=frontmatter,
         skill_id=skill_id,
@@ -306,5 +310,6 @@ def scan_skill_directory(skill_dir: Path, package_id: str | None = None) -> Dire
         provenance_path=str(skill_dir),
         files=files,
         skill_md_content=content,
-        file_tree=file_tree
+        file_tree=file_tree,
+        content_extraction=content_extraction,
     )
