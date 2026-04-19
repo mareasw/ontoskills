@@ -1,6 +1,10 @@
 import pytest
 from pydantic import ValidationError
 from compiler.schemas import Requirement, ExecutionPayload, ExtractedSkill, StateTransition
+from compiler.schemas import (
+    CodeBlock, MarkdownTable, FlowchartBlock, ProcedureStep,
+    OrderedProcedure, TemplateBlock, ContentExtraction
+)
 
 
 def test_skill_type_computed_as_executable():
@@ -397,3 +401,81 @@ def test_knowledge_node_filtering_unsupported_types():
         assert len(w) == 3
         warning_messages = [str(warning.message) for warning in w]
         assert any("unsupported type" in msg.lower() for msg in warning_messages)
+
+
+class TestContentExtractionModels:
+    def test_code_block_construction(self):
+        cb = CodeBlock(
+            language="python",
+            content="print('hello')",
+            source_line_start=10,
+            source_line_end=12,
+        )
+        assert cb.language == "python"
+        assert cb.content == "print('hello')"
+        assert cb.source_line_start == 10
+
+    def test_markdown_table_construction(self):
+        t = MarkdownTable(
+            markdown_source="| a | b |\n|---|---|\n| 1 | 2 |",
+            caption="Test table",
+            row_count=1,
+        )
+        assert t.row_count == 1
+        assert t.caption == "Test table"
+
+    def test_markdown_table_without_caption(self):
+        t = MarkdownTable(
+            markdown_source="| a |\n|---|\n| 1 |",
+            caption=None,
+            row_count=1,
+        )
+        assert t.caption is None
+
+    def test_flowchart_block_construction(self):
+        f = FlowchartBlock(
+            source="digraph { A -> B }",
+            chart_type="graphviz",
+        )
+        assert f.chart_type == "graphviz"
+
+    def test_flowchart_block_mermaid(self):
+        f = FlowchartBlock(
+            source="graph TD\n  A-->B",
+            chart_type="mermaid",
+        )
+        assert f.chart_type == "mermaid"
+
+    def test_ordered_procedure(self):
+        p = OrderedProcedure(items=[
+            ProcedureStep(text="Step one", position=1),
+            ProcedureStep(text="Step two", position=2),
+        ])
+        assert len(p.items) == 2
+        assert p.items[0].position == 1
+
+    def test_template_block(self):
+        t = TemplateBlock(
+            content="Hello {name}, welcome to {place}",
+            detected_variables=["name", "place"],
+        )
+        assert t.detected_variables == ["name", "place"]
+
+    def test_content_extraction_empty(self):
+        ce = ContentExtraction(
+            code_blocks=[], tables=[], flowcharts=[],
+            procedures=[], templates=[],
+        )
+        assert ce.code_blocks == []
+
+    def test_content_extraction_with_blocks(self):
+        ce = ContentExtraction(
+            code_blocks=[CodeBlock(language="python", content="x=1", source_line_start=1, source_line_end=1)],
+            tables=[],
+            flowcharts=[FlowchartBlock(source="digraph{}", chart_type="graphviz")],
+            procedures=[OrderedProcedure(items=[ProcedureStep(text="Do it", position=1)])],
+            templates=[],
+        )
+        assert len(ce.code_blocks) == 1
+        assert len(ce.flowcharts) == 1
+        assert len(ce.procedures) == 1
