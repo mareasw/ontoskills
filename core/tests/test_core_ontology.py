@@ -509,3 +509,70 @@ class TestKnowledgeRBoxAxioms:
         # Check that the triple exists (the object will be a BNode for the list)
         assert any((oc.inheritsKnowledge, OWL.propertyChainAxiom, obj) in core_ontology
                    for obj in core_ontology.objects(oc.inheritsKnowledge, OWL.propertyChainAxiom))
+
+
+class TestContentBlockClasses:
+    """Tests for content block OWL classes and properties."""
+
+    def test_code_example_class_exists(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.CodeExample, RDF.type, OWL.Class) in graph
+
+    def test_table_class_exists(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.Table, RDF.type, OWL.Class) in graph
+
+    def test_flowchart_class_exists(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.Flowchart, RDF.type, OWL.Class) in graph
+
+    def test_template_class_exists(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.Template, RDF.type, OWL.Class) in graph
+
+    def test_has_code_example_property(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.hasCodeExample, RDF.type, OWL.ObjectProperty) in graph
+        assert (oc.hasCodeExample, RDFS.domain, oc.Skill) in graph
+        assert (oc.hasCodeExample, RDFS.range, oc.CodeExample) in graph
+
+    def test_has_table_property(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.hasTable, RDF.type, OWL.ObjectProperty) in graph
+
+    def test_has_flowchart_property(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.hasFlowchart, RDF.type, OWL.ObjectProperty) in graph
+
+    def test_has_template_property(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.hasTemplate, RDF.type, OWL.ObjectProperty) in graph
+
+    def test_code_content_datatype_property(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.codeContent, RDF.type, OWL.DatatypeProperty) in graph
+
+    def test_step_order_property(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.stepOrder, RDF.type, OWL.DatatypeProperty) in graph
+        assert (oc.stepOrder, RDFS.domain, oc.WorkflowStep) in graph
