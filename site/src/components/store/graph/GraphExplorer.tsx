@@ -79,6 +79,27 @@ export function GraphExplorer({ skills, packages, initialStack, t, prefix, navig
     }
   }, [currentLevel, singleFile]);
 
+  const loadKnowledgeGraph = useCallback(async () => {
+    if (currentLevel.type !== 'skill') return;
+    setLoadingKnowledge(true);
+    setGraphError(false);
+    setKnowledgeFromFile(false);
+    try {
+      const ttlBase = `${TTL_BASE}${currentLevel.pkgId}/`;
+      const ttlFiles = skillModules.filter(m => m.endsWith('.ttl'));
+      const contents: string[] = [];
+      await Promise.all(ttlFiles.map(async (f) => {
+        try {
+          const res = await fetch(ttlBase + f, { signal: abortRef.current?.signal });
+          if (res.ok) contents.push(await res.text());
+        } catch (e: any) { if (e.name === 'AbortError') throw e; }
+      }));
+      if (!contents.length) { setGraphError(true); return; }
+      setKnowledgeData(parseTtlKnowledgeMap(contents.join('\n'), currentLevel.skillId));
+    } catch (e: any) { if (e.name !== 'AbortError') setGraphError(true); }
+    finally { setLoadingKnowledge(false); }
+  }, [currentLevel, skillModules]);
+
   // Load knowledge graph when mode requires it
   useEffect(() => {
     if (currentLevel.type !== 'skill') return;
@@ -135,27 +156,6 @@ export function GraphExplorer({ skills, packages, initialStack, t, prefix, navig
     if (currentLevel.type !== 'skill') return null;
     return buildFileGraphData(skillModules, currentLevel.skillId);
   }, [skillModules, currentLevel]);
-
-  const loadKnowledgeGraph = useCallback(async () => {
-    if (currentLevel.type !== 'skill') return;
-    setLoadingKnowledge(true);
-    setGraphError(false);
-    setKnowledgeFromFile(false);
-    try {
-      const ttlBase = `${TTL_BASE}${currentLevel.pkgId}/`;
-      const ttlFiles = skillModules.filter(m => m.endsWith('.ttl'));
-      const contents: string[] = [];
-      await Promise.all(ttlFiles.map(async (f) => {
-        try {
-          const res = await fetch(ttlBase + f, { signal: abortRef.current?.signal });
-          if (res.ok) contents.push(await res.text());
-        } catch (e: any) { if (e.name === 'AbortError') throw e; }
-      }));
-      if (!contents.length) { setGraphError(true); return; }
-      setKnowledgeData(parseTtlKnowledgeMap(contents.join('\n'), currentLevel.skillId));
-    } catch (e: any) { if (e.name !== 'AbortError') setGraphError(true); }
-    finally { setLoadingKnowledge(false); }
-  }, [currentLevel, skillModules]);
 
   const clusteredKnowledgeData = useMemo(() => knowledgeData ? clusterGraphData(knowledgeData.nodes, knowledgeData.edges) : null, [knowledgeData]);
 
