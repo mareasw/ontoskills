@@ -92,6 +92,11 @@ export const translations: Record<string, Translations> = {
     clusterInstances: 'instances',
     viewRaw: 'View raw',
     officialStore: 'Official Store',
+    exploreGraph: 'Explore 3D Graph',
+    backToGraph: 'Back to graph',
+    authorGraph: 'Author Graph',
+    packageGraph: 'Package Graph',
+    skillGraph: 'Skill Graph',
   },
   zh: {
     searchPlaceholder: '按本体技能、意图或描述搜索...',
@@ -184,5 +189,10 @@ export const translations: Record<string, Translations> = {
     viewRaw: '查看原始',
     more: '更多',
     officialStore: '官方商店',
+    exploreGraph: '探索 3D 图谱',
+    backToGraph: '返回图谱',
+    authorGraph: '作者图谱',
+    packageGraph: '包图谱',
+    skillGraph: '技能图谱',
   },
 };
