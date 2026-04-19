@@ -27,16 +27,33 @@ export function GraphExplorer({ skills, packages, initialStack, t, prefix, navig
   const [knowledgeData, setKnowledgeData] = useState<{ nodes: GraphNode[]; edges: GraphEdge[] } | null>(null);
   const [loadingKnowledge, setLoadingKnowledge] = useState(false);
   const [graphError, setGraphError] = useState(false);
+  const singleFile = currentLevel.type === 'skill' && skillModules.length <= 1;
   const [graphMode, setGraphMode] = useState<'files' | 'knowledge'>(
-    currentLevel.type === 'skill' ? currentLevel.mode : 'files'
+    currentLevel.type === 'skill' ? (singleFile ? 'knowledge' : currentLevel.mode) : 'files'
   );
   const abortRef = useRef<AbortController | null>(null);
 
-  // Lock body scroll
+  const savedUrl = useRef(typeof window !== 'undefined' ? window.location.href : '');
+
+  // Lock body scroll, restore URL on close
   useEffect(() => {
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = '';
+      history.replaceState(null, '', savedUrl.current);
+    };
   }, []);
+
+  // Browser back button
+  useEffect(() => {
+    const onPop = () => {
+      if (stack.length <= 1) { onClose(); return; }
+      setStack(prev => prev.slice(0, -1));
+      setKnowledgeData(null);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [stack.length, onClose]);
 
   // Reset state when level changes
   useEffect(() => {
@@ -44,9 +61,14 @@ export function GraphExplorer({ skills, packages, initialStack, t, prefix, navig
     setHighlightCategory(null);
     setGraphError(false);
     if (currentLevel.type === 'skill') {
-      setGraphMode(currentLevel.mode);
-      if (currentLevel.mode === 'knowledge' && !knowledgeData) {
-        loadKnowledgeGraph();
+      if (singleFile) {
+        setGraphMode('knowledge');
+        if (!knowledgeData) loadKnowledgeGraph();
+      } else {
+        setGraphMode(currentLevel.mode);
+        if (currentLevel.mode === 'knowledge' && !knowledgeData) {
+          loadKnowledgeGraph();
+        }
       }
     } else {
       setGraphMode('files');
@@ -61,15 +83,24 @@ export function GraphExplorer({ skills, packages, initialStack, t, prefix, navig
     return () => { ac.abort(); };
   }, [currentLevel]);
 
+  const levelToUrl = useCallback((level: GraphLevel): string => {
+    if (level.type === 'author') return `${prefix}/${level.authorId}`;
+    if (level.type === 'package') return `${prefix}/${level.pkgId}`;
+    return `${prefix}/${level.pkgId}/${level.skillId}`;
+  }, [prefix]);
+
   const pushLevel = useCallback((level: GraphLevel) => {
     setStack(prev => [...prev, level]);
     setKnowledgeData(null);
-  }, []);
+    history.pushState(null, '', levelToUrl(level));
+  }, [levelToUrl]);
 
   const popToLevel = useCallback((index: number) => {
     setStack(prev => prev.slice(0, index + 1));
     setKnowledgeData(null);
-  }, []);
+    const target = stack[index];
+    if (target) history.pushState(null, '', levelToUrl(target));
+  }, [stack, levelToUrl]);
 
   // --- Build graph data per level ---
   const authorGraphData = useMemo(() => {
@@ -189,7 +220,7 @@ export function GraphExplorer({ skills, packages, initialStack, t, prefix, navig
           ))}
           <span className="text-[#8a8a8a] text-xs">·</span>
           <span className="text-xs text-[#52c7e8]">{levelLabels[currentLevel.type]}</span>
-          {currentLevel.type === 'skill' && (
+          {currentLevel.type === 'skill' && !singleFile && (
             <div className="flex gap-1 bg-white/5 rounded-lg p-0.5">
               <button onClick={() => setGraphMode('files')} className={`px-2.5 py-1 rounded-md text-xs transition-colors ${graphMode === 'files' ? 'bg-[#52c7e8]/20 text-[#52c7e8]' : 'text-[#8a8a8a] hover:text-[#d4d4d4]'}`}>{t.fileGraph}</button>
               <button onClick={async () => { setGraphMode('knowledge'); if (!knowledgeData) await loadKnowledgeGraph(); }} className={`px-2.5 py-1 rounded-md text-xs transition-colors ${graphMode === 'knowledge' ? 'bg-[#52c7e8]/20 text-[#52c7e8]' : 'text-[#8a8a8a] hover:text-[#d4d4d4]'}`}>{t.knowledgeMap}</button>
