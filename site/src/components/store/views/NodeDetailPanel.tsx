@@ -23,9 +23,7 @@ export function NodeDetailPanel({ node, skills, pkgId, prefix, edges, allNodes, 
   const rawId = node.id.replace(/^dep:/, '').replace(/_/g, '-');
   const depSkill = skills.find(s => s.packageId === pkgId && s.skillId === rawId);
 
-  // Determine if this node can drill down to a deeper level
   const canDrillToPackage = currentLevel.type === 'author' && node.category === 'package' && node.id !== 'author';
-  const canDrillToSkill = currentLevel.type === 'package';
   const drillSkill = currentLevel.type === 'package' ? skills.find(s => s.packageId === currentLevel.pkgId && s.qualifiedId === node.id) : null;
   const canDrill = canDrillToPackage || !!drillSkill;
 

@@ -18,11 +18,6 @@ export function buildGraphData(skillList: Skill[], highlightId: string | null = 
   return { nodes, edges };
 }
 
-export function packageHasDeps(skillList: Skill[]) {
-  const idSet = new Set(skillList.map(s => s.skillId));
-  return skillList.some(s => s.dependsOn.some(d => idSet.has(d)));
-}
-
 export function buildFileGraphData(modules: string[], skillId: string) {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];

@@ -25,6 +25,7 @@ export function GraphExplorer({ skills, packages, initialStack, t, prefix, navig
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [highlightCategory, setHighlightCategory] = useState<string | null>(null);
   const [knowledgeData, setKnowledgeData] = useState<{ nodes: GraphNode[]; edges: GraphEdge[] } | null>(null);
+  const [knowledgeFromFile, setKnowledgeFromFile] = useState(false);
   const [loadingKnowledge, setLoadingKnowledge] = useState(false);
   const [graphError, setGraphError] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -46,15 +47,12 @@ export function GraphExplorer({ skills, packages, initialStack, t, prefix, navig
 
   const savedUrl = useRef(typeof window !== 'undefined' ? window.location.href : '');
 
-  // Lock body scroll, push initial history entry for Back-button support
+  // Lock body scroll, restore URL on close
   useEffect(() => {
     document.body.style.overflow = 'hidden';
-    history.pushState(null, '');
     return () => {
       document.body.style.overflow = '';
-      if (window.location.href !== savedUrl.current) {
-        history.replaceState(null, '', savedUrl.current);
-      }
+      history.replaceState(null, '', savedUrl.current);
     };
   }, []);
 
@@ -117,7 +115,7 @@ export function GraphExplorer({ skills, packages, initialStack, t, prefix, navig
     const target = stackRef.current[index];
     setStack(prev => prev.slice(0, index + 1));
     setKnowledgeData(null);
-    if (target) history.pushState(null, '', levelToUrl(target));
+    if (target) history.replaceState(null, '', levelToUrl(target));
   }, [levelToUrl]);
 
   // --- Build graph data per level ---
@@ -142,6 +140,7 @@ export function GraphExplorer({ skills, packages, initialStack, t, prefix, navig
     if (currentLevel.type !== 'skill') return;
     setLoadingKnowledge(true);
     setGraphError(false);
+    setKnowledgeFromFile(false);
     try {
       const ttlBase = `${TTL_BASE}${currentLevel.pkgId}/`;
       const ttlFiles = skillModules.filter(m => m.endsWith('.ttl'));
@@ -184,6 +183,7 @@ export function GraphExplorer({ skills, packages, initialStack, t, prefix, navig
       if (!res.ok) throw new Error(`Failed: ${res.status}`);
       const content = await res.text();
       setKnowledgeData(parseTtlKnowledgeMap(content, fileId.split('/').pop()!.replace('.ttl', '')));
+      setKnowledgeFromFile(true);
       setGraphMode('knowledge');
     } catch (e: any) { if (e.name !== 'AbortError') setGraphError(true); }
     finally { setLoadingKnowledge(false); }
@@ -232,7 +232,7 @@ export function GraphExplorer({ skills, packages, initialStack, t, prefix, navig
           {currentLevel.type === 'skill' && !singleFile && (
             <div className="flex gap-1 bg-white/5 rounded-lg p-0.5">
               <button onClick={() => setGraphMode('files')} className={`px-2.5 py-1 rounded-md text-xs transition-colors ${graphMode === 'files' ? 'bg-[#52c7e8]/20 text-[#52c7e8]' : 'text-[#8a8a8a] hover:text-[#d4d4d4]'}`}>{t.fileGraph}</button>
-              <button onClick={async () => { setGraphMode('knowledge'); if (!knowledgeData) await loadKnowledgeGraph(); }} className={`px-2.5 py-1 rounded-md text-xs transition-colors ${graphMode === 'knowledge' ? 'bg-[#52c7e8]/20 text-[#52c7e8]' : 'text-[#8a8a8a] hover:text-[#d4d4d4]'}`}>{t.knowledgeMap}</button>
+              <button onClick={async () => { setGraphMode('knowledge'); if (!knowledgeData || knowledgeFromFile) await loadKnowledgeGraph(); }} className={`px-2.5 py-1 rounded-md text-xs transition-colors ${graphMode === 'knowledge' ? 'bg-[#52c7e8]/20 text-[#52c7e8]' : 'text-[#8a8a8a] hover:text-[#d4d4d4]'}`}>{t.knowledgeMap}</button>
             </div>
           )}
         </div>

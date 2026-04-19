@@ -112,15 +112,12 @@ export type Translations = {
   setupSkillCommand: string;
   setupDocs: string;
   noDeps: string;
-  viewPackageGraph: string;
-  backToSkillGraph: string;
   copied: string;
   loadMore: string;
   remaining: string;
   more: string;
   fileGraph: string;
   knowledgeMap: string;
-  openGraph: string;
   loadingGraph: string;
   loading3d: string;
   graphError: string;
