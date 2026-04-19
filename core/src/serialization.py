@@ -12,7 +12,7 @@ from typing import Optional
 from rdflib import Graph, Namespace, RDF, OWL, Literal, URIRef, BNode
 from rdflib.namespace import DCTERMS, SKOS, PROV, XSD
 
-from compiler.schemas import ExtractedSkill, FileInfo
+from compiler.schemas import ExtractedSkill, FileInfo, ContentExtraction
 from compiler.exceptions import OntologyValidationError
 from compiler.config import BASE_URI, CORE_ONTOLOGY_FILENAME, CORE_ONTOLOGY_URL, OUTPUT_DIR, resolve_ontology_root
 from compiler.core_ontology import get_oc_namespace
@@ -82,6 +82,7 @@ def serialize_skill(
     qualified_id: str | None = None,
     extends_parent: str | None = None,
     extends_parent_qualified: str | None = None,
+    content_extraction: "ContentExtraction | None" = None,
 ) -> None:
     """
     Serialize a skill to RDF triples in the graph.
@@ -92,6 +93,7 @@ def serialize_skill(
         qualified_id: Optional qualified ID for URI (prevents collisions across packages)
         extends_parent: Optional parent skill short ID to inject as extends relationship
         extends_parent_qualified: Optional parent qualified ID for extends URI
+        content_extraction: Optional ContentExtraction with code blocks, tables, flowcharts, templates
     """
     oc = get_oc_namespace()
 
@@ -320,6 +322,65 @@ def serialize_skill(
         for tag in ex.tags:
             graph.add((ex_node, oc.hasTag, Literal(tag)))
 
+    # === Content Block Serialization ===
+
+    if content_extraction:
+        def _find_annotation(annotations: list, index: int):
+            for a in annotations:
+                if getattr(a, 'index', None) == index:
+                    return a
+            return None
+
+        # Code Examples
+        for idx, code_block in enumerate(content_extraction.code_blocks):
+            code_node = make_bnode("code", f"{idx}:{code_block.language}")
+            graph.add((skill_uri, oc.hasCodeExample, code_node))
+            graph.add((code_node, RDF.type, oc.CodeExample))
+            graph.add((code_node, oc.codeLanguage, Literal(code_block.language)))
+            graph.add((code_node, oc.codeContent, Literal(code_block.content)))
+            graph.add((code_node, oc.sourceLocation,
+                       Literal(f"lines {code_block.source_line_start}-{code_block.source_line_end}")))
+            ann = _find_annotation(skill.code_annotations, idx)
+            if ann:
+                graph.add((code_node, oc.codePurpose, Literal(ann.purpose)))
+                graph.add((code_node, oc.codeContext, Literal(ann.context)))
+
+        # Tables
+        for idx, table in enumerate(content_extraction.tables):
+            table_node = make_bnode("table", f"{idx}:{table.caption or 'untitled'}")
+            graph.add((skill_uri, oc.hasTable, table_node))
+            graph.add((table_node, RDF.type, oc.Table))
+            graph.add((table_node, oc.tableMarkdown, Literal(table.markdown_source)))
+            if table.caption:
+                graph.add((table_node, oc.tableCaption, Literal(table.caption)))
+            graph.add((table_node, oc.rowCount, Literal(table.row_count)))
+            ann = _find_annotation(skill.table_annotations, idx)
+            if ann:
+                graph.add((table_node, oc.tablePurpose, Literal(ann.purpose)))
+
+        # Flowcharts
+        for idx, flow in enumerate(content_extraction.flowcharts):
+            flow_node = make_bnode("flow", f"{idx}:{flow.chart_type}")
+            graph.add((skill_uri, oc.hasFlowchart, flow_node))
+            graph.add((flow_node, RDF.type, oc.Flowchart))
+            graph.add((flow_node, oc.flowchartSource, Literal(flow.source)))
+            graph.add((flow_node, oc.flowchartType, Literal(flow.chart_type)))
+            ann = _find_annotation(skill.flowchart_annotations, idx)
+            if ann:
+                graph.add((flow_node, oc.flowchartDescription, Literal(ann.description)))
+
+        # Templates
+        for idx, tmpl in enumerate(content_extraction.templates):
+            tmpl_node = make_bnode("tmpl", f"{idx}:{','.join(tmpl.detected_variables)}")
+            graph.add((skill_uri, oc.hasTemplate, tmpl_node))
+            graph.add((tmpl_node, RDF.type, oc.Template))
+            graph.add((tmpl_node, oc.templateContent, Literal(tmpl.content)))
+            for var in tmpl.detected_variables:
+                graph.add((tmpl_node, oc.templateVariables, Literal(var)))
+            ann = _find_annotation(skill.template_annotations, idx)
+            if ann:
+                graph.add((tmpl_node, oc.templateType, Literal(ann.template_type)))
+
     # Frontmatter properties
     if hasattr(skill, 'frontmatter') and skill.frontmatter:
         graph.add((skill_uri, oc.hasName, Literal(skill.frontmatter.name)))
@@ -357,6 +418,7 @@ def serialize_skill_to_module(
     qualified_id: str | None = None,
     extends_parent: str | None = None,
     extends_parent_qualified: str | None = None,
+    content_extraction: "ContentExtraction | None" = None,
 ) -> None:
     """
     Serialize a skill to a standalone ontoskill.ttl module file.
@@ -396,7 +458,8 @@ def serialize_skill_to_module(
 
     # Serialize the skill with optional extends injection
     serialize_skill(g, skill, qualified_id=qualified_id, extends_parent=extends_parent,
-                    extends_parent_qualified=extends_parent_qualified)
+                    extends_parent_qualified=extends_parent_qualified,
+                    content_extraction=content_extraction)
 
     # VALIDATE BEFORE WRITE
     try:
