@@ -159,11 +159,11 @@ def _extract_ordered_items(ol_open_token, tokens, start_idx, md_lines, block_cou
 
     for j in range(start_idx, len(tokens)):
         t = tokens[j]
-        if t.type == "ordered_list_close":
+        if t.type in ("ordered_list_close", "bullet_list_close"):
             depth -= 1
             if depth == 0:
                 break
-        elif t.type == "ordered_list_open":
+        elif t.type in ("ordered_list_open", "bullet_list_open"):
             depth += 1
         elif t.type == "list_item_open":
             if depth == 1:
@@ -187,11 +187,11 @@ def _extract_ordered_items(ol_open_token, tokens, start_idx, md_lines, block_cou
     depth = 1
     while j < len(tokens):
         t = tokens[j]
-        if t.type == "ordered_list_close":
+        if t.type in ("ordered_list_close", "bullet_list_close"):
             depth -= 1
             if depth == 0:
                 break
-        elif t.type == "ordered_list_open":
+        elif t.type in ("ordered_list_open", "bullet_list_open"):
             depth += 1
         elif t.type == "list_item_open" and depth == 1:
             parent_id = f"blk_{block_counter}_item_{item_idx}"
@@ -237,11 +237,11 @@ def _extract_bullet_items(bl_open_token, tokens, start_idx, md_lines, block_coun
 
     for j in range(start_idx, len(tokens)):
         t = tokens[j]
-        if t.type == "bullet_list_close":
+        if t.type in ("bullet_list_close", "ordered_list_close"):
             depth -= 1
             if depth == 0:
                 break
-        elif t.type == "bullet_list_open":
+        elif t.type in ("bullet_list_open", "ordered_list_open"):
             depth += 1
         elif t.type == "list_item_open" and depth == 1:
             current_order += 1
@@ -263,11 +263,11 @@ def _extract_bullet_items(bl_open_token, tokens, start_idx, md_lines, block_coun
     depth = 1
     while j < len(tokens):
         t = tokens[j]
-        if t.type == "bullet_list_close":
+        if t.type in ("bullet_list_close", "ordered_list_close"):
             depth -= 1
             if depth == 0:
                 break
-        elif t.type == "bullet_list_open":
+        elif t.type in ("bullet_list_open", "ordered_list_open"):
             depth += 1
         elif t.type == "list_item_open" and depth == 1:
             parent_id = f"blk_{block_counter}_item_{item_idx}"
@@ -526,7 +526,14 @@ def extract_flat_blocks(markdown: str) -> list[FlatBlock]:
                 ))
                 blocks.extend(child_blocks)
                 block_counter += len(child_blocks)
-            while i < len(tokens) and tokens[i].type != "bullet_list_close":
+            skip_depth = 0
+            while i < len(tokens):
+                if tokens[i].type == "bullet_list_open":
+                    skip_depth += 1
+                elif tokens[i].type == "bullet_list_close":
+                    skip_depth -= 1
+                    if skip_depth == 0:
+                        break
                 i += 1
             i += 1
             continue
