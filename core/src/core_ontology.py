@@ -247,7 +247,10 @@ def _add_docgraph_classes(g: Graph, oc: Namespace) -> None:
         if has_range:
             g.add((prop_uri, RDFS.range, XSD.integer))
 
-    # contentOrder is used by all content block types — no domain restriction
+    # contentOrder — no domain restriction because it applies to all ContentBlock subtypes
+    # (Paragraph, BulletList, BlockQuote, CodeExample, Table, Flowchart, Template, Workflow,
+    # HTMLBlock, FrontmatterBlock). A union domain would be correct but adds OWL complexity
+    # for no practical gain; SHACL shapes enforce per-type constraints instead.
     g.add((oc.contentOrder, RDF.type, OWL.DatatypeProperty))
     g.add((oc.contentOrder, RDFS.label, Literal("content order")))
     g.add((oc.contentOrder, RDFS.comment, Literal("Position within parent section")))
