@@ -40,27 +40,98 @@ NEUTRAL_LANGUAGES = frozenset({
 _TEMPLATE_VAR_RE = re.compile(r'\{([a-zA-Z_][a-zA-Z0-9_]*)\}')
 
 
+def build_section_tree_from_blocks(blocks: list[FlatBlock]) -> list[Section]:
+    """Build hierarchical section tree from flat blocks.
+
+    Walks blocks sequentially. Heading blocks create sections;
+    non-heading blocks accumulate into the current section's content.
+    Stack-based nesting matches heading levels (same algorithm as v1).
+    """
+    root_sections: list[Section] = []
+    stack: list[tuple[int, Section]] = []
+    section_order = 0
+    current_section = Section(title="", level=0, order=0)
+    content_counter = 0
+
+    for block in blocks:
+        if block.block_type == "heading":
+            # Place current section in tree (preamble or previous heading)
+            _place_section(current_section, stack, root_sections)
+
+            section_order += 1
+            new_section = Section(
+                title=block.content.text,
+                level=block.content.level,
+                order=section_order,
+            )
+            current_section = new_section
+            content_counter = 0
+
+            # Update stack: pop until parent has lower level
+            while stack and stack[-1][0] >= block.content.level:
+                stack.pop()
+            stack.append((block.content.level, new_section))
+        else:
+            content_counter += 1
+            content_block = block.content
+            content_block.content_order = content_counter
+            current_section.content.append(content_block)
+
+    # Place final section
+    _place_section(current_section, stack, root_sections)
+
+    return root_sections
+
+
+def _place_section(section, stack, root_sections):
+    """Place a section in the tree as subsection of stack parent or as root."""
+    if section.level == 0:
+        # Preamble — only add as root if it has content
+        if section.content:
+            root_sections.append(section)
+        return
+    # Find parent: first stack entry with lower level
+    for si in range(len(stack) - 1, -1, -1):
+        if stack[si][0] < section.level:
+            stack[si][1].subsections.append(section)
+            return
+    root_sections.append(section)
+
+
+def _derive_flat_lists(sections: list[Section]):
+    """Walk section tree and derive typed flat lists."""
+    code_blocks: list[CodeBlock] = []
+    tables: list[MarkdownTable] = []
+    flowcharts: list[FlowchartBlock] = []
+    procedures: list[OrderedProcedure] = []
+    templates: list[TemplateBlock] = []
+
+    def _walk(section):
+        for block in section.content:
+            if block.block_type == "code_block":
+                code_blocks.append(block)
+            elif block.block_type == "table":
+                tables.append(block)
+            elif block.block_type == "flowchart":
+                flowcharts.append(block)
+            elif block.block_type == "ordered_procedure":
+                procedures.append(block)
+            elif block.block_type == "template":
+                templates.append(block)
+        for sub in section.subsections:
+            _walk(sub)
+
+    for s in sections:
+        _walk(s)
+
+    return code_blocks, tables, flowcharts, procedures, templates
+
+
 def extract_structural_content(markdown: str) -> ContentExtraction:
     """Parse markdown into a section tree with typed content blocks."""
-    from markdown_it import MarkdownIt
-    from mdit_py_plugins.front_matter import front_matter_plugin
-
-    md_it = MarkdownIt("commonmark", {"html": True}).enable("table")
-    front_matter_plugin(md_it)
-    tokens = md_it.parse(markdown)
-    md_lines = markdown.splitlines(keepends=True)
-
-    # Pass 1: Group tokens by heading boundaries
-    groups = _group_by_headings(tokens)
-
-    # Pass 2: Build tree and extract content
-    sections = _build_section_tree(groups, tokens, md_lines)
-
-    # Derive flat lists from tree for backward compatibility
-    code_blocks, tables, flowcharts, procedures, templates = [], [], [], [], []
-    for section in sections:
-        _collect_flat_lists(section, code_blocks, tables, flowcharts, procedures, templates)
-
+    blocks = extract_flat_blocks(markdown)
+    sections = build_section_tree_from_blocks(blocks)
+    code_blocks, tables, flowcharts, procedures, templates = _derive_flat_lists(sections)
     return ContentExtraction(
         sections=sections,
         code_blocks=code_blocks,
@@ -71,7 +142,7 @@ def extract_structural_content(markdown: str) -> ContentExtraction:
     )
 
 
-def _extract_ordered_procedure_with_children(ol_open_token, tokens, start_idx, md_lines, block_counter):
+def _extract_ordered_items(ol_open_token, tokens, start_idx, md_lines, block_counter):
     """Extract ordered list items, including nested content blocks inside items.
 
     Returns (OrderedProcedure, list[FlatBlock]) where the FlatBlocks are child
@@ -147,7 +218,7 @@ def _extract_ordered_procedure_with_children(ol_open_token, tokens, start_idx, m
     return OrderedProcedure(items=items, content_order=0), child_blocks
 
 
-def _extract_bullet_list_with_children(bl_open_token, tokens, start_idx, md_lines, block_counter):
+def _extract_bullet_items(bl_open_token, tokens, start_idx, md_lines, block_counter):
     """Extract bullet list items, including nested content blocks inside items.
 
     Returns (BulletListBlock, list[FlatBlock]) where the FlatBlocks are child
@@ -236,7 +307,7 @@ def _try_extract_child_block(token, tokens, idx, md_lines, block_counter, parent
                 parent_block_id=parent_id,
             )
     elif token.type == "bullet_list_open" and token.map:
-        bl, _ = _extract_bullet_list_with_children(token, tokens, idx, md_lines, block_counter)
+        bl, _ = _extract_bullet_items(token, tokens, idx, md_lines, block_counter)
         if bl:
             return FlatBlock(
                 block_id=f"blk_{block_counter}",
@@ -388,7 +459,7 @@ def extract_flat_blocks(markdown: str) -> list[FlatBlock]:
 
         # Ordered list (procedure) — use with_children variant for nested extraction
         if token.type == "ordered_list_open" and token.map:
-            proc, child_blocks = _extract_ordered_procedure_with_children(
+            proc, child_blocks = _extract_ordered_items(
                 token, tokens, i, md_lines, block_counter
             )
             if proc:
@@ -417,7 +488,7 @@ def extract_flat_blocks(markdown: str) -> list[FlatBlock]:
 
         # Bullet list — use with_children variant for nested extraction
         if token.type == "bullet_list_open" and token.map:
-            bl, child_blocks = _extract_bullet_list_with_children(
+            bl, child_blocks = _extract_bullet_items(
                 token, tokens, i, md_lines, block_counter
             )
             if bl:
@@ -497,190 +568,6 @@ def extract_flat_blocks(markdown: str) -> list[FlatBlock]:
     return blocks
 
 
-def _collect_flat_lists(section, code_blocks, tables, flowcharts, procedures, templates):
-    """Walk section tree and collect flat lists for backward compatibility."""
-    for block in section.content:
-        if block.block_type == "code_block":
-            code_blocks.append(block)
-        elif block.block_type == "table":
-            tables.append(block)
-        elif block.block_type == "flowchart":
-            flowcharts.append(block)
-        elif block.block_type == "ordered_procedure":
-            procedures.append(block)
-        elif block.block_type == "template":
-            templates.append(block)
-    for sub in section.subsections:
-        _collect_flat_lists(sub, code_blocks, tables, flowcharts, procedures, templates)
-
-
-def _group_by_headings(tokens):
-    """Group tokens into buckets delimited by heading_open/heading_close pairs.
-
-    Returns list of (level, title, token_start, token_end) tuples.
-    Content before the first heading gets level=0, title="".
-    """
-    groups = []
-    current_level = 0
-    current_title = ""
-    current_start = 0
-    in_heading = False
-
-    for i, token in enumerate(tokens):
-        if token.type == "heading_open":
-            # Close previous group
-            if i > current_start:
-                groups.append((current_level, current_title, current_start, i))
-            current_start = i
-            current_level = int(token.tag[1])  # h1 -> 1, h2 -> 2
-            in_heading = True
-        elif token.type == "inline" and in_heading:
-            current_title = token.content
-        elif token.type == "heading_close":
-            in_heading = False
-
-    # Final group
-    if current_start < len(tokens):
-        groups.append((current_level, current_title, current_start, len(tokens)))
-
-    return groups
-
-
-def _build_section_tree(groups, tokens, md_lines):
-    """Convert heading groups into nested Section tree using stack-based nesting."""
-    root_sections = []
-    section_order = 0
-    stack = []  # (level, Section)
-
-    for group_level, group_title, tok_start, tok_end in groups:
-        if group_level == 0:
-            section_order = 0
-        else:
-            section_order += 1
-
-        section_tokens = tokens[tok_start:tok_end]
-        content = _extract_section_content(section_tokens, md_lines)
-
-        section = Section(
-            title=group_title,
-            level=group_level,
-            order=section_order,
-            content=content,
-        )
-
-        # Place in tree: pop until parent has lower level
-        while stack and stack[-1][0] >= group_level:
-            stack.pop()
-
-        if stack:
-            stack[-1][1].subsections.append(section)
-        else:
-            root_sections.append(section)
-
-        if group_level > 0:
-            stack.append((group_level, section))
-
-    return root_sections
-
-
-def _extract_section_content(section_tokens, md_lines):
-    """Extract ordered content blocks from a section's token range."""
-    content = []
-    order = 0
-    i = 0
-
-    while i < len(section_tokens):
-        token = section_tokens[i]
-
-        if token.type == "heading_open":
-            # Skip heading tokens (they define the section, not content)
-            i += 3  # heading_open, inline, heading_close
-            continue
-
-        if token.type == "fence" and token.map:
-            order += 1
-            block = _classify_fence(token, order)
-            if block is not None:
-                content.append(block)
-            else:
-                order -= 1
-            i += 1
-            continue
-
-        if token.type == "table_open" and token.map:
-            order += 1
-            table = _extract_table(token, section_tokens, i, md_lines, order)
-            if table:
-                content.append(table)
-            else:
-                order -= 1
-            # Skip to table_close
-            while i < len(section_tokens) and section_tokens[i].type != "table_close":
-                i += 1
-            i += 1
-            continue
-
-        if token.type == "ordered_list_open" and token.map:
-            order += 1
-            proc = _extract_ordered_procedure(token, section_tokens, i, order)
-            if proc:
-                content.append(proc)
-            else:
-                order -= 1
-            # Skip to ordered_list_close
-            depth = 0
-            while i < len(section_tokens):
-                if section_tokens[i].type == "ordered_list_open":
-                    depth += 1
-                elif section_tokens[i].type == "ordered_list_close":
-                    depth -= 1
-                    if depth == 0:
-                        break
-                i += 1
-            i += 1
-            continue
-
-        if token.type == "bullet_list_open" and token.map:
-            order += 1
-            bl = _extract_bullet_list(token, section_tokens, i, order)
-            if bl:
-                content.append(bl)
-            else:
-                order -= 1
-            # Skip to bullet_list_close
-            while i < len(section_tokens) and section_tokens[i].type != "bullet_list_close":
-                i += 1
-            i += 1
-            continue
-
-        if token.type == "blockquote_open" and token.map:
-            order += 1
-            bq = _extract_blockquote(token, section_tokens, i, md_lines, order)
-            if bq:
-                content.append(bq)
-            else:
-                order -= 1
-            # Skip to blockquote_close
-            while i < len(section_tokens) and section_tokens[i].type != "blockquote_close":
-                i += 1
-            i += 1
-            continue
-
-        if token.type == "paragraph_open" and token.map:
-            order += 1
-            para = _extract_paragraph(token, section_tokens, i, md_lines, order)
-            if para:
-                content.append(para)
-            else:
-                order -= 1
-            i += 1
-            continue
-
-        i += 1
-
-    return content
-
-
 def _classify_fence(token, content_order):
     """Classify a fence token. Returns typed block with block_type set."""
     info = (token.info or "").strip()
@@ -758,65 +645,6 @@ def _extract_table(table_open_token, tokens, start_idx, md_lines, content_order)
         row_count=row_count,
         content_order=content_order,
     )
-
-
-def _extract_ordered_procedure(ol_open_token, tokens, start_idx, content_order):
-    """Extract ordered list items as an OrderedProcedure."""
-    items = []
-    current_position = 0
-    depth = 0
-    in_item = False
-    captured_inline = False
-
-    for j in range(start_idx, len(tokens)):
-        t = tokens[j]
-        if t.type == "ordered_list_close":
-            depth -= 1
-            if depth == 0:
-                break
-        elif t.type == "ordered_list_open":
-            depth += 1
-        elif t.type == "list_item_open":
-            if depth == 1:
-                current_position += 1
-                in_item = True
-                captured_inline = False
-        elif t.type == "list_item_close":
-            if depth == 1:
-                in_item = False
-        elif t.type == "inline" and in_item and not captured_inline and depth == 1:
-            items.append(ProcedureStep(text=t.content, position=current_position))
-            captured_inline = True
-
-    if items:
-        return OrderedProcedure(items=items, content_order=content_order)
-    return None
-
-
-def _extract_bullet_list(bl_open_token, tokens, start_idx, content_order):
-    """Extract bullet list items."""
-    items = []
-    current_order = 0
-    in_item = False
-    captured_inline = False
-
-    for j in range(start_idx, len(tokens)):
-        t = tokens[j]
-        if t.type == "bullet_list_close":
-            break
-        if t.type == "list_item_open":
-            current_order += 1
-            in_item = True
-            captured_inline = False
-        elif t.type == "list_item_close":
-            in_item = False
-        elif t.type == "inline" and in_item and not captured_inline:
-            items.append(BulletItem(text=t.content, order=current_order))
-            captured_inline = True
-
-    if items:
-        return BulletListBlock(items=items, content_order=content_order)
-    return None
 
 
 def _extract_blockquote(bq_open_token, tokens, start_idx, md_lines, content_order):
