@@ -7,11 +7,10 @@ import { getNodeColor, CATEGORY_LABELS } from './colors';
 
 
 /** Text that scales with camera distance without per-frame React re-renders. */
-function DistanceScaledText({ position, baseFontSize, children, ...props }: {
-  position: [number, number, number];
+function DistanceScaledText({ baseFontSize, children, ...props }: {
   baseFontSize: number;
   children: string;
-} & Omit<React.ComponentProps<typeof Text>, 'fontSize' | 'position'>) {
+} & Omit<React.ComponentProps<typeof Text>, 'fontSize'>) {
   const { camera } = useThree();
   const groupRef = useRef<THREE.Group>(null);
   const worldPos = useRef(new THREE.Vector3());
@@ -26,7 +25,7 @@ function DistanceScaledText({ position, baseFontSize, children, ...props }: {
     else group.scale.setScalar(targetScale);
   });
   return (
-    <group ref={groupRef} position={position}>
+    <group ref={groupRef}>
       <Text fontSize={baseFontSize} {...props}>{children}</Text>
     </group>
   );
@@ -85,7 +84,6 @@ export const GraphNodeSphere = memo(function GraphNodeSphere({ node, position, o
       {isCluster && !dimmed && (
         <Billboard position={[0, radius + 0.35, 0]}>
           <DistanceScaledText
-            position={position}
             baseFontSize={0.35}
             color={color}
             anchorX="center"
@@ -100,7 +98,6 @@ export const GraphNodeSphere = memo(function GraphNodeSphere({ node, position, o
       {!hideLabel && (
         <Billboard position={[0, -(radius + 0.55), 0]}>
           <DistanceScaledText
-            position={position}
             baseFontSize={0.3}
             color="#e0e0e0"
             fillOpacity={dimmed ? 0.12 : 1}
