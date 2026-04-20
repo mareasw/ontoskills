@@ -156,7 +156,8 @@ def _serialize_section_tree(
             return node
 
         elif block.block_type == "code_block":
-            node = make_bnode("code", f"{section_ctx}:{block.content_order}:{block.language}")
+            loc = f"{block.source_line_start}-{block.source_line_end}"
+            node = make_bnode("code", f"{section_ctx}:{block.content_order}:{block.language}:{loc}")
             graph.add((node, RDF.type, oc.CodeExample))
             graph.add((node, oc.codeLanguage, Literal(block.language)))
             graph.add((node, oc.codeContent, Literal(block.content)))
