@@ -417,8 +417,9 @@ oc:BulletListShape a sh:NodeShape ;
     sh:targetClass oc:BulletList ;
     sh:property [
         sh:path oc:hasItem ;
+        sh:class oc:BulletItem ;
         sh:minCount 1 ;
-        sh:message "BulletList must have at least one hasItem" ;
+        sh:message "BulletList must have at least one hasItem of type BulletItem" ;
     ] .
 
 oc:BulletItemShape a sh:NodeShape ;
@@ -447,6 +448,11 @@ oc:BlockQuoteShape a sh:NodeShape ;
         sh:minCount 1 ;
         sh:datatype xsd:integer ;
         sh:message "BlockQuote must have contentOrder" ;
+    ] , [
+        sh:path oc:quoteAttribution ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "BlockQuote quoteAttribution must be a single string" ;
     ] .
 
 # === DocGraph v2 Shapes ===
