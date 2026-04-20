@@ -6,20 +6,30 @@ import type { GraphNode } from '../types';
 import { getNodeColor, CATEGORY_LABELS } from './colors';
 
 
-/** Text that scales fontSize with camera distance so labels stay readable. */
+/** Text that scales with camera distance without per-frame React re-renders. */
 function DistanceScaledText({ position, baseFontSize, children, ...props }: {
   position: [number, number, number];
   baseFontSize: number;
   children: string;
 } & Omit<React.ComponentProps<typeof Text>, 'fontSize' | 'position'>) {
   const { camera } = useThree();
-  const [fontSize, setFontSize] = useState(baseFontSize);
+  const groupRef = useRef<THREE.Group>(null);
+  const worldPos = useRef(new THREE.Vector3());
   useFrame(() => {
-    const d = camera.position.distanceTo(new THREE.Vector3(...position));
-    const target = baseFontSize * Math.max(1, d / 25);
-    setFontSize(prev => Math.abs(prev - target) > 0.02 ? THREE.MathUtils.lerp(prev, target, 0.15) : prev);
+    const group = groupRef.current;
+    if (!group) return;
+    group.getWorldPosition(worldPos.current);
+    const d = camera.position.distanceTo(worldPos.current);
+    const targetScale = Math.max(1, d / 25);
+    const s = THREE.MathUtils.lerp(group.scale.x, targetScale, 0.15);
+    if (Math.abs(s - targetScale) > 0.001) group.scale.setScalar(s);
+    else group.scale.setScalar(targetScale);
   });
-  return <Text fontSize={fontSize} {...props}>{children}</Text>;
+  return (
+    <group ref={groupRef} position={position}>
+      <Text fontSize={baseFontSize} {...props}>{children}</Text>
+    </group>
+  );
 }
 
 export const GraphNodeSphere = memo(function GraphNodeSphere({ node, position, onClick, dimmed = false, hideLabel = false, clusterLabel, exploreLabel, lowDetail = false }: {
