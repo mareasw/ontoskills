@@ -464,6 +464,11 @@ oc:HTMLBlockShape a sh:NodeShape ;
         sh:minCount 1 ;
         sh:datatype xsd:string ;
         sh:message "HTMLBlock must have htmlContent" ;
+    ] , [
+        sh:path oc:contentOrder ;
+        sh:minCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "HTMLBlock must have contentOrder" ;
     ] .
 
 oc:FrontmatterBlockShape a sh:NodeShape ;
@@ -473,4 +478,9 @@ oc:FrontmatterBlockShape a sh:NodeShape ;
         sh:minCount 1 ;
         sh:datatype xsd:string ;
         sh:message "FrontmatterBlock must have rawYaml" ;
+    ] , [
+        sh:path oc:contentOrder ;
+        sh:minCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "FrontmatterBlock must have contentOrder" ;
     ] .
