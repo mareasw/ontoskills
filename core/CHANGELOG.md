@@ -4,7 +4,7 @@ All notable changes to OntoCore (Python package) will be documented in this file
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.12.0] - 2026-04-19
+## [0.11.0] - 2026-04-20
 
 ### Added
 
@@ -17,29 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **SHACL shapes** for CodeExample, Table, Flowchart, Template validation
 - **`markdown-it-py` + `mdit-py-plugins`** — New Python dependencies for CommonMark-compliant markdown parsing
 - **`ontomcp-driver` skill** — Plain SKILL.md teaching agents how to use the OntoSkills MCP server
-
-### Changed
-
-- **`workflows` field moved** from `CompiledSkill` to `ExtractedSkill` — fixes bug where LLM prompt asked for workflows but tool schema didn't include them
-- **Phase 1 pipeline** now includes structural content extraction via `content_parser.py`
-- **Serialization** supports content blocks with annotation merge-by-index
-- **Circular dependency guard** — `enrich_extracted_skill()` removes self-referencing depends_on
-
-### Fixed
-
-- **Workflows dropped by Pydantic** — `ExtractedSkill.model_json_schema()` now includes `workflows` field
-- **Self-referencing dependencies** — `depends_on` filtered to exclude the skill's own ID
-
-## [0.11.0] - 2026-04-15
-
-### Added
-
 - **`--with-embeddings` install flag** — `ontoskills install <ref> --with-embeddings` optionally downloads per-skill embedding files from remote registries for semantic search
-- **Per-skill embedding copy on local install** — `install_package_from_directory()` copies embedding files when `with_embeddings=True`
-- **Remote embedding download** — `install_package_from_manifest_ref()` downloads embedding files from registry URLs (non-fatal on failure)
-- **Structural author/root detection** — `_is_author_dir()` uses multi-child heuristic (2+ children with skills = root) instead of hardcoded names
-- **`lru_cache` on author detection** — `_is_author_dir_cached()` prevents O(N×tree_size) filesystem scans during batch compilation
-- **`ontostore/index.json` embedding_model section** — Registry index includes model name, dimension, and file references for embedding discovery
 - **Per-skill embedding generation** — Every compiled skill produces `intents.json` with 384-dim L2-normalized embeddings alongside `ontoskill.ttl`. Requires `ontocore[embeddings]` extra; skipped with a warning when not installed
 - **`oc:dependsOnSkill`** — New ObjectProperty replacing `oc:dependsOn` for unambiguous skill-to-skill dependencies (domain/range `oc:Skill`)
 - **`oc:enablesSkill`** — Inverse ObjectProperty of `dependsOnSkill` (`owl:inverseOf`) for bidirectional skill relationship traversal
@@ -47,30 +25,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Multi-level install resolution** — `ontoskills install` supports author-level, package-level, and skill-level references via `resolve_install_ref()`
 - **Parallel compile workers** — Configurable retry mechanism and parallel LLM extraction workers
 - **Direct content injection** — Skip tool-use discovery phase, inject content directly to LLM
-- **`sentence-transformers` as optional dependency** — Available via `ontocore[embeddings]` extra in `pyproject.toml`; compilation succeeds without it
-- **uv.lock** — Committed lockfile for reproducible builds
 - **`ontocore lint` CLI command** — Run structural lint checks on compiled TTL files with Rich table output, `--errors-only` and `--json` flags
 
 ### Changed
 
+- **`workflows` field moved** from `CompiledSkill` to `ExtractedSkill` — fixes bug where LLM prompt asked for workflows but tool schema didn't include them
+- **Phase 1 pipeline** now includes structural content extraction via `content_parser.py`
+- **Serialization** supports content blocks with annotation merge-by-index
+- **Circular dependency guard** — `enrich_extracted_skill()` removes self-referencing depends_on
 - **Embeddings fully optional end-to-end** — Compile time (`ontocore[embeddings]`), install time (`--with-embeddings`), and MCP runtime (BM25 fallback) all treat embeddings as optional
-- **`ontostore/index.json` format** — Added `embedding_model` block with `model_name`, `dimension`, `model_file`, `tokenizer_file`
 - **`generatedBy` made optional** — No longer required by SHACL validation; auto-filled when present
-- **Serialization cleanup** — Stopped writing `version`/`license`/`author` to TTL (belongs in `package.json` manifest)
-- **CLI restructure** — Renamed `bin/` to `cli/`, consolidated JS tests into `cli/tests/`, removed root `tests/` directory
-- **Install single skill** — Remote module download via HTTP for single-skill installs from remote registries
-- **Global vendor→author rename** — Directory paths (`ontologies/vendor/` → `ontologies/author/`), variables, functions (`install_vendor` → `install_author`), types (`VendorTarget` → `AuthorTarget`), ontology property (`hasVendor` → `hasAuthor`), and all documentation
-- **Smart install resolution** — Single-segment targets resolve as author prefix match or short-name package match, with ambiguity disambiguation
+- **Global vendor→author rename** — Directory paths, variables, functions, types, ontology property, and all documentation
 - **`oc:dependsOn` deprecated** — Marked with `owl:deprecated true`; linter, differ, and serialization now use `oc:dependsOnSkill`
 
 ### Fixed
 
-- **`effective_trier` typo** — Corrected variable name in `install_package_from_directory()`
+- **Workflows dropped by Pydantic** — `ExtractedSkill.model_json_schema()` now includes `workflows` field
+- **Self-referencing dependencies** — `depends_on` filtered to exclude the skill's own ID
 - **Compile error collector** — Cleared per invocation to prevent batch contamination across compilations
 - **Skill registry context** — Preserved during sub-skill extraction to maintain LLM context
-- **Anti-hallucination rules** — Added to extraction prompts for more reliable LLM output
-- **`ONTOSKILLS_TRUST_TIER` env var** — Missing `os` import for environment variable reading
-- **Self-loop prevention** — Serialization silently skips `depends_on` entries that reference the skill itself
 - **Differ backward compatibility** — Migration suggestion SPARQL queries use UNION to cover both `dependsOnSkill` and deprecated `dependsOn`
 - **Linter property mismatch** — Circular dependency and workflow cycle detection now correctly query `oc:dependsOnSkill` instead of old `oc:dependsOn`
 
