@@ -130,10 +130,75 @@ def _derive_flat_lists(sections: list[Section]):
     return code_blocks, tables, flowcharts, procedures, templates
 
 
+def _try_skeleton_tree(blocks: list[FlatBlock], markdown: str) -> list[Section] | None:
+    """Attempt LLM-enhanced section tree via skeleton+hydration.
+
+    Returns hydrated sections on success, None on any failure
+    (missing API key, API error, parse error). Caller falls back
+    to deterministic tree building.
+    """
+    import os
+    import json
+    import logging
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return None
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        from compiler.prompts import build_skeleton_prompt, SKELETON_SYSTEM_PROMPT
+        from compiler.schemas import DocumentSkeleton
+        from compiler.transformer import hydrate_skeleton
+
+        user_prompt = build_skeleton_prompt(blocks)
+        blocks_index = {b.block_id: b for b in blocks}
+
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=4096,
+            system=SKELETON_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_prompt}],
+            timeout=60.0,
+        )
+
+        text = response.content[0].text.strip()
+        # Strip markdown code fences if present
+        if text.startswith("```"):
+            text = text.split("\n", 1)[-1]
+        if text.endswith("```"):
+            text = text.rsplit("```", 1)[0]
+
+        skeleton = DocumentSkeleton.model_validate_json(text)
+        if not skeleton.sections:
+            logger.debug("LLM skeleton returned empty sections, falling back")
+            return None
+
+        sections = hydrate_skeleton(skeleton, blocks_index, markdown)
+        if sections:
+            logger.info("Skeleton pipeline produced %d sections", len(sections))
+            return sections
+
+        return None
+
+    except Exception:
+        logger.debug("Skeleton LLM failed, using deterministic fallback", exc_info=True)
+        return None
+
+
 def extract_structural_content(markdown: str) -> ContentExtraction:
-    """Parse markdown into a section tree with typed content blocks."""
+    """Parse markdown into a section tree with typed content blocks.
+
+    Attempts LLM-enhanced skeleton tree if ANTHROPIC_API_KEY is available,
+    falls back to deterministic tree building otherwise.
+    """
     blocks = extract_flat_blocks(markdown)
-    sections = build_section_tree_from_blocks(blocks)
+    sections = _try_skeleton_tree(blocks, markdown)
+    if sections is None:
+        sections = build_section_tree_from_blocks(blocks)
     code_blocks, tables, flowcharts, procedures, templates = _derive_flat_lists(sections)
     return ContentExtraction(
         sections=sections,

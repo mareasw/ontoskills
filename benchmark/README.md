@@ -81,5 +81,36 @@ Only Anthropic models are called via API. Other models are price-comparison only
 
 - Rust toolchain (for `ontomcp-bench`)
 - Python 3.10+ with `anthropic` package (for `traditional-bench`)
-- `ANTHROPIC_API_KEY` env var (for traditional benchmark only)
+- `ANTHROPIC_API_KEY` env var (for traditional benchmark and skeleton LLM)
 - `libclang-dev` package (for oxrocksdb-sys compilation)
+
+## DocGraph Coverage Benchmark
+
+Measures how much of each SKILL.md is captured as typed RDF content blocks. Target: ≥95% line-level coverage across 30 real skills (14 superpowers + 16 Anthropic).
+
+### What it measures
+
+- **Line-level coverage**: percentage of non-blank lines that fall within an extracted `FlatBlock`'s line range
+- **Block type coverage**: verifies all expected block types (heading, paragraph, code_block, bullet_list, etc.) appear across the skill corpus
+
+### Usage
+
+```bash
+# Verbose per-skill report (no API key needed for flat extraction only)
+python benchmark/docgraph_coverage.py --verbose
+
+# With skeleton LLM enhancement (needs API key)
+ANTHROPIC_API_KEY=sk-ant-... python benchmark/docgraph_coverage.py --verbose
+
+# JSON output for CI
+python benchmark/docgraph_coverage.py --json results/coverage.json
+
+# Custom target
+python benchmark/docgraph_coverage.py --target 90
+```
+
+### Skill directories
+
+Auto-detected from `~/.claude/plugins/cache/`. Override with env vars:
+- `DOCGRAPH_SUP_DIR` — superpowers skills directory
+- `DOCGRAPH_ANT_DIR` — Anthropic document-skills directory
