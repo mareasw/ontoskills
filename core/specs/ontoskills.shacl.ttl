@@ -377,3 +377,74 @@ oc:TemplateShape a sh:NodeShape ;
         sh:in ("prompt" "output" "boilerplate") ;
         sh:message "If present, templateType must be prompt, output, or boilerplate" ;
     ] .
+
+# === DocGraph Shapes ===
+
+oc:SectionShape a sh:NodeShape ;
+    sh:targetClass oc:Section ;
+    sh:property [
+        sh:path oc:sectionTitle ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Section must have a sectionTitle" ;
+    ] , [
+        sh:path oc:sectionLevel ;
+        sh:minCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "Section must have a sectionLevel" ;
+    ] , [
+        sh:path oc:sectionOrder ;
+        sh:minCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "Section must have a sectionOrder" ;
+    ] .
+
+oc:ParagraphShape a sh:NodeShape ;
+    sh:targetClass oc:Paragraph ;
+    sh:property [
+        sh:path oc:textContent ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Paragraph must have textContent" ;
+    ] , [
+        sh:path oc:contentOrder ;
+        sh:minCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "Paragraph must have contentOrder" ;
+    ] .
+
+oc:BulletListShape a sh:NodeShape ;
+    sh:targetClass oc:BulletList ;
+    sh:property [
+        sh:path oc:hasItem ;
+        sh:minCount 1 ;
+        sh:message "BulletList must have at least one hasItem" ;
+    ] .
+
+oc:BulletItemShape a sh:NodeShape ;
+    sh:targetClass oc:BulletItem ;
+    sh:property [
+        sh:path oc:itemText ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "BulletItem must have itemText" ;
+    ] , [
+        sh:path oc:itemOrder ;
+        sh:minCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "BulletItem must have itemOrder" ;
+    ] .
+
+oc:BlockQuoteShape a sh:NodeShape ;
+    sh:targetClass oc:BlockQuote ;
+    sh:property [
+        sh:path oc:quoteContent ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "BlockQuote must have quoteContent" ;
+    ] , [
+        sh:path oc:contentOrder ;
+        sh:minCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "BlockQuote must have contentOrder" ;
+    ] .

@@ -206,6 +206,110 @@ def _add_content_block_classes(g: Graph, oc: Namespace) -> None:
     )))
 
 
+def _add_docgraph_classes(g: Graph, oc: Namespace) -> None:
+    """Add DocGraph classes for complete document structure preservation."""
+
+    # ========== Section ==========
+    g.add((oc.Section, RDF.type, OWL.Class))
+    g.add((oc.Section, RDFS.label, Literal("Section")))
+    g.add((oc.Section, RDFS.comment, Literal(
+        "A section of the document, identified by a header"
+    )))
+
+    for prop_name, label, comment, has_range in [
+        ("sectionTitle", "section title", "Header text of the section", False),
+        ("sectionLevel", "section level", "Header level 1-6", True),
+        ("sectionOrder", "section order", "Position among sibling sections", True),
+    ]:
+        prop_uri = oc[prop_name]
+        g.add((prop_uri, RDF.type, OWL.DatatypeProperty))
+        g.add((prop_uri, RDFS.domain, oc.Section))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+        if has_range:
+            g.add((prop_uri, RDFS.range, XSD.integer))
+
+    # ========== Paragraph ==========
+    g.add((oc.Paragraph, RDF.type, OWL.Class))
+    g.add((oc.Paragraph, RDFS.label, Literal("Paragraph")))
+    g.add((oc.Paragraph, RDFS.comment, Literal(
+        "Free-form text paragraph preserving inline formatting"
+    )))
+
+    for prop_name, label, comment, has_range in [
+        ("textContent", "text content", "Raw markdown text of the paragraph", False),
+        ("contentOrder", "content order", "Position within parent section", True),
+    ]:
+        prop_uri = oc[prop_name]
+        g.add((prop_uri, RDF.type, OWL.DatatypeProperty))
+        g.add((prop_uri, RDFS.domain, oc.Paragraph))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+        if has_range:
+            g.add((prop_uri, RDFS.range, XSD.integer))
+
+    # ========== BulletList + BulletItem ==========
+    g.add((oc.BulletList, RDF.type, OWL.Class))
+    g.add((oc.BulletList, RDFS.label, Literal("Bullet List")))
+    g.add((oc.BulletList, RDFS.comment, Literal(
+        "Unordered list of items"
+    )))
+
+    g.add((oc.BulletItem, RDF.type, OWL.Class))
+    g.add((oc.BulletItem, RDFS.label, Literal("Bullet Item")))
+    g.add((oc.BulletItem, RDFS.comment, Literal(
+        "Single item in a bullet list"
+    )))
+
+    for prop_name, label, comment, has_range in [
+        ("itemText", "item text", "Text content of the bullet item", False),
+        ("itemOrder", "item order", "Position within the bullet list", True),
+    ]:
+        prop_uri = oc[prop_name]
+        g.add((prop_uri, RDF.type, OWL.DatatypeProperty))
+        g.add((prop_uri, RDFS.domain, oc.BulletItem))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+        if has_range:
+            g.add((prop_uri, RDFS.range, XSD.integer))
+
+    # ========== BlockQuote ==========
+    g.add((oc.BlockQuote, RDF.type, OWL.Class))
+    g.add((oc.BlockQuote, RDFS.label, Literal("Block Quote")))
+    g.add((oc.BlockQuote, RDFS.comment, Literal(
+        "Blockquote from markdown, optionally with attribution"
+    )))
+
+    for prop_name, label, comment in [
+        ("quoteContent", "quote content", "Full text of the blockquote"),
+        ("quoteAttribution", "quote attribution", "Optional source/attribution of the quote"),
+    ]:
+        prop_uri = oc[prop_name]
+        g.add((prop_uri, RDF.type, OWL.DatatypeProperty))
+        g.add((prop_uri, RDFS.domain, oc.BlockQuote))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+
+    # ========== DocGraph Object Properties ==========
+    for prop_name, domain, range_cls, label, comment in [
+        ("hasSection", oc.Skill, oc.Section, "has section", "Top-level section of a skill document"),
+        ("hasSubsection", oc.Section, oc.Section, "has subsection", "Nested section within a section"),
+        ("hasContent", oc.Section, None, "has content", "Content block within a section"),
+        ("hasItem", oc.BulletList, oc.BulletItem, "has item", "Item in a bullet list"),
+    ]:
+        prop_uri = oc[prop_name]
+        g.add((prop_uri, RDF.type, OWL.ObjectProperty))
+        g.add((prop_uri, RDFS.domain, domain))
+        if range_cls is not None:
+            g.add((prop_uri, RDFS.range, range_cls))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+
+    # contentOrder also applies to BulletList and BlockQuote
+    for cls in [oc.BulletList, oc.BlockQuote]:
+        g.add((oc.contentOrder, RDFS.domain, cls))
+
+
 def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
     """
     Create the core OntoSkills ontology (TBox) with state transition system.
@@ -355,6 +459,9 @@ def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
 
     # Add content block classes and properties
     _add_content_block_classes(g, oc)
+
+    # Add DocGraph classes for document structure preservation
+    _add_docgraph_classes(g, oc)
 
     # ========== State Transition Properties ==========
 

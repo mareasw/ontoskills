@@ -576,3 +576,55 @@ class TestContentBlockClasses:
         oc = get_oc_namespace()
         assert (oc.stepOrder, RDF.type, OWL.DatatypeProperty) in graph
         assert (oc.stepOrder, RDFS.domain, oc.WorkflowStep) in graph
+
+
+class TestDocGraphOntology:
+    """Tests for DocGraph classes — Section, Paragraph, BulletList, BlockQuote."""
+
+    def test_section_class_exists(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        g = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.Section, RDF.type, OWL.Class) in g
+
+    def test_section_datatype_properties(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        g = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.sectionTitle, RDF.type, OWL.DatatypeProperty) in g
+        assert (oc.sectionLevel, RDF.type, OWL.DatatypeProperty) in g
+        assert (oc.sectionOrder, RDF.type, OWL.DatatypeProperty) in g
+
+    def test_section_object_properties(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        g = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.hasSection, RDF.type, OWL.ObjectProperty) in g
+        assert (oc.hasSubsection, RDF.type, OWL.ObjectProperty) in g
+        assert (oc.hasContent, RDF.type, OWL.ObjectProperty) in g
+
+    def test_paragraph_class_and_properties(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        g = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.Paragraph, RDF.type, OWL.Class) in g
+        assert (oc.textContent, RDF.type, OWL.DatatypeProperty) in g
+        assert (oc.contentOrder, RDF.type, OWL.DatatypeProperty) in g
+
+    def test_bullet_list_class_and_properties(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        g = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.BulletList, RDF.type, OWL.Class) in g
+        assert (oc.BulletItem, RDF.type, OWL.Class) in g
+        assert (oc.hasItem, RDF.type, OWL.ObjectProperty) in g
+        assert (oc.itemText, RDF.type, OWL.DatatypeProperty) in g
+        assert (oc.itemOrder, RDF.type, OWL.DatatypeProperty) in g
+
+    def test_blockquote_class_and_properties(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        g = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.BlockQuote, RDF.type, OWL.Class) in g
+        assert (oc.quoteContent, RDF.type, OWL.DatatypeProperty) in g
+        assert (oc.quoteAttribution, RDF.type, OWL.DatatypeProperty) in g
