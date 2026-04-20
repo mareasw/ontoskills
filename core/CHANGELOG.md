@@ -34,6 +34,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Content tree serialization** — Section tree walks produce RDF triples with `oc:hasSection`, `oc:hasSubsection`, `oc:hasContent`
 - **SHACL shapes** for Section, Paragraph, BulletList, BulletItem, BlockQuote validation
 - **≥80% markdown coverage** — up from ~50% with structural blocks alone
+- **DocGraph v2: Skeleton & Hydration** — LLM-assisted document tree building with deterministic byte-perfect content extraction via pointer-based architecture (Phase 1a flat extraction → Phase 1b LLM skeleton → Phase 1c hydration)
+- **`oc:HTMLBlock`** — Raw HTML blocks from markdown extracted as typed RDF nodes
+- **`oc:FrontmatterBlock`** — YAML frontmatter extracted as typed nodes with parsed properties
+- **`FlatBlock` / `DocumentSkeleton`** — Pointer-based models: Phase 1a extracts flat blocks with unique IDs, Phase 1b LLM arranges IDs into tree, Phase 1c Python hydrates with real content
+- **Nested list item extraction** — Code blocks, paragraphs, sub-lists inside bullet items and procedure steps via recursive token walking
+- **`oc:hasChild`** — Object property for nested content blocks within list items
+- **`BulletItem.children` / `ProcedureStep.children`** — Pydantic models support nested content blocks
+- **100% line-level coverage** across 30 benchmark skills (14 superpowers + 16 Anthropic), up from 54.7% average in v1
 
 ### Changed
 
