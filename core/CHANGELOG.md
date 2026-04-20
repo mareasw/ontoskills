@@ -26,6 +26,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Parallel compile workers** — Configurable retry mechanism and parallel LLM extraction workers
 - **Direct content injection** — Skip tool-use discovery phase, inject content directly to LLM
 - **`ontocore lint` CLI command** — Run structural lint checks on compiled TTL files with Rich table output, `--errors-only` and `--json` flags
+- **DocGraph: Ontological DOM** — Every markdown element (sections, paragraphs, bullet lists, blockquotes) becomes a typed RDF node in a tree structure
+- **`oc:Section`** — Document sections with title, level, order, nested subsections, and typed content
+- **`oc:Paragraph`** — Free-form text preserving bold, links, inline code
+- **`oc:BulletList` / `oc:BulletItem`** — Unordered list extraction with item ordering
+- **`oc:BlockQuote`** — Blockquote extraction with optional attribution detection
+- **Content tree serialization** — Section tree walks produce RDF triples with `oc:hasSection`, `oc:hasSubsection`, `oc:hasContent`
+- **SHACL shapes** for Section, Paragraph, BulletList, BulletItem, BlockQuote validation
+- **≥80% markdown coverage** — up from ~50% with structural blocks alone
 
 ### Changed
 
