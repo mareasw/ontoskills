@@ -125,7 +125,7 @@ export function StoreView({ loading, filteredSkills, meta, t, prefix, navigate, 
 
       {remaining > 0 && (
         <div className="mt-8 text-center">
-          <button onClick={() => setVisibleCount((c: number) => c + 20)} className="px-6 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 text-sm text-[#d4d4d4] hover:bg-white/[0.08] hover:border-white/20 transition-colors">
+          <button onClick={() => setVisibleCount(visibleCount + 20)} className="px-6 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 text-sm text-[#d4d4d4] hover:bg-white/[0.08] hover:border-white/20 transition-colors">
             {t.loadMore} ({remaining} {t.remaining})
           </button>
         </div>
