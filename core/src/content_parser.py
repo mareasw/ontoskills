@@ -76,6 +76,17 @@ def extract_structural_content(markdown: str) -> ContentExtraction:
             proc = _extract_ordered_procedure(token, tokens, i)
             if proc:
                 procedures.append(proc)
+            # Skip all tokens until the matching ordered_list_close
+            # so nested ordered_list_open tokens are not picked up separately
+            depth = 0
+            while i < len(tokens):
+                if tokens[i].type == "ordered_list_open":
+                    depth += 1
+                elif tokens[i].type == "ordered_list_close":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                i += 1
 
         i += 1
 
@@ -94,27 +105,28 @@ def _slice_lines(md_lines: list[str], start: int, end: int) -> str:
 
 
 def _classify_fence(token, md_lines: list[str]):
-    """Classify a fence token as CodeBlock, FlowchartBlock, or TemplateBlock."""
+    """Classify a fence token as CodeBlock, FlowchartBlock, or TemplateBlock.
+
+    Uses token.content for the inner content (excludes fence markers),
+    and token.map for source line tracking only.
+    """
     lang = (token.info or "").strip().split()[0] if token.info.strip() else ""
     lang_lower = lang.lower()
+    content = token.content
 
     if lang_lower in FLOWCHART_LANGUAGES:
         chart_type = "mermaid" if lang_lower == "mermaid" else "graphviz"
-        source = _slice_lines(md_lines, token.map[0], token.map[1])
-        return FlowchartBlock(source=source, chart_type=chart_type)
+        return FlowchartBlock(source=content, chart_type=chart_type)
 
     if lang_lower in PROGRAMMING_LANGUAGES:
-        content = _slice_lines(md_lines, token.map[0], token.map[1])
         return CodeBlock(
             language=lang_lower,
             content=content,
-            source_line_start=token.map[0],
-            source_line_end=token.map[1] - 1,
+            source_line_start=token.map[0] + 1,
+            source_line_end=token.map[1],
         )
 
     # Neutral or unknown language — check for template variables
-    content = _slice_lines(md_lines, token.map[0], token.map[1])
-
     if lang_lower in NEUTRAL_LANGUAGES:
         vars_found = _TEMPLATE_VAR_RE.findall(content)
         if vars_found:
@@ -123,8 +135,8 @@ def _classify_fence(token, md_lines: list[str]):
     return CodeBlock(
         language=lang_lower,
         content=content,
-        source_line_start=token.map[0],
-        source_line_end=token.map[1] - 1,
+        source_line_start=token.map[0] + 1,
+        source_line_end=token.map[1],
     )
 
 
@@ -161,22 +173,36 @@ def _extract_table(table_open_token, tokens, start_idx, md_lines):
 
 
 def _extract_ordered_procedure(ol_open_token, tokens, start_idx):
-    """Extract ordered list items as an OrderedProcedure."""
+    """Extract ordered list items as an OrderedProcedure.
+
+    Handles nested lists by tracking depth — only top-level items are extracted.
+    Handles multiple inline tokens per item by only capturing the first.
+    """
     items = []
     current_position = 0
+    depth = 0
     in_item = False
+    captured_inline = False
 
     for j in range(start_idx, len(tokens)):
         t = tokens[j]
         if t.type == "ordered_list_close":
-            break
-        if t.type == "list_item_open":
-            current_position += 1
-            in_item = True
+            depth -= 1
+            if depth < 0:
+                break
+        elif t.type == "ordered_list_open":
+            depth += 1
+        elif t.type == "list_item_open":
+            if depth == 1:
+                current_position += 1
+                in_item = True
+                captured_inline = False
         elif t.type == "list_item_close":
-            in_item = False
-        elif t.type == "inline" and in_item:
+            if depth == 1:
+                in_item = False
+        elif t.type == "inline" and in_item and not captured_inline and depth == 1:
             items.append(ProcedureStep(text=t.content, position=current_position))
+            captured_inline = True
 
     if items:
         return OrderedProcedure(items=items)

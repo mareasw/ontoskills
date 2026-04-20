@@ -28,9 +28,18 @@ class TestCodeBlockExtraction:
         md = f"```python\n{code}```\n"
         result = extract_structural_content(md)
         assert len(result.code_blocks) == 1
-        # content includes the full fenced block (opening + code + closing)
+        # content is just the inner code (no fence markers)
         assert "def foo():" in result.code_blocks[0].content
         assert "return 42" in result.code_blocks[0].content
+        assert not result.code_blocks[0].content.startswith("```")
+
+    def test_code_block_line_numbers_1_based(self):
+        md = "# Title\n\n```python\nprint('hello')\n```\n"
+        result = extract_structural_content(md)
+        assert len(result.code_blocks) == 1
+        # Lines are 1-based: line 3 = ```python, line 5 = ```
+        assert result.code_blocks[0].source_line_start == 3
+        assert result.code_blocks[0].source_line_end == 5
 
     def test_empty_language_treated_as_text(self):
         md = "```\nsome text\n```\n"
@@ -93,6 +102,15 @@ class TestOrderedProcedureExtraction:
         md = "- bullet one\n- bullet two\n"
         result = extract_structural_content(md)
         assert result.procedures == []
+
+    def test_nested_ordered_list_skipped(self):
+        """Nested list items should not pollute the top-level procedure."""
+        md = "1. First step\n   1. Nested sub-step\n   2. Another nested\n2. Second step\n"
+        result = extract_structural_content(md)
+        assert len(result.procedures) == 1
+        assert len(result.procedures[0].items) == 2
+        assert result.procedures[0].items[0].text == "First step"
+        assert result.procedures[0].items[1].text == "Second step"
 
 
 class TestTemplateExtraction:
