@@ -546,3 +546,48 @@ class TestContentBlockSerialization:
         assert len(tmpl_nodes) == 1
         assert (tmpl_nodes[0], oc.templateType, Literal("prompt")) in graph
         assert (tmpl_nodes[0], oc.templateVariables, Literal("name")) in graph
+
+    def test_procedure_serialized_as_workflow_with_step_order(self):
+        from compiler.schemas import OrderedProcedure, ProcedureStep
+        skill = self._make_skill_with_content()
+        content_extraction = ContentExtraction(
+            code_blocks=[], tables=[], flowcharts=[], templates=[],
+            procedures=[OrderedProcedure(items=[
+                ProcedureStep(text="First step", position=1),
+                ProcedureStep(text="Second step", position=2),
+            ])],
+        )
+        graph = Graph()
+        oc = get_oc_namespace()
+        serialize_skill(graph, skill, content_extraction=content_extraction)
+
+        wf_nodes = list(graph.subjects(RDF.type, oc.Workflow))
+        assert len(wf_nodes) == 1
+        step_nodes = list(graph.subjects(RDF.type, oc.WorkflowStep))
+        assert len(step_nodes) == 2
+        # Verify stepOrder is present
+        step_orders = [int(str(o)) for s in step_nodes for o in graph.objects(s, oc.stepOrder)]
+        assert sorted(step_orders) == [1, 2]
+
+    def test_content_extraction_fallback_from_skill_attribute(self):
+        from compiler.schemas import CompiledSkill, CodeBlock, FileInfo
+        skill = CompiledSkill(
+            id="fallback-skill",
+            hash="fb123",
+            nature="Fallback test",
+            genus="Test",
+            differentia="fallback",
+            intents=["test fallback"],
+            generated_by="test",
+            content_extraction=ContentExtraction(
+                code_blocks=[CodeBlock(language="python", content="x=1", source_line_start=1, source_line_end=1)],
+                tables=[], flowcharts=[], procedures=[], templates=[],
+            ),
+        )
+        graph = Graph()
+        oc = get_oc_namespace()
+        serialize_skill(graph, skill)  # No content_extraction param!
+
+        # Content blocks should still be serialized via fallback
+        code_nodes = list(graph.subjects(RDF.type, oc.CodeExample))
+        assert len(code_nodes) == 1

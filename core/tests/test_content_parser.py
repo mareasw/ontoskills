@@ -67,6 +67,13 @@ class TestTableExtraction:
         result = extract_structural_content(md)
         assert result.tables == []
 
+    def test_table_caption_detected_with_blank_line(self):
+        """Caption should be found even when separated by a blank line."""
+        md = "## Parameters\n\n| Name | Type |\n|------|------|\n| foo  | bar  |\n"
+        result = extract_structural_content(md)
+        assert len(result.tables) == 1
+        assert result.tables[0].caption == "## Parameters"
+
 
 class TestFlowchartExtraction:
     def test_graphviz_flowchart(self):

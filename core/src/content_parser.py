@@ -131,7 +131,7 @@ def _classify_fence(token, md_lines: list[str]):
 
     # Neutral or unknown language — check for template variables
     if lang_lower in NEUTRAL_LANGUAGES:
-        vars_found = _TEMPLATE_VAR_RE.findall(content)
+        vars_found = list(dict.fromkeys(_TEMPLATE_VAR_RE.findall(content)))
         if vars_found:
             return TemplateBlock(content=content, detected_variables=vars_found)
 
@@ -161,12 +161,16 @@ def _extract_table(table_open_token, tokens, start_idx, md_lines):
             if j + 1 < len(tokens) and tokens[j + 1].type == "td_open":
                 row_count += 1
 
-    # Try to find caption from preceding line
+    # Try to find caption from preceding non-empty, non-pipe line
     caption = None
-    if start > 0:
-        preceding_line = md_lines[start - 1].strip() if start - 1 < len(md_lines) else ""
-        if preceding_line and not preceding_line.startswith("|"):
-            caption = preceding_line.rstrip(":")
+    for k in range(start - 1, -1, -1):
+        preceding_line = md_lines[k].strip()
+        if not preceding_line:
+            continue
+        if preceding_line.startswith("|"):
+            break
+        caption = preceding_line.rstrip(":")
+        break
 
     return MarkdownTable(
         markdown_source=raw_source,
