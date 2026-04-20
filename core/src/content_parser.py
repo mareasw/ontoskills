@@ -54,6 +54,9 @@ def build_section_tree_from_blocks(blocks: list[FlatBlock]) -> list[Section]:
     content_counter = 0
 
     for block in blocks:
+        # Skip child blocks — they're already attached to BulletItem/ProcedureStep.children
+        if block.parent_block_id:
+            continue
         if block.block_type == "heading":
             # Place current section in tree (preamble or previous heading)
             _place_section(current_section, stack, root_sections)
@@ -211,6 +214,8 @@ def _extract_ordered_items(ol_open_token, tokens, start_idx, md_lines, block_cou
                     result = _try_extract_child_block(tk, tokens, k, md_lines, block_counter + 1 + len(child_blocks), parent_id)
                     if result:
                         child_blocks.extend(result)
+                        for r in result:
+                            items[item_idx].children.append(r.content)
                 k += 1
             item_idx += 1
         j += 1
@@ -222,24 +227,29 @@ def _extract_bullet_items(bl_open_token, tokens, start_idx, md_lines, block_coun
     """Extract bullet list items, including nested content blocks inside items.
 
     Returns (BulletListBlock, list[FlatBlock]) where the FlatBlocks are child
-    blocks with parent_block_id set.
+    blocks with parent_block_id set. Children are also attached to BulletItem.children.
     """
     items = []
     current_order = 0
     in_item = False
     captured_inline = False
+    depth = 0
 
     for j in range(start_idx, len(tokens)):
         t = tokens[j]
         if t.type == "bullet_list_close":
-            break
-        if t.type == "list_item_open":
+            depth -= 1
+            if depth == 0:
+                break
+        elif t.type == "bullet_list_open":
+            depth += 1
+        elif t.type == "list_item_open" and depth == 1:
             current_order += 1
             in_item = True
             captured_inline = False
-        elif t.type == "list_item_close":
+        elif t.type == "list_item_close" and depth == 1:
             in_item = False
-        elif t.type == "inline" and in_item and not captured_inline:
+        elif t.type == "inline" and in_item and not captured_inline and depth == 1:
             items.append(BulletItem(text=t.content, order=current_order))
             captured_inline = True
 
@@ -250,11 +260,16 @@ def _extract_bullet_items(bl_open_token, tokens, start_idx, md_lines, block_coun
     child_blocks = []
     item_idx = 0
     j = start_idx + 1
+    depth = 1
     while j < len(tokens):
         t = tokens[j]
         if t.type == "bullet_list_close":
-            break
-        if t.type == "list_item_open":
+            depth -= 1
+            if depth == 0:
+                break
+        elif t.type == "bullet_list_open":
+            depth += 1
+        elif t.type == "list_item_open" and depth == 1:
             parent_id = f"blk_{block_counter}_item_{item_idx}"
             k = j + 1
             item_depth = 1
@@ -275,6 +290,8 @@ def _extract_bullet_items(bl_open_token, tokens, start_idx, md_lines, block_coun
                     result = _try_extract_child_block(tk, tokens, k, md_lines, block_counter + 1 + len(child_blocks), parent_id)
                     if result:
                         child_blocks.extend(result)
+                        for r in result:
+                            items[item_idx].children.append(r.content)
                 k += 1
             item_idx += 1
         j += 1
