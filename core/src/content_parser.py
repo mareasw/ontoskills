@@ -214,8 +214,9 @@ def _extract_ordered_items(ol_open_token, tokens, start_idx, md_lines, block_cou
                     result = _try_extract_child_block(tk, tokens, k, md_lines, block_counter + 1 + len(child_blocks), parent_id)
                     if result:
                         child_blocks.extend(result)
-                        for r in result:
-                            items[item_idx].children.append(r.content)
+                        if item_idx < len(items):
+                            for r in result:
+                                items[item_idx].children.append(r.content)
                 k += 1
             item_idx += 1
         j += 1
@@ -290,12 +291,12 @@ def _extract_bullet_items(bl_open_token, tokens, start_idx, md_lines, block_coun
                     result = _try_extract_child_block(tk, tokens, k, md_lines, block_counter + 1 + len(child_blocks), parent_id)
                     if result:
                         child_blocks.extend(result)
-                        for r in result:
-                            items[item_idx].children.append(r.content)
+                        if item_idx < len(items):
+                            for r in result:
+                                items[item_idx].children.append(r.content)
                 k += 1
             item_idx += 1
         j += 1
-
     return BulletListBlock(items=items, content_order=0), child_blocks
 
 
