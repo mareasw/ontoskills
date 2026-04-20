@@ -1,3 +1,4 @@
+from __future__ import annotations
 import json
 import re
 import warnings
@@ -358,6 +359,7 @@ class ProcedureStep(BaseModel):
     """Single step in an ordered procedure."""
     text: str
     position: int  # 1-based
+    children: list[ContentBlock] = Field(default_factory=list)
 
 
 class OrderedProcedure(BaseModel):
@@ -386,6 +388,7 @@ class BulletItem(BaseModel):
     """Single item in a bullet list."""
     text: str
     order: int
+    children: list[ContentBlock] = Field(default_factory=list)
 
 
 class BulletListBlock(BaseModel):
@@ -403,9 +406,33 @@ class BlockQuoteBlock(BaseModel):
     content_order: int
 
 
+class HTMLBlock(BaseModel):
+    """HTML block from markdown."""
+    block_type: Literal["html_block"] = "html_block"
+    content: str
+    content_order: int
+
+
+class FrontmatterBlock(BaseModel):
+    """YAML frontmatter from markdown."""
+    block_type: Literal["frontmatter"] = "frontmatter"
+    raw_yaml: str
+    properties: dict[str, str] = Field(default_factory=dict)
+    content_order: int
+
+
+class HeadingBlock(BaseModel):
+    """Heading extracted as a block (for flat extraction mode)."""
+    block_type: Literal["heading"] = "heading"
+    text: str
+    level: int
+    content_order: int
+
+
 ContentBlock = Annotated[
     Union[Paragraph, CodeBlock, MarkdownTable, FlowchartBlock,
-          TemplateBlock, BulletListBlock, BlockQuoteBlock, OrderedProcedure],
+          TemplateBlock, BulletListBlock, BlockQuoteBlock, OrderedProcedure,
+          HTMLBlock, FrontmatterBlock],
     Field(discriminator="block_type")
 ]
 
@@ -427,6 +454,34 @@ class ContentExtraction(BaseModel):
     flowcharts: list[FlowchartBlock] = Field(default_factory=list)
     procedures: list[OrderedProcedure] = Field(default_factory=list)
     templates: list[TemplateBlock] = Field(default_factory=list)
+
+
+class FlatBlock(BaseModel):
+    """A content block with a unique ID for skeleton/hydration architecture."""
+    block_id: str
+    block_type: str
+    content: ContentBlock
+    line_start: int
+    line_end: int
+    parent_block_id: str | None = None
+
+
+class SkeletonNode(BaseModel):
+    """A node in the document skeleton tree (LLM output)."""
+    block_id: str
+    children: list[SkeletonNode] = Field(default_factory=list)
+
+
+class SkeletonListItem(BaseModel):
+    """A list item with children in the skeleton (LLM output)."""
+    text_block_id: str
+    children: list[str] = Field(default_factory=list)  # block_ids of child blocks
+
+
+class DocumentSkeleton(BaseModel):
+    """Document structure skeleton built by LLM from block IDs."""
+    sections: list[SkeletonNode]
+    list_items: dict[str, list[SkeletonListItem]] = Field(default_factory=dict)
 
 
 class DirectoryScan(BaseModel):

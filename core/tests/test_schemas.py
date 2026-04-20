@@ -624,3 +624,69 @@ class TestDocGraphModels:
         )
         assert len(ce.sections) == 1
         assert len(ce.code_blocks) == 1
+
+
+class TestDocGraphV2Models:
+    def test_html_block_model(self):
+        from compiler.schemas import HTMLBlock
+        hb = HTMLBlock(content="<HARD-GATE>Do not proceed</HARD-GATE>", content_order=1)
+        assert hb.block_type == "html_block"
+        assert "HARD-GATE" in hb.content
+
+    def test_frontmatter_block_model(self):
+        from compiler.schemas import FrontmatterBlock
+        fb = FrontmatterBlock(raw_yaml="name: test\ndescription: A test", properties={"name": "test", "description": "A test"}, content_order=0)
+        assert fb.block_type == "frontmatter"
+        assert fb.properties["name"] == "test"
+
+    def test_heading_block_model(self):
+        from compiler.schemas import HeadingBlock
+        hb = HeadingBlock(text="Overview", level=2, content_order=0)
+        assert hb.block_type == "heading"
+        assert hb.level == 2
+
+    def test_bullet_item_with_children(self):
+        from compiler.schemas import BulletItem, CodeBlock
+        bi = BulletItem(
+            text="Run the test",
+            order=1,
+            children=[CodeBlock(language="bash", content="pytest -v", source_line_start=5, source_line_end=5, content_order=0)],
+        )
+        assert len(bi.children) == 1
+        assert bi.children[0].block_type == "code_block"
+
+    def test_procedure_step_with_children(self):
+        from compiler.schemas import ProcedureStep, Paragraph
+        ps = ProcedureStep(
+            text="Fix the error",
+            position=2,
+            children=[Paragraph(text_content="See error message below.", content_order=1)],
+        )
+        assert len(ps.children) == 1
+
+    def test_flat_block_model(self):
+        from compiler.schemas import FlatBlock, Paragraph
+        para = Paragraph(text_content="Hello.", content_order=1)
+        fb = FlatBlock(block_id="blk_0", block_type="paragraph", content=para, line_start=1, line_end=1)
+        assert fb.block_id == "blk_0"
+        assert fb.parent_block_id is None
+
+    def test_flat_block_with_parent(self):
+        from compiler.schemas import FlatBlock, CodeBlock
+        code = CodeBlock(language="python", content="x=1", source_line_start=3, source_line_end=3, content_order=0)
+        fb = FlatBlock(block_id="blk_5", block_type="code_block", content=code, line_start=3, line_end=3, parent_block_id="blk_3_item_1")
+        assert fb.parent_block_id == "blk_3_item_1"
+
+    def test_skeleton_models(self):
+        from compiler.schemas import SkeletonNode, SkeletonListItem, DocumentSkeleton
+        skeleton = DocumentSkeleton(
+            sections=[SkeletonNode(block_id="blk_0", children=[SkeletonNode(block_id="blk_1")])],
+            list_items={"blk_3": [SkeletonListItem(text_block_id="blk_3_item_0", children=["blk_4"])]},
+        )
+        assert len(skeleton.sections) == 1
+        assert skeleton.list_items["blk_3"][0].children == ["blk_4"]
+
+    def test_content_block_union_includes_html_and_frontmatter(self):
+        from compiler.schemas import HTMLBlock, FrontmatterBlock
+        assert HTMLBlock(content="x", content_order=1).block_type == "html_block"
+        assert FrontmatterBlock(raw_yaml="x", content_order=0).block_type == "frontmatter"
