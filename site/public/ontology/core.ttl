@@ -7,7 +7,7 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <https://ontoskills.sh/ontology> a owl:Ontology ;
-    dcterms:created "2026-04-19T22:25:26.897577" ;
+    dcterms:created "2026-04-20T20:53:00.508704" ;
     dcterms:description "Core TBox ontology for skill state transitions and execution" ;
     dcterms:title "OntoSkills Core Ontology" .
 
@@ -216,6 +216,14 @@ oc:contentHash a owl:DatatypeProperty ;
     rdfs:comment "SHA-256 hash of skill content for deduplication" ;
     rdfs:domain oc:Skill .
 
+oc:contentOrder a owl:DatatypeProperty ;
+    rdfs:label "content order" ;
+    rdfs:comment "Position within parent section" ;
+    rdfs:domain oc:BlockQuote,
+        oc:BulletList,
+        oc:Paragraph ;
+    rdfs:range xsd:integer .
+
 oc:contradicts a owl:ObjectProperty,
         owl:SymmetricProperty ;
     rdfs:label "contradicts" ;
@@ -350,6 +358,10 @@ oc:hasCategory a owl:DatatypeProperty ;
     rdfs:domain oc:Skill ;
     rdfs:range xsd:string .
 
+oc:hasChild a owl:ObjectProperty ;
+    rdfs:label "has child" ;
+    rdfs:comment "Nested content block within a list item or procedure step" .
+
 oc:hasCodeExample a owl:ObjectProperty ;
     rdfs:label "has code example" ;
     rdfs:comment "Links a skill to an inline code example" ;
@@ -360,6 +372,11 @@ oc:hasConstraint a owl:DatatypeProperty ;
     rdfs:label "has constraint" ;
     rdfs:comment "Constraints or limitations on skill execution" ;
     rdfs:domain oc:Skill .
+
+oc:hasContent a owl:ObjectProperty ;
+    rdfs:label "has content" ;
+    rdfs:comment "Content block within a section" ;
+    rdfs:domain oc:Section .
 
 oc:hasDescription a owl:DatatypeProperty ;
     rdfs:label "has description" ;
@@ -383,6 +400,12 @@ oc:hasFlowchart a owl:ObjectProperty ;
     rdfs:comment "Links a skill to a flowchart diagram" ;
     rdfs:domain oc:Skill ;
     rdfs:range oc:Flowchart .
+
+oc:hasItem a owl:ObjectProperty ;
+    rdfs:label "has item" ;
+    rdfs:comment "Item in a bullet list" ;
+    rdfs:domain oc:BulletList ;
+    rdfs:range oc:BulletItem .
 
 oc:hasLicense a owl:DatatypeProperty ;
     rdfs:label "has license" ;
@@ -423,6 +446,12 @@ oc:hasRequirement a owl:ObjectProperty ;
     rdfs:comment "Links a skill to its requirements" ;
     rdfs:domain oc:Skill .
 
+oc:hasSection a owl:ObjectProperty ;
+    rdfs:label "has section" ;
+    rdfs:comment "Top-level section of a skill document" ;
+    rdfs:domain oc:Skill ;
+    rdfs:range oc:Section .
+
 oc:hasStatus a owl:ObjectProperty ;
     rdfs:label "has status" ;
     rdfs:comment "Current status state of an execution attempt" ;
@@ -434,6 +463,12 @@ oc:hasStep a owl:ObjectProperty ;
     rdfs:comment "Links a workflow to its steps" ;
     rdfs:domain oc:Workflow ;
     rdfs:range oc:WorkflowStep .
+
+oc:hasSubsection a owl:ObjectProperty ;
+    rdfs:label "has subsection" ;
+    rdfs:comment "Nested section within a section" ;
+    rdfs:domain oc:Section ;
+    rdfs:range oc:Section .
 
 oc:hasTable a owl:ObjectProperty ;
     rdfs:label "has table" ;
@@ -464,6 +499,11 @@ oc:hasWorkflow a owl:ObjectProperty ;
     rdfs:domain oc:Skill ;
     rdfs:range oc:Workflow .
 
+oc:htmlContent a owl:DatatypeProperty ;
+    rdfs:label "html content" ;
+    rdfs:comment "Raw HTML content of the block" ;
+    rdfs:domain oc:HTMLBlock .
+
 oc:inputDescription a owl:DatatypeProperty ;
     rdfs:label "input description" ;
     rdfs:comment "Description of input for an example" ;
@@ -479,6 +519,17 @@ oc:isUserInvocable a owl:DatatypeProperty ;
     rdfs:domain oc:Skill ;
     rdfs:range xsd:boolean .
 
+oc:itemOrder a owl:DatatypeProperty ;
+    rdfs:label "item order" ;
+    rdfs:comment "Position within the bullet list" ;
+    rdfs:domain oc:BulletItem ;
+    rdfs:range xsd:integer .
+
+oc:itemText a owl:DatatypeProperty ;
+    rdfs:label "item text" ;
+    rdfs:comment "Text content of the bullet item" ;
+    rdfs:domain oc:BulletItem .
+
 oc:nature a owl:DatatypeProperty ;
     rdfs:label "nature" ;
     rdfs:comment "Definition/differentia of the skill (what makes it unique)" ;
@@ -493,6 +544,21 @@ oc:purpose a owl:DatatypeProperty ;
     rdfs:label "purpose" ;
     rdfs:comment "Purpose of a reference file (api-reference, examples, guide, domain-specific, other)" ;
     rdfs:domain oc:ReferenceFile .
+
+oc:quoteAttribution a owl:DatatypeProperty ;
+    rdfs:label "quote attribution" ;
+    rdfs:comment "Optional source/attribution of the quote" ;
+    rdfs:domain oc:BlockQuote .
+
+oc:quoteContent a owl:DatatypeProperty ;
+    rdfs:label "quote content" ;
+    rdfs:comment "Full text of the blockquote" ;
+    rdfs:domain oc:BlockQuote .
+
+oc:rawYaml a owl:DatatypeProperty ;
+    rdfs:label "raw yaml" ;
+    rdfs:comment "Raw YAML content of the frontmatter" ;
+    rdfs:domain oc:FrontmatterBlock .
 
 oc:requirementType a owl:DatatypeProperty ;
     rdfs:label "requirement type" ;
@@ -549,6 +615,23 @@ oc:scriptOutput a owl:DatatypeProperty ;
     rdfs:comment "Description of what the script produces" ;
     rdfs:domain oc:ExecutableScript ;
     rdfs:range xsd:string .
+
+oc:sectionLevel a owl:DatatypeProperty ;
+    rdfs:label "section level" ;
+    rdfs:comment "Header level 1-6" ;
+    rdfs:domain oc:Section ;
+    rdfs:range xsd:integer .
+
+oc:sectionOrder a owl:DatatypeProperty ;
+    rdfs:label "section order" ;
+    rdfs:comment "Position among sibling sections" ;
+    rdfs:domain oc:Section ;
+    rdfs:range xsd:integer .
+
+oc:sectionTitle a owl:DatatypeProperty ;
+    rdfs:label "section title" ;
+    rdfs:comment "Header text of the section" ;
+    rdfs:domain oc:Section .
 
 oc:severityLevel a owl:DatatypeProperty ;
     rdfs:label "severity level" ;
@@ -607,6 +690,11 @@ oc:templateVariables a owl:DatatypeProperty ;
     rdfs:comment "Variable placeholder name (repeatable)" ;
     rdfs:domain oc:Template .
 
+oc:textContent a owl:DatatypeProperty ;
+    rdfs:label "text content" ;
+    rdfs:comment "Raw markdown text of the paragraph" ;
+    rdfs:domain oc:Paragraph .
+
 oc:timeout a owl:DatatypeProperty ;
     rdfs:label "timeout" ;
     rdfs:comment "Execution timeout in seconds" ;
@@ -639,6 +727,14 @@ oc:ExecutableSkill a owl:Class ;
 
 oc:FileResourceUnion rdf:first oc:ReferenceFile ;
     rdf:rest ( oc:ExecutableScript ) .
+
+oc:FrontmatterBlock a owl:Class ;
+    rdfs:label "Frontmatter Block" ;
+    rdfs:comment "YAML frontmatter from the document header" .
+
+oc:HTMLBlock a owl:Class ;
+    rdfs:label "HTML Block" ;
+    rdfs:comment "Raw HTML block from markdown" .
 
 oc:enables a owl:ObjectProperty ;
     rdfs:label "enables" ;
@@ -679,9 +775,17 @@ oc:isExtendedBy a owl:ObjectProperty ;
     rdfs:domain oc:Skill ;
     rdfs:range oc:Skill .
 
+oc:BulletList a owl:Class ;
+    rdfs:label "Bullet List" ;
+    rdfs:comment "Unordered list of items" .
+
 oc:Observability a owl:Class ;
     rdfs:label "Observability" ;
     rdfs:subClassOf oc:KnowledgeNode .
+
+oc:Paragraph a owl:Class ;
+    rdfs:label "Paragraph" ;
+    rdfs:comment "Free-form text paragraph preserving inline formatting" .
 
 oc:Requirement a owl:Class ;
     rdfs:label "Requirement" ;
@@ -698,6 +802,14 @@ oc:ResourceProfile a owl:Class ;
 oc:TrustMetric a owl:Class ;
     rdfs:label "TrustMetric" ;
     rdfs:subClassOf oc:KnowledgeNode .
+
+oc:BlockQuote a owl:Class ;
+    rdfs:label "Block Quote" ;
+    rdfs:comment "Blockquote from markdown, optionally with attribution" .
+
+oc:BulletItem a owl:Class ;
+    rdfs:label "Bullet Item" ;
+    rdfs:comment "Single item in a bullet list" .
 
 oc:CognitiveBoundary a owl:Class ;
     rdfs:label "CognitiveBoundary" ;
@@ -765,6 +877,10 @@ oc:WorkflowStep a owl:Class ;
 oc:ExecutableScript a owl:Class ;
     rdfs:label "Executable Script" ;
     rdfs:comment "An executable script associated with a skill" .
+
+oc:Section a owl:Class ;
+    rdfs:label "Section" ;
+    rdfs:comment "A section of the document, identified by a header" .
 
 oc:KnowledgeNode a owl:Class ;
     rdfs:label "Knowledge Node" ;
