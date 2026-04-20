@@ -1,4 +1,4 @@
-import { useRef, useState, memo } from 'react';
+import { useRef, useState, memo, type ComponentProps } from 'react';
 import { Html, Text, Billboard } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -10,7 +10,7 @@ import { getNodeColor, CATEGORY_LABELS } from './colors';
 function DistanceScaledText({ baseFontSize, children, ...props }: {
   baseFontSize: number;
   children: string;
-} & Omit<React.ComponentProps<typeof Text>, 'fontSize'>) {
+} & Omit<ComponentProps<typeof Text>, 'fontSize'>) {
   const { camera } = useThree();
   const groupRef = useRef<THREE.Group>(null);
   const worldPos = useRef(new THREE.Vector3());

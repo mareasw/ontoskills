@@ -394,6 +394,8 @@ def hydrate_skeleton(
         if block is None:
             logger.warning("Skeleton node references missing block_id=%s, skipping", node.block_id)
             continue
+        if block.parent_block_id:
+            continue  # child of a list item — already attached via parent
 
         if block.block_type == "heading":
             section_order += 1
@@ -430,6 +432,8 @@ def _hydrate_children(section, node, blocks_index):
         if block is None:
             logger.warning("Skeleton child references missing block_id=%s, skipping", child_node.block_id)
             continue
+        if block.parent_block_id:
+            continue  # child of a list item — already attached via parent
 
         if block.block_type == "heading":
             # Subsection
