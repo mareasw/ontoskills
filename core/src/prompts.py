@@ -259,7 +259,7 @@ For each flowchart, provide:
 
 ### Templates
 For each template, provide:
-- templateType: "prompt" | "output" | "boilerplate" — what kind of template this is
+- template_type: "prompt" | "output" | "boilerplate" — what kind of template this is
 
 CRITICAL: Only annotate blocks that are listed in the PRE-EXTRACTED CONTENT BLOCKS section.
 Use the index number to match your annotation to the correct block.

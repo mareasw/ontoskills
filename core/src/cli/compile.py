@@ -620,6 +620,7 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
                 skill_registry=skill_registry,
                 preloaded_content=dir_scan.skill_md_content,
                 preloaded_file_tree=dir_scan.file_tree,
+                content_extraction=dir_scan.content_extraction,
                 _max_retries=_retries,
             )
             extracted = enrich_extracted_skill(extracted, skill_dir, input_path, skill_parent_map, skill_registry)
@@ -726,6 +727,7 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
                 parent_context=parent_context,
                 skill_registry=skill_registry,
                 preloaded_content=sub_skill_content,
+                content_extraction=sub_content_extraction,
                 _max_retries=_retries,
             )
             extracted = enrich_extracted_skill(extracted, skill_dir, input_path, skill_parent_map, skill_registry)
