@@ -340,7 +340,6 @@ def _add_docgraph_v2_classes(g: Graph, oc: Namespace) -> None:
 
     # ========== hasChild ==========
     g.add((oc.hasChild, RDF.type, OWL.ObjectProperty))
-    g.add((oc.hasChild, RDFS.domain, oc.BulletItem))
     g.add((oc.hasChild, RDFS.range, OWL.Thing))
     g.add((oc.hasChild, RDFS.label, Literal("has child")))
     g.add((oc.hasChild, RDFS.comment, Literal(
