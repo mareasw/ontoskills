@@ -1,10 +1,17 @@
 """DocGraph v2 coverage benchmark — line-level metric against 30 real skills."""
+import os
 import pytest
 from pathlib import Path
 from compiler.content_parser import extract_flat_blocks
 
-SUP_DIR = Path("/home/marcello/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills")
-ANT_DIR = Path("/home/marcello/.claude/plugins/cache/anthropic-agent-skills/document-skills/3d5951151859/skills")
+
+def _env_path(name, fallback):
+    value = os.environ.get(name)
+    return Path(value).expanduser() if value else Path(fallback)
+
+
+SUP_DIR = _env_path("DOCGRAPH_SUP_DIR", "/home/marcello/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills")
+ANT_DIR = _env_path("DOCGRAPH_ANT_DIR", "/home/marcello/.claude/plugins/cache/anthropic-agent-skills/document-skills/3d5951151859/skills")
 
 
 def _dirs_available():
