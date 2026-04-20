@@ -71,6 +71,206 @@ def extract_structural_content(markdown: str) -> ContentExtraction:
     )
 
 
+def _extract_ordered_procedure_with_children(ol_open_token, tokens, start_idx, md_lines, block_counter):
+    """Extract ordered list items, including nested content blocks inside items.
+
+    Returns (OrderedProcedure, list[FlatBlock]) where the FlatBlocks are child
+    blocks with parent_block_id set.
+    """
+    items = []
+    current_position = 0
+    depth = 0
+    in_item = False
+    captured_inline = False
+
+    for j in range(start_idx, len(tokens)):
+        t = tokens[j]
+        if t.type == "ordered_list_close":
+            depth -= 1
+            if depth == 0:
+                break
+        elif t.type == "ordered_list_open":
+            depth += 1
+        elif t.type == "list_item_open":
+            if depth == 1:
+                current_position += 1
+                in_item = True
+                captured_inline = False
+        elif t.type == "list_item_close":
+            if depth == 1:
+                in_item = False
+        elif t.type == "inline" and in_item and not captured_inline and depth == 1:
+            items.append(ProcedureStep(text=t.content, position=current_position))
+            captured_inline = True
+
+    if not items:
+        return None, []
+
+    # Walk to extract child blocks per item
+    child_blocks = []
+    item_idx = 0
+    j = start_idx + 1
+    depth = 1
+    while j < len(tokens):
+        t = tokens[j]
+        if t.type == "ordered_list_close":
+            depth -= 1
+            if depth == 0:
+                break
+        elif t.type == "ordered_list_open":
+            depth += 1
+        elif t.type == "list_item_open" and depth == 1:
+            parent_id = f"blk_{block_counter}_item_{item_idx}"
+            k = j + 1
+            item_depth = 1
+            first_para_skipped = False
+            while k < len(tokens):
+                tk = tokens[k]
+                if tk.type == "list_item_close":
+                    item_depth -= 1
+                    if item_depth == 0:
+                        break
+                elif tk.type == "list_item_open":
+                    item_depth += 1
+                elif item_depth == 1 and tk.type == "inline":
+                    pass  # skip inline text (already captured)
+                elif item_depth >= 1 and tk.type == "paragraph_open" and not first_para_skipped:
+                    first_para_skipped = True  # skip first paragraph (item text)
+                elif item_depth >= 1 and tk.map:
+                    child = _try_extract_child_block(tk, tokens, k, md_lines, block_counter + len(child_blocks), parent_id)
+                    if child:
+                        child_blocks.append(child)
+                k += 1
+            item_idx += 1
+        j += 1
+
+    return OrderedProcedure(items=items, content_order=0), child_blocks
+
+
+def _extract_bullet_list_with_children(bl_open_token, tokens, start_idx, md_lines, block_counter):
+    """Extract bullet list items, including nested content blocks inside items.
+
+    Returns (BulletListBlock, list[FlatBlock]) where the FlatBlocks are child
+    blocks with parent_block_id set.
+    """
+    items = []
+    current_order = 0
+    in_item = False
+    captured_inline = False
+
+    for j in range(start_idx, len(tokens)):
+        t = tokens[j]
+        if t.type == "bullet_list_close":
+            break
+        if t.type == "list_item_open":
+            current_order += 1
+            in_item = True
+            captured_inline = False
+        elif t.type == "list_item_close":
+            in_item = False
+        elif t.type == "inline" and in_item and not captured_inline:
+            items.append(BulletItem(text=t.content, order=current_order))
+            captured_inline = True
+
+    if not items:
+        return None, []
+
+    # Walk items to find nested blocks
+    child_blocks = []
+    item_idx = 0
+    j = start_idx + 1
+    while j < len(tokens):
+        t = tokens[j]
+        if t.type == "bullet_list_close":
+            break
+        if t.type == "list_item_open":
+            parent_id = f"blk_{block_counter}_item_{item_idx}"
+            k = j + 1
+            item_depth = 1
+            first_para_skipped = False
+            while k < len(tokens):
+                tk = tokens[k]
+                if tk.type == "list_item_close":
+                    item_depth -= 1
+                    if item_depth == 0:
+                        break
+                elif tk.type == "list_item_open":
+                    item_depth += 1
+                elif item_depth == 1 and tk.type == "inline":
+                    pass
+                elif item_depth >= 1 and tk.type == "paragraph_open" and not first_para_skipped:
+                    first_para_skipped = True  # skip first paragraph (item text)
+                elif item_depth >= 1 and tk.map:
+                    child = _try_extract_child_block(tk, tokens, k, md_lines, block_counter + len(child_blocks), parent_id)
+                    if child:
+                        child_blocks.append(child)
+                k += 1
+            item_idx += 1
+        j += 1
+
+    return BulletListBlock(items=items, content_order=0), child_blocks
+
+
+def _try_extract_child_block(token, tokens, idx, md_lines, block_counter, parent_id):
+    """Try to extract a child block from a token inside a list item."""
+    if token.type == "fence" and token.map:
+        block = _classify_fence(token, 0)
+        if block:
+            return FlatBlock(
+                block_id=f"blk_{block_counter}",
+                block_type=block.block_type,
+                content=block,
+                line_start=token.map[0] + 1,
+                line_end=token.map[1],
+                parent_block_id=parent_id,
+            )
+    elif token.type == "paragraph_open" and token.map:
+        para = _extract_paragraph(token, tokens, idx, md_lines, 0)
+        if para:
+            return FlatBlock(
+                block_id=f"blk_{block_counter}",
+                block_type="paragraph",
+                content=para,
+                line_start=token.map[0] + 1,
+                line_end=token.map[1],
+                parent_block_id=parent_id,
+            )
+    elif token.type == "bullet_list_open" and token.map:
+        bl, _ = _extract_bullet_list_with_children(token, tokens, idx, md_lines, block_counter)
+        if bl:
+            return FlatBlock(
+                block_id=f"blk_{block_counter}",
+                block_type="bullet_list",
+                content=bl,
+                line_start=token.map[0] + 1,
+                line_end=token.map[1],
+                parent_block_id=parent_id,
+            )
+    elif token.type == "blockquote_open" and token.map:
+        bq = _extract_blockquote(token, tokens, idx, md_lines, 0)
+        if bq:
+            return FlatBlock(
+                block_id=f"blk_{block_counter}",
+                block_type="blockquote",
+                content=bq,
+                line_start=token.map[0] + 1,
+                line_end=token.map[1],
+                parent_block_id=parent_id,
+            )
+    elif token.type == "html_block" and token.map:
+        start, end = token.map
+        raw = "".join(md_lines[start:end])
+        return FlatBlock(
+            block_id=f"blk_{block_counter}",
+            block_type="html_block",
+            content=HTMLBlock(content=raw.strip(), content_order=0),
+            line_start=start + 1,
+            line_end=end,
+            parent_block_id=parent_id,
+        )
+    return None
+
+
 def extract_flat_blocks(markdown: str) -> list[FlatBlock]:
     """Extract ALL content blocks as a flat list with unique block_ids.
 
@@ -186,9 +386,11 @@ def extract_flat_blocks(markdown: str) -> list[FlatBlock]:
             i += 1
             continue
 
-        # Ordered list (procedure)
+        # Ordered list (procedure) — use with_children variant for nested extraction
         if token.type == "ordered_list_open" and token.map:
-            proc = _extract_ordered_procedure(token, tokens, i, 0)
+            proc, child_blocks = _extract_ordered_procedure_with_children(
+                token, tokens, i, md_lines, block_counter
+            )
             if proc:
                 bid = f"blk_{block_counter}"
                 block_counter += 1
@@ -199,6 +401,8 @@ def extract_flat_blocks(markdown: str) -> list[FlatBlock]:
                     line_start=token.map[0] + 1,
                     line_end=token.map[1],
                 ))
+                blocks.extend(child_blocks)
+                block_counter += len(child_blocks)
             depth = 0
             while i < len(tokens):
                 if tokens[i].type == "ordered_list_open":
@@ -211,9 +415,11 @@ def extract_flat_blocks(markdown: str) -> list[FlatBlock]:
             i += 1
             continue
 
-        # Bullet list
+        # Bullet list — use with_children variant for nested extraction
         if token.type == "bullet_list_open" and token.map:
-            bl = _extract_bullet_list(token, tokens, i, 0)
+            bl, child_blocks = _extract_bullet_list_with_children(
+                token, tokens, i, md_lines, block_counter
+            )
             if bl:
                 bid = f"blk_{block_counter}"
                 block_counter += 1
@@ -224,6 +430,8 @@ def extract_flat_blocks(markdown: str) -> list[FlatBlock]:
                     line_start=token.map[0] + 1,
                     line_end=token.map[1],
                 ))
+                blocks.extend(child_blocks)
+                block_counter += len(child_blocks)
             while i < len(tokens) and tokens[i].type != "bullet_list_close":
                 i += 1
             i += 1

@@ -264,3 +264,32 @@ class TestFlatExtraction:
         assert "table" in types
         assert "ordered_procedure" in types
         assert "html_block" in types
+
+
+class TestNestedListExtraction:
+    def test_code_inside_bullet_item(self):
+        md = "## Section\n\n- First item\n- Second item with code:\n\n  ```python\n  x = 1\n  ```\n\n- Third item\n"
+        blocks = extract_flat_blocks(md)
+        code_blocks = [b for b in blocks if b.block_type == "code_block" and b.parent_block_id]
+        assert len(code_blocks) == 1
+        assert "x = 1" in code_blocks[0].content.content
+
+    def test_nested_bullet_list_inside_ordered(self):
+        md = "## Steps\n\n1. First step:\n\n   - Sub-item A\n   - Sub-item B\n\n2. Second step\n"
+        blocks = extract_flat_blocks(md)
+        nested_lists = [b for b in blocks if b.block_type == "bullet_list" and b.parent_block_id]
+        assert len(nested_lists) == 1
+
+    def test_paragraph_inside_ordered_item(self):
+        md = "## Steps\n\n1. First step\n\n   Extra explanation paragraph.\n\n2. Second step\n"
+        blocks = extract_flat_blocks(md)
+        nested_paras = [b for b in blocks if b.block_type == "paragraph" and b.parent_block_id]
+        assert len(nested_paras) == 1
+        assert "Extra explanation" in nested_paras[0].content.text_content
+
+    def test_code_inside_ordered_item(self):
+        md = "## Section\n\n1. Run tests:\n\n   ```bash\n   pytest -v\n   ```\n\n2. Check results\n"
+        blocks = extract_flat_blocks(md)
+        nested_code = [b for b in blocks if b.block_type == "code_block" and b.parent_block_id]
+        assert len(nested_code) == 1
+        assert "pytest" in nested_code[0].content.content
