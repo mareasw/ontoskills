@@ -103,6 +103,8 @@ def _serialize_section_tree(
             content_node = _serialize_content_block(graph, block, make_bnode, section_ctx)
             if content_node:
                 graph.add((section_node, oc.hasContent, content_node))
+                if block.block_type == "ordered_procedure":
+                    graph.add((skill_uri, oc.hasWorkflow, content_node))
 
         for sub in section.subsections:
             _serialize_section(sub, section_node, is_subsection=True, section_ctx=section_ctx)
