@@ -208,9 +208,9 @@ def _extract_ordered_items(ol_open_token, tokens, start_idx, md_lines, block_cou
                 elif item_depth >= 1 and tk.type == "paragraph_open" and not first_para_skipped:
                     first_para_skipped = True  # skip first paragraph (item text)
                 elif item_depth >= 1 and tk.map:
-                    child = _try_extract_child_block(tk, tokens, k, md_lines, block_counter + len(child_blocks), parent_id)
-                    if child:
-                        child_blocks.append(child)
+                    result = _try_extract_child_block(tk, tokens, k, md_lines, block_counter + 1 + len(child_blocks), parent_id)
+                    if result:
+                        child_blocks.extend(result)
                 k += 1
             item_idx += 1
         j += 1
@@ -272,9 +272,9 @@ def _extract_bullet_items(bl_open_token, tokens, start_idx, md_lines, block_coun
                 elif item_depth >= 1 and tk.type == "paragraph_open" and not first_para_skipped:
                     first_para_skipped = True  # skip first paragraph (item text)
                 elif item_depth >= 1 and tk.map:
-                    child = _try_extract_child_block(tk, tokens, k, md_lines, block_counter + len(child_blocks), parent_id)
-                    if child:
-                        child_blocks.append(child)
+                    result = _try_extract_child_block(tk, tokens, k, md_lines, block_counter + 1 + len(child_blocks), parent_id)
+                    if result:
+                        child_blocks.extend(result)
                 k += 1
             item_idx += 1
         j += 1
@@ -283,63 +283,69 @@ def _extract_bullet_items(bl_open_token, tokens, start_idx, md_lines, block_coun
 
 
 def _try_extract_child_block(token, tokens, idx, md_lines, block_counter, parent_id):
-    """Try to extract a child block from a token inside a list item."""
+    """Try to extract child blocks from a token inside a list item.
+
+    Returns a list of FlatBlocks (may be empty, or contain the block plus
+    any descendant blocks from nested structures).
+    """
     if token.type == "fence" and token.map:
         block = _classify_fence(token, 0)
         if block:
-            return FlatBlock(
+            return [FlatBlock(
                 block_id=f"blk_{block_counter}",
                 block_type=block.block_type,
                 content=block,
                 line_start=token.map[0] + 1,
                 line_end=token.map[1],
                 parent_block_id=parent_id,
-            )
+            )]
     elif token.type == "paragraph_open" and token.map:
         para = _extract_paragraph(token, tokens, idx, md_lines, 0)
         if para:
-            return FlatBlock(
+            return [FlatBlock(
                 block_id=f"blk_{block_counter}",
                 block_type="paragraph",
                 content=para,
                 line_start=token.map[0] + 1,
                 line_end=token.map[1],
                 parent_block_id=parent_id,
-            )
+            )]
     elif token.type == "bullet_list_open" and token.map:
-        bl, _ = _extract_bullet_items(token, tokens, idx, md_lines, block_counter)
+        bl, nested_children = _extract_bullet_items(token, tokens, idx, md_lines, block_counter)
         if bl:
-            return FlatBlock(
+            result = [FlatBlock(
                 block_id=f"blk_{block_counter}",
                 block_type="bullet_list",
                 content=bl,
                 line_start=token.map[0] + 1,
                 line_end=token.map[1],
                 parent_block_id=parent_id,
-            )
+            )]
+            result.extend(nested_children)
+            return result
     elif token.type == "blockquote_open" and token.map:
         bq = _extract_blockquote(token, tokens, idx, md_lines, 0)
         if bq:
-            return FlatBlock(
+            return [FlatBlock(
                 block_id=f"blk_{block_counter}",
                 block_type="blockquote",
                 content=bq,
                 line_start=token.map[0] + 1,
                 line_end=token.map[1],
                 parent_block_id=parent_id,
-            )
+            )]
     elif token.type == "html_block" and token.map:
         start, end = token.map
         raw = "".join(md_lines[start:end])
-        return FlatBlock(
+        return [FlatBlock(
             block_id=f"blk_{block_counter}",
             block_type="html_block",
             content=HTMLBlock(content=raw.strip(), content_order=0),
             line_start=start + 1,
             line_end=end,
             parent_block_id=parent_id,
-        )
-    return None
+        )]
+    return []
 
 
 def extract_flat_blocks(markdown: str) -> list[FlatBlock]:

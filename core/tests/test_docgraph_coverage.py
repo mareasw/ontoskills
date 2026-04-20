@@ -1,9 +1,14 @@
 """DocGraph v2 coverage benchmark — line-level metric against 30 real skills."""
+import pytest
 from pathlib import Path
 from compiler.content_parser import extract_flat_blocks
 
 SUP_DIR = Path("/home/marcello/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills")
 ANT_DIR = Path("/home/marcello/.claude/plugins/cache/anthropic-agent-skills/document-skills/3d5951151859/skills")
+
+
+def _dirs_available():
+    return SUP_DIR.is_dir() and ANT_DIR.is_dir()
 
 
 def _collect_skill_paths():
@@ -36,6 +41,7 @@ def _calc_line_coverage(md, blocks):
     return covered_content / total_content * 100 if total_content else 100.0
 
 
+@pytest.mark.skipif(not _dirs_available(), reason="Skill benchmark directories not available")
 def test_coverage_all_skills():
     """Benchmark: measure line-level coverage across all available skills."""
     paths = _collect_skill_paths()
@@ -72,6 +78,7 @@ def test_coverage_all_skills():
         assert cov >= 60.0, f"{source}:{name} coverage {cov:.1f}% below 60%"
 
 
+@pytest.mark.skipif(not _dirs_available(), reason="Skill benchmark directories not available")
 def test_flat_extraction_preserves_all_block_types():
     """Verify all expected block types are represented in at least one skill."""
     all_types = set()

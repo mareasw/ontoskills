@@ -109,7 +109,7 @@ def _serialize_section_tree(
     def _serialize_content_block(graph, block, make_bnode):
         """Serialize a single content block, return its BNode."""
         if block.block_type == "paragraph":
-            node = make_bnode("para", f"{block.content_order}:{hash(block.text_content) & 0xFFFF}")
+            node = make_bnode("para", f"{block.content_order}:{len(block.text_content)}")
             graph.add((node, RDF.type, oc.Paragraph))
             graph.add((node, oc.textContent, Literal(block.text_content)))
             graph.add((node, oc.contentOrder, Literal(block.content_order)))
@@ -120,7 +120,7 @@ def _serialize_section_tree(
             graph.add((node, RDF.type, oc.BulletList))
             graph.add((node, oc.contentOrder, Literal(block.content_order)))
             for item in block.items:
-                item_node = make_bnode("bitem", f"{item.order}:{hash(item.text) & 0xFFFF}")
+                item_node = make_bnode("bitem", f"{item.order}:{len(item.text)}")
                 graph.add((node, oc.hasItem, item_node))
                 graph.add((item_node, RDF.type, oc.BulletItem))
                 graph.add((item_node, oc.itemText, Literal(item.text)))
@@ -132,7 +132,7 @@ def _serialize_section_tree(
             return node
 
         elif block.block_type == "blockquote":
-            node = make_bnode("bquote", f"{block.content_order}:{hash(block.content) & 0xFFFF}")
+            node = make_bnode("bquote", f"{block.content_order}:{len(block.content)}")
             graph.add((node, RDF.type, oc.BlockQuote))
             graph.add((node, oc.quoteContent, Literal(block.content)))
             if block.attribution:
@@ -141,14 +141,14 @@ def _serialize_section_tree(
             return node
 
         elif block.block_type == "html_block":
-            node = make_bnode("html", f"{block.content_order}:{hash(block.content) & 0xFFFF}")
+            node = make_bnode("html", f"{block.content_order}:{len(block.content)}")
             graph.add((node, RDF.type, oc.HTMLBlock))
             graph.add((node, oc.htmlContent, Literal(block.content)))
             graph.add((node, oc.contentOrder, Literal(block.content_order)))
             return node
 
         elif block.block_type == "frontmatter":
-            node = make_bnode("fm", f"{block.content_order}:{hash(block.raw_yaml) & 0xFFFF}")
+            node = make_bnode("fm", f"{block.content_order}:{len(block.raw_yaml)}")
             graph.add((node, RDF.type, oc.FrontmatterBlock))
             graph.add((node, oc.rawYaml, Literal(block.raw_yaml)))
             graph.add((node, oc.contentOrder, Literal(block.content_order)))
@@ -466,25 +466,6 @@ def serialize_skill(
     if content_extraction is None:
         content_extraction = getattr(skill, 'content_extraction', None)
 
-    # === Ordered Procedures (from Phase 1 content extraction) ===
-    # Convert extracted OrderedProcedure items to Workflow/WorkflowStep triples
-    if content_extraction:
-        for proc_idx, proc in enumerate(content_extraction.procedures):
-            proc_node = make_bnode("proc_workflow", f"{proc_idx}")
-            graph.add((skill_uri, oc.hasWorkflow, proc_node))
-            graph.add((proc_node, RDF.type, oc.Workflow))
-            graph.add((proc_node, oc.workflowId, Literal(f"procedure_{proc_idx}")))
-            graph.add((proc_node, oc.workflowName, Literal(f"Ordered Procedure {proc_idx + 1}")))
-            graph.add((proc_node, DCTERMS.description, Literal(
-                f"Extracted ordered procedure with {len(proc.items)} steps")))
-            for step in proc.items:
-                step_node = make_bnode("proc_step", f"{proc_idx}_{step.position}")
-                graph.add((proc_node, oc.hasStep, step_node))
-                graph.add((step_node, RDF.type, oc.WorkflowStep))
-                graph.add((step_node, oc.stepId, Literal(f"step_{step.position}")))
-                graph.add((step_node, DCTERMS.description, Literal(step.text)))
-                graph.add((step_node, oc.stepOrder, Literal(step.position)))
-
     # === Content Block Serialization ===
 
     if content_extraction:
@@ -543,6 +524,21 @@ def serialize_skill(
             ann = _find_annotation(skill.template_annotations, idx)
             if ann:
                 graph.add((tmpl_node, oc.templateType, Literal(ann.template_type)))
+
+        # Ordered Procedures (flat list)
+        for idx, proc in enumerate(content_extraction.procedures):
+            proc_node = make_bnode("proc", f"{idx}")
+            graph.add((skill_uri, oc.hasWorkflow, proc_node))
+            graph.add((proc_node, RDF.type, oc.Workflow))
+            graph.add((proc_node, oc.workflowId, Literal(f"procedure_{idx}")))
+            graph.add((proc_node, oc.workflowName, Literal("Ordered Procedure")))
+            for step in proc.items:
+                step_node = make_bnode("step", f"{idx}_{step.position}")
+                graph.add((proc_node, oc.hasStep, step_node))
+                graph.add((step_node, RDF.type, oc.WorkflowStep))
+                graph.add((step_node, oc.stepId, Literal(f"step_{step.position}")))
+                graph.add((step_node, DCTERMS.description, Literal(step.text)))
+                graph.add((step_node, oc.stepOrder, Literal(step.position)))
 
     # === DocGraph Section Tree Serialization ===
     if content_extraction and content_extraction.sections:

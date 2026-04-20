@@ -782,5 +782,9 @@ class TestDocGraphV2Serialization:
         serialize_skill(graph, skill, content_extraction=ce)
         child_nodes = list(graph.subjects(RDF.type, oc.CodeExample))
         assert len(child_nodes) >= 1
-        has_child = any((item, oc.hasChild, child) for item in list(graph.subjects(RDF.type, oc.BulletItem)) for child in child_nodes)
+        has_child = any(
+            (item, oc.hasChild, child) in graph
+            for item in list(graph.subjects(RDF.type, oc.BulletItem))
+            for child in child_nodes
+        )
         assert has_child
