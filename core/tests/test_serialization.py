@@ -570,7 +570,7 @@ class TestContentBlockSerialization:
         assert sorted(step_orders) == [1, 2]
 
     def test_content_extraction_fallback_from_skill_attribute(self):
-        from compiler.schemas import CompiledSkill, CodeBlock, FileInfo
+        from compiler.schemas import CompiledSkill, CodeBlock
         skill = CompiledSkill(
             id="fallback-skill",
             hash="fb123",
