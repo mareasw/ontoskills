@@ -19,16 +19,17 @@ export function Scene({ nodes, edges, onNodeClick, autoRotate = true, highlightC
   exploreLabel?: string;
 }) {
   const positions = useMemo(() => layoutForce3D(nodes, edges), [nodes, edges]);
-  const R = 5 + Math.sqrt(nodes.length) * 4;
+  const R = 5 + Math.sqrt(nodes.length) * 2.5;
   const largeGraph = nodes.length > 50;
   const focusNode = focusNodeId ? nodes.find(n => n.id === focusNodeId) : null;
   const focusPos = focusNode ? positions[focusNode.id] : null;
 
   return (
     <>
-      <ambientLight intensity={0.5} />
-      <pointLight position={[20, 20, 20]} intensity={1.5} color="#52c7e8" />
-      <pointLight position={[-20, -10, 15]} intensity={0.8} color="#85f496" />
+      <hemisphereLight intensity={0.4} color="#b0d0f0" groundColor="#1a1a2e" />
+      <ambientLight intensity={0.6} />
+      <pointLight position={[20, 20, 20]} intensity={1.0} color="#ffffff" />
+      <pointLight position={[-15, -10, 15]} intensity={0.6} color="#85f496" />
       <BackgroundParticles />
       {autoRotate && !focusNode && <AutoRotate />}
       {focusPos && isFinite(focusPos.x) && <CameraFocus target={[focusPos.x, focusPos.y, focusPos.z]} active={!!focusNode} />}

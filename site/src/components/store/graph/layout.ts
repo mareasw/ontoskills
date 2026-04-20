@@ -6,8 +6,8 @@ export function layoutForce3D(nodes: GraphNode[], edges: GraphEdge[]) {
   if (!n) return positions;
 
   // Scale radius and bounds to node count: spread grows with population
-  const R = 5 + Math.sqrt(n) * 4;
-  const bound = R * 2;
+  const R = 5 + Math.sqrt(n) * 2.5;
+  const bound = R * 1.5;
 
   // Fibonacci sphere initialization
   nodes.forEach((node, i) => {
