@@ -310,6 +310,41 @@ def _add_docgraph_classes(g: Graph, oc: Namespace) -> None:
         g.add((oc.contentOrder, RDFS.domain, cls))
 
 
+def _add_docgraph_v2_classes(g: Graph, oc: Namespace) -> None:
+    """Add DocGraph v2 classes: HTMLBlock, FrontmatterBlock, hasChild."""
+
+    # ========== HTMLBlock ==========
+    g.add((oc.HTMLBlock, RDF.type, OWL.Class))
+    g.add((oc.HTMLBlock, RDFS.label, Literal("HTML Block")))
+    g.add((oc.HTMLBlock, RDFS.comment, Literal(
+        "Raw HTML block from markdown"
+    )))
+
+    g.add((oc.htmlContent, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.htmlContent, RDFS.domain, oc.HTMLBlock))
+    g.add((oc.htmlContent, RDFS.label, Literal("html content")))
+    g.add((oc.htmlContent, RDFS.comment, Literal("Raw HTML content of the block")))
+
+    # ========== FrontmatterBlock ==========
+    g.add((oc.FrontmatterBlock, RDF.type, OWL.Class))
+    g.add((oc.FrontmatterBlock, RDFS.label, Literal("Frontmatter Block")))
+    g.add((oc.FrontmatterBlock, RDFS.comment, Literal(
+        "YAML frontmatter from the document header"
+    )))
+
+    g.add((oc.rawYaml, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.rawYaml, RDFS.domain, oc.FrontmatterBlock))
+    g.add((oc.rawYaml, RDFS.label, Literal("raw yaml")))
+    g.add((oc.rawYaml, RDFS.comment, Literal("Raw YAML content of the frontmatter")))
+
+    # ========== hasChild ==========
+    g.add((oc.hasChild, RDF.type, OWL.ObjectProperty))
+    g.add((oc.hasChild, RDFS.label, Literal("has child")))
+    g.add((oc.hasChild, RDFS.comment, Literal(
+        "Nested content block within a list item or procedure step"
+    )))
+
+
 def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
     """
     Create the core OntoSkills ontology (TBox) with state transition system.
@@ -462,6 +497,9 @@ def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
 
     # Add DocGraph classes for document structure preservation
     _add_docgraph_classes(g, oc)
+
+    # Add DocGraph v2 classes (HTMLBlock, FrontmatterBlock, hasChild)
+    _add_docgraph_v2_classes(g, oc)
 
     # ========== State Transition Properties ==========
 

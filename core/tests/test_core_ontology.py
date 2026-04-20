@@ -628,3 +628,27 @@ class TestDocGraphOntology:
         assert (oc.BlockQuote, RDF.type, OWL.Class) in g
         assert (oc.quoteContent, RDF.type, OWL.DatatypeProperty) in g
         assert (oc.quoteAttribution, RDF.type, OWL.DatatypeProperty) in g
+
+
+class TestDocGraphV2Ontology:
+    """Tests for DocGraph v2 classes — HTMLBlock, FrontmatterBlock, hasChild."""
+
+    def test_html_block_class_and_properties(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        g = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.HTMLBlock, RDF.type, OWL.Class) in g
+        assert (oc.htmlContent, RDF.type, OWL.DatatypeProperty) in g
+
+    def test_frontmatter_block_class_and_properties(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        g = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.FrontmatterBlock, RDF.type, OWL.Class) in g
+        assert (oc.rawYaml, RDF.type, OWL.DatatypeProperty) in g
+
+    def test_has_child_property(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        g = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.hasChild, RDF.type, OWL.ObjectProperty) in g
