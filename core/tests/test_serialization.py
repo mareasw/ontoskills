@@ -591,3 +591,153 @@ class TestContentBlockSerialization:
         # Content blocks should still be serialized via fallback
         code_nodes = list(graph.subjects(RDF.type, oc.CodeExample))
         assert len(code_nodes) == 1
+
+
+class TestDocGraphSerialization:
+    def _make_skill_with_sections(self, **overrides):
+        from compiler.schemas import ExtractedSkill
+        defaults = dict(
+            id="docgraph-skill",
+            hash="dg123",
+            nature="A skill with section tree",
+            genus="Test",
+            differentia="docgraph",
+            intents=["test docgraph"],
+            generated_by="test",
+        )
+        defaults.update(overrides)
+        return ExtractedSkill(**defaults)
+
+    def test_section_serialization(self):
+        from compiler.schemas import Section, Paragraph
+        skill = self._make_skill_with_sections()
+        content_extraction = ContentExtraction(
+            sections=[
+                Section(title="Overview", level=2, order=1, content=[
+                    Paragraph(text_content="Intro text.", content_order=1),
+                ]),
+            ],
+        )
+        graph = Graph()
+        oc = get_oc_namespace()
+        serialize_skill(graph, skill, content_extraction=content_extraction)
+
+        section_nodes = list(graph.subjects(RDF.type, oc.Section))
+        assert len(section_nodes) == 1
+        assert (section_nodes[0], oc.sectionTitle, Literal("Overview")) in graph
+        assert (section_nodes[0], oc.sectionLevel, Literal(2)) in graph
+        assert (section_nodes[0], oc.sectionOrder, Literal(1)) in graph
+        assert (skill_uri_for_id("docgraph-skill"), oc.hasSection, section_nodes[0]) in graph
+
+    def test_paragraph_in_section_serialization(self):
+        from compiler.schemas import Section, Paragraph
+        skill = self._make_skill_with_sections()
+        content_extraction = ContentExtraction(
+            sections=[
+                Section(title="Intro", level=2, order=1, content=[
+                    Paragraph(text_content="Hello **world**", content_order=1),
+                ]),
+            ],
+        )
+        graph = Graph()
+        oc = get_oc_namespace()
+        serialize_skill(graph, skill, content_extraction=content_extraction)
+
+        para_nodes = list(graph.subjects(RDF.type, oc.Paragraph))
+        assert len(para_nodes) == 1
+        assert (para_nodes[0], oc.textContent, Literal("Hello **world**")) in graph
+        assert (para_nodes[0], oc.contentOrder, Literal(1)) in graph
+
+        section_nodes = list(graph.subjects(RDF.type, oc.Section))
+        assert (section_nodes[0], oc.hasContent, para_nodes[0]) in graph
+
+    def test_bullet_list_serialization(self):
+        from compiler.schemas import Section, BulletListBlock, BulletItem
+        skill = self._make_skill_with_sections()
+        content_extraction = ContentExtraction(
+            sections=[
+                Section(title="Mistakes", level=2, order=1, content=[
+                    BulletListBlock(items=[
+                        BulletItem(text="Don't skip tests", order=1),
+                        BulletItem(text="Don't ignore errors", order=2),
+                    ], content_order=1),
+                ]),
+            ],
+        )
+        graph = Graph()
+        oc = get_oc_namespace()
+        serialize_skill(graph, skill, content_extraction=content_extraction)
+
+        bl_nodes = list(graph.subjects(RDF.type, oc.BulletList))
+        assert len(bl_nodes) == 1
+
+        bi_nodes = list(graph.subjects(RDF.type, oc.BulletItem))
+        assert len(bi_nodes) == 2
+        assert (bi_nodes[0], oc.itemText, Literal("Don't skip tests")) in graph
+        assert (bi_nodes[0], oc.itemOrder, Literal(1)) in graph
+
+    def test_blockquote_serialization(self):
+        from compiler.schemas import Section, BlockQuoteBlock
+        skill = self._make_skill_with_sections()
+        content_extraction = ContentExtraction(
+            sections=[
+                Section(title="Quote", level=2, order=1, content=[
+                    BlockQuoteBlock(content="Clean code matters.", attribution="R.C. Martin", content_order=1),
+                ]),
+            ],
+        )
+        graph = Graph()
+        oc = get_oc_namespace()
+        serialize_skill(graph, skill, content_extraction=content_extraction)
+
+        bq_nodes = list(graph.subjects(RDF.type, oc.BlockQuote))
+        assert len(bq_nodes) == 1
+        assert (bq_nodes[0], oc.quoteContent, Literal("Clean code matters.")) in graph
+        assert (bq_nodes[0], oc.quoteAttribution, Literal("R.C. Martin")) in graph
+
+    def test_nested_section_serialization(self):
+        from compiler.schemas import Section, Paragraph
+        skill = self._make_skill_with_sections()
+        content_extraction = ContentExtraction(
+            sections=[
+                Section(title="Parent", level=2, order=1, content=[
+                    Paragraph(text_content="Parent intro.", content_order=1),
+                ], subsections=[
+                    Section(title="Child", level=3, order=1, content=[
+                        Paragraph(text_content="Child text.", content_order=1),
+                    ]),
+                ]),
+            ],
+        )
+        graph = Graph()
+        oc = get_oc_namespace()
+        serialize_skill(graph, skill, content_extraction=content_extraction)
+
+        section_nodes = list(graph.subjects(RDF.type, oc.Section))
+        assert len(section_nodes) == 2
+
+        parent = [s for s in section_nodes if (s, oc.sectionTitle, Literal("Parent")) in graph][0]
+        child = [s for s in section_nodes if (s, oc.sectionTitle, Literal("Child")) in graph][0]
+        assert (parent, oc.hasSubsection, child) in graph
+
+    def test_code_block_in_section_gets_content_order(self):
+        from compiler.schemas import Section, Paragraph, CodeBlock
+        skill = self._make_skill_with_sections()
+        content_extraction = ContentExtraction(
+            sections=[
+                Section(title="Example", level=2, order=1, content=[
+                    Paragraph(text_content="Intro.", content_order=1),
+                    CodeBlock(language="python", content="x=1", source_line_start=3, source_line_end=3, content_order=2),
+                ]),
+            ],
+            code_blocks=[CodeBlock(language="python", content="x=1", source_line_start=3, source_line_end=3, content_order=2)],
+        )
+        graph = Graph()
+        oc = get_oc_namespace()
+        serialize_skill(graph, skill, content_extraction=content_extraction)
+
+        code_nodes = list(graph.subjects(RDF.type, oc.CodeExample))
+        assert len(code_nodes) >= 1
+        # Check that at least one code node has contentOrder = 2
+        has_order_2 = any((node, oc.contentOrder, Literal(2)) in graph for node in code_nodes)
+        assert has_order_2
