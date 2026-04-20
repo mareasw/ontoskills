@@ -1,127 +1,85 @@
-"""End-to-end coverage test: verify DocGraph captures ≥80% of markdown content."""
-from compiler.content_parser import extract_structural_content
+"""DocGraph v2 coverage benchmark — line-level metric against 30 real skills."""
+from pathlib import Path
+from compiler.content_parser import extract_flat_blocks
+
+SUP_DIR = Path("/home/marcello/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills")
+ANT_DIR = Path("/home/marcello/.claude/plugins/cache/anthropic-agent-skills/document-skills/3d5951151859/skills")
 
 
-def test_coverage_on_ontomcp_driver_skill():
-    """Test against a rich skill markdown with all block types."""
-    md = """\
-## OVERVIEW
-
-The OntoSkills MCP server exposes a knowledge graph of compiled skills. This document teaches you how to use its 4 tools effectively.
-
-> Clean code always looks like it was written by someone who cares.
-
-## AVAILABLE MCP TOOLS
-
-### 1. search_skills(query: string) -> Vec<SkillSearchResult>
-
-Semantic search across all compiled skills. Returns matching skills with relevance indicators.
-
-**When to use:** When you need to find skills that address a user's intent.
-
-**Best practices:**
-- Use natural language queries that describe the GOAL
-- If results are sparse, try synonyms or broader terms
-- Call this FIRST before any other MCP tool
-
-### 2. get_skill_context(skill_id: string) -> SkillContextResult
-
-Returns full details for a specific skill.
-
-**Response structure:**
-
-```json
-{
-  "skill_details": {"name": "..."},
-  "payload": {"executor": "shell"}
-}
-```
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /health | Health check |
-| POST | /skills | Create a skill |
-
-## WORKFLOW
-
-### Discovery Phase
-
-1. Call `search_skills` with the user's intent
-2. For each match, call `get_skill_context(skill_id)`
-3. Select the best 1-3 candidates
-
-### Execution Phase
-
-4. Call `get_skill_context(skill_id, include_content=true)`
-5. Follow ordered procedures if present
-
-## COMMON MISTAKES TO AVOID
-
-- **Skipping search_skills:** Don't guess skill names. Always search first.
-- **Ignoring requiresState:** Executing a skill without its preconditions leads to failures.
-- **Overlooking CRITICAL knowledge nodes:** These are hard constraints, not suggestions.
-
-## CONTENT BLOCK TYPES
-
-When include_content=true, responses may contain:
-- **CodeExample**: Inline code with language, purpose
-- **Table**: Markdown tables with raw source
-- **Flowchart**: Graphviz or Mermaid diagrams
-- **Template**: Reusable templates with variables
-"""
-    result = extract_structural_content(md)
-
-    # Count sections
-    total_sections = 0
-    total_content = 0
-    for s in result.sections:
-        total_sections += 1
-        total_content += len(s.content)
-        for sub in s.subsections:
-            total_sections += 1
-            total_content += len(sub.content)
-
-    # Verify structural elements captured
-    assert total_sections >= 6, f"Expected ≥6 sections, got {total_sections}"
-    assert total_content >= 10, f"Expected ≥10 content blocks, got {total_content}"
-
-    # Verify specific block types
-    all_blocks = []
-    for s in result.sections:
-        all_blocks.extend(s.content)
-        for sub in s.subsections:
-            all_blocks.extend(sub.content)
-
-    block_types = [b.block_type for b in all_blocks]
-    assert "paragraph" in block_types
-    assert "bullet_list" in block_types
-    assert "code_block" in block_types
-    assert "table" in block_types
-    assert "ordered_procedure" in block_types
-
-    # Calculate character coverage
-    extracted_chars = 0
-    for b in all_blocks:
-        if b.block_type == "paragraph":
-            extracted_chars += len(b.text_content)
-        elif b.block_type == "code_block":
-            extracted_chars += len(b.content)
-        elif b.block_type == "table":
-            extracted_chars += len(b.markdown_source)
-        elif b.block_type == "bullet_list":
-            extracted_chars += sum(len(i.text) for i in b.items)
-        elif b.block_type == "ordered_procedure":
-            extracted_chars += sum(len(s.text) for s in b.items)
-        elif b.block_type == "blockquote":
-            extracted_chars += len(b.content)
-
-    total_chars = len(md.strip())
-    coverage = extracted_chars / total_chars * 100
-    assert coverage >= 80, f"Coverage {coverage:.1f}% is below 80% threshold"
+def _collect_skill_paths():
+    paths = []
+    for d in sorted(SUP_DIR.iterdir()):
+        p = d / "SKILL.md"
+        if p.exists():
+            paths.append(("sup", p))
+    for d in sorted(ANT_DIR.iterdir()):
+        p = d / "SKILL.md"
+        if p.exists():
+            paths.append(("ant", p))
+    return paths
 
 
-def test_empty_markdown_coverage():
-    md = ""
-    result = extract_structural_content(md)
-    assert result.sections == []
-    assert result.code_blocks == []
+def _calc_line_coverage(md, blocks):
+    """Calculate line-level coverage.
+
+    A line is 'covered' if it falls within any FlatBlock's line_start..line_end range.
+    Blank lines and horizontal rules (---/***/___) are excluded from the denominator.
+    """
+    lines = md.splitlines()
+    covered = set()
+    for b in blocks:
+        for line_no in range(b.line_start - 1, b.line_end):
+            if 0 <= line_no < len(lines):
+                covered.add(line_no)
+    total_content = sum(1 for i, l in enumerate(lines) if l.strip() and l.strip() not in ("---", "***", "___"))
+    covered_content = sum(1 for i in covered if i < len(lines) and lines[i].strip() and lines[i].strip() not in ("---", "***", "___"))
+    return covered_content / total_content * 100 if total_content else 100.0
+
+
+def test_coverage_all_skills():
+    """Benchmark: measure line-level coverage across all available skills."""
+    paths = _collect_skill_paths()
+    assert len(paths) >= 20, f"Expected >=20 skills, found {len(paths)}"
+
+    results = []
+    for source, path in paths:
+        md = path.read_text()
+        blocks = extract_flat_blocks(md)
+        coverage = _calc_line_coverage(md, blocks)
+        results.append((source, path.parent.name, coverage))
+
+    # Report
+    avg = sum(c for _, _, c in results) / len(results)
+    below_90 = [(s, n, c) for s, n, c in results if c < 90.0]
+
+    # Print report for visibility
+    print(f"\n{'='*70}")
+    print(f"DOCGRAPH V2 COVERAGE — {len(results)} skills")
+    print(f"{'='*70}")
+    for s, n, c in sorted(results, key=lambda x: x[2]):
+        marker = " <<<" if c < 90 else ""
+        print(f"  {s:>3} {n:<38} {c:>6.1f}%{marker}")
+    print(f"\n  Average: {avg:.1f}%")
+    if below_90:
+        print(f"  Below 90%: {len(below_90)} skills")
+    print(f"{'='*70}")
+
+    # Assert overall average >= 85% (realistic target for flat extraction without LLM hydration)
+    assert avg >= 85.0, f"Average coverage {avg:.1f}% below 85% target"
+
+    # Hard assert: no skill below 60%
+    for source, name, cov in results:
+        assert cov >= 60.0, f"{source}:{name} coverage {cov:.1f}% below 60%"
+
+
+def test_flat_extraction_preserves_all_block_types():
+    """Verify all expected block types are represented in at least one skill."""
+    all_types = set()
+    for _, path in _collect_skill_paths():
+        md = path.read_text()
+        blocks = extract_flat_blocks(md)
+        for b in blocks:
+            all_types.add(b.block_type)
+    expected = {"heading", "paragraph", "code_block", "bullet_list", "blockquote", "table", "ordered_procedure", "frontmatter", "html_block"}
+    for t in expected:
+        assert t in all_types, f"Block type '{t}' not found in any skill"
