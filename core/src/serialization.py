@@ -85,8 +85,9 @@ def _serialize_section_tree(
     """Serialize the DocGraph section tree to RDF triples."""
     oc = get_oc_namespace()
 
-    def _serialize_section(section, parent_uri, is_subsection=False):
-        section_node = make_bnode("section", f"{section.level}:{section.order}:{section.title}")
+    def _serialize_section(section, parent_uri, is_subsection=False, section_ctx="root"):
+        section_ctx = f"{section_ctx}:{section.order}"
+        section_node = make_bnode("section", f"{section_ctx}:{section.title}")
 
         if is_subsection:
             graph.add((parent_uri, oc.hasSubsection, section_node))
@@ -99,40 +100,40 @@ def _serialize_section_tree(
         graph.add((section_node, oc.sectionOrder, Literal(section.order)))
 
         for block in section.content:
-            content_node = _serialize_content_block(graph, block, make_bnode)
+            content_node = _serialize_content_block(graph, block, make_bnode, section_ctx)
             if content_node:
                 graph.add((section_node, oc.hasContent, content_node))
 
         for sub in section.subsections:
-            _serialize_section(sub, section_node, is_subsection=True)
+            _serialize_section(sub, section_node, is_subsection=True, section_ctx=section_ctx)
 
-    def _serialize_content_block(graph, block, make_bnode):
+    def _serialize_content_block(graph, block, make_bnode, section_ctx="root"):
         """Serialize a single content block, return its BNode."""
         if block.block_type == "paragraph":
-            node = make_bnode("para", f"{block.content_order}:{len(block.text_content)}")
+            node = make_bnode("para", f"{section_ctx}:{block.content_order}:{len(block.text_content)}")
             graph.add((node, RDF.type, oc.Paragraph))
             graph.add((node, oc.textContent, Literal(block.text_content)))
             graph.add((node, oc.contentOrder, Literal(block.content_order)))
             return node
 
         elif block.block_type == "bullet_list":
-            node = make_bnode("blist", f"{block.content_order}:{len(block.items)}")
+            node = make_bnode("blist", f"{section_ctx}:{block.content_order}:{len(block.items)}")
             graph.add((node, RDF.type, oc.BulletList))
             graph.add((node, oc.contentOrder, Literal(block.content_order)))
             for item in block.items:
-                item_node = make_bnode("bitem", f"{item.order}:{len(item.text)}")
+                item_node = make_bnode("bitem", f"{section_ctx}:{item.order}:{len(item.text)}")
                 graph.add((node, oc.hasItem, item_node))
                 graph.add((item_node, RDF.type, oc.BulletItem))
                 graph.add((item_node, oc.itemText, Literal(item.text)))
                 graph.add((item_node, oc.itemOrder, Literal(item.order)))
                 for child in item.children:
-                    child_node = _serialize_content_block(graph, child, make_bnode)
+                    child_node = _serialize_content_block(graph, child, make_bnode, section_ctx)
                     if child_node:
                         graph.add((item_node, oc.hasChild, child_node))
             return node
 
         elif block.block_type == "blockquote":
-            node = make_bnode("bquote", f"{block.content_order}:{len(block.content)}")
+            node = make_bnode("bquote", f"{section_ctx}:{block.content_order}:{len(block.content)}")
             graph.add((node, RDF.type, oc.BlockQuote))
             graph.add((node, oc.quoteContent, Literal(block.content)))
             if block.attribution:
@@ -141,21 +142,21 @@ def _serialize_section_tree(
             return node
 
         elif block.block_type == "html_block":
-            node = make_bnode("html", f"{block.content_order}:{len(block.content)}")
+            node = make_bnode("html", f"{section_ctx}:{block.content_order}:{len(block.content)}")
             graph.add((node, RDF.type, oc.HTMLBlock))
             graph.add((node, oc.htmlContent, Literal(block.content)))
             graph.add((node, oc.contentOrder, Literal(block.content_order)))
             return node
 
         elif block.block_type == "frontmatter":
-            node = make_bnode("fm", f"{block.content_order}:{len(block.raw_yaml)}")
+            node = make_bnode("fm", f"{section_ctx}:{block.content_order}:{len(block.raw_yaml)}")
             graph.add((node, RDF.type, oc.FrontmatterBlock))
             graph.add((node, oc.rawYaml, Literal(block.raw_yaml)))
             graph.add((node, oc.contentOrder, Literal(block.content_order)))
             return node
 
         elif block.block_type == "code_block":
-            node = make_bnode("code", f"{block.content_order}:{block.language}")
+            node = make_bnode("code", f"{section_ctx}:{block.content_order}:{block.language}")
             graph.add((node, RDF.type, oc.CodeExample))
             graph.add((node, oc.codeLanguage, Literal(block.language)))
             graph.add((node, oc.codeContent, Literal(block.content)))
@@ -165,7 +166,7 @@ def _serialize_section_tree(
             return node
 
         elif block.block_type == "table":
-            node = make_bnode("table", f"{block.content_order}:{block.caption or 'untitled'}")
+            node = make_bnode("table", f"{section_ctx}:{block.content_order}:{block.caption or 'untitled'}")
             graph.add((node, RDF.type, oc.Table))
             graph.add((node, oc.tableMarkdown, Literal(block.markdown_source)))
             if block.caption:
@@ -175,7 +176,7 @@ def _serialize_section_tree(
             return node
 
         elif block.block_type == "flowchart":
-            node = make_bnode("flow", f"{block.content_order}:{block.chart_type}")
+            node = make_bnode("flow", f"{section_ctx}:{block.content_order}:{block.chart_type}")
             graph.add((node, RDF.type, oc.Flowchart))
             graph.add((node, oc.flowchartSource, Literal(block.source)))
             graph.add((node, oc.flowchartType, Literal(block.chart_type)))
@@ -183,7 +184,7 @@ def _serialize_section_tree(
             return node
 
         elif block.block_type == "template":
-            node = make_bnode("tmpl", f"{block.content_order}:{','.join(block.detected_variables)}")
+            node = make_bnode("tmpl", f"{section_ctx}:{block.content_order}:{','.join(block.detected_variables)}")
             graph.add((node, RDF.type, oc.Template))
             graph.add((node, oc.templateContent, Literal(block.content)))
             for var in block.detected_variables:
@@ -192,20 +193,20 @@ def _serialize_section_tree(
             return node
 
         elif block.block_type == "ordered_procedure":
-            node = make_bnode("proc", f"{block.content_order}")
+            node = make_bnode("proc", f"{section_ctx}:{block.content_order}")
             graph.add((node, RDF.type, oc.Workflow))
             graph.add((node, oc.workflowId, Literal(f"procedure_{block.content_order}")))
             graph.add((node, oc.workflowName, Literal("Ordered Procedure")))
             graph.add((node, oc.contentOrder, Literal(block.content_order)))
             for step in block.items:
-                step_node = make_bnode("step", f"{block.content_order}_{step.position}")
+                step_node = make_bnode("step", f"{section_ctx}:{block.content_order}_{step.position}")
                 graph.add((node, oc.hasStep, step_node))
                 graph.add((step_node, RDF.type, oc.WorkflowStep))
                 graph.add((step_node, oc.stepId, Literal(f"step_{step.position}")))
                 graph.add((step_node, DCTERMS.description, Literal(step.text)))
                 graph.add((step_node, oc.stepOrder, Literal(step.position)))
                 for child in step.children:
-                    child_node = _serialize_content_block(graph, child, make_bnode)
+                    child_node = _serialize_content_block(graph, child, make_bnode, section_ctx)
                     if child_node:
                         graph.add((step_node, oc.hasChild, child_node))
             return node
