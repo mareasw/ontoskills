@@ -448,3 +448,23 @@ oc:BlockQuoteShape a sh:NodeShape ;
         sh:datatype xsd:integer ;
         sh:message "BlockQuote must have contentOrder" ;
     ] .
+
+# === DocGraph v2 Shapes ===
+
+oc:HTMLBlockShape a sh:NodeShape ;
+    sh:targetClass oc:HTMLBlock ;
+    sh:property [
+        sh:path oc:htmlContent ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "HTMLBlock must have htmlContent" ;
+    ] .
+
+oc:FrontmatterBlockShape a sh:NodeShape ;
+    sh:targetClass oc:FrontmatterBlock ;
+    sh:property [
+        sh:path oc:rawYaml ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "FrontmatterBlock must have rawYaml" ;
+    ] .
