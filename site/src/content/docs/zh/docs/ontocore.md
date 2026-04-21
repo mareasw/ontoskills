@@ -54,6 +54,38 @@ SKILL.md → [提取] → [安全检查] → [序列化] → [SHACL] → [嵌入
 
 如果任何阶段失败，技能**不会被写入**。SHACL 守门员强制执行宪法规则。嵌入阶段是可选的 — 通过 `pip install ontocore[embeddings]` 安装以生成每技能语义搜索向量。未安装时，嵌入生成会被跳过并显示警告。
 
+### 内容提取
+
+**提取**阶段是 OntoCore 的核心。它将你的 Markdown 转换为带有类型化内容块的结构化节树 — 即 OntoMCP 通过 SPARQL 查询的数据模型。
+
+```
+SKILL.md → 平坦块 → 节树 → 类型化 RDF 三元组
+```
+
+1. **平坦块提取** — 解析器将 Markdown 分词为类型化块：段落、代码块、表格、项目列表、有序过程、引用、流程图、模板、HTML 块、前置元数据和标题
+2. **节树构建** — 块根据标题级别组织为层次树，通过父子关系保留文档结构
+3. **LLM 增强**（可选）— 如果设置了 `ANTHROPIC_API_KEY`，LLM 骨架步骤在回退到确定性树构建之前改善节嵌套
+
+### 内容块类型
+
+SKILL.md 中的每个元素都成为一个类型化的 RDF 节点。共有 11 种块类型：
+
+| 块类型 | 捕获内容 | 关键属性 |
+|--------|----------|----------|
+| `paragraph` | 自由文本 | `textContent` |
+| `code_block` | 带语言的围栏代码 | `codeLanguage`、`codeContent` |
+| `table` | Markdown 表格 | `tableMarkdown`、`rowCount` |
+| `flowchart` | Mermaid 或 Graphviz 图表 | `flowchartType`、`flowchartSource` |
+| `template` | 带 `{variables}` 的可重用模板 | `templateContent`、`templateVariables` |
+| `bullet_list` | 带嵌套子项的无序列表 | `hasItem` → `itemText`、`itemOrder` |
+| `blockquote` | 带可选归属的引用文本 | `quoteContent`、`quoteAttribution` |
+| `ordered_procedure` | 编号的逐步过程 | `hasStep` → `stepText`、`stepOrder` |
+| `html_block` | 原始 HTML 内容 | `htmlContent` |
+| `frontmatter` | YAML 元数据 | `rawYaml`、解析后的属性 |
+| `heading` | 节标题 | 集成到节树中 |
+
+项目列表中的条目和过程中的步骤可以通过 `hasChild` 属性包含**嵌套子块**（代码示例、引用等）。
+
 ---
 
 ## 文件处理规则

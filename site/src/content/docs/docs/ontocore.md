@@ -45,7 +45,7 @@ SKILL.md → [Extract] → [Security] → [Serialize] → [SHACL] → [Embed (op
 
 | Stage | What Happens |
 |-------|--------------|
-| **Extract** | Claude reads SKILL.md and extracts structured knowledge |
+| **Extract** | Structural content extraction + LLM knowledge extraction |
 | **Security** | Regex + LLM review for malicious content |
 | **Serialize** | Pydantic models → RDF triples |
 | **Validate** | SHACL shapes check logical validity |
@@ -53,6 +53,38 @@ SKILL.md → [Extract] → [Security] → [Serialize] → [SHACL] → [Embed (op
 | **Write** | Atomic write with backup |
 
 If any stage fails, the skill is **not written**. The SHACL gatekeeper enforces constitutional rules. The embedding stage is optional — skipped with a warning when `ontocore[embeddings]` is not installed.
+
+### Content extraction
+
+The **Extract** stage is the core of OntoCore. It transforms your markdown into a structured section tree with typed content blocks — the data model that OntoMCP queries via SPARQL.
+
+```
+SKILL.md → flat blocks → section tree → typed RDF triples
+```
+
+1. **Flat block extraction** — The parser tokenizes markdown into typed blocks: paragraphs, code blocks, tables, bullet lists, ordered procedures, blockquotes, flowcharts, templates, HTML blocks, frontmatter, and headings
+2. **Section tree building** — Blocks are organized into a hierarchical tree based on heading levels, preserving document structure with parent-child relationships
+3. **LLM enhancement** (optional) — If `ANTHROPIC_API_KEY` is set, an LLM skeleton step improves section nesting before falling back to deterministic tree building
+
+### Content block types
+
+Every element in your SKILL.md becomes a typed RDF node. The 11 block types:
+
+| Block Type | What It Captures | Key Properties |
+|------------|-----------------|----------------|
+| `paragraph` | Free-form text | `textContent` |
+| `code_block` | Fenced code with language | `codeLanguage`, `codeContent` |
+| `table` | Markdown tables | `tableMarkdown`, `rowCount` |
+| `flowchart` | Mermaid or Graphviz diagrams | `flowchartType`, `flowchartSource` |
+| `template` | Reusable templates with `{variables}` | `templateContent`, `templateVariables` |
+| `bullet_list` | Unordered lists with nested children | `hasItem` → `itemText`, `itemOrder` |
+| `blockquote` | Quoted text with optional attribution | `quoteContent`, `quoteAttribution` |
+| `ordered_procedure` | Numbered step-by-step procedures | `hasStep` → `stepText`, `stepOrder` |
+| `html_block` | Raw HTML content | `htmlContent` |
+| `frontmatter` | YAML metadata | `rawYaml`, parsed properties |
+| `heading` | Section headings | Integrated into section tree |
+
+Items in bullet lists and steps in procedures can contain **nested child blocks** (code examples, blockquotes, etc.) via the `hasChild` property.
 
 ---
 
