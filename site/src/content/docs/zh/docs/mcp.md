@@ -55,7 +55,7 @@ ONTOMCP_ONTOLOGY_ROOT=~/.ontoskills/ontologies
 
 ## 工具参考
 
-OntoMCP 暴露 **4 个工具** 用于技能发现和推理。
+OntoMCP 暴露 **5 个工具** 用于技能发现和推理。
 
 ### `search`
 
