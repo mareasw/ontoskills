@@ -1217,7 +1217,7 @@ impl Catalog {
             let mut lines = Vec::new();
             for st in &titles {
                 let prefix = "#".repeat(st.level as usize);
-                let indent = if st.parent_title.is_some() { "  " } else { "" };
+                let indent = "  ".repeat(st.level.saturating_sub(2) as usize);
                 lines.push(format!("{indent}{prefix} {}", st.title));
             }
             return Ok(SkillContentResult {

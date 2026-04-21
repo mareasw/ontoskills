@@ -5,7 +5,7 @@ description: Protocol for interacting with the OntoSkills MCP server to discover
 
 ## OVERVIEW
 
-The OntoSkills MCP server exposes a knowledge graph of compiled skills. This document teaches you how to use its 4 tools effectively to find, evaluate, and compose skills for any task.
+The OntoSkills MCP server exposes a knowledge graph of compiled skills. This document teaches you how to use its 5 tools effectively to find, evaluate, and compose skills for any task.
 
 ## AVAILABLE MCP TOOLS
 
@@ -23,13 +23,14 @@ Semantic search across all compiled skills. Returns matching skills with relevan
 
 ### 2. get_skill_context(skill_id: string, include_content: bool = false) -> SkillContextResult
 
-Returns full details for a specific skill: metadata, knowledge nodes, state transitions, dependencies, and optionally full content blocks (code, tables, flowcharts, templates).
+Returns full details for a specific skill: metadata, knowledge nodes, state transitions, dependencies, section titles (table of contents), and optionally full content blocks (code, tables, flowcharts, templates).
 
-**When to use:** After search_skills identified candidate skills, to evaluate fitness.
+**When to use:** After search_skills identified candidate skills, to evaluate fitness and see what sections are available.
 
 **Best practices:**
 - Start with include_content=false (default) to get summaries
 - Only set include_content=true when you've decided to USE the skill and need the actual code/templates
+- Check the `sections` field to see what sections the skill contains — use these titles with get_skill_content
 - Always check requiresState before attempting execution
 - Read ALL knowledge nodes with severity CRITICAL or HIGH before proceeding
 
@@ -37,10 +38,26 @@ Returns full details for a specific skill: metadata, knowledge nodes, state tran
 - `skill_details`: name, description, category, intents, aliases
 - `payload`: executor type and code (for executable skills)
 - `knowledge_nodes`: epistemic rules (standards, anti-patterns, constraints, heuristics, etc.)
+- `sections`: table of contents — list of section titles with levels and hierarchy
 - `content_blocks`: summary of available code examples, tables, flowcharts, templates
 - `state_transitions`: requiresState (preconditions), yieldsState (outcomes), handlesFailure
 
-### 3. evaluate_execution_plan(plan: ExecutionPlan) -> ExecutionPlanEvaluation
+### 3. get_skill_content(skill_id: string, section: string = None) -> SkillContentResult
+
+Retrieves skill section content as reconstructed markdown. If `section` is omitted, returns the table of contents. If `section` is provided, returns the content of that section and all its subsections.
+
+**When to use:** After get_skill_context showed available sections, to read the actual instructions, code examples, checklists, and procedures.
+
+**Best practices:**
+- Call get_skill_context first to see which sections exist
+- Request sections one at a time — only load what you need
+- The response includes subsections automatically — no need to request them separately
+- Reconstructed markdown matches the original SKILL.md structure
+
+**Response (no section):** TOC as markdown headings
+**Response (with section):** Reconstructed markdown with paragraphs, code blocks, bullet lists, ordered procedures, tables, blockquotes, flowcharts, templates
+
+### 4. evaluate_execution_plan(plan: ExecutionPlan) -> ExecutionPlanEvaluation
 
 Validates a proposed execution plan against the skill knowledge graph. Checks state chains, dependencies, and identifies missing prerequisites.
 
@@ -62,7 +79,7 @@ Validates a proposed execution plan against the skill knowledge graph. Checks st
 }
 ```
 
-### 4. query_epistemic_rules(context: string, kind: string = None, severity: string = None) -> Vec<KnowledgeNodeInfo>
+### 5. query_epistemic_rules(context: string, kind: string = None, severity: string = None) -> Vec<KnowledgeNodeInfo>
 
 Queries knowledge rules across all skills, optionally filtered by type and severity.
 
