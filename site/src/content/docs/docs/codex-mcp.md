@@ -69,6 +69,7 @@ ONTOMCP_ONTOLOGY_ROOT=~/.ontoskills/ontologies
 
 - `search` — search by semantic query, alias, or structured filters
 - `get_skill_context`
+- `get_skill_content`
 - `evaluate_execution_plan`
 - `query_epistemic_rules`
 
