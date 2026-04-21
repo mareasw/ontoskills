@@ -166,6 +166,7 @@ def _try_skeleton_tree(blocks: list[FlatBlock], markdown: str) -> list[Section] 
             max_tokens=4096,
             system=SKELETON_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}],
+            temperature=0,
             timeout=60.0,
         )
 
@@ -267,7 +268,7 @@ def _extract_ordered_items(ol_open_token, tokens, start_idx, md_lines, block_cou
             k = j + 1
             item_depth = 1
             first_para_skipped = False
-            child_order = 0
+            child_order = 1
             while k < len(tokens):
                 tk = tokens[k]
                 if tk.type == "list_item_close":
@@ -350,7 +351,7 @@ def _extract_bullet_items(bl_open_token, tokens, start_idx, md_lines, block_coun
             k = j + 1
             item_depth = 1
             first_para_skipped = False
-            child_order = 0
+            child_order = 1
             while k < len(tokens):
                 tk = tokens[k]
                 if tk.type == "list_item_close":

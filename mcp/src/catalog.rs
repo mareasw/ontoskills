@@ -1102,7 +1102,7 @@ impl Catalog {
         let query = format!(
             r#"
         PREFIX oc: <https://ontoskills.sh/ontology#>
-        SELECT ?itemText ?itemOrder ?childType ?childContent
+        SELECT ?itemText ?itemOrder ?childType ?childContent ?childLanguage
         WHERE {{
             {block_pattern} oc:hasItem ?item .
             ?item oc:itemText ?itemText ;
@@ -1114,6 +1114,7 @@ impl Catalog {
                 OPTIONAL {{ ?child oc:codeContent ?childContent . }}
                 OPTIONAL {{ ?child oc:quoteContent ?childContent . }}
                 OPTIONAL {{ ?child oc:templateContent ?childContent . }}
+                OPTIONAL {{ ?child oc:codeLanguage ?childLanguage . }}
             }}
         }}
         ORDER BY ?itemOrder
@@ -1142,7 +1143,8 @@ impl Catalog {
                             .join("\n");
                         match child_type.as_str() {
                             "code_block" => {
-                                lines.push(format!("  ```"));
+                                let lang = row.optional_literal("childLanguage").unwrap_or_default();
+                                lines.push(format!("  ```{lang}"));
                                 lines.push(indented);
                                 lines.push(format!("  ```"));
                             }
@@ -1176,7 +1178,7 @@ impl Catalog {
             r#"
         PREFIX oc: <https://ontoskills.sh/ontology#>
         PREFIX dcterms: <http://purl.org/dc/terms/>
-        SELECT ?stepText ?stepOrder ?childType ?childContent
+        SELECT ?stepText ?stepOrder ?childType ?childContent ?childLanguage
         WHERE {{
             {block_pattern} oc:hasStep ?step .
             ?step dcterms:description ?stepText ;
@@ -1188,6 +1190,7 @@ impl Catalog {
                 OPTIONAL {{ ?child oc:codeContent ?childContent . }}
                 OPTIONAL {{ ?child oc:quoteContent ?childContent . }}
                 OPTIONAL {{ ?child oc:templateContent ?childContent . }}
+                OPTIONAL {{ ?child oc:codeLanguage ?childLanguage . }}
             }}
         }}
         ORDER BY ?stepOrder
@@ -1218,7 +1221,8 @@ impl Catalog {
                             .join("\n");
                         match child_type.as_str() {
                             "code_block" => {
-                                lines.push(format!("   ```"));
+                                let lang = row.optional_literal("childLanguage").unwrap_or_default();
+                                lines.push(format!("   ```{lang}"));
                                 lines.push(indented);
                                 lines.push(format!("   ```"));
                             }
@@ -1408,27 +1412,25 @@ impl Catalog {
             )));
         }
 
-        // Sort rows into document (pre-order) traversal
+        // Build pre-order index from section titles for stable document-order sorting
+        let section_order: std::collections::HashMap<String, usize> = self
+            .get_section_titles(skill_id)
+            .unwrap_or_default()
+            .into_iter()
+            .enumerate()
+            .map(|(i, st)| (st.title, i))
+            .collect();
+
+        // Sort rows into document (pre-order) traversal using the title index
         rows.sort_by(|a, b| {
             let a_sec = a.optional_literal("secTitle").unwrap_or_default();
             let b_sec = b.optional_literal("secTitle").unwrap_or_default();
-            let a_parent = a.optional_literal("secParentTitle");
-            let b_parent = b.optional_literal("secParentTitle");
-            let a_order = a.optional_i64("secOrder").unwrap_or(0);
-            let b_order = b.optional_i64("secOrder").unwrap_or(0);
+            let a_idx = section_order.get(&a_sec).copied().unwrap_or(usize::MAX);
+            let b_idx = section_order.get(&b_sec).copied().unwrap_or(usize::MAX);
             let a_content = a.optional_i64("contentOrder").unwrap_or(0);
             let b_content = b.optional_i64("contentOrder").unwrap_or(0);
 
-            // Root section (no parent) sorts before children
-            // Within same parent, sort by sectionOrder then title then contentOrder
-            match (a_parent.as_deref(), b_parent.as_deref()) {
-                (None, None) => a_order.cmp(&b_order),
-                (Some(_), None) => std::cmp::Ordering::Greater,
-                (None, Some(_)) => std::cmp::Ordering::Less,
-                (Some(ap), Some(bp)) => ap.cmp(bp).then_with(|| a_order.cmp(&b_order)),
-            }
-            .then_with(|| a_sec.cmp(&b_sec))
-            .then_with(|| a_content.cmp(&b_content))
+            a_idx.cmp(&b_idx).then_with(|| a_content.cmp(&b_content))
         });
 
         let mut content_parts: Vec<String> = Vec::new();

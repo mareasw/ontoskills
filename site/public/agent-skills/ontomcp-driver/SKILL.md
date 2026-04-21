@@ -34,12 +34,11 @@ Returns full details for a specific skill: metadata, knowledge nodes, state tran
 - Read ALL knowledge nodes with severity CRITICAL or HIGH before proceeding
 
 **Response structure:**
-- `skill_details`: name, description, category, intents, aliases
+- `skill`: skill metadata (name, description, category, intents, aliases)
 - `payload`: executor type and code (for executable skills)
 - `knowledge_nodes`: epistemic rules (standards, anti-patterns, constraints, heuristics, etc.)
 - `sections`: table of contents — list of section titles with levels and hierarchy
-- `content_blocks`: summary of available code examples, tables, flowcharts, templates
-- `state_transitions`: requiresState (preconditions), yieldsState (outcomes), handlesFailure
+- `include_inherited_knowledge`: whether inherited knowledge from extended skills was included
 
 ### 3. get_skill_content(skill_id: string, section: string = None) -> SkillContentResult
 
