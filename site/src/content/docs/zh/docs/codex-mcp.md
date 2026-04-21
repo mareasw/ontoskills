@@ -69,6 +69,7 @@ ONTOMCP_ONTOLOGY_ROOT=~/.ontoskills/ontologies
 
 - `search` — 通过语义查询、别名或结构化过滤器搜索
 - `get_skill_context`
+- `get_skill_content`
 - `evaluate_execution_plan`
 - `query_epistemic_rules`
 

@@ -83,13 +83,13 @@ oc:tdd-workflow a oc:Skill ;
       'Intent-based discovery'
     ],
     code: `# Search by intent
-search_intents("create_pdf")
+search({ query: "create_pdf" })
   → pdf-generator
   → report-exporter
 
 # Get skill context
-get_skill("pdf-generator")
-  → { name, description, instructions }`
+get_skill_context({ skill_id: "pdf-generator" })
+  → { name, description, sections }`
   }
 ];
 ---
