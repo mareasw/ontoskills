@@ -601,8 +601,8 @@ class TestContentTreeSerialization:
             hash="dg123",
             nature="A skill with section tree",
             genus="Test",
-            differentia="docgraph",
-            intents=["test docgraph"],
+            differentia="content",
+            intents=["test content"],
             generated_by="test",
         )
         defaults.update(overrides)

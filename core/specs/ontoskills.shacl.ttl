@@ -378,7 +378,7 @@ oc:TemplateShape a sh:NodeShape ;
         sh:message "If present, templateType must be prompt, output, or boilerplate" ;
     ] .
 
-# === DocGraph Shapes ===
+# === Content Model Shapes ===
 
 oc:SectionShape a sh:NodeShape ;
     sh:targetClass oc:Section ;
@@ -455,7 +455,7 @@ oc:BlockQuoteShape a sh:NodeShape ;
         sh:message "BlockQuote quoteAttribution must be a single string" ;
     ] .
 
-# === DocGraph v2 Shapes ===
+# === Content Block Shapes ===
 
 oc:HTMLBlockShape a sh:NodeShape ;
     sh:targetClass oc:HTMLBlock ;

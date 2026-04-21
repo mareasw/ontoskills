@@ -39,6 +39,34 @@ flowchart LR
 
 ---
 
+## 内容模型
+
+OntoCore 将 Markdown 转换为三层内容模型，OntoMCP 通过 SPARQL 查询。
+
+```
+FlatBlock → 节树 → ContentExtraction
+```
+
+**FlatBlock** — 每个 Markdown 元素成为类型化块（paragraph、code_block、table 等），带有行范围和内容特定属性。这是解析器的原始平坦提取。
+
+**节树** — 块根据标题级别组织为层次结构。每个节有标题、级别、顺序，并包含内容块和子节。树结构使用：
+
+| 属性 | 用途 |
+|------|------|
+| `oc:hasSection` | 将技能链接到其顶级节 |
+| `oc:hasSubsection` | 将节链接到其子节 |
+| `oc:hasContent` | 将节链接到其内容块 |
+| `oc:hasChild` | 将列表条目或步骤链接到嵌套子块 |
+| `oc:sectionTitle` | 节标题文本 |
+| `oc:sectionLevel` | 标题级别（1-6）|
+| `oc:contentOrder` | 节内的排序 |
+
+**ContentExtraction** — 聚合结果，包含所有节、代码块、表格、流程图、过程和模板。这是 LLM 在提取期间注释的内容。
+
+在 TTL 输出中，节和内容块表示为带有 `rdf:type` 断言的空白节点（如 `oc:Paragraph`、`oc:CodeBlock`）。`get_skill_content` MCP 工具查询这些三元组并从中重建可读的 Markdown — 因此代理可以通过 SPARQL 逐步遵循技能的指令，而无需读取原始 Markdown。
+
+---
+
 ## 技能类型
 
 ```mermaid
