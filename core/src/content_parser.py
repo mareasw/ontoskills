@@ -500,6 +500,7 @@ def extract_flat_blocks(markdown: str) -> list[FlatBlock]:
         if token.type == "front_matter" and token.map:
             start, end = token.map
             raw = "".join(md_lines[start:end])
+            raw_yaml = "\n".join(line for line in raw.split("\n") if line.strip() != "---")
             props: dict[str, str] = {}
             for line in raw.split("\n"):
                 if ":" in line and not line.strip().startswith("---"):
@@ -513,7 +514,7 @@ def extract_flat_blocks(markdown: str) -> list[FlatBlock]:
             blocks.append(FlatBlock(
                 block_id=bid,
                 block_type="frontmatter",
-                content=FrontmatterBlock(raw_yaml=raw, properties=props, content_order=0),
+                content=FrontmatterBlock(raw_yaml=raw_yaml, properties=props, content_order=0),
                 line_start=start + 1,
                 line_end=end,
             ))

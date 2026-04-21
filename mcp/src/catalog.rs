@@ -1090,31 +1090,68 @@ impl Catalog {
 
     fn reconstruct_list_items(&self, list_block_ref: &str) -> String {
         let block_pattern = if list_block_ref.starts_with("_:") {
-            // Blank node: use directly in SPARQL pattern
             list_block_ref.to_string()
         } else {
-            // Named node: use IRI syntax
             format!("<{list_block_ref}>")
         };
         let query = format!(
             r#"
         PREFIX oc: <https://ontoskills.sh/ontology#>
-        SELECT ?itemText ?itemOrder
+        SELECT ?itemText ?itemOrder ?childType ?childContent
         WHERE {{
             {block_pattern} oc:hasItem ?item .
             ?item oc:itemText ?itemText ;
                   oc:itemOrder ?itemOrder .
+            OPTIONAL {{
+                ?item oc:hasChild ?child .
+                ?child oc:blockType ?childType .
+                OPTIONAL {{ ?child oc:textContent ?childContent . }}
+                OPTIONAL {{ ?child oc:codeContent ?childContent . }}
+                OPTIONAL {{ ?child oc:quoteContent ?childContent . }}
+                OPTIONAL {{ ?child oc:templateContent ?childContent . }}
+            }}
         }}
         ORDER BY ?itemOrder
         "#
         );
         match self.select_rows(&query) {
-            Ok(rows) => rows
-                .iter()
-                .filter_map(|r| r.optional_literal("itemText"))
-                .map(|text| format!("- {text}"))
-                .collect::<Vec<_>>()
-                .join("\n"),
+            Ok(rows) => {
+                let mut lines: Vec<String> = Vec::new();
+                let mut last_item_order: Option<i64> = None;
+                for row in &rows {
+                    let item_text = row.optional_literal("itemText").unwrap_or_default();
+                    let item_order: i64 = row.optional_literal("itemOrder")
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or(0);
+                    if last_item_order != Some(item_order) {
+                        lines.push(format!("- {item_text}"));
+                        last_item_order = Some(item_order);
+                    }
+                    if let (Some(child_type), Some(child_content)) =
+                        (row.optional_literal("childType"), row.optional_literal("childContent"))
+                    {
+                        let indented = child_content
+                            .lines()
+                            .map(|l| format!("  {l}"))
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        match child_type.as_str() {
+                            "code_block" => {
+                                lines.push(format!("  ```"));
+                                lines.push(indented);
+                                lines.push(format!("  ```"));
+                            }
+                            "blockquote" => {
+                                lines.push(indented);
+                            }
+                            _ => {
+                                lines.push(indented);
+                            }
+                        }
+                    }
+                }
+                lines.join("\n")
+            }
             Err(_) => String::new(),
         }
     }
@@ -1129,23 +1166,63 @@ impl Catalog {
             r#"
         PREFIX oc: <https://ontoskills.sh/ontology#>
         PREFIX dcterms: <http://purl.org/dc/terms/>
-        SELECT ?stepText ?stepOrder
+        SELECT ?stepText ?stepOrder ?childType ?childContent
         WHERE {{
             {block_pattern} oc:hasStep ?step .
             ?step dcterms:description ?stepText ;
                   oc:stepOrder ?stepOrder .
+            OPTIONAL {{
+                ?step oc:hasChild ?child .
+                ?child oc:blockType ?childType .
+                OPTIONAL {{ ?child oc:textContent ?childContent . }}
+                OPTIONAL {{ ?child oc:codeContent ?childContent . }}
+                OPTIONAL {{ ?child oc:quoteContent ?childContent . }}
+                OPTIONAL {{ ?child oc:templateContent ?childContent . }}
+            }}
         }}
         ORDER BY ?stepOrder
         "#
         );
         match self.select_rows(&query) {
-            Ok(rows) => rows
-                .iter()
-                .filter_map(|r| r.optional_literal("stepText"))
-                .enumerate()
-                .map(|(i, text)| format!("{}. {text}", i + 1))
-                .collect::<Vec<_>>()
-                .join("\n"),
+            Ok(rows) => {
+                let mut lines: Vec<String> = Vec::new();
+                let mut last_step_order: Option<i64> = None;
+                let mut step_num = 0u32;
+                for row in &rows {
+                    let step_text = row.optional_literal("stepText").unwrap_or_default();
+                    let step_order: i64 = row.optional_literal("stepOrder")
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or(0);
+                    if last_step_order != Some(step_order) {
+                        step_num += 1;
+                        lines.push(format!("{step_num}. {step_text}"));
+                        last_step_order = Some(step_order);
+                    }
+                    if let (Some(child_type), Some(child_content)) =
+                        (row.optional_literal("childType"), row.optional_literal("childContent"))
+                    {
+                        let indented = child_content
+                            .lines()
+                            .map(|l| format!("   {l}"))
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        match child_type.as_str() {
+                            "code_block" => {
+                                lines.push(format!("   ```"));
+                                lines.push(indented);
+                                lines.push(format!("   ```"));
+                            }
+                            "blockquote" => {
+                                lines.push(indented);
+                            }
+                            _ => {
+                                lines.push(indented);
+                            }
+                        }
+                    }
+                }
+                lines.join("\n")
+            }
             Err(_) => String::new(),
         }
     }
