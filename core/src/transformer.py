@@ -365,7 +365,7 @@ Use the available tools to:
 
 
 # ============================================================================
-# DocGraph v2: Skeleton Hydration (Phase 1c)
+# Skeleton Hydration (Phase 1c)
 # ============================================================================
 
 def hydrate_skeleton(

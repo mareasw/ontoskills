@@ -593,11 +593,11 @@ class TestContentBlockSerialization:
         assert len(code_nodes) == 1
 
 
-class TestDocGraphSerialization:
+class TestContentTreeSerialization:
     def _make_skill_with_sections(self, **overrides):
         from compiler.schemas import ExtractedSkill
         defaults = dict(
-            id="docgraph-skill",
+            id="content-skill",
             hash="dg123",
             nature="A skill with section tree",
             genus="Test",
@@ -627,7 +627,7 @@ class TestDocGraphSerialization:
         assert (section_nodes[0], oc.sectionTitle, Literal("Overview")) in graph
         assert (section_nodes[0], oc.sectionLevel, Literal(2)) in graph
         assert (section_nodes[0], oc.sectionOrder, Literal(1)) in graph
-        assert (skill_uri_for_id("docgraph-skill"), oc.hasSection, section_nodes[0]) in graph
+        assert (skill_uri_for_id("content-skill"), oc.hasSection, section_nodes[0]) in graph
 
     def test_paragraph_in_section_serialization(self):
         from compiler.schemas import Section, Paragraph
@@ -743,7 +743,7 @@ class TestDocGraphSerialization:
         assert has_order_2
 
 
-class TestDocGraphV2Serialization:
+class TestContentBlockSerialization:
     def _make_skill(self, **kw):
         defaults = dict(id="v2-skill", hash="v2hash", nature="test", genus="Test", differentia="v2", intents=["test"], generated_by="test")
         defaults.update(kw)

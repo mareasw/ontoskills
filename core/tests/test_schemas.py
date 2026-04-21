@@ -557,7 +557,7 @@ class TestAnnotationModels:
         assert len(compiled.workflows) == 1
 
 
-class TestDocGraphModels:
+class TestContentBlockModels:
     def test_paragraph_model(self):
         from compiler.schemas import Paragraph
         p = Paragraph(text_content="Hello **world**", content_order=1)
@@ -626,7 +626,7 @@ class TestDocGraphModels:
         assert len(ce.code_blocks) == 1
 
 
-class TestDocGraphV2Models:
+class TestContentBlockV2Models:
     def test_html_block_model(self):
         from compiler.schemas import HTMLBlock
         hb = HTMLBlock(content="<HARD-GATE>Do not proceed</HARD-GATE>", content_order=1)

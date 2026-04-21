@@ -210,8 +210,8 @@ def _add_content_block_classes(g: Graph, oc: Namespace) -> None:
     )))
 
 
-def _add_docgraph_classes(g: Graph, oc: Namespace) -> None:
-    """Add DocGraph classes for complete document structure preservation."""
+def _add_content_model_classes(g: Graph, oc: Namespace) -> None:
+    """Add content model classes for document structure preservation."""
 
     # ========== ContentBlock superclass ==========
     g.add((oc.ContentBlock, RDF.type, OWL.Class))
@@ -321,7 +321,7 @@ def _add_docgraph_classes(g: Graph, oc: Namespace) -> None:
         g.add((prop_uri, RDFS.label, Literal(label)))
         g.add((prop_uri, RDFS.comment, Literal(comment)))
 
-    # ========== DocGraph Object Properties ==========
+    # ========== Content Model Object Properties ==========
     for prop_name, domain, range_cls, label, comment in [
         ("hasSection", oc.Skill, oc.Section, "has section", "Top-level section of a skill document"),
         ("hasSubsection", oc.Section, oc.Section, "has subsection", "Nested section within a section"),
@@ -337,8 +337,8 @@ def _add_docgraph_classes(g: Graph, oc: Namespace) -> None:
         g.add((prop_uri, RDFS.comment, Literal(comment)))
 
 
-def _add_docgraph_v2_classes(g: Graph, oc: Namespace) -> None:
-    """Add DocGraph v2 classes: HTMLBlock, FrontmatterBlock, hasChild."""
+def _add_content_block_classes(g: Graph, oc: Namespace) -> None:
+    """Add additional content block classes: HTMLBlock, FrontmatterBlock, hasChild."""
 
     # ========== HTMLBlock ==========
     g.add((oc.HTMLBlock, RDF.type, OWL.Class))
@@ -525,11 +525,11 @@ def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
     # Add content block classes and properties
     _add_content_block_classes(g, oc)
 
-    # Add DocGraph classes for document structure preservation
-    _add_docgraph_classes(g, oc)
+    # Add content model classes for document structure preservation
+    _add_content_model_classes(g, oc)
 
-    # Add DocGraph v2 classes (HTMLBlock, FrontmatterBlock, hasChild)
-    _add_docgraph_v2_classes(g, oc)
+    # Add additional content block classes (HTMLBlock, FrontmatterBlock, hasChild)
+    _add_content_block_classes(g, oc)
 
     # ========== State Transition Properties ==========
 

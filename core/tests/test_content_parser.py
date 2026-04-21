@@ -1,4 +1,4 @@
-"""Tests for the content_parser module — DocGraph tree builder."""
+"""Tests for the content_parser module — content extraction tree builder."""
 import pytest
 from compiler.content_parser import extract_structural_content
 

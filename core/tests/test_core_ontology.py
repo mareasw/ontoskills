@@ -578,8 +578,8 @@ class TestContentBlockClasses:
         assert (oc.stepOrder, RDFS.domain, oc.WorkflowStep) in graph
 
 
-class TestDocGraphOntology:
-    """Tests for DocGraph classes — Section, Paragraph, BulletList, BlockQuote."""
+class TestContentModelOntology:
+    """Tests for content model classes — Section, Paragraph, BulletList, BlockQuote."""
 
     def test_section_class_exists(self, tmp_path):
         output_path = tmp_path / "core.ttl"
@@ -630,8 +630,8 @@ class TestDocGraphOntology:
         assert (oc.quoteAttribution, RDF.type, OWL.DatatypeProperty) in g
 
 
-class TestDocGraphV2Ontology:
-    """Tests for DocGraph v2 classes — HTMLBlock, FrontmatterBlock, hasChild."""
+class TestContentBlockOntology:
+    """Tests for content block classes — HTMLBlock, FrontmatterBlock, hasChild."""
 
     def test_html_block_class_and_properties(self, tmp_path):
         output_path = tmp_path / "core.ttl"

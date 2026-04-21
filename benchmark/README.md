@@ -84,7 +84,7 @@ Only Anthropic models are called via API. Other models are price-comparison only
 - `ANTHROPIC_API_KEY` env var (for traditional benchmark and skeleton LLM)
 - `libclang-dev` package (for oxrocksdb-sys compilation)
 
-## DocGraph Coverage Benchmark
+## Content Coverage Benchmark
 
 Measures how much of each SKILL.md is captured as typed RDF content blocks. Target: ≥95% line-level coverage across 30 real skills (14 superpowers + 16 Anthropic).
 
@@ -97,19 +97,19 @@ Measures how much of each SKILL.md is captured as typed RDF content blocks. Targ
 
 ```bash
 # Verbose per-skill report (no API key needed for flat extraction only)
-python benchmark/docgraph_coverage.py --verbose
+python benchmark/content_coverage.py --verbose
 
 # With skeleton LLM enhancement (needs API key)
-ANTHROPIC_API_KEY=sk-ant-... python benchmark/docgraph_coverage.py --verbose
+ANTHROPIC_API_KEY=sk-ant-... python benchmark/content_coverage.py --verbose
 
 # JSON output for CI
-python benchmark/docgraph_coverage.py --json results/coverage.json
+python benchmark/content_coverage.py --json results/coverage.json
 
 # Custom target
-python benchmark/docgraph_coverage.py --target 90
+python benchmark/content_coverage.py --target 90
 ```
 
 ### Skill directories
 
-By default, `benchmark/docgraph_coverage.py` reads skills from `./.agents/skills/`. Override with:
+By default, `benchmark/content_coverage.py` reads skills from `./.agents/skills/`. Override with:
 - `DOCGRAPH_SKILLS_DIR` — path to the skills directory to analyze

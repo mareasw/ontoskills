@@ -82,7 +82,7 @@ def _serialize_section_tree(
     content_extraction,
     make_bnode,
 ) -> None:
-    """Serialize the DocGraph section tree to RDF triples."""
+    """Serialize the section tree to RDF triples."""
     oc = get_oc_namespace()
 
     def _serialize_section(section, parent_uri, is_subsection=False, section_ctx="root"):
@@ -476,7 +476,7 @@ def serialize_skill(
     if content_extraction is None:
         content_extraction = getattr(skill, 'content_extraction', None)
 
-    # === DocGraph Serialization (section tree OR flat lists, never both) ===
+    # === Section tree OR flat lists serialization, never both ===
     if content_extraction and content_extraction.sections:
         _serialize_section_tree(graph, skill_uri, content_extraction, make_bnode)
     elif content_extraction:

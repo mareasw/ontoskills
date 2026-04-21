@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""DocGraph coverage benchmark — line-level metric against real skills.
+"""Content coverage benchmark — line-level metric against real skills.
 
 Measures how much of each SKILL.md is captured as typed RDF nodes.
 Target: ≥95% line-level coverage.
 
 Usage:
-    python benchmark/docgraph_coverage.py --verbose
-    python benchmark/docgraph_coverage.py --json results.json
-    python benchmark/docgraph_coverage.py --target 95
+    python benchmark/content_coverage.py --verbose
+    python benchmark/content_coverage.py --json results.json
+    python benchmark/content_coverage.py --target 95
 """
 
 import argparse
@@ -107,7 +107,7 @@ def run_benchmark(target=95.0, verbose=False, json_output=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="DocGraph coverage benchmark")
+    parser = argparse.ArgumentParser(description="Content coverage benchmark")
     parser.add_argument("--verbose", "-v", action="store_true", help="Per-skill report")
     parser.add_argument("--json", dest="json_output", help="Write results to JSON file")
     parser.add_argument("--target", type=float, default=95.0, help="Coverage target %% (default: 95)")

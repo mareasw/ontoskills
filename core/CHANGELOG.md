@@ -26,7 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Parallel compile workers** — Configurable retry mechanism and parallel LLM extraction workers
 - **Direct content injection** — Skip tool-use discovery phase, inject content directly to LLM
 - **`ontocore lint` CLI command** — Run structural lint checks on compiled TTL files with Rich table output, `--errors-only` and `--json` flags
-- **DocGraph: Ontological DOM** — Every markdown element (sections, paragraphs, bullet lists, blockquotes) becomes a typed RDF node in a tree structure
+- **Content Extraction** — Every markdown element (sections, paragraphs, bullet lists, blockquotes) becomes a typed RDF node in a tree structure
 - **`oc:Section`** — Document sections with title, level, order, nested subsections, and typed content
 - **`oc:Paragraph`** — Free-form text preserving bold, links, inline code
 - **`oc:BulletList` / `oc:BulletItem`** — Unordered list extraction with item ordering
@@ -34,7 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Content tree serialization** — Section tree walks produce RDF triples with `oc:hasSection`, `oc:hasSubsection`, `oc:hasContent`
 - **SHACL shapes** for Section, Paragraph, BulletList, BulletItem, BlockQuote validation
 - **≥80% markdown coverage** — up from ~50% with structural blocks alone
-- **DocGraph v2: Skeleton & Hydration** — LLM-assisted document tree building with deterministic byte-perfect content extraction via pointer-based architecture (Phase 1a flat extraction → Phase 1b LLM skeleton → Phase 1c hydration)
+- **Skeleton & Hydration** — LLM-assisted document tree building with deterministic byte-perfect content extraction via pointer-based architecture (Phase 1a flat extraction → Phase 1b LLM skeleton → Phase 1c hydration)
 - **`oc:HTMLBlock`** — Raw HTML blocks from markdown extracted as typed RDF nodes
 - **`oc:FrontmatterBlock`** — YAML frontmatter extracted as typed nodes with parsed properties
 - **`FlatBlock` / `DocumentSkeleton`** — Pointer-based models: Phase 1a extracts flat blocks with unique IDs, Phase 1b LLM arranges IDs into tree, Phase 1c Python hydrates with real content

@@ -268,7 +268,7 @@ Use the index number to match your annotation to the correct block.
 
 
 # ============================================================================
-# DocGraph v2: Skeleton Building Prompt (Phase 1b)
+# Skeleton Building Prompt (Phase 1b)
 # ============================================================================
 
 SKELETON_SYSTEM_PROMPT = """You are a Document Structure Analyst. You receive a list of content blocks extracted from a markdown document, each with a unique block_id. Your task is to arrange these block_ids into a hierarchical tree structure.

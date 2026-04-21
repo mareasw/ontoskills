@@ -1,7 +1,7 @@
 """
-DocGraph Content Parser.
+Content Parser.
 
-Transforms markdown into a section tree (DocGraph) where every element
+Transforms markdown into a section tree where every element
 is a typed content block within its section context. Uses markdown-it-py
 for deterministic, CommonMark-compliant tokenization.
 
