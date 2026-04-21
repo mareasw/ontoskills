@@ -180,6 +180,7 @@ pub struct SkillContextResult {
     pub skill: SkillDetails,
     pub payload: PayloadInfo,
     pub knowledge_nodes: Vec<KnowledgeNodeInfo>,
+    pub sections: Vec<SectionTitle>,
     pub include_inherited_knowledge: bool,
 }
 
@@ -486,11 +487,13 @@ impl Catalog {
         let skill = self.get_skill(skill_id)?;
         let payload = self.get_skill_payload(skill_id)?;
         let knowledge_nodes = self.get_knowledge_nodes(skill_id, include_inherited_knowledge)?;
+        let sections = self.get_section_titles(skill_id).unwrap_or_default();
 
         Ok(SkillContextResult {
             skill,
             payload,
             knowledge_nodes,
+            sections,
             include_inherited_knowledge,
         })
     }
@@ -2249,6 +2252,18 @@ oc:skill_xlsx_local a oc:Skill, oc:ExecutableSkill ;
                 .iter()
                 .any(|node| node.kind == "heuristic" && !node.inherited)
         );
+    }
+
+    #[test]
+    fn skill_context_includes_sections() {
+        let dir = tempdir().unwrap();
+        write_test_ontology(dir.path());
+        let catalog = Catalog::load(dir.path()).unwrap();
+
+        let context = catalog.get_skill_context("pdf-generator", true).unwrap();
+        assert_eq!(context.sections.len(), 3);
+        assert_eq!(context.sections[0].title, "Overview");
+        assert_eq!(context.sections[2].title, "Advanced Options");
     }
 
     #[test]
