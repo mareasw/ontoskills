@@ -184,6 +184,15 @@ pub struct SkillContextResult {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct SectionTitle {
+    pub title: String,
+    pub level: i64,
+    pub order: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_title: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct PlanStep {
     pub skill_id: String,
     pub purpose: String,
@@ -1024,6 +1033,50 @@ impl Catalog {
         }
 
         Ok(by_uri.into_values().collect())
+    }
+
+    pub fn get_section_titles(
+        &self,
+        skill_id: &str,
+    ) -> Result<Vec<SectionTitle>, CatalogError> {
+        validate_skill_id(skill_id)?;
+        let record = self.resolve_skill_reference(skill_id)?;
+        let skill_uri = &record.uri;
+
+        let query = format!(
+            r#"
+        PREFIX oc: <https://ontoskills.sh/ontology#>
+        SELECT ?title ?level ?order ?parent_title
+        WHERE {{
+            {{
+                <{skill_uri}> oc:hasSection ?section .
+                BIND("" AS ?parent_title)
+            }}
+            UNION
+            {{
+                <{skill_uri}> oc:hasSection/oc:hasSubsection* ?section .
+                ?parent oc:hasSubsection ?section .
+                ?parent oc:sectionTitle ?parent_title .
+            }}
+            ?section oc:sectionTitle ?title ;
+                     oc:sectionLevel ?level ;
+                     oc:sectionOrder ?order .
+        }}
+        ORDER BY ?parent_title ?order ?title
+        "#
+        );
+
+        let mut titles = Vec::new();
+        for row in self.select_rows(&query)? {
+            let parent = row.optional_literal("parent_title");
+            titles.push(SectionTitle {
+                title: row.required_literal("title")?,
+                level: row.optional_i64("level").unwrap_or(0),
+                order: row.optional_i64("order").unwrap_or(0),
+                parent_title: if parent.as_deref() == Some("") { None } else { parent },
+            });
+        }
+        Ok(titles)
     }
 
     fn build_plan_for_skill_iterative(
@@ -1974,6 +2027,33 @@ oc:kn_pdf a oc:Heuristic ;
     oc:directiveContent "Prefer direct generation when possible" ;
     oc:hasRationale "Fewer steps reduce risk" ;
     oc:appliesToContext "document generation" .
+
+oc:skill_pdf oc:hasSection _:s1 .
+_:s1 a oc:Section ;
+    oc:sectionTitle "Overview" ;
+    oc:sectionLevel 2 ;
+    oc:sectionOrder 1 ;
+    oc:hasContent _:p1 .
+_:p1 a oc:Paragraph ;
+    oc:blockType "paragraph" ;
+    oc:textContent "This skill generates PDF files." ;
+    oc:contentOrder 1 .
+
+oc:skill_pdf oc:hasSection _:s2 .
+_:s2 a oc:Section ;
+    oc:sectionTitle "Configuration" ;
+    oc:sectionLevel 2 ;
+    oc:sectionOrder 2 ;
+    oc:hasSubsection _:sub1 .
+_:sub1 a oc:Section ;
+    oc:sectionTitle "Advanced Options" ;
+    oc:sectionLevel 3 ;
+    oc:sectionOrder 1 ;
+    oc:hasContent _:p2 .
+_:p2 a oc:Paragraph ;
+    oc:blockType "paragraph" ;
+    oc:textContent "Set page size to A4." ;
+    oc:contentOrder 1 .
 "#,
             base = DEFAULT_BASE_URI
         );
@@ -2261,5 +2341,23 @@ oc:skill_xlsx_local a oc:Skill, oc:ExecutableSkill ;
         assert_eq!(preferred.trust_tier, "local");
         assert_eq!(imported.qualified_id, "marea/office/xlsx");
         assert_eq!(imported.trust_tier, "verified");
+    }
+
+    #[test]
+    fn get_section_titles_returns_hierarchy() {
+        let dir = tempdir().unwrap();
+        write_test_ontology(dir.path());
+        let catalog = Catalog::load(dir.path()).unwrap();
+
+        let titles = catalog.get_section_titles("pdf-generator").unwrap();
+        assert_eq!(titles.len(), 3);
+        assert_eq!(titles[0].title, "Overview");
+        assert_eq!(titles[0].level, 2);
+        assert_eq!(titles[0].parent_title, None);
+        assert_eq!(titles[1].title, "Configuration");
+        assert_eq!(titles[1].parent_title, None);
+        assert_eq!(titles[2].title, "Advanced Options");
+        assert_eq!(titles[2].level, 3);
+        assert_eq!(titles[2].parent_title, Some("Configuration".to_string()));
     }
 }
