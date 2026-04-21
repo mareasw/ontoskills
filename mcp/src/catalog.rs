@@ -194,6 +194,16 @@ pub struct SectionTitle {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct SkillContentResult {
+    pub skill_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub section: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level: Option<i64>,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct PlanStep {
     pub skill_id: String,
     pub purpose: String,
@@ -1038,6 +1048,39 @@ impl Catalog {
         Ok(by_uri.into_values().collect())
     }
 
+    fn reconstruct_block(&self, row: &QueryRow, block_type: &str) -> String {
+        match block_type {
+            "paragraph" => row.optional_literal("textContent").unwrap_or_default(),
+            "code_block" => {
+                let lang = row.optional_literal("codeLanguage").unwrap_or_default();
+                let code = row.optional_literal("codeContent").unwrap_or_default();
+                format!("```{lang}\n{code}\n```")
+            }
+            "blockquote" => {
+                let text = row.optional_literal("quoteContent").unwrap_or_default();
+                let attribution = row.optional_literal("quoteAttribution");
+                match attribution {
+                    Some(attr) => format!("> {text}\n> — {attr}"),
+                    None => format!("> {text}"),
+                }
+            }
+            "table" => row.optional_literal("tableMarkdown").unwrap_or_default(),
+            "flowchart" => {
+                let chart_type = row.optional_literal("flowchartType").unwrap_or_else(|| "text".to_string());
+                let source = row.optional_literal("flowchartSource").unwrap_or_default();
+                format!("```{chart_type}\n{source}\n```")
+            }
+            "template" => row.optional_literal("templateContent").unwrap_or_default(),
+            "html_block" => row.optional_literal("htmlContent").unwrap_or_default(),
+            "frontmatter" => {
+                let yaml = row.optional_literal("rawYaml").unwrap_or_default();
+                format!("---\n{yaml}\n---")
+            }
+            // bullet_list and ordered_procedure need sub-queries — handled in Task 4
+            _ => String::new(),
+        }
+    }
+
     pub fn get_section_titles(
         &self,
         skill_id: &str,
@@ -1080,6 +1123,129 @@ impl Catalog {
             });
         }
         Ok(titles)
+    }
+
+    pub fn get_section_content(
+        &self,
+        skill_id: &str,
+        section_title: Option<&str>,
+    ) -> Result<SkillContentResult, CatalogError> {
+        validate_skill_id(skill_id)?;
+        let record = self.resolve_skill_reference(skill_id)?;
+        let skill_uri = &record.uri;
+
+        // No section specified — return TOC as text
+        let Some(title) = section_title else {
+            let titles = self.get_section_titles(skill_id)?;
+            if titles.is_empty() {
+                return Ok(SkillContentResult {
+                    skill_id: skill_id.to_string(),
+                    section: None,
+                    level: None,
+                    content: "This skill has no documented sections.".to_string(),
+                });
+            }
+            let mut lines = Vec::new();
+            for st in &titles {
+                let prefix = "#".repeat(st.level as usize);
+                let indent = if st.parent_title.is_some() { "  " } else { "" };
+                lines.push(format!("{indent}{prefix} {}", st.title));
+            }
+            return Ok(SkillContentResult {
+                skill_id: skill_id.to_string(),
+                section: None,
+                level: None,
+                content: lines.join("\n"),
+            });
+        };
+
+        // Section specified — query content blocks with subsections
+        let query = format!(
+            r#"
+        PREFIX oc: <https://ontoskills.sh/ontology#>
+        PREFIX dcterms: <http://purl.org/dc/terms/>
+        SELECT ?secTitle ?secLevel ?block ?blockType ?contentOrder
+               ?textContent ?codeContent ?codeLanguage
+               ?tableMarkdown ?quoteContent ?quoteAttribution
+               ?flowchartSource ?flowchartType
+               ?templateContent ?htmlContent ?rawYaml
+        WHERE {{
+            <{skill_uri}> oc:hasSection ?root_section .
+            ?root_section oc:sectionTitle ?root_title .
+            FILTER(?root_title = "{title}")
+            ?root_section oc:hasSubsection* ?section .
+            ?section oc:sectionTitle ?secTitle ;
+                     oc:sectionLevel ?secLevel .
+            OPTIONAL {{
+                ?section oc:hasContent ?block .
+                ?block oc:blockType ?blockType ;
+                       oc:contentOrder ?contentOrder .
+                OPTIONAL {{ ?block oc:textContent ?textContent }}
+                OPTIONAL {{ ?block oc:codeContent ?codeContent }}
+                OPTIONAL {{ ?block oc:codeLanguage ?codeLanguage }}
+                OPTIONAL {{ ?block oc:tableMarkdown ?tableMarkdown }}
+                OPTIONAL {{ ?block oc:quoteContent ?quoteContent }}
+                OPTIONAL {{ ?block oc:quoteAttribution ?quoteAttribution }}
+                OPTIONAL {{ ?block oc:flowchartSource ?flowchartSource }}
+                OPTIONAL {{ ?block oc:flowchartType ?flowchartType }}
+                OPTIONAL {{ ?block oc:templateContent ?templateContent }}
+                OPTIONAL {{ ?block oc:htmlContent ?htmlContent }}
+                OPTIONAL {{ ?block oc:rawYaml ?rawYaml }}
+            }}
+        }}
+        ORDER BY ?secLevel ?secTitle ?contentOrder
+        "#
+        );
+
+        let rows = self.select_rows(&query)?;
+        if rows.is_empty() {
+            let titles = self.get_section_titles(skill_id)?;
+            let available: Vec<String> = titles.iter().map(|t| t.title.clone()).collect();
+            return Err(CatalogError::InvalidInput(format!(
+                "Section '{}' not found. Available sections: {}",
+                title,
+                available.join(", ")
+            )));
+        }
+
+        let mut content_parts: Vec<String> = Vec::new();
+        let mut current_section = String::new();
+        let mut root_level: Option<i64> = None;
+
+        for row in &rows {
+            let sec_title = row.optional_literal("secTitle").unwrap_or_default();
+            let sec_level = row.optional_i64("secLevel").unwrap_or(0);
+
+            if root_level.is_none() {
+                root_level = Some(sec_level);
+            }
+
+            // New section header (skip root, render subsections)
+            if sec_title != current_section {
+                current_section = sec_title.clone();
+                if root_level != Some(sec_level) {
+                    let hashes = "#".repeat(sec_level as usize);
+                    content_parts.push(format!("\n{hashes} {sec_title}\n"));
+                }
+            }
+
+            // Reconstruct block content
+            if let Some(bt) = row.optional_literal("blockType") {
+                let reconstructed = self.reconstruct_block(row, &bt);
+                if !reconstructed.is_empty() {
+                    content_parts.push(reconstructed);
+                }
+            }
+        }
+
+        let content = content_parts.join("\n\n").trim().to_string();
+
+        Ok(SkillContentResult {
+            skill_id: skill_id.to_string(),
+            section: Some(title.to_string()),
+            level: root_level,
+            content,
+        })
     }
 
     fn build_plan_for_skill_iterative(
@@ -2374,5 +2540,55 @@ oc:skill_xlsx_local a oc:Skill, oc:ExecutableSkill ;
         assert_eq!(titles[2].title, "Advanced Options");
         assert_eq!(titles[2].level, 3);
         assert_eq!(titles[2].parent_title, Some("Configuration".to_string()));
+    }
+
+    #[test]
+    fn get_section_content_returns_paragraph() {
+        let dir = tempdir().unwrap();
+        write_test_ontology(dir.path());
+        let catalog = Catalog::load(dir.path()).unwrap();
+
+        let result = catalog.get_section_content("pdf-generator", Some("Overview")).unwrap();
+        assert_eq!(result.section, Some("Overview".to_string()));
+        assert_eq!(result.level, Some(2));
+        assert!(result.content.contains("This skill generates PDF files."));
+    }
+
+    #[test]
+    fn get_section_content_includes_subsections() {
+        let dir = tempdir().unwrap();
+        write_test_ontology(dir.path());
+        let catalog = Catalog::load(dir.path()).unwrap();
+
+        let result = catalog.get_section_content("pdf-generator", Some("Configuration")).unwrap();
+        assert_eq!(result.section, Some("Configuration".to_string()));
+        assert!(result.content.contains("Advanced Options"));
+        assert!(result.content.contains("Set page size to A4."));
+    }
+
+    #[test]
+    fn get_section_content_toc_without_section() {
+        let dir = tempdir().unwrap();
+        write_test_ontology(dir.path());
+        let catalog = Catalog::load(dir.path()).unwrap();
+
+        let result = catalog.get_section_content("pdf-generator", None).unwrap();
+        assert!(result.section.is_none());
+        assert!(result.content.contains("Overview"));
+        assert!(result.content.contains("Configuration"));
+        assert!(result.content.contains("Advanced Options"));
+    }
+
+    #[test]
+    fn get_section_content_section_not_found() {
+        let dir = tempdir().unwrap();
+        write_test_ontology(dir.path());
+        let catalog = Catalog::load(dir.path()).unwrap();
+
+        let result = catalog.get_section_content("pdf-generator", Some("Nonexistent"));
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("not found"));
+        assert!(msg.contains("Overview"));
     }
 }
