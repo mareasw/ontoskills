@@ -386,25 +386,13 @@ def _add_operational_node_types(g: Graph, oc: Namespace) -> None:
         g.add((oc[node_type], RDFS.label, Literal(node_type)))
 
     # ========== Operational Node Properties ==========
+    # These properties already exist from content block definitions (codeLanguage,
+    # stepOrder, templateVariables). We only add comments for the operational context.
+    # No RDFS.domain re-declaration to avoid conflicting domain assertions.
 
-    # oc:codeLanguage — programming language of a CodePattern
-    g.add((oc.codeLanguage, RDF.type, OWL.DatatypeProperty))
-    g.add((oc.codeLanguage, RDFS.domain, oc.KnowledgeNode))
-    g.add((oc.codeLanguage, RDFS.label, Literal("code language")))
-    g.add((oc.codeLanguage, RDFS.comment, Literal("Programming language of a CodePattern node")))
-
-    # oc:stepOrder — position of a Procedure in sequence
-    g.add((oc.stepOrder, RDF.type, OWL.DatatypeProperty))
-    g.add((oc.stepOrder, RDFS.domain, oc.KnowledgeNode))
-    g.add((oc.stepOrder, RDFS.range, XSD.integer))
-    g.add((oc.stepOrder, RDFS.label, Literal("step order")))
-    g.add((oc.stepOrder, RDFS.comment, Literal("Position of a Procedure node in sequence")))
-
-    # oc:templateVariables — variable placeholders in an OutputFormat
-    g.add((oc.templateVariables, RDF.type, OWL.DatatypeProperty))
-    g.add((oc.templateVariables, RDFS.domain, oc.KnowledgeNode))
-    g.add((oc.templateVariables, RDFS.label, Literal("template variables")))
-    g.add((oc.templateVariables, RDFS.comment, Literal("Variable placeholders in an OutputFormat node")))
+    g.add((oc.codeLanguage, RDFS.comment, Literal("Programming language of a CodePattern node (also used for code blocks)")))
+    g.add((oc.stepOrder, RDFS.comment, Literal("Position of a Procedure node in sequence (also used for workflow steps)")))
+    g.add((oc.templateVariables, RDFS.comment, Literal("Variable placeholders in an OutputFormat node (also used for templates)")))
 
 
 def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
@@ -500,11 +488,11 @@ def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
 
     # ========== Knowledge Node Foundation ==========
 
-    # oc:KnowledgeNode - Base class for epistemic knowledge
+    # oc:KnowledgeNode - Base class for epistemic and operational knowledge
     g.add((oc.KnowledgeNode, RDF.type, OWL.Class))
     g.add((oc.KnowledgeNode, RDFS.label, Literal("Knowledge Node")))
     g.add((oc.KnowledgeNode, RDFS.comment, Literal(
-        "Epistemic knowledge imparted by a skill to an agent"
+        "Knowledge imparted by a skill to an agent — epistemic (rules, constraints) or operational (procedures, code patterns)"
     )))
 
     # oc:impartsKnowledge (ObjectProperty) - Skill → KnowledgeNode
@@ -513,7 +501,7 @@ def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
     g.add((oc.impartsKnowledge, RDFS.range, oc.KnowledgeNode))
     g.add((oc.impartsKnowledge, RDFS.label, Literal("imparts knowledge")))
     g.add((oc.impartsKnowledge, RDFS.comment, Literal(
-        "Links a skill to epistemic knowledge it imparts to the agent"
+        "Links a skill to knowledge it imparts to the agent"
     )))
 
     # oc:directiveContent (DatatypeProperty)
