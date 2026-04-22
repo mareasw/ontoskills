@@ -27,7 +27,7 @@ def _env_path(name, fallback):
     return Path(value).expanduser() if value else Path(fallback)
 
 
-_SKILLS_DIR = _env_path("DOCGRAPH_SKILLS_DIR", str(
+_SKILLS_DIR = _env_path("ONTOSKILLS_BENCH_DIR", str(
     Path(__file__).resolve().parent.parent / ".agents" / "skills"))
 
 
@@ -78,7 +78,7 @@ def run_benchmark(target=95.0, verbose=False, json_output=None):
 
     if verbose:
         print(f"\n{'=' * 70}")
-        print(f"DOCGRAPH COVERAGE — {len(results)} skills")
+        print(f"CONTENT COVERAGE — {len(results)} skills")
         print(f"{'=' * 70}")
         has_api_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
         print(f"  Skeleton LLM: {'ACTIVE' if has_api_key else 'INACTIVE (set ANTHROPIC_API_KEY)'}")
@@ -115,7 +115,7 @@ def main():
 
     if not _SKILLS_DIR.is_dir():
         print(f"Error: Skills directory not found: {_SKILLS_DIR}")
-        print(f"Set DOCGRAPH_SKILLS_DIR to override.")
+        print(f"Set ONTOSKILLS_BENCH_DIR to override.")
         sys.exit(1)
 
     sys.exit(run_benchmark(target=args.target, verbose=args.verbose, json_output=args.json_output))

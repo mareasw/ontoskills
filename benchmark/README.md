@@ -112,4 +112,4 @@ python benchmark/content_coverage.py --target 90
 ### Skill directories
 
 By default, `benchmark/content_coverage.py` reads skills from `./.agents/skills/`. Override with:
-- `DOCGRAPH_SKILLS_DIR` — path to the skills directory to analyze
+- `ONTOSKILLS_BENCH_DIR` — path to the skills directory to analyze
