@@ -156,7 +156,8 @@ def _try_skeleton_tree(blocks: list[FlatBlock], markdown: str) -> list[Section] 
         blocks_index = {b.block_id: b for b in blocks}
 
         import anthropic
-        model = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
+        from compiler.config import ANTHROPIC_MODEL
+        model = os.environ.get("ANTHROPIC_MODEL", ANTHROPIC_MODEL)
         client = anthropic.Anthropic(
             api_key=api_key,
             base_url=os.environ.get("ANTHROPIC_BASE_URL"),

@@ -406,18 +406,14 @@ def hydrate_skeleton(
             )
             _hydrate_children(section, node, blocks_index)
             sections.append(section)
-        elif block.block_type == "frontmatter":
-            # Frontmatter as preamble section
-            section = Section(title="", level=0, order=0)
-            section.content.append(block.content)
-            _hydrate_children(section, node, blocks_index)
-            sections.append(section)
         else:
-            # Non-heading root — preamble section gets order=0
-            section = Section(title="", level=0, order=0)
-            section.content.append(block.content)
-            _hydrate_children(section, node, blocks_index)
-            sections.append(section)
+            # Non-heading root (frontmatter, paragraphs) — accumulate into single preamble
+            preamble = next((s for s in sections if s.title == "" and s.level == 0), None)
+            if preamble is None:
+                preamble = Section(title="", level=0, order=0)
+                sections.insert(0, preamble)
+            preamble.content.append(block.content)
+            _hydrate_children(preamble, node, blocks_index)
 
     return sections
 
