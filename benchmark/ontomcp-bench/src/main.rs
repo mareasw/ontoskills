@@ -133,12 +133,28 @@ fn main() -> Result<()> {
             ),
         ),
         (
-            "query_epistemic_rules",
+            "query_knowledge_nodes (epistemic)",
             format!(
                 r#"SELECT ?node ?type ?content WHERE {{
                     ?node a ?type .
                     ?node a <{oc}KnowledgeNode> .
                     ?node <{oc}directiveContent> ?content .
+                    FILTER (?type != <{oc}KnowledgeNode>)
+                    FILTER (?type != <{oc}Procedure> && ?type != <{oc}CodePattern> && ?type != <{oc}OutputFormat> && ?type != <{oc}Command> && ?type != <{oc}Prerequisite>)
+                }}"#
+            ),
+        ),
+        (
+            "query_knowledge_nodes (operational)",
+            format!(
+                r#"SELECT ?node ?type ?content ?codeLang ?stepOrd ?tmplVar WHERE {{
+                    ?node a ?type .
+                    ?node a <{oc}KnowledgeNode> .
+                    ?node <{oc}directiveContent> ?content .
+                    FILTER (?type IN (<{oc}Procedure>, <{oc}CodePattern>, <{oc}OutputFormat>, <{oc}Command>, <{oc}Prerequisite>))
+                    OPTIONAL {{ ?node <{oc}codeLanguage> ?codeLang }}
+                    OPTIONAL {{ ?node <{oc}stepOrder> ?stepOrd }}
+                    OPTIONAL {{ ?node <{oc}templateVariables> ?tmplVar }}
                 }}"#
             ),
         ),
