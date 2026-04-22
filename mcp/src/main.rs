@@ -533,15 +533,6 @@ fn handle_tool_call(
                     .map_err(public_error)?
             )
         }
-        "get_skill_content" => {
-            let skill_id = required_string(&arguments, "skill_id")?;
-            let section = optional_string(&arguments, "section");
-            json!(
-                catalog
-                    .get_section_content(skill_id, section.as_deref())
-                    .map_err(public_error)?
-            )
-        }
         _ => return Err(format!("Unknown tool: {tool_name}")),
     };
 
@@ -789,18 +780,6 @@ fn tool_definitions() -> Vec<Value> {
                     "include_inherited": { "type": "boolean", "default": true },
                     "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
                 }
-            }),
-        ),
-        tool(
-            "get_skill_content",
-            "Retrieve skill section content as reconstructed markdown. If 'section' is omitted, returns the table of contents. If 'section' is provided, returns the content of that section and all its subsections.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "skill_id": { "type": "string", "description": "Short id like 'xlsx' or qualified id like 'marea/office/xlsx'." },
-                    "section": { "type": "string", "description": "Section title to retrieve. If omitted, returns the table of contents." }
-                },
-                "required": ["skill_id"]
             }),
         ),
     ]
