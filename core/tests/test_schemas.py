@@ -241,8 +241,7 @@ def test_knowledge_node_filtering_removes_incomplete_dicts():
             knowledge_nodes=[
                 {
                     "node_type": "Standard",
-                    "directive_content": "Always validate"
-                    # Missing: applies_to_context, has_rationale
+                    # Missing: directive_content
                 }
             ]
         )
@@ -690,3 +689,55 @@ class TestContentBlockV2Models:
         from compiler.schemas import HTMLBlock, FrontmatterBlock
         assert HTMLBlock(content="x", content_order=1).block_type == "html_block"
         assert FrontmatterBlock(raw_yaml="x", content_order=0).block_type == "frontmatter"
+
+
+# ============================================================================
+# Operational Knowledge Node Tests (Dimension 11)
+# ============================================================================
+
+
+def test_operational_node_types_validate():
+    """Procedure, CodePattern, OutputFormat, Command, Prerequisite are valid node types."""
+    from compiler.schemas import KnowledgeNode
+    for node_type in ["Procedure", "CodePattern", "OutputFormat", "Command", "Prerequisite"]:
+        kn = KnowledgeNode(
+            node_type=node_type,
+            directive_content="Test directive",
+        )
+        assert kn.node_type == node_type
+
+
+def test_operational_node_fields_optional():
+    """Operational fields are optional and default to None."""
+    from compiler.schemas import KnowledgeNode
+    kn = KnowledgeNode(
+        node_type="Procedure",
+        directive_content="1. Do X 2. Do Y",
+        step_order=1,
+    )
+    assert kn.code_language is None
+    assert kn.template_variables is None
+    assert kn.step_order == 1
+
+
+def test_code_pattern_node():
+    """CodePattern with language validates."""
+    from compiler.schemas import KnowledgeNode
+    kn = KnowledgeNode(
+        node_type="CodePattern",
+        directive_content="def test_x(): assert f() == expected",
+        code_language="python",
+        applies_to_context="When writing basic TDD tests",
+    )
+    assert kn.code_language == "python"
+
+
+def test_output_format_node():
+    """OutputFormat with template variables validates."""
+    from compiler.schemas import KnowledgeNode
+    kn = KnowledgeNode(
+        node_type="OutputFormat",
+        directive_content="## Summary\n- Finding\n- Recommendation",
+        template_variables=["Finding", "Recommendation"],
+    )
+    assert kn.template_variables == ["Finding", "Recommendation"]

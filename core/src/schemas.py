@@ -52,7 +52,7 @@ class SeverityLevel(str, Enum):
     LOW = "LOW"
 
 
-# 26 concrete knowledge node types across 10 dimensions
+# 31 knowledge node types: 26 epistemic (10 dimensions) + 5 operational
 KnowledgeNodeType = Literal[
     # Dimension 1: NormativeRule
     "Standard", "AntiPattern", "Constraint",
@@ -74,20 +74,27 @@ KnowledgeNodeType = Literal[
     "ExecutionDeterminism", "DataProvenance",
     # Dimension 10: LifecycleHook
     "PreFlightCheck", "PostFlightValidation", "RollbackProcedure",
+    # Dimension 11: OperationalKnowledge
+    "Procedure", "CodePattern", "OutputFormat", "Command", "Prerequisite",
 ]
 
 
 class KnowledgeNode(BaseModel):
-    """Epistemic knowledge node extracted from a skill.
+    """Knowledge node extracted from a skill.
 
-    Each node captures a single piece of cognitive/physical/temporal
-    knowledge that the skill imparts to the agent.
+    Each node captures a single piece of knowledge — epistemic (rules,
+    constraints) or operational (procedures, code patterns) — that the
+    skill imparts to the agent.
     """
     node_type: KnowledgeNodeType
-    directive_content: str  # The actual rule/guideline
-    applies_to_context: str  # When this rule applies
-    has_rationale: str       # Why this rule exists
-    severity_level: SeverityLevel | None = None  # Optional priority
+    directive_content: str
+    applies_to_context: str | None = None
+    has_rationale: str | None = None
+    severity_level: SeverityLevel | None = None
+    # Operational fields
+    code_language: str | None = None
+    step_order: int | None = None
+    template_variables: list[str] | None = None
 
 
 class CodeAnnotation(BaseModel):
@@ -217,7 +224,7 @@ class ExtractedSkill(BaseModel):
             # - For dicts, require all fields with non-empty values
             # - Emit warning via warnings.warn() when discarding incomplete/invalid nodes
             if 'knowledge_nodes' in data and isinstance(data['knowledge_nodes'], list):
-                required_fields = {'node_type', 'directive_content', 'applies_to_context', 'has_rationale'}
+                required_fields = {'node_type', 'directive_content'}
                 filtered_nodes = []
                 for i, node in enumerate(data['knowledge_nodes']):
                     if isinstance(node, KnowledgeNode):
