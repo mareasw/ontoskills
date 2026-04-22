@@ -778,6 +778,18 @@ wheels = [
 ]
 
 [[package]]
+name = "mdit-py-plugins"
+version = "0.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markdown-it-py" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b2/fd/a756d36c0bfba5f6e39a1cdbdbfdd448dc02692467d83816dff4592a1ebc/mdit_py_plugins-0.5.0.tar.gz", hash = "sha256:f4918cb50119f50446560513a8e311d574ff6aaed72606ddae6d35716fe809c6", size = 44655, upload-time = "2025-08-11T07:25:49.083Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fb/86/dd6e5db36df29e76c7a7699123569a4a18c1623ce68d826ed96c62643cae/mdit_py_plugins-0.5.0-py3-none-any.whl", hash = "sha256:07a08422fc1936a5d26d146759e9155ea466e842f5ab2f7d2266dd084c8dab1f", size = 57205, upload-time = "2025-08-11T07:25:47.597Z" },
+]
+
+[[package]]
 name = "mdurl"
 version = "0.1.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1360,18 +1372,19 @@ wheels = [
 
 [[package]]
 name = "ontocore"
-version = "0.10.0"
+version = "0.11.0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "click" },
+    { name = "markdown-it-py" },
+    { name = "mdit-py-plugins" },
     { name = "owlrl" },
     { name = "pydantic" },
     { name = "pyshacl" },
     { name = "pyyaml" },
     { name = "rdflib" },
     { name = "rich" },
-    { name = "sentence-transformers" },
 ]
 
 [package.optional-dependencies]
@@ -1387,12 +1400,15 @@ embeddings = [
     { name = "onnxruntime", version = "1.24.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "onnxruntime", version = "1.24.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "optimum" },
+    { name = "sentence-transformers" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=0.39.0" },
     { name = "click", specifier = ">=8.1.0" },
+    { name = "markdown-it-py", specifier = ">=3.0.0" },
+    { name = "mdit-py-plugins", specifier = ">=0.4.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "onnx", marker = "extra == 'embeddings'", specifier = ">=1.15.0" },
     { name = "onnxruntime", marker = "extra == 'embeddings'", specifier = ">=1.16.0" },
@@ -1407,7 +1423,7 @@ requires-dist = [
     { name = "rdflib", specifier = ">=7.0.0" },
     { name = "rich", specifier = ">=13.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
-    { name = "sentence-transformers", specifier = ">=2.2.0" },
+    { name = "sentence-transformers", marker = "extra == 'embeddings'", specifier = ">=2.2.0" },
 ]
 provides-extras = ["dev", "embeddings"]
 

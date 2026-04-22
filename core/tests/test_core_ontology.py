@@ -509,3 +509,146 @@ class TestKnowledgeRBoxAxioms:
         # Check that the triple exists (the object will be a BNode for the list)
         assert any((oc.inheritsKnowledge, OWL.propertyChainAxiom, obj) in core_ontology
                    for obj in core_ontology.objects(oc.inheritsKnowledge, OWL.propertyChainAxiom))
+
+
+class TestContentBlockClasses:
+    """Tests for content block OWL classes and properties."""
+
+    def test_code_example_class_exists(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.CodeExample, RDF.type, OWL.Class) in graph
+
+    def test_table_class_exists(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.Table, RDF.type, OWL.Class) in graph
+
+    def test_flowchart_class_exists(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.Flowchart, RDF.type, OWL.Class) in graph
+
+    def test_template_class_exists(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.Template, RDF.type, OWL.Class) in graph
+
+    def test_has_code_example_property(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.hasCodeExample, RDF.type, OWL.ObjectProperty) in graph
+        assert (oc.hasCodeExample, RDFS.domain, oc.Skill) in graph
+        assert (oc.hasCodeExample, RDFS.range, oc.CodeExample) in graph
+
+    def test_has_table_property(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.hasTable, RDF.type, OWL.ObjectProperty) in graph
+
+    def test_has_flowchart_property(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.hasFlowchart, RDF.type, OWL.ObjectProperty) in graph
+
+    def test_has_template_property(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.hasTemplate, RDF.type, OWL.ObjectProperty) in graph
+
+    def test_code_content_datatype_property(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.codeContent, RDF.type, OWL.DatatypeProperty) in graph
+
+    def test_step_order_property(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        graph = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.stepOrder, RDF.type, OWL.DatatypeProperty) in graph
+        assert (oc.stepOrder, RDFS.domain, oc.WorkflowStep) in graph
+
+
+class TestContentModelOntology:
+    """Tests for content model classes — Section, Paragraph, BulletList, BlockQuote."""
+
+    def test_section_class_exists(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        g = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.Section, RDF.type, OWL.Class) in g
+
+    def test_section_datatype_properties(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        g = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.sectionTitle, RDF.type, OWL.DatatypeProperty) in g
+        assert (oc.sectionLevel, RDF.type, OWL.DatatypeProperty) in g
+        assert (oc.sectionOrder, RDF.type, OWL.DatatypeProperty) in g
+
+    def test_section_object_properties(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        g = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.hasSection, RDF.type, OWL.ObjectProperty) in g
+        assert (oc.hasSubsection, RDF.type, OWL.ObjectProperty) in g
+        assert (oc.hasContent, RDF.type, OWL.ObjectProperty) in g
+
+    def test_paragraph_class_and_properties(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        g = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.Paragraph, RDF.type, OWL.Class) in g
+        assert (oc.textContent, RDF.type, OWL.DatatypeProperty) in g
+        assert (oc.contentOrder, RDF.type, OWL.DatatypeProperty) in g
+
+    def test_bullet_list_class_and_properties(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        g = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.BulletList, RDF.type, OWL.Class) in g
+        assert (oc.BulletItem, RDF.type, OWL.Class) in g
+        assert (oc.hasItem, RDF.type, OWL.ObjectProperty) in g
+        assert (oc.itemText, RDF.type, OWL.DatatypeProperty) in g
+        assert (oc.itemOrder, RDF.type, OWL.DatatypeProperty) in g
+
+    def test_blockquote_class_and_properties(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        g = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.BlockQuote, RDF.type, OWL.Class) in g
+        assert (oc.quoteContent, RDF.type, OWL.DatatypeProperty) in g
+        assert (oc.quoteAttribution, RDF.type, OWL.DatatypeProperty) in g
+
+
+class TestContentBlockOntology:
+    """Tests for content block classes — HTMLBlock, FrontmatterBlock, hasChild."""
+
+    def test_html_block_class_and_properties(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        g = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.HTMLBlock, RDF.type, OWL.Class) in g
+        assert (oc.htmlContent, RDF.type, OWL.DatatypeProperty) in g
+
+    def test_frontmatter_block_class_and_properties(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        g = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.FrontmatterBlock, RDF.type, OWL.Class) in g
+        assert (oc.rawYaml, RDF.type, OWL.DatatypeProperty) in g
+
+    def test_has_child_property(self, tmp_path):
+        output_path = tmp_path / "core.ttl"
+        g = create_core_ontology(output_path)
+        oc = get_oc_namespace()
+        assert (oc.hasChild, RDF.type, OWL.ObjectProperty) in g

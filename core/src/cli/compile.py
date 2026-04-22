@@ -45,6 +45,7 @@ from compiler.exceptions import (
 from compiler.config import CORE_ONTOLOGY_FILENAME, SKILLS_DIR, OUTPUT_DIR, resolve_ontology_root, ANTHROPIC_MODEL
 from compiler.loader import scan_skill_directory, LoaderError
 from compiler.schemas import CompiledSkill
+from compiler.content_parser import extract_structural_content
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -119,6 +120,8 @@ def enrich_extracted_skill(extracted, skill_dir: Path, input_path: Path, skill_p
         extracted.depends_on = skill_registry.filter_relations(extracted.depends_on, "depends_on")
         extracted.extends = skill_registry.filter_relations(extracted.extends, "extends")
         extracted.contradicts = skill_registry.filter_relations(extracted.contradicts, "contradicts")
+    # Prevent self-referencing dependencies
+    extracted.depends_on = [d for d in extracted.depends_on if d != extracted.id]
     return extracted
 
 
@@ -617,6 +620,7 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
                 skill_registry=skill_registry,
                 preloaded_content=dir_scan.skill_md_content,
                 preloaded_file_tree=dir_scan.file_tree,
+                content_extraction=dir_scan.content_extraction,
                 _max_retries=_retries,
             )
             extracted = enrich_extracted_skill(extracted, skill_dir, input_path, skill_parent_map, skill_registry)
@@ -636,6 +640,7 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
                 **extracted.model_dump(),
                 frontmatter=dir_scan.frontmatter,
                 files=dir_scan.files,
+                content_extraction=dir_scan.content_extraction,
             )
 
             # Serialize immediately to disk (unless dry_run)
@@ -645,7 +650,8 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
                 try:
                     serialize_skill_to_module(
                         compiled, output_skill_path, output_path,
-                        qualified_id=qualified_id
+                        qualified_id=qualified_id,
+                        content_extraction=compiled.content_extraction,
                     )
                     # Generate per-skill embeddings (optional)
                     if embedding_model is not None:
@@ -714,12 +720,14 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
 
         try:
             sub_skill_content = md_file.read_text(encoding="utf-8")
+            sub_content_extraction = extract_structural_content(sub_skill_content)
             extracted = retry_extraction(
                 tool_use_loop, sub_skill_short_id,
                 skill_dir, sub_skill_hash, sub_skill_short_id,
                 parent_context=parent_context,
                 skill_registry=skill_registry,
                 preloaded_content=sub_skill_content,
+                content_extraction=sub_content_extraction,
                 _max_retries=_retries,
             )
             extracted = enrich_extracted_skill(extracted, skill_dir, input_path, skill_parent_map, skill_registry)
@@ -743,6 +751,7 @@ def compile_cmd(ctx, skill_name, input_dir, output_dir, dry_run, skip_security, 
                         qualified_id=sub_skill_qualified_id,
                         extends_parent=parent_local_id,
                         extends_parent_qualified=parent_qualified_id,
+                        content_extraction=sub_content_extraction,
                     )
                     # Generate per-skill embeddings (optional)
                     if embedding_model is not None:

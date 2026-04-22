@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 System prompts for OntoSkills extraction module.
 """
@@ -238,4 +239,99 @@ Extract input/output example pairs for pattern matching:
 - `tags`: Optional categorization
 
 Examples help agents understand expected behavior patterns.
+
+## CONTENT BLOCK ANNOTATION
+
+The skill has been pre-parsed and contains structural content blocks listed below.
+For each block, provide a brief annotation. DO NOT rewrite or summarize the content blocks.
+
+### Code Examples
+For each code block, provide:
+- purpose: What this code does or demonstrates (1 sentence)
+- context: When an agent should reference this code (e.g., "when creating slides", "always")
+
+### Tables
+For each table, provide:
+- purpose: What this table represents or helps decide (1 sentence)
+
+### Flowcharts
+For each flowchart, provide:
+- description: What decision flow or process this diagram represents (1-2 sentences)
+
+### Templates
+For each template, provide:
+- template_type: "prompt" | "output" | "boilerplate" — what kind of template this is
+
+CRITICAL: Only annotate blocks that are listed in the PRE-EXTRACTED CONTENT BLOCKS section.
+Use the index number to match your annotation to the correct block.
 """
+
+
+# ============================================================================
+# Skeleton Building Prompt (Phase 1b)
+# ============================================================================
+
+SKELETON_SYSTEM_PROMPT = """You are a Document Structure Analyst. You receive a list of content blocks extracted from a markdown document, each with a unique block_id. Your task is to arrange these block_ids into a hierarchical tree structure.
+
+Rules:
+1. Headings become sections. Nest sections by heading level (h2 contains h3, etc.)
+2. Content blocks between headings belong to the current section
+3. Frontmatter blocks go in a preamble section (block_id, no heading)
+4. HTML blocks are content blocks in their section
+5. If a block has a parent_block_id, it is a child of that list item — place it in the list_items map
+6. Return ONLY the JSON structure — no content text, only block_ids
+
+Output format:
+{
+  "sections": [
+    {
+      "block_id": "blk_X",
+      "children": [
+        { "block_id": "blk_Y", "children": [] }
+      ]
+    }
+  ],
+  "list_items": {
+    "blk_Z": [
+      { "text_block_id": "blk_Z_item_0", "children": ["blk_W"] }
+    ]
+  }
+}"""
+
+
+def build_skeleton_prompt(blocks) -> str:
+    """Build the user prompt for skeleton building from flat blocks."""
+    lines = ["Extracted blocks from markdown:"]
+    for b in blocks:
+        preview = _block_preview(b)
+        line = f"- {b.block_id} ({b.block_type}"
+        if b.block_type == "heading":
+            heading = b.content
+            line += f", level {heading.level}"
+            preview = heading.text
+        elif b.block_type == "code_block":
+            line += f", {b.content.language}"
+            preview = f"{b.content.content.count(chr(10)) + 1} lines"
+        elif b.block_type == "table":
+            preview = f"{b.content.row_count} rows"
+        elif b.block_type == "frontmatter":
+            props = b.content.properties
+            preview = ", ".join(f"{k}: {v}" for k, v in list(props.items())[:3])
+        elif b.block_type == "bullet_list":
+            preview = f"{len(b.content.items)} items"
+        elif b.block_type == "ordered_procedure":
+            preview = f"{len(b.content.items)} steps"
+        parent_info = f", parent={b.parent_block_id}" if b.parent_block_id else ""
+        line += f"{parent_info}): \"{preview[:78]}\""
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _block_preview(block) -> str:
+    """Get a short text preview for a block."""
+    c = block.content
+    if hasattr(c, "text_content"):
+        return c.text_content[:80]
+    if hasattr(c, "content"):
+        return c.content[:80]
+    return ""

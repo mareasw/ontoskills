@@ -87,6 +87,294 @@ def _add_knowledge_rbox(g: Graph, oc: Namespace) -> None:
     g.add((chain_second, RDF.rest, RDF.nil))
 
 
+def _add_extracted_block_classes(g: Graph, oc: Namespace) -> None:
+    """Add LLM-extracted content block classes (CodeExample, Table, Flowchart, Template) and their properties."""
+
+    # ========== Content Block Classes ==========
+
+    g.add((oc.CodeExample, RDF.type, OWL.Class))
+    g.add((oc.CodeExample, RDFS.subClassOf, oc.ContentBlock))
+    g.add((oc.CodeExample, RDFS.label, Literal("Code Example")))
+    g.add((oc.CodeExample, RDFS.comment, Literal(
+        "Inline code block extracted from skill markdown"
+    )))
+
+    g.add((oc.Table, RDF.type, OWL.Class))
+    g.add((oc.Table, RDFS.subClassOf, oc.ContentBlock))
+    g.add((oc.Table, RDFS.label, Literal("Table")))
+    g.add((oc.Table, RDFS.comment, Literal(
+        "Markdown table extracted from skill content"
+    )))
+
+    g.add((oc.Flowchart, RDF.type, OWL.Class))
+    g.add((oc.Flowchart, RDFS.subClassOf, oc.ContentBlock))
+    g.add((oc.Flowchart, RDFS.label, Literal("Flowchart")))
+    g.add((oc.Flowchart, RDFS.comment, Literal(
+        "Graphviz or Mermaid diagram extracted from skill content"
+    )))
+
+    g.add((oc.Template, RDF.type, OWL.Class))
+    g.add((oc.Template, RDFS.subClassOf, oc.ContentBlock))
+    g.add((oc.Template, RDFS.label, Literal("Template")))
+    g.add((oc.Template, RDFS.comment, Literal(
+        "Reusable template with variable placeholders"
+    )))
+
+    # ========== Content Block Object Properties ==========
+
+    for prop_name, range_name, label, comment in [
+        ("hasCodeExample", "CodeExample", "has code example", "Links a skill to an inline code example"),
+        ("hasTable", "Table", "has table", "Links a skill to a markdown table"),
+        ("hasFlowchart", "Flowchart", "has flowchart", "Links a skill to a flowchart diagram"),
+        ("hasTemplate", "Template", "has template", "Links a skill to a reusable template"),
+    ]:
+        prop_uri = oc[prop_name]
+        range_class = oc[range_name]
+        g.add((prop_uri, RDF.type, OWL.ObjectProperty))
+        g.add((prop_uri, RDFS.domain, oc.Skill))
+        g.add((prop_uri, RDFS.range, range_class))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+
+    # ========== CodeExample Datatype Properties ==========
+
+    for prop_name, label, comment in [
+        ("codeLanguage", "code language", "Programming language of the code block"),
+        ("codeContent", "code content", "Full source code of the inline example"),
+        ("codePurpose", "code purpose", "LLM annotation: what this code does"),
+        ("codeContext", "code context", "LLM annotation: when to reference this code"),
+        ("sourceLocation", "source location", "Line range in original markdown"),
+    ]:
+        prop_uri = oc[prop_name]
+        g.add((prop_uri, RDF.type, OWL.DatatypeProperty))
+        g.add((prop_uri, RDFS.domain, oc.CodeExample))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+
+    # ========== Table Datatype Properties ==========
+
+    for prop_name, label, comment, has_range in [
+        ("tableCaption", "table caption", "Caption or title of the table", False),
+        ("tableMarkdown", "table markdown", "Original markdown source of the table", False),
+        ("tablePurpose", "table purpose", "LLM annotation: what this table represents", False),
+        ("rowCount", "row count", "Number of data rows in the table", True),
+    ]:
+        prop_uri = oc[prop_name]
+        g.add((prop_uri, RDF.type, OWL.DatatypeProperty))
+        g.add((prop_uri, RDFS.domain, oc.Table))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+        if has_range:
+            g.add((prop_uri, RDFS.range, XSD.integer))
+
+    # ========== Flowchart Datatype Properties ==========
+
+    for prop_name, label, comment in [
+        ("flowchartSource", "flowchart source", "Original graphviz or mermaid source"),
+        ("flowchartType", "flowchart type", "Diagram type: graphviz or mermaid"),
+        ("flowchartDescription", "flowchart description", "LLM annotation: what decision flow this represents"),
+    ]:
+        prop_uri = oc[prop_name]
+        g.add((prop_uri, RDF.type, OWL.DatatypeProperty))
+        g.add((prop_uri, RDFS.domain, oc.Flowchart))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+
+    # ========== Template Datatype Properties ==========
+
+    for prop_name, label, comment in [
+        ("templateContent", "template content", "Full template source text"),
+        ("templateType", "template type", "Kind of template: prompt, output, or boilerplate"),
+    ]:
+        prop_uri = oc[prop_name]
+        g.add((prop_uri, RDF.type, OWL.DatatypeProperty))
+        g.add((prop_uri, RDFS.domain, oc.Template))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+
+    g.add((oc.templateVariables, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.templateVariables, RDFS.domain, oc.Template))
+    g.add((oc.templateVariables, RDFS.label, Literal("template variables")))
+    g.add((oc.templateVariables, RDFS.comment, Literal(
+        "Variable placeholder name (repeatable)"
+    )))
+
+    # ========== stepOrder for WorkflowStep ==========
+
+    g.add((oc.stepOrder, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.stepOrder, RDFS.domain, oc.WorkflowStep))
+    g.add((oc.stepOrder, RDFS.range, XSD.integer))
+    g.add((oc.stepOrder, RDFS.label, Literal("step order")))
+    g.add((oc.stepOrder, RDFS.comment, Literal(
+        "Position of this step in a linear procedure (1-based)"
+    )))
+
+
+def _add_content_model_classes(g: Graph, oc: Namespace) -> None:
+    """Add content model classes for document structure preservation."""
+
+    # ========== ContentBlock superclass ==========
+    g.add((oc.ContentBlock, RDF.type, OWL.Class))
+    g.add((oc.ContentBlock, RDFS.label, Literal("Content Block")))
+    g.add((oc.ContentBlock, RDFS.comment, Literal(
+        "Abstract superclass for all typed content blocks in a document"
+    )))
+
+    g.add((oc.blockType, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.blockType, RDFS.domain, oc.ContentBlock))
+    g.add((oc.blockType, RDFS.range, XSD.string))
+    g.add((oc.blockType, RDFS.label, Literal("block type")))
+    g.add((oc.blockType, RDFS.comment, Literal(
+        "Discriminator string matching the Pydantic block_type literal"
+    )))
+
+    # ========== Section (container, not a ContentBlock) ==========
+    g.add((oc.Section, RDF.type, OWL.Class))
+    g.add((oc.Section, RDFS.label, Literal("Section")))
+    g.add((oc.Section, RDFS.comment, Literal(
+        "A section of the document, identified by a header"
+    )))
+
+    for prop_name, label, comment, has_range in [
+        ("sectionTitle", "section title", "Header text of the section", False),
+        ("sectionLevel", "section level", "Header level 1-6", True),
+        ("sectionOrder", "section order", "Position among sibling sections", True),
+    ]:
+        prop_uri = oc[prop_name]
+        g.add((prop_uri, RDF.type, OWL.DatatypeProperty))
+        g.add((prop_uri, RDFS.domain, oc.Section))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+        if has_range:
+            g.add((prop_uri, RDFS.range, XSD.integer))
+
+    # ========== Paragraph ==========
+    g.add((oc.Paragraph, RDF.type, OWL.Class))
+    g.add((oc.Paragraph, RDFS.subClassOf, oc.ContentBlock))
+    g.add((oc.Paragraph, RDFS.label, Literal("Paragraph")))
+    g.add((oc.Paragraph, RDFS.comment, Literal(
+        "Free-form text paragraph preserving inline formatting"
+    )))
+
+    for prop_name, label, comment, has_range in [
+        ("textContent", "text content", "Raw markdown text of the paragraph", False),
+    ]:
+        prop_uri = oc[prop_name]
+        g.add((prop_uri, RDF.type, OWL.DatatypeProperty))
+        g.add((prop_uri, RDFS.domain, oc.Paragraph))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+        if has_range:
+            g.add((prop_uri, RDFS.range, XSD.integer))
+
+    # contentOrder — no domain restriction because it applies to all ContentBlock subtypes
+    # (Paragraph, BulletList, BlockQuote, CodeExample, Table, Flowchart, Template, Workflow,
+    # HTMLBlock, FrontmatterBlock). A union domain would be correct but adds OWL complexity
+    # for no practical gain; SHACL shapes enforce per-type constraints instead.
+    g.add((oc.contentOrder, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.contentOrder, RDFS.label, Literal("content order")))
+    g.add((oc.contentOrder, RDFS.comment, Literal("Position within parent section")))
+    g.add((oc.contentOrder, RDFS.range, XSD.integer))
+
+    # ========== BulletList + BulletItem ==========
+    g.add((oc.BulletList, RDF.type, OWL.Class))
+    g.add((oc.BulletList, RDFS.subClassOf, oc.ContentBlock))
+    g.add((oc.BulletList, RDFS.label, Literal("Bullet List")))
+    g.add((oc.BulletList, RDFS.comment, Literal(
+        "Unordered list of items"
+    )))
+
+    g.add((oc.BulletItem, RDF.type, OWL.Class))
+    g.add((oc.BulletItem, RDFS.subClassOf, oc.ContentBlock))
+    g.add((oc.BulletItem, RDFS.label, Literal("Bullet Item")))
+    g.add((oc.BulletItem, RDFS.comment, Literal(
+        "Single item in a bullet list"
+    )))
+
+    for prop_name, label, comment, has_range in [
+        ("itemText", "item text", "Text content of the bullet item", False),
+        ("itemOrder", "item order", "Position within the bullet list", True),
+    ]:
+        prop_uri = oc[prop_name]
+        g.add((prop_uri, RDF.type, OWL.DatatypeProperty))
+        g.add((prop_uri, RDFS.domain, oc.BulletItem))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+        if has_range:
+            g.add((prop_uri, RDFS.range, XSD.integer))
+
+    # ========== BlockQuote ==========
+    g.add((oc.BlockQuote, RDF.type, OWL.Class))
+    g.add((oc.BlockQuote, RDFS.subClassOf, oc.ContentBlock))
+    g.add((oc.BlockQuote, RDFS.label, Literal("Block Quote")))
+    g.add((oc.BlockQuote, RDFS.comment, Literal(
+        "Blockquote from markdown, optionally with attribution"
+    )))
+
+    for prop_name, label, comment in [
+        ("quoteContent", "quote content", "Full text of the blockquote"),
+        ("quoteAttribution", "quote attribution", "Optional source/attribution of the quote"),
+    ]:
+        prop_uri = oc[prop_name]
+        g.add((prop_uri, RDF.type, OWL.DatatypeProperty))
+        g.add((prop_uri, RDFS.domain, oc.BlockQuote))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+
+    # ========== Content Model Object Properties ==========
+    for prop_name, domain, range_cls, label, comment in [
+        ("hasSection", oc.Skill, oc.Section, "has section", "Top-level section of a skill document"),
+        ("hasSubsection", oc.Section, oc.Section, "has subsection", "Nested section within a section"),
+        ("hasContent", oc.Section, OWL.Thing, "has content", "Content block within a section"),
+        ("hasItem", oc.BulletList, oc.BulletItem, "has item", "Item in a bullet list"),
+    ]:
+        prop_uri = oc[prop_name]
+        g.add((prop_uri, RDF.type, OWL.ObjectProperty))
+        g.add((prop_uri, RDFS.domain, domain))
+        if range_cls is not None:
+            g.add((prop_uri, RDFS.range, range_cls))
+        g.add((prop_uri, RDFS.label, Literal(label)))
+        g.add((prop_uri, RDFS.comment, Literal(comment)))
+
+
+def _add_content_block_classes(g: Graph, oc: Namespace) -> None:
+    """Add additional content block classes: HTMLBlock, FrontmatterBlock, hasChild."""
+
+    # ========== HTMLBlock ==========
+    g.add((oc.HTMLBlock, RDF.type, OWL.Class))
+    g.add((oc.HTMLBlock, RDFS.subClassOf, oc.ContentBlock))
+    g.add((oc.HTMLBlock, RDFS.label, Literal("HTML Block")))
+    g.add((oc.HTMLBlock, RDFS.comment, Literal(
+        "Raw HTML block from markdown"
+    )))
+
+    g.add((oc.htmlContent, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.htmlContent, RDFS.domain, oc.HTMLBlock))
+    g.add((oc.htmlContent, RDFS.label, Literal("html content")))
+    g.add((oc.htmlContent, RDFS.comment, Literal("Raw HTML content of the block")))
+
+    # ========== FrontmatterBlock ==========
+    g.add((oc.FrontmatterBlock, RDF.type, OWL.Class))
+    g.add((oc.FrontmatterBlock, RDFS.subClassOf, oc.ContentBlock))
+    g.add((oc.FrontmatterBlock, RDFS.label, Literal("Frontmatter Block")))
+    g.add((oc.FrontmatterBlock, RDFS.comment, Literal(
+        "YAML frontmatter from the document header"
+    )))
+
+    g.add((oc.rawYaml, RDF.type, OWL.DatatypeProperty))
+    g.add((oc.rawYaml, RDFS.domain, oc.FrontmatterBlock))
+    g.add((oc.rawYaml, RDFS.label, Literal("raw yaml")))
+    g.add((oc.rawYaml, RDFS.comment, Literal("Raw YAML content of the frontmatter")))
+
+    # ========== hasChild ==========
+    g.add((oc.hasChild, RDF.type, OWL.ObjectProperty))
+    g.add((oc.hasChild, RDFS.range, OWL.Thing))
+    g.add((oc.hasChild, RDFS.label, Literal("has child")))
+    g.add((oc.hasChild, RDFS.comment, Literal(
+        "Nested content block within a list item or procedure step"
+    )))
+
+
 def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
     """
     Create the core OntoSkills ontology (TBox) with state transition system.
@@ -233,6 +521,15 @@ def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
 
     # Add RBox axioms for knowledge inheritance
     _add_knowledge_rbox(g, oc)
+
+    # Add LLM-extracted content block classes and properties
+    _add_extracted_block_classes(g, oc)
+
+    # Add content model classes for document structure preservation
+    _add_content_model_classes(g, oc)
+
+    # Add additional content block classes (HTMLBlock, FrontmatterBlock, hasChild)
+    _add_content_block_classes(g, oc)
 
     # ========== State Transition Properties ==========
 
@@ -713,6 +1010,7 @@ def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
 
     # oc:Workflow - Sequential workflow with dependencies
     g.add((oc.Workflow, RDF.type, OWL.Class))
+    g.add((oc.Workflow, RDFS.subClassOf, oc.ContentBlock))
     g.add((oc.Workflow, RDFS.label, Literal("Workflow")))
     g.add((oc.Workflow, RDFS.comment, Literal(
         "A sequential workflow with dependencies between steps"
@@ -720,6 +1018,7 @@ def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
 
     # oc:WorkflowStep - Single step in a workflow
     g.add((oc.WorkflowStep, RDF.type, OWL.Class))
+    g.add((oc.WorkflowStep, RDFS.subClassOf, oc.ContentBlock))
     g.add((oc.WorkflowStep, RDFS.label, Literal("Workflow Step")))
     g.add((oc.WorkflowStep, RDFS.comment, Literal(
         "A single step in a workflow with optional dependencies"

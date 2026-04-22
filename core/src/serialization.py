@@ -12,7 +12,7 @@ from typing import Optional
 from rdflib import Graph, Namespace, RDF, OWL, Literal, URIRef, BNode
 from rdflib.namespace import DCTERMS, SKOS, PROV, XSD
 
-from compiler.schemas import ExtractedSkill, FileInfo
+from compiler.schemas import ExtractedSkill, FileInfo, ContentExtraction
 from compiler.exceptions import OntologyValidationError
 from compiler.config import BASE_URI, CORE_ONTOLOGY_FILENAME, CORE_ONTOLOGY_URL, OUTPUT_DIR, resolve_ontology_root
 from compiler.core_ontology import get_oc_namespace
@@ -76,12 +76,163 @@ def relation_uri_for_value(value: str) -> URIRef:
     return skill_uri_for_id(raw)
 
 
+def _serialize_section_tree(
+    graph: Graph,
+    skill_uri,
+    content_extraction,
+    make_bnode,
+) -> None:
+    """Serialize the section tree to RDF triples."""
+    oc = get_oc_namespace()
+
+    def _serialize_section(section, parent_uri, is_subsection=False, section_ctx="root"):
+        section_ctx = f"{section_ctx}:{section.order}"
+        section_node = make_bnode("section", f"{section_ctx}:{section.title}")
+
+        if is_subsection:
+            graph.add((parent_uri, oc.hasSubsection, section_node))
+        else:
+            graph.add((parent_uri, oc.hasSection, section_node))
+
+        graph.add((section_node, RDF.type, oc.Section))
+        graph.add((section_node, oc.sectionTitle, Literal(section.title)))
+        graph.add((section_node, oc.sectionLevel, Literal(section.level)))
+        graph.add((section_node, oc.sectionOrder, Literal(section.order)))
+
+        for block in section.content:
+            content_node = _serialize_content_block(graph, block, make_bnode, section_ctx)
+            if content_node:
+                graph.add((section_node, oc.hasContent, content_node))
+                if block.block_type == "ordered_procedure":
+                    graph.add((skill_uri, oc.hasWorkflow, content_node))
+
+        for sub in section.subsections:
+            _serialize_section(sub, section_node, is_subsection=True, section_ctx=section_ctx)
+
+    def _serialize_content_block(graph, block, make_bnode, section_ctx="root", parent_id=""):
+        """Serialize a single content block, return its BNode."""
+        ctx = f"{section_ctx}:{parent_id}" if parent_id else section_ctx
+
+        def _add_type(node, owl_class, block_type_str):
+            graph.add((node, RDF.type, owl_class))
+            graph.add((node, oc.blockType, Literal(block_type_str)))
+
+        if block.block_type == "paragraph":
+            node = make_bnode("para", f"{ctx}:{block.content_order}:{len(block.text_content)}")
+            _add_type(node, oc.Paragraph, block.block_type)
+            graph.add((node, oc.textContent, Literal(block.text_content)))
+            graph.add((node, oc.contentOrder, Literal(block.content_order)))
+            return node
+
+        elif block.block_type == "bullet_list":
+            node = make_bnode("blist", f"{ctx}:{block.content_order}:{len(block.items)}")
+            _add_type(node, oc.BulletList, block.block_type)
+            graph.add((node, oc.contentOrder, Literal(block.content_order)))
+            for item in block.items:
+                item_node = make_bnode("bitem", f"{ctx}:{block.content_order}:{item.order}:{len(item.text)}")
+                graph.add((node, oc.hasItem, item_node))
+                _add_type(item_node, oc.BulletItem, "bullet_item")
+                graph.add((item_node, oc.itemText, Literal(item.text)))
+                graph.add((item_node, oc.itemOrder, Literal(item.order)))
+                for child in item.children:
+                    child_node = _serialize_content_block(graph, child, make_bnode, section_ctx, parent_id=f"item{item.order}")
+                    if child_node:
+                        graph.add((item_node, oc.hasChild, child_node))
+            return node
+
+        elif block.block_type == "blockquote":
+            node = make_bnode("bquote", f"{ctx}:{block.content_order}:{len(block.content)}")
+            _add_type(node, oc.BlockQuote, block.block_type)
+            graph.add((node, oc.quoteContent, Literal(block.content)))
+            if block.attribution:
+                graph.add((node, oc.quoteAttribution, Literal(block.attribution)))
+            graph.add((node, oc.contentOrder, Literal(block.content_order)))
+            return node
+
+        elif block.block_type == "html_block":
+            node = make_bnode("html", f"{ctx}:{block.content_order}:{len(block.content)}")
+            _add_type(node, oc.HTMLBlock, block.block_type)
+            graph.add((node, oc.htmlContent, Literal(block.content)))
+            graph.add((node, oc.contentOrder, Literal(block.content_order)))
+            return node
+
+        elif block.block_type == "frontmatter":
+            node = make_bnode("fm", f"{ctx}:{block.content_order}:{len(block.raw_yaml)}")
+            _add_type(node, oc.FrontmatterBlock, block.block_type)
+            graph.add((node, oc.rawYaml, Literal(block.raw_yaml)))
+            graph.add((node, oc.contentOrder, Literal(block.content_order)))
+            return node
+
+        elif block.block_type == "code_block":
+            loc = f"{block.source_line_start}-{block.source_line_end}"
+            node = make_bnode("code", f"{ctx}:{block.content_order}:{block.language}:{loc}")
+            _add_type(node, oc.CodeExample, block.block_type)
+            graph.add((node, oc.codeLanguage, Literal(block.language)))
+            graph.add((node, oc.codeContent, Literal(block.content)))
+            graph.add((node, oc.sourceLocation,
+                       Literal(f"lines {block.source_line_start}-{block.source_line_end}")))
+            graph.add((node, oc.contentOrder, Literal(block.content_order)))
+            return node
+
+        elif block.block_type == "table":
+            node = make_bnode("table", f"{ctx}:{block.content_order}:{block.caption or 'untitled'}")
+            _add_type(node, oc.Table, block.block_type)
+            graph.add((node, oc.tableMarkdown, Literal(block.markdown_source)))
+            if block.caption:
+                graph.add((node, oc.tableCaption, Literal(block.caption)))
+            graph.add((node, oc.rowCount, Literal(block.row_count)))
+            graph.add((node, oc.contentOrder, Literal(block.content_order)))
+            return node
+
+        elif block.block_type == "flowchart":
+            node = make_bnode("flow", f"{ctx}:{block.content_order}:{block.chart_type}")
+            _add_type(node, oc.Flowchart, block.block_type)
+            graph.add((node, oc.flowchartSource, Literal(block.source)))
+            graph.add((node, oc.flowchartType, Literal(block.chart_type)))
+            graph.add((node, oc.contentOrder, Literal(block.content_order)))
+            return node
+
+        elif block.block_type == "template":
+            node = make_bnode("tmpl", f"{ctx}:{block.content_order}:{','.join(block.detected_variables)}")
+            _add_type(node, oc.Template, block.block_type)
+            graph.add((node, oc.templateContent, Literal(block.content)))
+            for var in block.detected_variables:
+                graph.add((node, oc.templateVariables, Literal(var)))
+            graph.add((node, oc.contentOrder, Literal(block.content_order)))
+            return node
+
+        elif block.block_type == "ordered_procedure":
+            node = make_bnode("proc", f"{ctx}:{block.content_order}")
+            _add_type(node, oc.Workflow, block.block_type)
+            graph.add((node, oc.workflowId, Literal(f"procedure_{block.content_order}")))
+            graph.add((node, oc.workflowName, Literal("Ordered Procedure")))
+            graph.add((node, oc.contentOrder, Literal(block.content_order)))
+            for step in block.items:
+                step_node = make_bnode("step", f"{ctx}:{block.content_order}_{step.position}")
+                graph.add((node, oc.hasStep, step_node))
+                _add_type(step_node, oc.WorkflowStep, "workflow_step")
+                graph.add((step_node, oc.stepId, Literal(f"step_{step.position}")))
+                graph.add((step_node, DCTERMS.description, Literal(step.text)))
+                graph.add((step_node, oc.stepOrder, Literal(step.position)))
+                for child in step.children:
+                    child_node = _serialize_content_block(graph, child, make_bnode, section_ctx, parent_id=f"step{step.position}")
+                    if child_node:
+                        graph.add((step_node, oc.hasChild, child_node))
+            return node
+
+        return None
+
+    for section in content_extraction.sections:
+        _serialize_section(section, skill_uri, is_subsection=False)
+
+
 def serialize_skill(
     graph: Graph,
     skill: ExtractedSkill,
     qualified_id: str | None = None,
     extends_parent: str | None = None,
     extends_parent_qualified: str | None = None,
+    content_extraction: "ContentExtraction | None" = None,
 ) -> None:
     """
     Serialize a skill to RDF triples in the graph.
@@ -92,6 +243,7 @@ def serialize_skill(
         qualified_id: Optional qualified ID for URI (prevents collisions across packages)
         extends_parent: Optional parent skill short ID to inject as extends relationship
         extends_parent_qualified: Optional parent qualified ID for extends URI
+        content_extraction: Optional ContentExtraction with code blocks, tables, flowcharts, templates
     """
     oc = get_oc_namespace()
 
@@ -320,6 +472,96 @@ def serialize_skill(
         for tag in ex.tags:
             graph.add((ex_node, oc.hasTag, Literal(tag)))
 
+    # === Resolve content_extraction: explicit param or skill attribute ===
+    if content_extraction is None:
+        content_extraction = getattr(skill, 'content_extraction', None)
+
+    # === Section tree OR flat lists serialization, never both ===
+    if content_extraction and content_extraction.sections:
+        _serialize_section_tree(graph, skill_uri, content_extraction, make_bnode)
+    elif content_extraction:
+        def _find_annotation(annotations: list, index: int):
+            for a in annotations:
+                if getattr(a, 'index', None) == index:
+                    return a
+            return None
+
+        # Code Examples
+        for idx, code_block in enumerate(content_extraction.code_blocks):
+            code_node = make_bnode("code", f"{idx}:{code_block.language}")
+            graph.add((skill_uri, oc.hasCodeExample, code_node))
+            graph.add((code_node, RDF.type, oc.CodeExample))
+            graph.add((code_node, oc.blockType, Literal("code_block")))
+            graph.add((code_node, oc.contentOrder, Literal(idx + 1)))
+            graph.add((code_node, oc.codeLanguage, Literal(code_block.language)))
+            graph.add((code_node, oc.codeContent, Literal(code_block.content)))
+            graph.add((code_node, oc.sourceLocation,
+                       Literal(f"lines {code_block.source_line_start}-{code_block.source_line_end}")))
+            ann = _find_annotation(skill.code_annotations, idx)
+            if ann:
+                graph.add((code_node, oc.codePurpose, Literal(ann.purpose)))
+                graph.add((code_node, oc.codeContext, Literal(ann.context)))
+
+        # Tables
+        for idx, table in enumerate(content_extraction.tables):
+            table_node = make_bnode("table", f"{idx}:{table.caption or 'untitled'}")
+            graph.add((skill_uri, oc.hasTable, table_node))
+            graph.add((table_node, RDF.type, oc.Table))
+            graph.add((table_node, oc.blockType, Literal("table")))
+            graph.add((table_node, oc.contentOrder, Literal(idx + 1)))
+            graph.add((table_node, oc.tableMarkdown, Literal(table.markdown_source)))
+            if table.caption:
+                graph.add((table_node, oc.tableCaption, Literal(table.caption)))
+            graph.add((table_node, oc.rowCount, Literal(table.row_count)))
+            ann = _find_annotation(skill.table_annotations, idx)
+            if ann:
+                graph.add((table_node, oc.tablePurpose, Literal(ann.purpose)))
+
+        # Flowcharts
+        for idx, flow in enumerate(content_extraction.flowcharts):
+            flow_node = make_bnode("flow", f"{idx}:{flow.chart_type}")
+            graph.add((skill_uri, oc.hasFlowchart, flow_node))
+            graph.add((flow_node, RDF.type, oc.Flowchart))
+            graph.add((flow_node, oc.blockType, Literal("flowchart")))
+            graph.add((flow_node, oc.contentOrder, Literal(idx + 1)))
+            graph.add((flow_node, oc.flowchartSource, Literal(flow.source)))
+            graph.add((flow_node, oc.flowchartType, Literal(flow.chart_type)))
+            ann = _find_annotation(skill.flowchart_annotations, idx)
+            if ann:
+                graph.add((flow_node, oc.flowchartDescription, Literal(ann.description)))
+
+        # Templates
+        for idx, tmpl in enumerate(content_extraction.templates):
+            tmpl_node = make_bnode("tmpl", f"{idx}:{','.join(tmpl.detected_variables)}")
+            graph.add((skill_uri, oc.hasTemplate, tmpl_node))
+            graph.add((tmpl_node, RDF.type, oc.Template))
+            graph.add((tmpl_node, oc.blockType, Literal("template")))
+            graph.add((tmpl_node, oc.contentOrder, Literal(idx + 1)))
+            graph.add((tmpl_node, oc.templateContent, Literal(tmpl.content)))
+            for var in tmpl.detected_variables:
+                graph.add((tmpl_node, oc.templateVariables, Literal(var)))
+            ann = _find_annotation(skill.template_annotations, idx)
+            if ann:
+                graph.add((tmpl_node, oc.templateType, Literal(ann.template_type)))
+
+        # Ordered Procedures (flat list)
+        for idx, proc in enumerate(content_extraction.procedures):
+            proc_node = make_bnode("proc", f"{idx}")
+            graph.add((skill_uri, oc.hasWorkflow, proc_node))
+            graph.add((proc_node, RDF.type, oc.Workflow))
+            graph.add((proc_node, oc.blockType, Literal("ordered_procedure")))
+            graph.add((proc_node, oc.contentOrder, Literal(idx + 1)))
+            graph.add((proc_node, oc.workflowId, Literal(f"procedure_{idx}")))
+            graph.add((proc_node, oc.workflowName, Literal("Ordered Procedure")))
+            for step in proc.items:
+                step_node = make_bnode("step", f"{idx}_{step.position}")
+                graph.add((proc_node, oc.hasStep, step_node))
+                graph.add((step_node, RDF.type, oc.WorkflowStep))
+                graph.add((step_node, oc.blockType, Literal("workflow_step")))
+                graph.add((step_node, oc.stepId, Literal(f"step_{step.position}")))
+                graph.add((step_node, DCTERMS.description, Literal(step.text)))
+                graph.add((step_node, oc.stepOrder, Literal(step.position)))
+
     # Frontmatter properties
     if hasattr(skill, 'frontmatter') and skill.frontmatter:
         graph.add((skill_uri, oc.hasName, Literal(skill.frontmatter.name)))
@@ -357,6 +599,7 @@ def serialize_skill_to_module(
     qualified_id: str | None = None,
     extends_parent: str | None = None,
     extends_parent_qualified: str | None = None,
+    content_extraction: "ContentExtraction | None" = None,
 ) -> None:
     """
     Serialize a skill to a standalone ontoskill.ttl module file.
@@ -396,7 +639,8 @@ def serialize_skill_to_module(
 
     # Serialize the skill with optional extends injection
     serialize_skill(g, skill, qualified_id=qualified_id, extends_parent=extends_parent,
-                    extends_parent_qualified=extends_parent_qualified)
+                    extends_parent_qualified=extends_parent_qualified,
+                    content_extraction=content_extraction)
 
     # VALIDATE BEFORE WRITE
     try:

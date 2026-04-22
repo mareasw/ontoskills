@@ -1,6 +1,14 @@
 import pytest
 from pydantic import ValidationError
 from compiler.schemas import Requirement, ExecutionPayload, ExtractedSkill, StateTransition
+from compiler.schemas import (
+    CodeBlock, MarkdownTable, FlowchartBlock, ProcedureStep,
+    OrderedProcedure, TemplateBlock, ContentExtraction
+)
+from compiler.schemas import (
+    CodeAnnotation, TableAnnotation, FlowchartAnnotation,
+    TemplateAnnotation, CompiledSkill, Workflow, WorkflowStep,
+)
 
 
 def test_skill_type_computed_as_executable():
@@ -397,3 +405,288 @@ def test_knowledge_node_filtering_unsupported_types():
         assert len(w) == 3
         warning_messages = [str(warning.message) for warning in w]
         assert any("unsupported type" in msg.lower() for msg in warning_messages)
+
+
+class TestContentExtractionModels:
+    def test_code_block_construction(self):
+        cb = CodeBlock(
+            language="python",
+            content="print('hello')",
+            source_line_start=10,
+            source_line_end=12,
+        )
+        assert cb.language == "python"
+        assert cb.content == "print('hello')"
+        assert cb.source_line_start == 10
+
+    def test_markdown_table_construction(self):
+        t = MarkdownTable(
+            markdown_source="| a | b |\n|---|---|\n| 1 | 2 |",
+            caption="Test table",
+            row_count=1,
+        )
+        assert t.row_count == 1
+        assert t.caption == "Test table"
+
+    def test_markdown_table_without_caption(self):
+        t = MarkdownTable(
+            markdown_source="| a |\n|---|\n| 1 |",
+            caption=None,
+            row_count=1,
+        )
+        assert t.caption is None
+
+    def test_flowchart_block_construction(self):
+        f = FlowchartBlock(
+            source="digraph { A -> B }",
+            chart_type="graphviz",
+        )
+        assert f.chart_type == "graphviz"
+
+    def test_flowchart_block_mermaid(self):
+        f = FlowchartBlock(
+            source="graph TD\n  A-->B",
+            chart_type="mermaid",
+        )
+        assert f.chart_type == "mermaid"
+
+    def test_ordered_procedure(self):
+        p = OrderedProcedure(items=[
+            ProcedureStep(text="Step one", position=1),
+            ProcedureStep(text="Step two", position=2),
+        ])
+        assert len(p.items) == 2
+        assert p.items[0].position == 1
+
+    def test_template_block(self):
+        t = TemplateBlock(
+            content="Hello {name}, welcome to {place}",
+            detected_variables=["name", "place"],
+        )
+        assert t.detected_variables == ["name", "place"]
+
+    def test_content_extraction_empty(self):
+        ce = ContentExtraction(
+            code_blocks=[], tables=[], flowcharts=[],
+            procedures=[], templates=[],
+        )
+        assert ce.code_blocks == []
+
+    def test_content_extraction_with_blocks(self):
+        ce = ContentExtraction(
+            code_blocks=[CodeBlock(language="python", content="x=1", source_line_start=1, source_line_end=1)],
+            tables=[],
+            flowcharts=[FlowchartBlock(source="digraph{}", chart_type="graphviz")],
+            procedures=[OrderedProcedure(items=[ProcedureStep(text="Do it", position=1)])],
+            templates=[],
+        )
+        assert len(ce.code_blocks) == 1
+        assert len(ce.flowcharts) == 1
+        assert len(ce.procedures) == 1
+
+
+class TestAnnotationModels:
+    def test_code_annotation(self):
+        a = CodeAnnotation(index=0, purpose="Creates a presentation", context="when creating slides")
+        assert a.index == 0
+        assert a.purpose == "Creates a presentation"
+
+    def test_table_annotation(self):
+        a = TableAnnotation(index=0, purpose="Parameter reference")
+        assert a.index == 0
+
+    def test_flowchart_annotation(self):
+        a = FlowchartAnnotation(index=0, description="Decision flow for TDD cycle")
+        assert a.description == "Decision flow for TDD cycle"
+
+    def test_template_annotation(self):
+        a = TemplateAnnotation(index=0, template_type="prompt")
+        assert a.template_type == "prompt"
+
+    def test_extracted_skill_has_annotation_fields(self):
+        skill = ExtractedSkill(
+            id="test",
+            hash="abc",
+            nature="Test",
+            genus="Test",
+            differentia="test",
+            intents=["test"],
+            code_annotations=[CodeAnnotation(index=0, purpose="demo", context="always")],
+            table_annotations=[],
+            flowchart_annotations=[],
+            template_annotations=[],
+        )
+        assert len(skill.code_annotations) == 1
+        assert skill.code_annotations[0].purpose == "demo"
+
+    def test_extracted_skill_has_workflows(self):
+        """Verify workflows moved from CompiledSkill to ExtractedSkill (bug fix)."""
+        skill = ExtractedSkill(
+            id="test",
+            hash="abc",
+            nature="Test",
+            genus="Test",
+            differentia="test",
+            intents=["test"],
+            workflows=[Workflow(
+                workflow_id="main",
+                name="Main flow",
+                description="The main flow",
+                steps=[WorkflowStep(step_id="s1", description="Step 1")],
+            )],
+        )
+        assert len(skill.workflows) == 1
+        assert skill.workflows[0].workflow_id == "main"
+
+    def test_compiled_skill_inherits_workflows(self):
+        """CompiledSkill should still have workflows via inheritance."""
+        compiled = CompiledSkill(
+            id="test",
+            hash="abc",
+            nature="Test",
+            genus="Test",
+            differentia="test",
+            intents=["test"],
+            workflows=[Workflow(
+                workflow_id="inherited",
+                name="Inherited",
+                description="Test",
+                steps=[],
+            )],
+        )
+        assert len(compiled.workflows) == 1
+
+
+class TestContentBlockModels:
+    def test_paragraph_model(self):
+        from compiler.schemas import Paragraph
+        p = Paragraph(text_content="Hello **world**", content_order=1)
+        assert p.block_type == "paragraph"
+        assert p.content_order == 1
+
+    def test_bullet_list_model(self):
+        from compiler.schemas import BulletListBlock, BulletItem
+        bl = BulletListBlock(
+            items=[BulletItem(text="First", order=1), BulletItem(text="Second", order=2)],
+            content_order=2,
+        )
+        assert bl.block_type == "bullet_list"
+        assert len(bl.items) == 2
+
+    def test_blockquote_model(self):
+        from compiler.schemas import BlockQuoteBlock
+        bq = BlockQuoteBlock(content="Clean code always looks like it was written by someone who cares.", attribution="Robert C. Martin", content_order=3)
+        assert bq.block_type == "blockquote"
+        assert bq.attribution is not None
+
+    def test_section_model_with_heterogeneous_content(self):
+        from compiler.schemas import Section, Paragraph, CodeBlock, BulletListBlock, BulletItem
+        section = Section(
+            title="Overview",
+            level=2,
+            order=1,
+            content=[
+                Paragraph(text_content="Some intro text.", content_order=1),
+                CodeBlock(language="python", content="print('hi')", source_line_start=5, source_line_end=7),
+                BulletListBlock(items=[BulletItem(text="Point A", order=1)], content_order=3),
+            ],
+        )
+        assert len(section.content) == 3
+        assert section.content[0].block_type == "paragraph"
+        assert section.content[1].block_type == "code_block"
+        assert section.content[2].block_type == "bullet_list"
+
+    def test_section_nested_subsections(self):
+        from compiler.schemas import Section, Paragraph
+        parent = Section(
+            title="Tools",
+            level=2,
+            order=1,
+            content=[Paragraph(text_content="Intro.", content_order=1)],
+            subsections=[
+                Section(title="search_skills", level=3, order=1, content=[]),
+                Section(title="get_skill_context", level=3, order=2, content=[]),
+            ],
+        )
+        assert len(parent.subsections) == 2
+        assert parent.subsections[0].level == 3
+
+    def test_content_extraction_with_sections_and_flat_lists(self):
+        from compiler.schemas import ContentExtraction, Section, Paragraph, CodeBlock
+        ce = ContentExtraction(
+            sections=[
+                Section(title="Intro", level=2, order=1, content=[
+                    Paragraph(text_content="Hello.", content_order=1),
+                    CodeBlock(language="python", content="x=1", source_line_start=3, source_line_end=3),
+                ]),
+            ],
+            code_blocks=[CodeBlock(language="python", content="x=1", source_line_start=3, source_line_end=3)],
+        )
+        assert len(ce.sections) == 1
+        assert len(ce.code_blocks) == 1
+
+
+class TestContentBlockV2Models:
+    def test_html_block_model(self):
+        from compiler.schemas import HTMLBlock
+        hb = HTMLBlock(content="<HARD-GATE>Do not proceed</HARD-GATE>", content_order=1)
+        assert hb.block_type == "html_block"
+        assert "HARD-GATE" in hb.content
+
+    def test_frontmatter_block_model(self):
+        from compiler.schemas import FrontmatterBlock
+        fb = FrontmatterBlock(raw_yaml="name: test\ndescription: A test", properties={"name": "test", "description": "A test"}, content_order=0)
+        assert fb.block_type == "frontmatter"
+        assert fb.properties["name"] == "test"
+
+    def test_heading_block_model(self):
+        from compiler.schemas import HeadingBlock
+        hb = HeadingBlock(text="Overview", level=2, content_order=0)
+        assert hb.block_type == "heading"
+        assert hb.level == 2
+
+    def test_bullet_item_with_children(self):
+        from compiler.schemas import BulletItem, CodeBlock
+        bi = BulletItem(
+            text="Run the test",
+            order=1,
+            children=[CodeBlock(language="bash", content="pytest -v", source_line_start=5, source_line_end=5, content_order=0)],
+        )
+        assert len(bi.children) == 1
+        assert bi.children[0].block_type == "code_block"
+
+    def test_procedure_step_with_children(self):
+        from compiler.schemas import ProcedureStep, Paragraph
+        ps = ProcedureStep(
+            text="Fix the error",
+            position=2,
+            children=[Paragraph(text_content="See error message below.", content_order=1)],
+        )
+        assert len(ps.children) == 1
+
+    def test_flat_block_model(self):
+        from compiler.schemas import FlatBlock, Paragraph
+        para = Paragraph(text_content="Hello.", content_order=1)
+        fb = FlatBlock(block_id="blk_0", block_type="paragraph", content=para, line_start=1, line_end=1)
+        assert fb.block_id == "blk_0"
+        assert fb.parent_block_id is None
+
+    def test_flat_block_with_parent(self):
+        from compiler.schemas import FlatBlock, CodeBlock
+        code = CodeBlock(language="python", content="x=1", source_line_start=3, source_line_end=3, content_order=0)
+        fb = FlatBlock(block_id="blk_5", block_type="code_block", content=code, line_start=3, line_end=3, parent_block_id="blk_3_item_1")
+        assert fb.parent_block_id == "blk_3_item_1"
+
+    def test_skeleton_models(self):
+        from compiler.schemas import SkeletonNode, SkeletonListItem, DocumentSkeleton
+        skeleton = DocumentSkeleton(
+            sections=[SkeletonNode(block_id="blk_0", children=[SkeletonNode(block_id="blk_1")])],
+            list_items={"blk_3": [SkeletonListItem(text_block_id="blk_3_item_0", children=["blk_4"])]},
+        )
+        assert len(skeleton.sections) == 1
+        assert skeleton.list_items["blk_3"][0].children == ["blk_4"]
+
+    def test_content_block_union_includes_html_and_frontmatter(self):
+        from compiler.schemas import HTMLBlock, FrontmatterBlock
+        assert HTMLBlock(content="x", content_order=1).block_type == "html_block"
+        assert FrontmatterBlock(raw_yaml="x", content_order=0).block_type == "frontmatter"
