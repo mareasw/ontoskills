@@ -14,7 +14,7 @@ import anthropic
 from anthropic import Anthropic
 
 from compiler.env import load_local_env
-from compiler.schemas import ExtractedSkill
+from compiler.schemas import ContentExtraction, ExtractedSkill
 from compiler.exceptions import ExtractionError
 from compiler.config import ANTHROPIC_MODEL, MAX_ITERATIONS, EXTRACTION_TIMEOUT
 from compiler.prompts import SYSTEM_PROMPT
@@ -173,6 +173,7 @@ def tool_use_loop(
     skill_registry: "SkillRegistry | None" = None,
     preloaded_content: str | None = None,
     preloaded_file_tree: str | None = None,
+    content_extraction: "ContentExtraction | None" = None,
 ) -> ExtractedSkill:
     """
     Orchestrates the tool-use conversation with Claude.
@@ -188,6 +189,7 @@ def tool_use_loop(
         skill_registry: Optional SkillRegistry for known-skills context
         preloaded_content: Optional SKILL.md content to inject directly
         preloaded_file_tree: Optional file tree string to include
+        content_extraction: Optional pre-parsed content blocks for LLM annotation
 
     Returns:
         ExtractedSkill with structured data
@@ -238,6 +240,69 @@ Use the available tools to:
 1. List and read the skill files
 2. Extract the structured data
 3. Submit with extract_skill"""]
+
+    # Inject pre-extracted content block summaries for LLM annotation
+    if content_extraction and (
+        content_extraction.code_blocks
+        or content_extraction.tables
+        or content_extraction.flowcharts
+        or content_extraction.procedures
+        or content_extraction.templates
+    ):
+        import json as _json
+        content_summary_parts = ["\n\n## PRE-EXTRACTED CONTENT BLOCKS\n"]
+
+        if content_extraction.code_blocks:
+            blocks_summary = [
+                {"index": i, "language": b.language, "lines": f"{b.source_line_start}-{b.source_line_end}"}
+                for i, b in enumerate(content_extraction.code_blocks)
+            ]
+            content_summary_parts.append(
+                f"### Code Blocks ({len(content_extraction.code_blocks)} found)\n"
+                f"{_json.dumps(blocks_summary)}\n"
+            )
+
+        if content_extraction.tables:
+            tables_summary = [
+                {"index": i, "rows": t.row_count, "caption": t.caption}
+                for i, t in enumerate(content_extraction.tables)
+            ]
+            content_summary_parts.append(
+                f"### Tables ({len(content_extraction.tables)} found)\n"
+                f"{_json.dumps(tables_summary)}\n"
+            )
+
+        if content_extraction.flowcharts:
+            flow_summary = [
+                {"index": i, "type": f.chart_type}
+                for i, f in enumerate(content_extraction.flowcharts)
+            ]
+            content_summary_parts.append(
+                f"### Flowcharts ({len(content_extraction.flowcharts)} found)\n"
+                f"{_json.dumps(flow_summary)}\n"
+            )
+
+        if content_extraction.procedures:
+            proc_summary = [
+                {"index": i, "steps": len(p.items)}
+                for i, p in enumerate(content_extraction.procedures)
+            ]
+            content_summary_parts.append(
+                f"### Ordered Procedures ({len(content_extraction.procedures)} found)\n"
+                f"{_json.dumps(proc_summary)}\n"
+            )
+
+        if content_extraction.templates:
+            tmpl_summary = [
+                {"index": i, "variables": t.detected_variables}
+                for i, t in enumerate(content_extraction.templates)
+            ]
+            content_summary_parts.append(
+                f"### Templates ({len(content_extraction.templates)} found)\n"
+                f"{_json.dumps(tmpl_summary)}\n"
+            )
+
+        content_parts[0] += "".join(content_summary_parts)
 
     messages = [{
         "role": "user",
@@ -297,3 +362,87 @@ Use the available tools to:
             messages.extend(tool_results)
 
     raise ExtractionError(f"Max iterations ({MAX_ITERATIONS}) exceeded")
+
+
+# ============================================================================
+# Skeleton Hydration (Phase 1c)
+# ============================================================================
+
+def hydrate_skeleton(
+    skeleton: "DocumentSkeleton",
+    blocks_index: dict[str, "FlatBlock"],
+    markdown: str | None = None,
+) -> list["Section"]:
+    """Hydrate a document skeleton with real Pydantic objects.
+
+    Phase 1c: replaces block_ids in skeleton with actual content from Phase 1a.
+    Falls back to v1 deterministic tree builder if skeleton is empty.
+    """
+    from compiler.schemas import Section
+
+    if not skeleton.sections and markdown:
+        # Fallback to v1 builder
+        from compiler.content_parser import extract_structural_content
+        result = extract_structural_content(markdown)
+        return result.sections
+
+    sections = []
+    section_order = 0
+
+    for node in skeleton.sections:
+        block = blocks_index.get(node.block_id)
+        if block is None:
+            logger.warning("Skeleton node references missing block_id=%s, skipping", node.block_id)
+            continue
+        if block.parent_block_id:
+            continue  # child of a list item — already attached via parent
+
+        if block.block_type == "heading":
+            section_order += 1
+            section = Section(
+                title=block.content.text,
+                level=block.content.level,
+                order=section_order,
+            )
+            _hydrate_children(section, node, blocks_index)
+            sections.append(section)
+        else:
+            # Non-heading root (frontmatter, paragraphs) — accumulate into single preamble
+            preamble = next((s for s in sections if s.title == "" and s.level == 0), None)
+            if preamble is None:
+                preamble = Section(title="", level=0, order=0)
+                sections.insert(0, preamble)
+            block.content.content_order = len(preamble.content) + 1
+            preamble.content.append(block.content)
+            _hydrate_children(preamble, node, blocks_index)
+
+    return sections
+
+
+def _hydrate_children(section, node, blocks_index):
+    """Recursively hydrate children of a skeleton node into a section."""
+    from compiler.schemas import Section
+
+    content_counter = len(section.content)
+    for child_node in node.children:
+        block = blocks_index.get(child_node.block_id)
+        if block is None:
+            logger.warning("Skeleton child references missing block_id=%s, skipping", child_node.block_id)
+            continue
+        if block.parent_block_id:
+            continue  # child of a list item — already attached via parent
+
+        if block.block_type == "heading":
+            # Subsection
+            sub = Section(
+                title=block.content.text,
+                level=block.content.level,
+                order=len(section.subsections) + 1,
+            )
+            _hydrate_children(sub, child_node, blocks_index)
+            section.subsections.append(sub)
+        else:
+            content_counter += 1
+            block.content.content_order = content_counter
+            section.content.append(block.content)
+            _hydrate_children(section, child_node, blocks_index)

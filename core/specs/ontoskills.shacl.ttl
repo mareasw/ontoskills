@@ -322,3 +322,165 @@ oc:SkillKnowledgeWarningShape
         sh:message "ATTENZIONE: Questa Skill non fornisce nodi di conoscenza epistemica (impartsKnowledge). Considera l'aggiunta di Standard, AntiPattern o Heuristics nel file SKILL.md." ;
     ] ;
     .
+
+# === Content Block Shapes ===
+
+oc:CodeExampleShape a sh:NodeShape ;
+    sh:targetClass oc:CodeExample ;
+    sh:property [
+        sh:path oc:codeLanguage ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "CodeExample must have a codeLanguage" ;
+    ] , [
+        sh:path oc:codeContent ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "CodeExample must have codeContent" ;
+    ] .
+
+oc:TableShape a sh:NodeShape ;
+    sh:targetClass oc:Table ;
+    sh:property [
+        sh:path oc:tableMarkdown ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Table must have tableMarkdown" ;
+    ] .
+
+oc:FlowchartShape a sh:NodeShape ;
+    sh:targetClass oc:Flowchart ;
+    sh:property [
+        sh:path oc:flowchartSource ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Flowchart must have flowchartSource" ;
+    ] , [
+        sh:path oc:flowchartType ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:in ("graphviz" "mermaid") ;
+        sh:message "Flowchart must have flowchartType (graphviz or mermaid)" ;
+    ] .
+
+oc:TemplateShape a sh:NodeShape ;
+    sh:targetClass oc:Template ;
+    sh:property [
+        sh:path oc:templateContent ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Template must have templateContent" ;
+    ] , [
+        sh:path oc:templateType ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:in ("prompt" "output" "boilerplate") ;
+        sh:message "If present, templateType must be prompt, output, or boilerplate" ;
+    ] .
+
+# === Content Model Shapes ===
+
+oc:SectionShape a sh:NodeShape ;
+    sh:targetClass oc:Section ;
+    sh:property [
+        sh:path oc:sectionTitle ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Section must have a sectionTitle" ;
+    ] , [
+        sh:path oc:sectionLevel ;
+        sh:minCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "Section must have a sectionLevel" ;
+    ] , [
+        sh:path oc:sectionOrder ;
+        sh:minCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "Section must have a sectionOrder" ;
+    ] .
+
+oc:ParagraphShape a sh:NodeShape ;
+    sh:targetClass oc:Paragraph ;
+    sh:property [
+        sh:path oc:textContent ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Paragraph must have textContent" ;
+    ] , [
+        sh:path oc:contentOrder ;
+        sh:minCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "Paragraph must have contentOrder" ;
+    ] .
+
+oc:BulletListShape a sh:NodeShape ;
+    sh:targetClass oc:BulletList ;
+    sh:property [
+        sh:path oc:hasItem ;
+        sh:class oc:BulletItem ;
+        sh:minCount 1 ;
+        sh:message "BulletList must have at least one hasItem of type BulletItem" ;
+    ] .
+
+oc:BulletItemShape a sh:NodeShape ;
+    sh:targetClass oc:BulletItem ;
+    sh:property [
+        sh:path oc:itemText ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "BulletItem must have itemText" ;
+    ] , [
+        sh:path oc:itemOrder ;
+        sh:minCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "BulletItem must have itemOrder" ;
+    ] .
+
+oc:BlockQuoteShape a sh:NodeShape ;
+    sh:targetClass oc:BlockQuote ;
+    sh:property [
+        sh:path oc:quoteContent ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "BlockQuote must have quoteContent" ;
+    ] , [
+        sh:path oc:contentOrder ;
+        sh:minCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "BlockQuote must have contentOrder" ;
+    ] , [
+        sh:path oc:quoteAttribution ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "BlockQuote quoteAttribution must be a single string" ;
+    ] .
+
+# === Content Block Shapes ===
+
+oc:HTMLBlockShape a sh:NodeShape ;
+    sh:targetClass oc:HTMLBlock ;
+    sh:property [
+        sh:path oc:htmlContent ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "HTMLBlock must have htmlContent" ;
+    ] , [
+        sh:path oc:contentOrder ;
+        sh:minCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "HTMLBlock must have contentOrder" ;
+    ] .
+
+oc:FrontmatterBlockShape a sh:NodeShape ;
+    sh:targetClass oc:FrontmatterBlock ;
+    sh:property [
+        sh:path oc:rawYaml ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "FrontmatterBlock must have rawYaml" ;
+    ] , [
+        sh:path oc:contentOrder ;
+        sh:minCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "FrontmatterBlock must have contentOrder" ;
+    ] .

@@ -39,6 +39,34 @@ flowchart LR
 
 ---
 
+## Content model
+
+OntoCore transforms markdown into a three-layer content model that OntoMCP queries via SPARQL.
+
+```
+FlatBlock → Section tree → ContentExtraction
+```
+
+**FlatBlock** — Every markdown element becomes a typed block (paragraph, code_block, table, etc.) with line range and content-specific properties. This is the raw, flat extraction from the parser.
+
+**Section tree** — Blocks are organized into a hierarchy based on heading levels. Each section has a title, level, order, and contains content blocks and subsections. The tree structure uses:
+
+| Property | Purpose |
+|----------|---------|
+| `oc:hasSection` | Links a skill to its top-level sections |
+| `oc:hasSubsection` | Links a section to its child sections |
+| `oc:hasContent` | Links a section to its content blocks |
+| `oc:hasChild` | Links a list item or step to nested child blocks |
+| `oc:sectionTitle` | Section heading text |
+| `oc:sectionLevel` | Heading level (1-6) |
+| `oc:contentOrder` | Ordering within a section |
+
+**ContentExtraction** — The aggregated result containing all sections, code blocks, tables, flowcharts, procedures, and templates. This is what the LLM annotates during extraction.
+
+In the TTL output, sections and content blocks are represented as blank nodes with `rdf:type` assertions (e.g., `oc:Paragraph`, `oc:CodeBlock`). The `get_skill_content` MCP tool queries these triples and reconstructs readable markdown from them — so agents can follow a skill's instructions step-by-step via SPARQL without reading the raw markdown.
+
+---
+
 ## Skill types
 
 ```mermaid

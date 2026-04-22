@@ -1,9 +1,10 @@
+from __future__ import annotations
 import json
 import re
 import warnings
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator, model_validator, computed_field
-from typing import Literal, Any
+from typing import Annotated, Literal, Union, Any
 
 
 class Requirement(BaseModel):
@@ -89,6 +90,31 @@ class KnowledgeNode(BaseModel):
     severity_level: SeverityLevel | None = None  # Optional priority
 
 
+class CodeAnnotation(BaseModel):
+    """LLM annotation for a pre-extracted code block."""
+    index: int
+    purpose: str
+    context: str
+
+
+class TableAnnotation(BaseModel):
+    """LLM annotation for a pre-extracted table."""
+    index: int
+    purpose: str
+
+
+class FlowchartAnnotation(BaseModel):
+    """LLM annotation for a pre-extracted flowchart."""
+    index: int
+    description: str
+
+
+class TemplateAnnotation(BaseModel):
+    """LLM annotation for a pre-extracted template."""
+    index: int
+    template_type: Literal["prompt", "output", "boilerplate"]
+
+
 class ExtractedSkill(BaseModel):
     id: str
     hash: str
@@ -116,6 +142,13 @@ class ExtractedSkill(BaseModel):
     argument_hint: str | None = None
     allowed_tools: list[str] = Field(default_factory=list)
     aliases: list[str] = Field(default_factory=list)
+
+    # Content block annotations (Phase 2 LLM)
+    code_annotations: list[CodeAnnotation] = Field(default_factory=list)
+    table_annotations: list[TableAnnotation] = Field(default_factory=list)
+    flowchart_annotations: list[FlowchartAnnotation] = Field(default_factory=list)
+    template_annotations: list[TemplateAnnotation] = Field(default_factory=list)
+    workflows: list["Workflow"] = Field(default_factory=list)
 
     @field_validator('depends_on', 'extends', 'contradicts')
     @classmethod
@@ -295,6 +328,162 @@ class FileInfo(BaseModel):
     mime_type: str
 
 
+class CodeBlock(BaseModel):
+    """Inline code block extracted from markdown."""
+    block_type: Literal["code_block"] = "code_block"
+    language: str
+    content: str
+    source_line_start: int
+    source_line_end: int
+    content_order: int = 0
+
+
+class MarkdownTable(BaseModel):
+    """Markdown table extracted via map slicing."""
+    block_type: Literal["table"] = "table"
+    markdown_source: str
+    caption: str | None
+    row_count: int
+    content_order: int = 0
+
+
+class FlowchartBlock(BaseModel):
+    """Graphviz or Mermaid diagram extracted from markdown."""
+    block_type: Literal["flowchart"] = "flowchart"
+    source: str
+    chart_type: Literal["graphviz", "mermaid"]
+    content_order: int = 0
+
+
+class ProcedureStep(BaseModel):
+    """Single step in an ordered procedure."""
+    text: str
+    position: int  # 1-based
+    children: list[ContentBlock] = Field(default_factory=list)
+
+
+class OrderedProcedure(BaseModel):
+    """Ordered checklist/numbered list extracted from markdown."""
+    block_type: Literal["ordered_procedure"] = "ordered_procedure"
+    items: list[ProcedureStep]
+    content_order: int = 0
+
+
+class TemplateBlock(BaseModel):
+    """Template with variable placeholders."""
+    block_type: Literal["template"] = "template"
+    content: str
+    detected_variables: list[str]
+    content_order: int = 0
+
+
+class Paragraph(BaseModel):
+    """Free-form text paragraph from markdown."""
+    block_type: Literal["paragraph"] = "paragraph"
+    text_content: str
+    content_order: int
+
+
+class BulletItem(BaseModel):
+    """Single item in a bullet list."""
+    text: str
+    order: int
+    children: list[ContentBlock] = Field(default_factory=list)
+
+
+class BulletListBlock(BaseModel):
+    """Unordered (bullet) list from markdown."""
+    block_type: Literal["bullet_list"] = "bullet_list"
+    items: list[BulletItem]
+    content_order: int
+
+
+class BlockQuoteBlock(BaseModel):
+    """Blockquote from markdown."""
+    block_type: Literal["blockquote"] = "blockquote"
+    content: str
+    attribution: str | None = None
+    content_order: int
+
+
+class HTMLBlock(BaseModel):
+    """HTML block from markdown."""
+    block_type: Literal["html_block"] = "html_block"
+    content: str
+    content_order: int
+
+
+class FrontmatterBlock(BaseModel):
+    """YAML frontmatter from markdown."""
+    block_type: Literal["frontmatter"] = "frontmatter"
+    raw_yaml: str
+    properties: dict[str, str] = Field(default_factory=dict)
+    content_order: int
+
+
+class HeadingBlock(BaseModel):
+    """Heading extracted as a block (for flat extraction mode)."""
+    block_type: Literal["heading"] = "heading"
+    text: str
+    level: int
+    content_order: int
+
+
+ContentBlock = Annotated[
+    Union[Paragraph, CodeBlock, MarkdownTable, FlowchartBlock,
+          TemplateBlock, BulletListBlock, BlockQuoteBlock, OrderedProcedure,
+          HTMLBlock, FrontmatterBlock, HeadingBlock],
+    Field(discriminator="block_type")
+]
+
+
+class Section(BaseModel):
+    """A section of the markdown document, identified by a header."""
+    title: str
+    level: int
+    order: int
+    content: list[ContentBlock] = Field(default_factory=list)
+    subsections: list["Section"] = Field(default_factory=list)
+
+
+class ContentExtraction(BaseModel):
+    """Result of Phase 1 structural content extraction from markdown."""
+    sections: list[Section] = Field(default_factory=list)
+    code_blocks: list[CodeBlock] = Field(default_factory=list)
+    tables: list[MarkdownTable] = Field(default_factory=list)
+    flowcharts: list[FlowchartBlock] = Field(default_factory=list)
+    procedures: list[OrderedProcedure] = Field(default_factory=list)
+    templates: list[TemplateBlock] = Field(default_factory=list)
+
+
+class FlatBlock(BaseModel):
+    """A content block with a unique ID for skeleton/hydration architecture."""
+    block_id: str
+    block_type: str
+    content: ContentBlock
+    line_start: int
+    line_end: int
+    parent_block_id: str | None = None
+
+
+class SkeletonNode(BaseModel):
+    """A node in the document skeleton tree (LLM output)."""
+    block_id: str
+    children: list[SkeletonNode] = Field(default_factory=list)
+
+
+class SkeletonListItem(BaseModel):
+    """A list item with children in the skeleton (LLM output)."""
+    text_block_id: str
+    children: list[str] = Field(default_factory=list)  # block_ids of child blocks
+
+
+class DocumentSkeleton(BaseModel):
+    """Document structure skeleton built by LLM from block IDs."""
+    sections: list[SkeletonNode]
+    list_items: dict[str, list[SkeletonListItem]] = Field(default_factory=dict)
+
+
 class DirectoryScan(BaseModel):
     """Phase 1 output - all filesystem metadata."""
     frontmatter: Frontmatter
@@ -305,6 +494,7 @@ class DirectoryScan(BaseModel):
     files: list[FileInfo]
     skill_md_content: str
     file_tree: str  # Formatted string for LLM context
+    content_extraction: ContentExtraction
 
 
 # =============================================================================
@@ -370,4 +560,4 @@ class CompiledSkill(ExtractedSkill):
     reference_files: list[ReferenceFile] = Field(default_factory=list)
     executable_scripts: list[ExecutableScript] = Field(default_factory=list)
     examples: list[Example] = Field(default_factory=list)
-    workflows: list[Workflow] = Field(default_factory=list)
+    content_extraction: ContentExtraction | None = None

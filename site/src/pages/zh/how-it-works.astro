@@ -83,13 +83,13 @@ oc:tdd-workflow a oc:Skill ;
       '基于意图的发现'
     ],
     code: `# 按意图搜索技能
-search_intents("create_pdf")
+search({ query: "create_pdf" })
   → pdf-generator
   → report-exporter
 
 # 获取技能上下文
-get_skill("pdf-generator")
-  → { name, description, instructions }`
+get_skill_context({ skill_id: "pdf-generator" })
+  → { name, description, sections }`
   }
 ];
 ---

@@ -1,8 +1,35 @@
-import { useRef, useState, memo } from 'react';
+import { useRef, useState, memo, type ComponentProps } from 'react';
 import { Html, Text, Billboard } from '@react-three/drei';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { GraphNode } from '../types';
 import { getNodeColor, CATEGORY_LABELS } from './colors';
+
+
+/** Text that scales with camera distance without per-frame React re-renders. */
+function DistanceScaledText({ baseFontSize, children, ...props }: {
+  baseFontSize: number;
+  children: string;
+} & Omit<ComponentProps<typeof Text>, 'fontSize'>) {
+  const { camera } = useThree();
+  const groupRef = useRef<THREE.Group>(null);
+  const worldPos = useRef(new THREE.Vector3());
+  useFrame(() => {
+    const group = groupRef.current;
+    if (!group) return;
+    group.getWorldPosition(worldPos.current);
+    const d = camera.position.distanceTo(worldPos.current);
+    const targetScale = Math.max(1, d / 25);
+    const s = THREE.MathUtils.lerp(group.scale.x, targetScale, 0.15);
+    if (Math.abs(s - targetScale) > 0.001) group.scale.setScalar(s);
+    else group.scale.setScalar(targetScale);
+  });
+  return (
+    <group ref={groupRef}>
+      <Text fontSize={baseFontSize} {...props}>{children}</Text>
+    </group>
+  );
+}
 
 export const GraphNodeSphere = memo(function GraphNodeSphere({ node, position, onClick, dimmed = false, hideLabel = false, clusterLabel, exploreLabel, lowDetail = false }: {
   node: GraphNode;
@@ -56,8 +83,8 @@ export const GraphNodeSphere = memo(function GraphNodeSphere({ node, position, o
       </mesh>
       {isCluster && !dimmed && (
         <Billboard position={[0, radius + 0.35, 0]}>
-          <Text
-            fontSize={0.35}
+          <DistanceScaledText
+            baseFontSize={0.35}
             color={color}
             anchorX="center"
             anchorY="middle"
@@ -65,13 +92,13 @@ export const GraphNodeSphere = memo(function GraphNodeSphere({ node, position, o
             outlineColor="#000000"
           >
             {`\u00d7${clusterCount}`}
-          </Text>
+          </DistanceScaledText>
         </Billboard>
       )}
       {!hideLabel && (
         <Billboard position={[0, -(radius + 0.55), 0]}>
-          <Text
-            fontSize={0.3}
+          <DistanceScaledText
+            baseFontSize={0.3}
             color="#e0e0e0"
             fillOpacity={dimmed ? 0.12 : 1}
             outlineWidth={dimmed ? 0 : 0.12}
@@ -83,7 +110,7 @@ export const GraphNodeSphere = memo(function GraphNodeSphere({ node, position, o
             onClick={(e) => { e.stopPropagation(); onClick(node); }}
           >
             {displayLabel}
-          </Text>
+          </DistanceScaledText>
         </Billboard>
       )}
       {hovered && !dimmed && (

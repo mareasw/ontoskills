@@ -31,7 +31,8 @@ flowchart LR
 The MCP server is intentionally focused on:
 
 - **Skill discovery** — Search skills by intent, state, and type
-- **Skill context retrieval** — Return execution payload, transitions, dependencies, and knowledge nodes in one call
+- **Skill context retrieval** — Return execution payload, transitions, dependencies, knowledge nodes, and section titles in one call
+- **Skill content retrieval** — Return reconstructed markdown for skill sections (code, procedures, tables, etc.)
 - **Planning** — Evaluate whether a skill or intent is executable from the current state set
 - **Epistemic retrieval** — Query normalized `KnowledgeNode` rules by kind, dimension, severity, and context
 
@@ -43,7 +44,7 @@ The server does **not** execute skill payloads. Payload execution is delegated t
 
 ```mermaid
 flowchart LR
-    CLIENT["MCP Client<br/>━━━━━━━━━━<br/>Claude Code<br/>stdio transport"] -->|"tools/call"| TOOLS["MCP Tools<br/>━━━━━━━━━━<br/>4 tools<br/>search, context, plan, rules"]
+    CLIENT["MCP Client<br/>━━━━━━━━━━<br/>Claude Code<br/>stdio transport"] -->|"tools/call"| TOOLS["MCP Tools<br/>━━━━━━━━━━<br/>5 tools<br/>search, context, content, plan, rules"]
     TOOLS -->|"BM25 search"| BM25["BM25 Engine<br/>━━━━━━━━━━<br/>in-memory<br/>keyword search"]
     TOOLS -->|"SPARQL"| SPARQL["oxigraph<br/>━━━━━━━━━━<br/>SPARQL 1.1 engine<br/>in-memory store"]
     BM25 -->|"builds from"| GRAPH["RDF Graph<br/>━━━━━━━━━━<br/>Loaded .ttl files<br/>OntoSkills catalog"]
@@ -72,7 +73,8 @@ flowchart LR
 | Tool | Purpose |
 |------|---------|
 | `search` | Search skills by keyword query, alias, or structured filters. Dispatches by parameter: `query` → BM25 keyword search (with optional semantic fallback), `alias` → alias resolution, otherwise → structured skill search |
-| `get_skill_context` | Return the complete execution context for a skill, including payload and knowledge nodes |
+| `get_skill_context` | Return the complete execution context for a skill, including payload, knowledge nodes, and section titles (table of contents) |
+| `get_skill_content` | Retrieve skill section content as reconstructed markdown. If `section` is omitted, returns the table of contents |
 | `evaluate_execution_plan` | Evaluate applicability and generate a plan for a target intent or skill |
 | `query_epistemic_rules` | Query normalized knowledge nodes across the ontology with guided filters |
 
@@ -201,6 +203,8 @@ If nothing is found locally, OntoMCP falls back to:
 --ontology-root /path/to/ontology-root
 # or
 ONTOMCP_ONTOLOGY_ROOT=/path/to/ontology-root
+# alternative env var (same effect)
+ONTOSKILLS_MCP_ONTOLOGY_ROOT=/path/to/ontology-root
 ```
 
 **ONNX Runtime** (optional, for large skill catalogs):
@@ -253,6 +257,7 @@ After registration, Claude Code can call:
 flowchart LR
     CLAUDE["Claude Code"] -->|"search"| TOOLS["OntoMCP"]
     CLAUDE -->|"get_skill_context"| TOOLS
+    CLAUDE -->|"get_skill_content"| TOOLS
     CLAUDE -->|"evaluate_execution_plan"| TOOLS
     CLAUDE -->|"query_epistemic_rules"| TOOLS
 

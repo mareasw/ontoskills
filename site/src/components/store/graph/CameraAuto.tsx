@@ -37,7 +37,7 @@ export function BackgroundParticles() {
   return (
     <points>
       <bufferGeometry>
-        <bufferAttribute attach="attributes-position" count={count} array={positions} itemSize={3} />
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
       </bufferGeometry>
       <pointsMaterial color="#52c7e8" size={0.08} transparent opacity={0.2} blending={THREE.AdditiveBlending} depthWrite={false} />
     </points>

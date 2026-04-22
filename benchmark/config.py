@@ -3,18 +3,25 @@
 # Model pricing ($/MTok). Only Anthropic models are called.
 # GPT and Gemini are price-comparison only — same token counts, different rates.
 MODEL_PRICING = {
-    "claude-opus-4-20250514": {
-        "label": "Claude Opus 4.6",
+    "claude-opus-4-7": {
+        "label": "Claude Opus 4.7",
         "provider": "anthropic",
-        "input_per_mtok": 5.00,
-        "output_per_mtok": 25.00,
+        "input_per_mtok": 15.00,
+        "output_per_mtok": 75.00,
         "context_limit": 200_000,
     },
-    "claude-sonnet-4-20250514": {
+    "claude-sonnet-4-6": {
         "label": "Claude Sonnet 4.6",
         "provider": "anthropic",
         "input_per_mtok": 3.00,
         "output_per_mtok": 15.00,
+        "context_limit": 200_000,
+    },
+    "claude-haiku-4-5-20251001": {
+        "label": "Claude Haiku 4.5",
+        "provider": "anthropic",
+        "input_per_mtok": 0.80,
+        "output_per_mtok": 4.00,
         "context_limit": 200_000,
     },
     "gpt-5.4": {
@@ -34,7 +41,6 @@ MODEL_PRICING = {
     "gemini-3.1-pro": {
         "label": "Gemini 3.1 Pro",
         "provider": "price_only",
-        # Tiered: ≤200K tokens = lower price, >200K = higher price
         "input_per_mtok_le200k": 2.00,
         "output_per_mtok_le200k": 12.00,
         "input_per_mtok_gt200k": 4.00,

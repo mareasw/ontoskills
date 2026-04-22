@@ -22,6 +22,8 @@ dependencies = [
     "owlrl>=1.0.0",
     "pyshacl>=0.25.0",
     "pyyaml>=6.0",
+    "markdown-it-py>=3.0.0",
+    "mdit-py-plugins>=0.4.0",
 ]
 
 [project.optional-dependencies]
@@ -59,5 +61,6 @@ python_files = ["test_*.py"]
 python_functions = ["test_*"]
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "benchmark: marks coverage benchmark tests requiring external skill directories",
 ]
 addopts = "-m 'not integration'"
