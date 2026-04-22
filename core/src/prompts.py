@@ -150,7 +150,7 @@ ONLY leave this empty if the skill is an extremely simple, atomic operation with
     - `RollbackProcedure`: How to undo
 
 ### For each knowledge node, provide:
-- `node_type`: One of the 26 concrete types above
+- `node_type`: One of the 31 concrete types above
 - `directive_content`: What the agent should know (1-2 sentences)
 - `applies_to_context`: When this applies (e.g., "always", "on error", "before execution")
 - `has_rationale`: Why this matters (the "why")
@@ -165,6 +165,55 @@ Example:
   "has_rationale": "Formula corruption breaks the spreadsheet's computational integrity",
   "severity_level": "CRITICAL"
 }
+```
+
+## OPERATIONAL KNOWLEDGE EXTRACTION (NEW)
+
+In addition to epistemic nodes, extract operational nodes that tell the agent
+what to DO. These compact the skill's instructions into actionable nodes.
+
+### 5 Operational Node Types
+
+1. **Procedure** — Ordered steps to follow. Compact multi-line instructions into numbered steps.
+   - `step_order`: Integer position in sequence (1, 2, 3...)
+   - Example: "1. Write test → 2. Run (fails) → 3. Minimal code → 4. Run (passes) → 5. Refactor"
+
+2. **CodePattern** — Reusable code snippet with language context.
+   - `code_language`: Programming language
+   - Example directive: "def test_x(): assert f() == expected" with applies_to_context "basic TDD"
+
+3. **OutputFormat** — Template showing expected output structure.
+   - `template_variables`: List of placeholder names from the template
+   - Example directive: "## Summary\n- Finding\n- Recommendation\n- Next steps"
+
+4. **Command** — CLI command with exact syntax.
+   - Example directive: "npx awal@2.0.3 transfer --to ADDRESS --amount AMOUNT"
+
+5. **Prerequisite** — Required precondition before execution.
+   - Example directive: "Python 3.10+ must be installed"
+   - Example directive: "Requires ANTHROPIC_API_KEY environment variable"
+
+### Extraction Rules
+
+- Extract 3-8 operational nodes per skill (more for complex skills)
+- **Compact aggressively**: Remove filler words, explanations, motivational text. Keep only what the agent needs to DO.
+- A Procedure node should condense a full "Instructions" section into a few steps
+- A CodePattern should be the minimal code snippet, not the surrounding explanation
+- An OutputFormat should be the skeleton template, not a filled-in example
+- Only extract Prerequisite for external requirements (tools, env vars, versions), not for skill-internal steps
+- If a skill has code examples, extract the most important 1-3 as CodePattern nodes
+- If a skill defines an output format, extract it as OutputFormat
+
+### Example operational nodes:
+
+```json
+[
+  {"node_type": "Procedure", "directive_content": "1. Write failing test 2. Run test 3. Write minimal code to pass 4. Run test 5. Refactor", "step_order": 1},
+  {"node_type": "CodePattern", "directive_content": "def test_addition():\n    assert add(1, 2) == 3", "code_language": "python", "applies_to_context": "When writing basic unit tests"},
+  {"node_type": "OutputFormat", "directive_content": "## {Title}\n- **Status**: {status}\n- **Finding**: {finding}\n- **Recommendation**: {rec}", "template_variables": ["Title", "status", "finding", "rec"]},
+  {"node_type": "Command", "directive_content": "pytest tests/ -v --tb=short", "applies_to_context": "When running tests"},
+  {"node_type": "Prerequisite", "directive_content": "pytest must be installed (pip install pytest)"}
+]
 ```
 
 ## REFERENCE FILES
