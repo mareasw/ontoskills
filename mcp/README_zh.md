@@ -31,8 +31,7 @@ flowchart LR
 MCP 服务器专注于以下功能：
 
 - **技能发现** — 按意图、状态和类型搜索技能
-- **技能上下文检索** — 一次调用返回执行负载、状态转换、依赖、知识节点和章节标题
-- **技能内容检索** — 返回技能章节的重建 markdown（代码、步骤、表格等）
+- **技能上下文检索** — 一次调用返回执行负载、状态转换、依赖以及所有知识节点（认知 + 操作）
 - **规划** — 评估技能或意图在当前状态集下是否可执行
 - **认知检索** — 按类型、维度、严重性和上下文查询规范化的 `KnowledgeNode` 规则
 
@@ -44,7 +43,7 @@ MCP 服务器专注于以下功能：
 
 ```mermaid
 flowchart LR
-    CLIENT["MCP 客户端<br/>━━━━━━━━━━<br/>Claude Code<br/>stdio 传输"] -->|"tools/call"| TOOLS["MCP 工具<br/>━━━━━━━━━━<br/>5 个工具<br/>搜索、上下文、内容、规划、规则"]
+    CLIENT["MCP 客户端<br/>━━━━━━━━━━<br/>Claude Code<br/>stdio 传输"] -->|"tools/call"| TOOLS["MCP 工具<br/>━━━━━━━━━━<br/>4 个工具<br/>搜索、上下文、规划、规则"]
     TOOLS -->|"BM25 搜索"| BM25["BM25 引擎<br/>━━━━━━━━━━<br/>内存<br/>关键词搜索"]
     TOOLS -->|"SPARQL"| SPARQL["oxigraph<br/>━━━━━━━━━━<br/>SPARQL 1.1 引擎<br/>内存存储"]
     BM25 -->|"构建自"| GRAPH["RDF 图<br/>━━━━━━━━━━<br/>已加载 .ttl 文件<br/>OntoSkills 目录"]
@@ -73,8 +72,7 @@ flowchart LR
 | 工具 | 用途 |
 |------|------|
 | `search` | 通过关键词查询、别名或结构化过滤器搜索技能。按参数分派：`query` → BM25 关键词搜索（可选语义回退），`alias` → 别名解析，否则 → 结构化技能搜索 |
-| `get_skill_context` | 返回技能的完整执行上下文，包括负载、知识节点和章节标题（目录） |
-| `get_skill_content` | 检索技能章节内容为重建的 markdown。如果省略 `section`，返回目录 |
+| `get_skill_context` | 返回技能的完整执行上下文，包括负载和所有知识节点（认知 + 操作） |
 | `evaluate_execution_plan` | 评估适用性并为目标意图或技能生成执行计划 |
 | `query_epistemic_rules` | 通过引导过滤器查询本体中的规范化知识节点 |
 
@@ -244,7 +242,6 @@ claude mcp add ontomcp -- \
 flowchart LR
     CLAUDE["Claude Code"] -->|"search"| TOOLS["OntoMCP"]
     CLAUDE -->|"get_skill_context"| TOOLS
-    CLAUDE -->|"get_skill_content"| TOOLS
     CLAUDE -->|"evaluate_execution_plan"| TOOLS
     CLAUDE -->|"query_epistemic_rules"| TOOLS
 
