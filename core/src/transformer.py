@@ -412,6 +412,7 @@ def hydrate_skeleton(
             if preamble is None:
                 preamble = Section(title="", level=0, order=0)
                 sections.insert(0, preamble)
+            block.content.content_order = len(preamble.content) + 1
             preamble.content.append(block.content)
             _hydrate_children(preamble, node, blocks_index)
 
