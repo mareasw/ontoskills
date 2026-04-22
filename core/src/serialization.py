@@ -349,8 +349,20 @@ def serialize_skill(
         graph.add((kn_uri, RDF.type, oc[kn.node_type]))
         graph.add((kn_uri, RDF.type, oc.KnowledgeNode))
         graph.add((kn_uri, oc.directiveContent, Literal(kn.directive_content)))
-        graph.add((kn_uri, oc.appliesToContext, Literal(kn.applies_to_context)))
-        graph.add((kn_uri, oc.hasRationale, Literal(kn.has_rationale)))
+
+        if kn.applies_to_context:
+            graph.add((kn_uri, oc.appliesToContext, Literal(kn.applies_to_context)))
+        if kn.has_rationale:
+            graph.add((kn_uri, oc.hasRationale, Literal(kn.has_rationale)))
+
+        # Operational fields
+        if kn.code_language:
+            graph.add((kn_uri, oc.codeLanguage, Literal(kn.code_language)))
+        if kn.step_order is not None:
+            graph.add((kn_uri, oc.stepOrder, Literal(kn.step_order)))
+        if kn.template_variables:
+            for var in kn.template_variables:
+                graph.add((kn_uri, oc.templateVariables, Literal(var)))
 
         if kn.severity_level:
             graph.add((kn_uri, oc.severityLevel, Literal(kn.severity_level.value)))
