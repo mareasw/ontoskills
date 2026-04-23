@@ -2,5 +2,6 @@
 
 from .gaia import GAIAWrapper
 from .swebench import SWEBenchWrapper
+from .tau2bench import Tau2BenchWrapper
 
-__all__ = ["GAIAWrapper", "SWEBenchWrapper"]
+__all__ = ["GAIAWrapper", "SWEBenchWrapper", "Tau2BenchWrapper"]
