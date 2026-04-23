@@ -788,3 +788,65 @@ class TestContentBlockSerialization:
             for child in child_nodes
         )
         assert has_child
+
+
+def test_operational_node_serialization():
+    """Operational fields serialize to RDF triples."""
+    from compiler.schemas import KnowledgeNode
+    from compiler.serialization import serialize_skill
+    from compiler.core_ontology import get_oc_namespace
+
+    skill = ExtractedSkill(
+        id="ops-skill", hash="abc", nature="test", genus="Test",
+        differentia="ops", intents=["test"], generated_by="test",
+        knowledge_nodes=[
+            KnowledgeNode(node_type="Procedure", directive_content="1. Do X 2. Do Y", step_order=1),
+            KnowledgeNode(node_type="CodePattern", directive_content="print('hi')", code_language="python"),
+            KnowledgeNode(node_type="OutputFormat", directive_content="## Summary", template_variables=["Summary"]),
+            KnowledgeNode(node_type="Command", directive_content="npm install"),
+            KnowledgeNode(node_type="Prerequisite", directive_content="Node.js 18+"),
+        ],
+    )
+    graph = Graph()
+    oc = get_oc_namespace()
+    serialize_skill(graph, skill)
+
+    # Verify operational types exist as KnowledgeNode subclasses
+    assert list(graph.subjects(RDF.type, oc.Procedure))
+    assert list(graph.subjects(RDF.type, oc.CodePattern))
+    assert list(graph.subjects(RDF.type, oc.OutputFormat))
+    assert list(graph.subjects(RDF.type, oc.Command))
+    assert list(graph.subjects(RDF.type, oc.Prerequisite))
+
+    # Verify operational properties
+    proc_uri = list(graph.subjects(RDF.type, oc.Procedure))[0]
+    assert (proc_uri, oc.stepOrder, Literal(1)) in graph
+
+    code_uri = list(graph.subjects(RDF.type, oc.CodePattern))[0]
+    assert (code_uri, oc.codeLanguage, Literal("python")) in graph
+
+    tmpl_uri = list(graph.subjects(RDF.type, oc.OutputFormat))[0]
+    assert (tmpl_uri, oc.templateVariables, Literal("Summary")) in graph
+
+
+def test_optional_fields_not_serialized_when_none():
+    """appliesToContext and hasRationale are not serialized when None."""
+    from compiler.schemas import KnowledgeNode
+    from compiler.serialization import serialize_skill
+    from compiler.core_ontology import get_oc_namespace
+
+    skill = ExtractedSkill(
+        id="minimal-skill", hash="abc", nature="test", genus="Test",
+        differentia="min", intents=["test"], generated_by="test",
+        knowledge_nodes=[
+            KnowledgeNode(node_type="Procedure", directive_content="Do it"),
+        ],
+    )
+    graph = Graph()
+    oc = get_oc_namespace()
+    serialize_skill(graph, skill)
+
+    proc_uri = list(graph.subjects(RDF.type, oc.Procedure))[0]
+    # appliesToContext should NOT be in the graph since it's None
+    assert not list(graph.objects(proc_uri, oc.appliesToContext))
+    assert not list(graph.objects(proc_uri, oc.hasRationale))

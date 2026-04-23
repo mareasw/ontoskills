@@ -5,7 +5,7 @@ description: Protocol for interacting with the OntoSkills MCP server to discover
 
 ## OVERVIEW
 
-The OntoSkills MCP server exposes a knowledge graph of compiled skills. This document teaches you how to use its 5 tools effectively to find, evaluate, and compose skills for any task.
+The OntoSkills MCP server exposes a knowledge graph of compiled skills. This document teaches you how to use its 4 tools effectively to find, evaluate, and compose skills for any task.
 
 ## AVAILABLE MCP TOOLS
 
@@ -23,12 +23,12 @@ Search across all compiled skills by keyword (BM25), alias, or structured filter
 
 ### 2. get_skill_context({ skill_id: string, include_inherited_knowledge: bool = true }) -> SkillContextResult
 
-Returns full details for a specific skill: metadata, knowledge nodes, state transitions, dependencies, and section titles (table of contents).
+Returns full details for a specific skill: metadata, all operational knowledge (procedures, code patterns, constraints, heuristics, anti-patterns, etc.), state transitions, dependencies, and section titles (table of contents).
 
-**When to use:** After search identified candidate skills, to evaluate fitness and see what sections are available.
+**When to use:** After search identified candidate skills, to evaluate fitness and access all the knowledge needed to execute the skill.
 
 **Best practices:**
-- The `sections` field lists all section titles — use these with get_skill_content to read specific sections
+- The response includes all operational knowledge nodes — read them carefully before executing
 - Set `include_inherited_knowledge=false` to exclude knowledge from extended skills
 - Always check requiresState before attempting execution
 - Read ALL knowledge nodes with severity CRITICAL or HIGH before proceeding
@@ -36,26 +36,11 @@ Returns full details for a specific skill: metadata, knowledge nodes, state tran
 **Response structure:**
 - `skill`: skill metadata (name, description, category, intents, aliases)
 - `payload`: executor type and code (for executable skills)
-- `knowledge_nodes`: epistemic rules (standards, anti-patterns, constraints, heuristics, etc.)
+- `knowledge_nodes`: epistemic rules — all operational knowledge including standards, anti-patterns, constraints, heuristics, procedures, code patterns, etc.
 - `sections`: table of contents — list of section titles with levels and hierarchy
 - `include_inherited_knowledge`: whether inherited knowledge from extended skills was included
 
-### 3. get_skill_content({ skill_id: string, section: string = None }) -> SkillContentResult
-
-Retrieves skill section content as reconstructed markdown. If `section` is omitted, returns the table of contents. If `section` is provided, returns the content of that section and all its subsections.
-
-**When to use:** After get_skill_context showed available sections, to read the actual instructions, code examples, checklists, and procedures.
-
-**Best practices:**
-- Call get_skill_context first to see which sections exist
-- Request sections one at a time — only load what you need
-- The response includes subsections automatically — no need to request them separately
-- Reconstructed markdown matches the original SKILL.md structure
-
-**Response (no section):** TOC as markdown headings
-**Response (with section):** Reconstructed markdown with paragraphs, code blocks, bullet lists, ordered procedures, tables, blockquotes, flowcharts, templates
-
-### 4. evaluate_execution_plan({ plan: ExecutionPlan }) -> ExecutionPlanEvaluation
+### 3. evaluate_execution_plan({ plan: ExecutionPlan }) -> ExecutionPlanEvaluation
 
 Validates a proposed execution plan against the skill knowledge graph. Checks state chains, dependencies, and identifies missing prerequisites.
 
@@ -77,7 +62,7 @@ Validates a proposed execution plan against the skill knowledge graph. Checks st
 }
 ```
 
-### 5. query_epistemic_rules({ context: string, kind: string = None, severity: string = None }) -> Vec<KnowledgeNodeInfo>
+### 4. query_epistemic_rules({ context: string, kind: string = None, severity: string = None }) -> Vec<KnowledgeNodeInfo>
 
 Queries knowledge rules across all skills, optionally filtered by type and severity.
 
@@ -93,7 +78,7 @@ Queries knowledge rules across all skills, optionally filtered by type and sever
 
 ### Discovery Phase
 1. Call `search` with the user's intent
-2. For each match (up to 5), call `get_skill_context({ skill_id })` to see sections and requirements
+2. For each match (up to 5), call `get_skill_context({ skill_id })` to see knowledge nodes and requirements
 3. Evaluate: check intents alignment, requiresState preconditions, category relevance
 4. Select the best 1-3 candidates
 
@@ -104,10 +89,9 @@ Queries knowledge rules across all skills, optionally filtered by type and sever
 8. For CRITICAL/HIGH knowledge nodes: internalize the rules before proceeding
 
 ### Execution Phase
-9. Call `get_skill_content({ skill_id, section })` for the sections you'll execute
-10. Follow ordered procedures (stepOrder) if present
-11. Respect all knowledge nodes — especially AntiPatterns and Constraints
-12. After execution, verify yieldsState matches expected outcomes
+9. Follow ordered procedures (stepOrder) if present
+10. Respect all knowledge nodes — especially AntiPatterns and Constraints
+11. After execution, verify yieldsState matches expected outcomes
 
 ## COMMON MISTAKES TO AVOID
 
@@ -115,7 +99,6 @@ Queries knowledge rules across all skills, optionally filtered by type and sever
 - **Ignoring requiresState:** Executing a skill without its preconditions leads to failures.
 - **Overlooking CRITICAL knowledge nodes:** These are hard constraints, not suggestions.
 - **Not validating plans:** Multi-skill workflows can have broken state chains.
-- **Loading full content too early:** Use get_skill_context first, then get_skill_content only for sections you need.
 - **Assuming skill availability:** Search results only include compiled and enabled skills.
 
 ## STATE TRANSITION SEMANTICS
@@ -127,14 +110,3 @@ Skills form a state machine via requiresState/yieldsState:
 
 State chaining: Skill A's yieldsState should match Skill B's requiresState for valid sequencing.
 If evaluate_execution_plan reports `missing_states`, you need to find or ensure skills that yield those states.
-
-## CONTENT BLOCK TYPES
-
-When using get_skill_content, responses may contain:
-- **CodeExample**: Inline code with language, purpose, and usage context
-- **Table**: Markdown tables with raw source (can be reconstructed)
-- **Flowchart**: Graphviz or Mermaid diagrams encoding decision flows
-- **Template**: Reusable prompt/output templates with variable placeholders
-- **Workflow**: Ordered procedure steps with dependencies
-
-Use these to execute the skill without reading the original SKILL.md.
