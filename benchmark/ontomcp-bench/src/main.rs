@@ -1,6 +1,7 @@
 use anyhow::Result;
 use oxigraph::io::RdfFormat;
 use oxigraph::model::Term;
+use oxigraph::sparql::{QueryResults, SparqlEvaluator};
 use oxigraph::store::Store;
 use std::env;
 use std::fs::{self, File};
@@ -30,9 +31,17 @@ struct BenchReport {
     results: Vec<BenchResult>,
 }
 
+/// Execute a SELECT query and return solution rows.
+fn exec_select(store: &Store, query: &str) -> Result<Vec<oxigraph::sparql::QuerySolution>> {
+    let prepared = SparqlEvaluator::new().parse_query(query)?;
+    let results = prepared.on_store(store).execute()?;
+    match results {
+        QueryResults::Solutions(solutions) => solutions.collect::<Result<Vec<_>, _>>().map_err(Into::into),
+        _ => anyhow::bail!("Expected SELECT query results"),
+    }
+}
+
 /// Extract the numeric value from a SPARQL COUNT binding.
-/// Oxigraph terms for typed literals stringify as `"42"^^<...>`,
-/// so we must extract the Literal's lexical form, not use to_string().
 fn extract_count(bindings: &oxigraph::sparql::QuerySolution, index: usize) -> usize {
     bindings
         .get(index)
@@ -77,17 +86,17 @@ fn main() -> Result<()> {
 
     let oc = "https://ontoskills.sh/ontology#";
 
-    // Count skills via SPARQL (authoritative, not substring matching)
+    // Count skills via SPARQL
     let total_skills: usize = {
         let query = format!("SELECT (COUNT(?s) AS ?count) WHERE {{ ?s a <{oc}Skill> }}");
-        let results: Vec<_> = store.query(&query)?.into_bindings().collect();
+        let results = exec_select(&store, &query)?;
         results.first().map(|r| extract_count(r, 0)).unwrap_or(0)
     };
 
     // Count triples
     let total_triples: usize = {
         let count_query = "SELECT (COUNT(*) AS ?count) WHERE { ?s ?p ?o }";
-        let results: Vec<_> = store.query(count_query)?.into_bindings().collect();
+        let results = exec_select(&store, count_query)?;
         results.first().map(|r| extract_count(r, 0)).unwrap_or(0)
     };
 
@@ -99,9 +108,6 @@ fn main() -> Result<()> {
         load_time.as_secs_f64() * 1000.0,
     );
 
-    // Define benchmark queries using the oc: namespace from core.ttl
-    // Property names match the actual ontology: oc:hasDescription (not oc:description),
-    // oc:directiveContent, oc:resolvesIntent, etc.
     let queries: Vec<(&str, String)> = vec![
         (
             "search (by intent)",
@@ -133,12 +139,28 @@ fn main() -> Result<()> {
             ),
         ),
         (
-            "query_epistemic_rules",
+            "query_knowledge_nodes (epistemic)",
             format!(
                 r#"SELECT ?node ?type ?content WHERE {{
                     ?node a ?type .
                     ?node a <{oc}KnowledgeNode> .
                     ?node <{oc}directiveContent> ?content .
+                    FILTER (?type != <{oc}KnowledgeNode>)
+                    FILTER (?type != <{oc}Procedure> && ?type != <{oc}CodePattern> && ?type != <{oc}OutputFormat> && ?type != <{oc}Command> && ?type != <{oc}Prerequisite>)
+                }}"#
+            ),
+        ),
+        (
+            "query_knowledge_nodes (operational)",
+            format!(
+                r#"SELECT ?node ?type ?content ?codeLang ?stepOrd ?tmplVar WHERE {{
+                    ?node a ?type .
+                    ?node a <{oc}KnowledgeNode> .
+                    ?node <{oc}directiveContent> ?content .
+                    FILTER (?type IN (<{oc}Procedure>, <{oc}CodePattern>, <{oc}OutputFormat>, <{oc}Command>, <{oc}Prerequisite>))
+                    OPTIONAL {{ ?node <{oc}codeLanguage> ?codeLang }}
+                    OPTIONAL {{ ?node <{oc}stepOrder> ?stepOrd }}
+                    OPTIONAL {{ ?node <{oc}templateVariables> ?tmplVar }}
                 }}"#
             ),
         ),
@@ -168,7 +190,7 @@ fn main() -> Result<()> {
 
     for (name, query) in &queries {
         // Validate query once before timing (fail fast on errors)
-        if let Err(e) = store.query(query.as_str()) {
+        if let Err(e) = exec_select(&store, query) {
             eprintln!("ERROR: query '{}' failed: {}", name, e);
             results.push(BenchResult {
                 query_name: name.to_string(),
@@ -183,9 +205,8 @@ fn main() -> Result<()> {
             continue;
         }
 
-        // Guard against iterations == 0 to avoid panic on empty times vec
         if iterations == 0 {
-            println!("{:<35} skipped (0 iterations)", name);
+            println!("{:<45} skipped (0 iterations)", name);
             results.push(BenchResult {
                 query_name: name.to_string(),
                 skill_count: total_skills,
@@ -203,12 +224,9 @@ fn main() -> Result<()> {
 
         for _ in 0..iterations {
             let start = Instant::now();
-            // Materialize results to measure full execution, not just lazy setup
-            let results = store.query(query.as_str()).unwrap();
-            let count = match results {
-                oxigraph::sparql::QueryResults::Solutions(solutions) => solutions.count(),
-                oxigraph::sparql::QueryResults::Graph(graph) => graph.count(),
-                _ => 0,
+            let count = match exec_select(&store, query) {
+                Ok(rows) => rows.len(),
+                Err(_) => 0,
             };
             std::hint::black_box(count);
             times.push(start.elapsed().as_micros() as u64);
@@ -223,7 +241,7 @@ fn main() -> Result<()> {
         let p99 = times[times.len() * 99 / 100];
 
         println!(
-            "{:<35} avg={:>6}μs  p50={:>6}μs  p99={:>6}μs  min={:>5}μs  max={:>6}μs",
+            "{:<45} avg={:>6}μs  p50={:>6}μs  p99={:>6}μs  min={:>5}μs  max={:>6}μs",
             name, avg, p50, p99, min, max
         );
 

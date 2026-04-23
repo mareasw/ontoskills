@@ -375,6 +375,26 @@ def _add_content_block_classes(g: Graph, oc: Namespace) -> None:
     )))
 
 
+def _add_operational_node_types(g: Graph, oc: Namespace) -> None:
+    """Add 5 operational knowledge node types and their properties."""
+
+    # ========== Operational Node Type Classes ==========
+
+    for node_type in ["Procedure", "CodePattern", "OutputFormat", "Command", "Prerequisite"]:
+        g.add((oc[node_type], RDF.type, OWL.Class))
+        g.add((oc[node_type], RDFS.subClassOf, oc.KnowledgeNode))
+        g.add((oc[node_type], RDFS.label, Literal(node_type)))
+
+    # ========== Operational Node Properties ==========
+    # These properties already exist from content block definitions (codeLanguage,
+    # stepOrder, templateVariables). We only add comments for the operational context.
+    # No RDFS.domain re-declaration to avoid conflicting domain assertions.
+
+    g.add((oc.codeLanguage, RDFS.comment, Literal("Programming language of a CodePattern node (also used for code blocks)")))
+    g.add((oc.stepOrder, RDFS.comment, Literal("Position of a Procedure node in sequence (also used for workflow steps)")))
+    g.add((oc.templateVariables, RDFS.comment, Literal("Variable placeholders in an OutputFormat node (also used for templates)")))
+
+
 def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
     """
     Create the core OntoSkills ontology (TBox) with state transition system.
@@ -468,11 +488,11 @@ def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
 
     # ========== Knowledge Node Foundation ==========
 
-    # oc:KnowledgeNode - Base class for epistemic knowledge
+    # oc:KnowledgeNode - Base class for epistemic and operational knowledge
     g.add((oc.KnowledgeNode, RDF.type, OWL.Class))
     g.add((oc.KnowledgeNode, RDFS.label, Literal("Knowledge Node")))
     g.add((oc.KnowledgeNode, RDFS.comment, Literal(
-        "Epistemic knowledge imparted by a skill to an agent"
+        "Knowledge imparted by a skill to an agent — epistemic (rules, constraints) or operational (procedures, code patterns)"
     )))
 
     # oc:impartsKnowledge (ObjectProperty) - Skill → KnowledgeNode
@@ -481,7 +501,7 @@ def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
     g.add((oc.impartsKnowledge, RDFS.range, oc.KnowledgeNode))
     g.add((oc.impartsKnowledge, RDFS.label, Literal("imparts knowledge")))
     g.add((oc.impartsKnowledge, RDFS.comment, Literal(
-        "Links a skill to epistemic knowledge it imparts to the agent"
+        "Links a skill to knowledge it imparts to the agent"
     )))
 
     # oc:directiveContent (DatatypeProperty)
@@ -521,6 +541,9 @@ def create_core_ontology(output_path: Optional[Path] = None) -> Graph:
 
     # Add RBox axioms for knowledge inheritance
     _add_knowledge_rbox(g, oc)
+
+    # Add operational knowledge node types and properties
+    _add_operational_node_types(g, oc)
 
     # Add LLM-extracted content block classes and properties
     _add_extracted_block_classes(g, oc)

@@ -173,6 +173,13 @@ pub struct KnowledgeNodeInfo {
     pub source_skill_id: String,
     pub source_qualified_id: Option<String>,
     pub inherited: bool,
+    // Operational fields
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code_language: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub step_order: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template_variables: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -180,27 +187,7 @@ pub struct SkillContextResult {
     pub skill: SkillDetails,
     pub payload: PayloadInfo,
     pub knowledge_nodes: Vec<KnowledgeNodeInfo>,
-    pub sections: Vec<SectionTitle>,
     pub include_inherited_knowledge: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct SectionTitle {
-    pub title: String,
-    pub level: i64,
-    pub order: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub parent_title: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct SkillContentResult {
-    pub skill_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub section: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub level: Option<i64>,
-    pub content: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -497,13 +484,11 @@ impl Catalog {
         let skill = self.get_skill(skill_id)?;
         let payload = self.get_skill_payload(skill_id)?;
         let knowledge_nodes = self.get_knowledge_nodes(skill_id, include_inherited_knowledge)?;
-        let sections = self.get_section_titles(skill_id).unwrap_or_default();
 
         Ok(SkillContextResult {
             skill,
             payload,
             knowledge_nodes,
-            sections,
             include_inherited_knowledge,
         })
     }
@@ -986,7 +971,7 @@ impl Catalog {
             PREFIX oc: <https://ontoskills.sh/ontology#>
             PREFIX dcterms: <http://purl.org/dc/terms/>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-            SELECT DISTINCT ?sourceSkillId ?node ?nodeType ?nodeLabel ?directiveContent ?rationale ?appliesToContext ?severityLevel ?dimension
+            SELECT DISTINCT ?sourceSkillId ?node ?nodeType ?nodeLabel ?directiveContent ?rationale ?appliesToContext ?severityLevel ?dimension ?codeLanguage ?stepOrder ?templateVar
             WHERE {{
                 {source_binding}
                 ?node a ?nodeType ;
@@ -1000,6 +985,9 @@ impl Catalog {
                     ?nodeType rdfs:subClassOf* ?dimension .
                     FILTER (?dimension IN ({dimensions}))
                 }}
+                OPTIONAL {{ ?node oc:codeLanguage ?codeLanguage }}
+                OPTIONAL {{ ?node oc:stepOrder ?stepOrder }}
+                OPTIONAL {{ ?node oc:templateVariables ?templateVar }}
             }}
             ORDER BY ?sourceSkillId ?node
         "#,
@@ -1012,10 +1000,21 @@ impl Catalog {
         );
 
         let mut by_uri: BTreeMap<String, KnowledgeNodeInfo> = BTreeMap::new();
+        let mut template_vars_by_uri: HashMap<String, Vec<String>> = HashMap::new();
+
         for row in self.select_rows(&query)? {
             let uri = row.required_iri("node")?;
             let source_skill_id = row.required_literal("sourceSkillId")?;
             let inherited = source_skill_id != requested_skill_id;
+
+            // Accumulate template variables across duplicate rows
+            if let Some(tv) = row.optional_literal("templateVar") {
+                template_vars_by_uri
+                    .entry(uri.clone())
+                    .or_default()
+                    .push(tv);
+            }
+
             let candidate = KnowledgeNodeInfo {
                 uri: uri.clone(),
                 label: row.optional_literal("nodeLabel"),
@@ -1035,6 +1034,9 @@ impl Catalog {
                 source_qualified_id: self.qualified_id_for(&source_skill_id),
                 source_skill_id,
                 inherited,
+                code_language: row.optional_literal("codeLanguage"),
+                step_order: row.optional_i64("stepOrder"),
+                template_variables: None, // Set after deduplication
             };
 
             match by_uri.get(&uri) {
@@ -1045,448 +1047,21 @@ impl Catalog {
             }
         }
 
-        Ok(by_uri.into_values().collect())
-    }
-
-    fn reconstruct_block(&self, row: &QueryRow, block_type: &str, block_iri: Option<&str>) -> String {
-        match block_type {
-            "paragraph" => row.optional_literal("textContent").unwrap_or_default(),
-            "code_block" => {
-                let lang = row.optional_literal("codeLanguage").unwrap_or_default();
-                let code = row.optional_literal("codeContent").unwrap_or_default();
-                format!("```{lang}\n{code}\n```")
-            }
-            "blockquote" => {
-                let text = row.optional_literal("quoteContent").unwrap_or_default();
-                let attribution = row.optional_literal("quoteAttribution");
-                let mut quoted = text
-                    .split('\n')
-                    .map(|line| format!("> {line}"))
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                if let Some(attr) = attribution {
-                    quoted.push_str(&format!("\n> — {attr}"));
+        // Attach accumulated template_variables to each node
+        let mut nodes: Vec<KnowledgeNodeInfo> = by_uri.into_values().collect();
+        for node in &mut nodes {
+            if let Some(vars) = template_vars_by_uri.remove(&node.uri) {
+                if !vars.is_empty() {
+                    node.template_variables = Some(vars);
                 }
-                quoted
-            }
-            "table" => row.optional_literal("tableMarkdown").unwrap_or_default(),
-            "flowchart" => {
-                let chart_type = row.optional_literal("flowchartType").unwrap_or_else(|| "text".to_string());
-                let source = row.optional_literal("flowchartSource").unwrap_or_default();
-                format!("```{chart_type}\n{source}\n```")
-            }
-            "template" => row.optional_literal("templateContent").unwrap_or_default(),
-            "html_block" => row.optional_literal("htmlContent").unwrap_or_default(),
-            "frontmatter" => {
-                let yaml = row.optional_literal("rawYaml").unwrap_or_default();
-                format!("---\n{yaml}\n---")
-            }
-            "bullet_list" => match block_iri {
-                Some(iri) => self.reconstruct_list_items(iri),
-                None => String::new(),
-            },
-            "ordered_procedure" => match block_iri {
-                Some(iri) => self.reconstruct_workflow_steps(iri),
-                None => String::new(),
-            },
-            _ => String::new(),
-        }
-    }
-
-    fn reconstruct_list_items(&self, list_block_ref: &str) -> String {
-        let block_pattern = if list_block_ref.starts_with("_:") {
-            list_block_ref.to_string()
-        } else {
-            format!("<{list_block_ref}>")
-        };
-        let query = format!(
-            r#"
-        PREFIX oc: <https://ontoskills.sh/ontology#>
-        SELECT ?itemText ?itemOrder ?childType ?childContent ?childLanguage ?childOrder ?childAttribution
-        WHERE {{
-            {block_pattern} oc:hasItem ?item .
-            ?item oc:itemText ?itemText ;
-                  oc:itemOrder ?itemOrder .
-            OPTIONAL {{
-                ?item oc:hasChild ?child .
-                ?child oc:blockType ?childType .
-                OPTIONAL {{ ?child oc:textContent ?childContent . }}
-                OPTIONAL {{ ?child oc:codeContent ?childContent . }}
-                OPTIONAL {{ ?child oc:quoteContent ?childContent . }}
-                OPTIONAL {{ ?child oc:templateContent ?childContent . }}
-                OPTIONAL {{ ?child oc:codeLanguage ?childLanguage . }}
-                OPTIONAL {{ ?child oc:contentOrder ?childOrder . }}
-                OPTIONAL {{ ?child oc:quoteAttribution ?childAttribution . }}
-            }}
-        }}
-        ORDER BY ?itemOrder ?childOrder
-        "#
-        );
-        match self.select_rows(&query) {
-            Ok(rows) => {
-                let mut lines: Vec<String> = Vec::new();
-                let mut last_item_order: Option<i64> = None;
-                for row in &rows {
-                    let item_text = row.optional_literal("itemText").unwrap_or_default();
-                    let item_order: i64 = row.optional_literal("itemOrder")
-                        .and_then(|v| v.parse().ok())
-                        .unwrap_or(0);
-                    if last_item_order != Some(item_order) {
-                        lines.push(format!("- {item_text}"));
-                        last_item_order = Some(item_order);
-                    }
-                    if let (Some(child_type), Some(child_content)) =
-                        (row.optional_literal("childType"), row.optional_literal("childContent"))
-                    {
-                        let indented = child_content
-                            .lines()
-                            .map(|l| format!("  {l}"))
-                            .collect::<Vec<_>>()
-                            .join("\n");
-                        match child_type.as_str() {
-                            "code_block" => {
-                                let lang = row.optional_literal("childLanguage").unwrap_or_default();
-                                lines.push(format!("  ```{lang}"));
-                                lines.push(indented);
-                                lines.push(format!("  ```"));
-                            }
-                            "blockquote" => {
-                                let quoted = child_content
-                                    .lines()
-                                    .map(|l| if l.is_empty() { "  >".to_string() } else { format!("  > {l}") })
-                                    .collect::<Vec<_>>()
-                                    .join("\n");
-                                lines.push(quoted);
-                                if let Some(attr) = row.optional_literal("childAttribution") {
-                                    lines.push(format!("  > — {attr}"));
-                                }
-                            }
-                            _ => {
-                                lines.push(indented);
-                            }
-                        }
-                    }
-                }
-                lines.join("\n")
-            }
-            Err(_) => String::new(),
-        }
-    }
-
-    fn reconstruct_workflow_steps(&self, workflow_block_ref: &str) -> String {
-        let block_pattern = if workflow_block_ref.starts_with("_:") {
-            workflow_block_ref.to_string()
-        } else {
-            format!("<{workflow_block_ref}>")
-        };
-        let query = format!(
-            r#"
-        PREFIX oc: <https://ontoskills.sh/ontology#>
-        PREFIX dcterms: <http://purl.org/dc/terms/>
-        SELECT ?stepText ?stepOrder ?childType ?childContent ?childLanguage ?childOrder ?childAttribution
-        WHERE {{
-            {block_pattern} oc:hasStep ?step .
-            ?step dcterms:description ?stepText ;
-                  oc:stepOrder ?stepOrder .
-            OPTIONAL {{
-                ?step oc:hasChild ?child .
-                ?child oc:blockType ?childType .
-                OPTIONAL {{ ?child oc:textContent ?childContent . }}
-                OPTIONAL {{ ?child oc:codeContent ?childContent . }}
-                OPTIONAL {{ ?child oc:quoteContent ?childContent . }}
-                OPTIONAL {{ ?child oc:templateContent ?childContent . }}
-                OPTIONAL {{ ?child oc:codeLanguage ?childLanguage . }}
-                OPTIONAL {{ ?child oc:contentOrder ?childOrder . }}
-                OPTIONAL {{ ?child oc:quoteAttribution ?childAttribution . }}
-            }}
-        }}
-        ORDER BY ?stepOrder ?childOrder
-        "#
-        );
-        match self.select_rows(&query) {
-            Ok(rows) => {
-                let mut lines: Vec<String> = Vec::new();
-                let mut last_step_order: Option<i64> = None;
-                let mut step_num = 0u32;
-                for row in &rows {
-                    let step_text = row.optional_literal("stepText").unwrap_or_default();
-                    let step_order: i64 = row.optional_literal("stepOrder")
-                        .and_then(|v| v.parse().ok())
-                        .unwrap_or(0);
-                    if last_step_order != Some(step_order) {
-                        step_num += 1;
-                        lines.push(format!("{step_num}. {step_text}"));
-                        last_step_order = Some(step_order);
-                    }
-                    if let (Some(child_type), Some(child_content)) =
-                        (row.optional_literal("childType"), row.optional_literal("childContent"))
-                    {
-                        let indented = child_content
-                            .lines()
-                            .map(|l| format!("   {l}"))
-                            .collect::<Vec<_>>()
-                            .join("\n");
-                        match child_type.as_str() {
-                            "code_block" => {
-                                let lang = row.optional_literal("childLanguage").unwrap_or_default();
-                                lines.push(format!("   ```{lang}"));
-                                lines.push(indented);
-                                lines.push(format!("   ```"));
-                            }
-                            "blockquote" => {
-                                let quoted = child_content
-                                    .lines()
-                                    .map(|l| if l.is_empty() { "   >".to_string() } else { format!("   > {l}") })
-                                    .collect::<Vec<_>>()
-                                    .join("\n");
-                                lines.push(quoted);
-                                if let Some(attr) = row.optional_literal("childAttribution") {
-                                    lines.push(format!("   > — {attr}"));
-                                }
-                            }
-                            _ => {
-                                lines.push(indented);
-                            }
-                        }
-                    }
-                }
-                lines.join("\n")
-            }
-            Err(_) => String::new(),
-        }
-    }
-}
-
-/// Sort sections into pre-order (document) traversal.
-/// Root sections (no parent) come first ordered by their `order`,
-/// then their children, then the next root, etc.
-fn pre_order_sort(titles: Vec<SectionTitle>) -> Vec<SectionTitle> {
-    use std::collections::HashMap;
-    let mut by_parent: HashMap<Option<String>, Vec<&SectionTitle>> = HashMap::new();
-    for t in &titles {
-        by_parent.entry(t.parent_title.clone()).or_default().push(t);
-    }
-    for children in by_parent.values_mut() {
-        children.sort_by_key(|t| t.order);
-    }
-
-    let mut result = Vec::with_capacity(titles.len());
-    fn walk<'a>(
-        parent: &Option<String>,
-        by_parent: &'a HashMap<Option<String>, Vec<&'a SectionTitle>>,
-        result: &mut Vec<SectionTitle>,
-    ) {
-        if let Some(children) = by_parent.get(parent) {
-            for child in children {
-                result.push((*child).clone());
-                walk(&Some(child.title.clone()), by_parent, result);
             }
         }
+
+        Ok(nodes)
     }
-    walk(&None, &by_parent, &mut result);
-    result
 }
 
 impl Catalog {
-    pub fn get_section_titles(
-        &self,
-        skill_id: &str,
-    ) -> Result<Vec<SectionTitle>, CatalogError> {
-        validate_skill_id(skill_id)?;
-        let record = self.resolve_skill_reference(skill_id)?;
-        let skill_uri = &record.uri;
-
-        let query = format!(
-            r#"
-        PREFIX oc: <https://ontoskills.sh/ontology#>
-        SELECT ?title ?level ?order ?parent_title
-        WHERE {{
-            {{
-                <{skill_uri}> oc:hasSection ?section .
-                BIND("" AS ?parent_title)
-            }}
-            UNION
-            {{
-                <{skill_uri}> oc:hasSection/oc:hasSubsection* ?section .
-                ?parent oc:hasSubsection ?section .
-                ?parent oc:sectionTitle ?parent_title .
-            }}
-            ?section oc:sectionTitle ?title ;
-                     oc:sectionLevel ?level ;
-                     oc:sectionOrder ?order .
-        }}
-        "#
-        );
-
-        let mut titles = Vec::new();
-        for row in self.select_rows(&query)? {
-            let parent = row.optional_literal("parent_title");
-            titles.push(SectionTitle {
-                title: row.required_literal("title")?,
-                level: row.optional_i64("level").unwrap_or(0),
-                order: row.optional_i64("order").unwrap_or(0),
-                parent_title: if parent.as_deref() == Some("") { None } else { parent },
-            });
-        }
-        Ok(pre_order_sort(titles))
-    }
-
-    pub fn get_section_content(
-        &self,
-        skill_id: &str,
-        section_title: Option<&str>,
-    ) -> Result<SkillContentResult, CatalogError> {
-        validate_skill_id(skill_id)?;
-        let record = self.resolve_skill_reference(skill_id)?;
-        let skill_uri = &record.uri;
-
-        // No section specified — return TOC as text
-        let Some(title) = section_title else {
-            let titles = self.get_section_titles(skill_id)?;
-            if titles.is_empty() {
-                return Ok(SkillContentResult {
-                    skill_id: skill_id.to_string(),
-                    section: None,
-                    level: None,
-                    content: "This skill has no documented sections.".to_string(),
-                });
-            }
-            let mut lines = Vec::new();
-            for st in &titles {
-                if st.level < 2 || st.title.trim().is_empty() {
-                    continue;
-                }
-                let prefix = "#".repeat(st.level as usize);
-                let indent = "  ".repeat(st.level.saturating_sub(2) as usize);
-                lines.push(format!("{indent}{prefix} {}", st.title));
-            }
-            return Ok(SkillContentResult {
-                skill_id: skill_id.to_string(),
-                section: None,
-                level: None,
-                content: lines.join("\n"),
-            });
-        };
-
-        // Section specified — query content blocks with subsections
-        // Match at any nesting depth using hasSection/hasSubsection*
-        let escaped_title = sparql_string(title);
-        let query = format!(
-            r#"
-        PREFIX oc: <https://ontoskills.sh/ontology#>
-        PREFIX dcterms: <http://purl.org/dc/terms/>
-        SELECT ?secTitle ?secLevel ?secOrder ?secParentTitle ?block ?blockType ?contentOrder
-               ?textContent ?codeContent ?codeLanguage
-               ?tableMarkdown ?quoteContent ?quoteAttribution
-               ?flowchartSource ?flowchartType
-               ?templateContent ?htmlContent ?rawYaml
-        WHERE {{
-            <{skill_uri}> oc:hasSection/oc:hasSubsection* ?root_section .
-            ?root_section oc:sectionTitle {escaped_title} .
-            ?root_section oc:hasSubsection* ?section .
-            ?section oc:sectionTitle ?secTitle ;
-                     oc:sectionLevel ?secLevel .
-            OPTIONAL {{ ?section oc:sectionOrder ?secOrder }}
-            OPTIONAL {{
-                ?secParentNode oc:hasSubsection ?section .
-                ?secParentNode oc:sectionTitle ?secParentTitle .
-            }}
-            OPTIONAL {{
-                ?section oc:hasContent ?block .
-                ?block oc:blockType ?blockType ;
-                       oc:contentOrder ?contentOrder .
-                OPTIONAL {{ ?block oc:textContent ?textContent }}
-                OPTIONAL {{ ?block oc:codeContent ?codeContent }}
-                OPTIONAL {{ ?block oc:codeLanguage ?codeLanguage }}
-                OPTIONAL {{ ?block oc:tableMarkdown ?tableMarkdown }}
-                OPTIONAL {{ ?block oc:quoteContent ?quoteContent }}
-                OPTIONAL {{ ?block oc:quoteAttribution ?quoteAttribution }}
-                OPTIONAL {{ ?block oc:flowchartSource ?flowchartSource }}
-                OPTIONAL {{ ?block oc:flowchartType ?flowchartType }}
-                OPTIONAL {{ ?block oc:templateContent ?templateContent }}
-                OPTIONAL {{ ?block oc:htmlContent ?htmlContent }}
-                OPTIONAL {{ ?block oc:rawYaml ?rawYaml }}
-            }}
-        }}
-        "#
-        );
-
-        let mut rows = self.select_rows(&query)?;
-        if rows.is_empty() {
-            let titles = self.get_section_titles(skill_id)?;
-            let available: Vec<String> = titles.iter().map(|t| t.title.clone()).collect();
-            return Err(CatalogError::InvalidInput(format!(
-                "Section '{}' not found. Available sections: {}",
-                title,
-                available.join(", ")
-            )));
-        }
-
-        // Build pre-order index from section titles for stable document-order sorting.
-        // Key by (title, parent_title) to handle duplicate section titles at different nesting levels.
-        let section_order: std::collections::HashMap<(String, Option<String>), usize> = self
-            .get_section_titles(skill_id)
-            .unwrap_or_default()
-            .into_iter()
-            .enumerate()
-            .map(|(i, st)| ((st.title, st.parent_title), i))
-            .collect();
-
-        // Sort rows into document (pre-order) traversal using the title index
-        rows.sort_by(|a, b| {
-            let a_sec = a.optional_literal("secTitle").unwrap_or_default();
-            let b_sec = b.optional_literal("secTitle").unwrap_or_default();
-            let a_parent = a.optional_literal("secParentTitle");
-            let b_parent = b.optional_literal("secParentTitle");
-            let a_key = (a_sec.clone(), a_parent);
-            let b_key = (b_sec.clone(), b_parent);
-            let a_idx = section_order.get(&a_key).copied().unwrap_or(usize::MAX);
-            let b_idx = section_order.get(&b_key).copied().unwrap_or(usize::MAX);
-            let a_content = a.optional_i64("contentOrder").unwrap_or(0);
-            let b_content = b.optional_i64("contentOrder").unwrap_or(0);
-
-            a_idx.cmp(&b_idx).then_with(|| a_content.cmp(&b_content))
-        });
-
-        let mut content_parts: Vec<String> = Vec::new();
-        let mut current_section = String::new();
-        let root_level = rows
-            .first()
-            .and_then(|r| r.optional_i64("secLevel"));
-
-        for row in &rows {
-            let sec_title = row.optional_literal("secTitle").unwrap_or_default();
-            let sec_level = row.optional_i64("secLevel").unwrap_or(0);
-
-            // New section header (skip root, render subsections)
-            if sec_title != current_section {
-                current_section = sec_title.clone();
-                if root_level != Some(sec_level) {
-                    let hashes = "#".repeat(std::cmp::max(sec_level, 1) as usize);
-                    content_parts.push(format!("\n{hashes} {sec_title}\n"));
-                }
-            }
-
-            // Reconstruct block content
-            if let Some(bt) = row.optional_literal("blockType") {
-                let block_iri = row.optional_iri("block");
-                let reconstructed = self.reconstruct_block(row, &bt, block_iri.as_deref());
-                if !reconstructed.is_empty() {
-                    content_parts.push(reconstructed);
-                }
-            }
-        }
-
-        let content = content_parts.join("\n\n").trim().to_string();
-
-        Ok(SkillContentResult {
-            skill_id: skill_id.to_string(),
-            section: Some(title.to_string()),
-            level: root_level,
-            content,
-        })
-    }
-
     fn build_plan_for_skill_iterative(
         &self,
         skill_id: &str,
@@ -2675,18 +2250,6 @@ oc:skill_xlsx_local a oc:Skill, oc:ExecutableSkill ;
     }
 
     #[test]
-    fn skill_context_includes_sections() {
-        let dir = tempdir().unwrap();
-        write_test_ontology(dir.path());
-        let catalog = Catalog::load(dir.path()).unwrap();
-
-        let context = catalog.get_skill_context("pdf-generator", true).unwrap();
-        assert_eq!(context.sections.len(), 3);
-        assert_eq!(context.sections[0].title, "Overview");
-        assert_eq!(context.sections[2].title, "Advanced Options");
-    }
-
-    #[test]
     fn search_skills_filters_by_intent() {
         let dir = tempdir().unwrap();
         write_test_ontology(dir.path());
@@ -2776,97 +2339,5 @@ oc:skill_xlsx_local a oc:Skill, oc:ExecutableSkill ;
         assert_eq!(preferred.trust_tier, "local");
         assert_eq!(imported.qualified_id, "marea/office/xlsx");
         assert_eq!(imported.trust_tier, "verified");
-    }
-
-    #[test]
-    fn get_section_titles_returns_hierarchy() {
-        let dir = tempdir().unwrap();
-        write_test_ontology(dir.path());
-        let catalog = Catalog::load(dir.path()).unwrap();
-
-        let titles = catalog.get_section_titles("pdf-generator").unwrap();
-        assert_eq!(titles.len(), 3);
-        assert_eq!(titles[0].title, "Overview");
-        assert_eq!(titles[0].level, 2);
-        assert_eq!(titles[0].parent_title, None);
-        assert_eq!(titles[1].title, "Configuration");
-        assert_eq!(titles[1].parent_title, None);
-        assert_eq!(titles[2].title, "Advanced Options");
-        assert_eq!(titles[2].level, 3);
-        assert_eq!(titles[2].parent_title, Some("Configuration".to_string()));
-    }
-
-    #[test]
-    fn get_section_content_returns_paragraph() {
-        let dir = tempdir().unwrap();
-        write_test_ontology(dir.path());
-        let catalog = Catalog::load(dir.path()).unwrap();
-
-        let result = catalog.get_section_content("pdf-generator", Some("Overview")).unwrap();
-        assert_eq!(result.section, Some("Overview".to_string()));
-        assert_eq!(result.level, Some(2));
-        assert!(result.content.contains("This skill generates PDF files."));
-    }
-
-    #[test]
-    fn get_section_content_includes_subsections() {
-        let dir = tempdir().unwrap();
-        write_test_ontology(dir.path());
-        let catalog = Catalog::load(dir.path()).unwrap();
-
-        let result = catalog.get_section_content("pdf-generator", Some("Configuration")).unwrap();
-        assert_eq!(result.section, Some("Configuration".to_string()));
-        assert!(result.content.contains("Advanced Options"));
-        assert!(result.content.contains("Set page size to A4."));
-    }
-
-    #[test]
-    fn get_section_content_toc_without_section() {
-        let dir = tempdir().unwrap();
-        write_test_ontology(dir.path());
-        let catalog = Catalog::load(dir.path()).unwrap();
-
-        let result = catalog.get_section_content("pdf-generator", None).unwrap();
-        assert!(result.section.is_none());
-        assert!(result.content.contains("Overview"));
-        assert!(result.content.contains("Configuration"));
-        assert!(result.content.contains("Advanced Options"));
-    }
-
-    #[test]
-    fn get_section_content_section_not_found() {
-        let dir = tempdir().unwrap();
-        write_test_ontology(dir.path());
-        let catalog = Catalog::load(dir.path()).unwrap();
-
-        let result = catalog.get_section_content("pdf-generator", Some("Nonexistent"));
-        assert!(result.is_err());
-        let msg = result.unwrap_err().to_string();
-        assert!(msg.contains("not found"));
-        assert!(msg.contains("Overview"));
-    }
-
-    #[test]
-    fn get_section_content_reconstructs_bullet_list() {
-        let dir = tempdir().unwrap();
-        write_test_ontology(dir.path());
-        let catalog = Catalog::load(dir.path()).unwrap();
-
-        let result = catalog.get_section_content("pdf-generator", Some("Overview")).unwrap();
-        assert!(result.content.contains("- First bullet point"));
-        assert!(result.content.contains("- Second bullet point"));
-    }
-
-    #[test]
-    fn get_section_content_finds_nested_subsection_directly() {
-        let dir = tempdir().unwrap();
-        write_test_ontology(dir.path());
-        let catalog = Catalog::load(dir.path()).unwrap();
-
-        // "Advanced Options" is a subsection (level 3) under "Configuration"
-        let result = catalog.get_section_content("pdf-generator", Some("Advanced Options")).unwrap();
-        assert_eq!(result.section, Some("Advanced Options".to_string()));
-        assert_eq!(result.level, Some(3));
-        assert!(result.content.contains("Set page size to A4."));
     }
 }
