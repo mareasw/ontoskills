@@ -1,4 +1,6 @@
-"""Benchmark configuration: model pricing, context limits, task definitions."""
+"""Benchmark configuration: model pricing, context limits, benchmark definitions."""
+
+import os
 
 # Model pricing ($/MTok). Only Anthropic models are called.
 # GPT and Gemini are price-comparison only — same token counts, different rates.
@@ -81,26 +83,22 @@ ANTHROPIC_MODELS = [
     mid for mid, cfg in MODEL_PRICING.items() if cfg["provider"] == "anthropic"
 ]
 
-# Traditional benchmark tasks — each maps to an OntoMCP query
-TASKS = [
-    {
-        "name": "skill_discovery",
-        "question": "Which skills can create a PDF document? List only the skill names.",
-        "ontomcp_query": "search (by intent)",
+# ---------------------------------------------------------------------------
+# Benchmark definitions
+# ---------------------------------------------------------------------------
+
+BENCHMARK_CONFIG = {
+    "gaia": {
+        "dataset": "gaia-benchmark/GAIA",
+        "levels": ["2023_level1", "2023_level2", "2023_level3"],
     },
-    {
-        "name": "context_retrieval",
-        "question": "What are the preconditions and steps for the pdf-generator skill?",
-        "ontomcp_query": "get_skill_context",
+    "swebench": {
+        "dataset": "princeton-nlp/SWE-bench_Verified",
     },
-    {
-        "name": "execution_planning",
-        "question": "I need to create a PDF. My current state is: template_loaded. Which skill should I use and what are the steps?",
-        "ontomcp_query": "evaluate_execution_plan",
+    "tau2bench": {
+        "environments": ["airline", "retail", "banking"],
     },
-    {
-        "name": "dependency_check",
-        "question": "Does any skill depend on the output of another skill? List all dependencies you find.",
-        "ontomcp_query": "search (all — scan)",
-    },
-]
+}
+
+ONTOMCP_BIN_PATH = os.path.expanduser("~/.ontoskills/bin/ontomcp")
+TTL_ROOT = os.path.expanduser("~/.ontoskills/packages")

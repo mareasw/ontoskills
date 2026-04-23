@@ -1,6 +1,9 @@
 # Benchmark results
 results/
 
+# Downloaded datasets
+data/
+
 # Generated skills
 skills/*.md
 
@@ -10,4 +13,3 @@ ontomcp-bench/target/
 # Python
 __pycache__/
 *.pyc
-traditional-bench/.venv/
