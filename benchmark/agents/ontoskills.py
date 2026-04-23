@@ -48,6 +48,7 @@ _TOOL_DEFINITIONS: list[dict] = [
                     "maximum": 100,
                 },
             },
+            "required": ["query"],
         },
     },
     {
@@ -179,6 +180,10 @@ class OntoSkillsAgent(BaseAgent):
         tool_result messages are appended to *messages* so that the next
         call sees the full conversation.  The assistant message is also
         appended (before tool_results) to maintain correct ordering.
+
+        Sets ``self._subprocess_dead`` to ``True`` if an MCP exception
+        is caught and the underlying subprocess is no longer alive, so
+        that ``run()`` can break out of its loop.
         """
         start = time.perf_counter()
         response = self._call_api(messages)
@@ -220,13 +225,23 @@ class OntoSkillsAgent(BaseAgent):
                 # The MCP result has a "content" list; serialize it for the
                 # tool_result payload.
                 result_text = json.dumps(mcp_result, ensure_ascii=False)
+                is_error = False
             except Exception as exc:
                 result_text = f"Error calling {tool_name}: {exc}"
+                is_error = True
+                # I2: Check if the MCP subprocess is still alive.  If it
+                # has crashed, set a flag so run() can break out instead
+                # of sending cascading errors on subsequent turns.
+                if self._mcp_client._proc is not None:
+                    proc = self._mcp_client._proc
+                    if proc.poll() is not None:
+                        self._subprocess_dead = True
 
             tool_result_blocks.append({
                 "type": "tool_result",
                 "tool_use_id": block["id"],
                 "content": result_text,
+                "is_error": is_error,
             })
 
         # When there are tool results, append both the assistant message
@@ -262,7 +277,13 @@ class OntoSkillsAgent(BaseAgent):
            the subclass does not append messages during ``run_turn``,
            but this agent must append tool_result messages to support
            multi-turn tool use).
+        4. Validate that tool_result messages are present for every
+           tool_use block (C1).
+        5. Break out of the loop early if the MCP subprocess has
+           crashed (I2).
         """
+        self._subprocess_dead = False
+
         with self._mcp_client:
             self._mcp_client.initialize()
 
@@ -295,7 +316,34 @@ class OntoSkillsAgent(BaseAgent):
                     if isinstance(b, dict) and b.get("type") == "tool_use"
                 ]
 
-                if not tool_use_blocks:
+                if tool_use_blocks:
+                    # C1: Validate that run_turn appended matching
+                    # tool_result messages for every tool_use block.
+                    tool_ids = {b["id"] for b in tool_use_blocks}
+                    last_msg = messages[-1] if messages else {}
+                    result_ids: set[str] = set()
+                    if isinstance(last_msg.get("content"), list):
+                        result_ids = {
+                            b.get("tool_use_id", "")
+                            for b in last_msg["content"]
+                            if isinstance(b, dict)
+                            and b.get("type") == "tool_result"
+                        }
+                    missing = tool_ids - result_ids
+                    if missing:
+                        raise RuntimeError(
+                            f"run_turn() returned tool_use blocks but the last "
+                            f"message in *messages* does not contain matching "
+                            f"tool_result blocks.  Missing tool_result for "
+                            f"ids: {missing}."
+                        )
+
+                    # I2: If the MCP subprocess has crashed, break out
+                    # instead of sending cascading errors on subsequent
+                    # turns.
+                    if self._subprocess_dead:
+                        break
+                else:
                     messages.append(assistant_msg)
                     break
 
