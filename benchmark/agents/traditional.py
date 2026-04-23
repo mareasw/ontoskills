@@ -6,8 +6,11 @@ the system prompt, and makes a single Anthropic API call per task.
 
 from __future__ import annotations
 
+import os
 import time
 from pathlib import Path
+
+from benchmark.config import MODEL_PRICING
 
 from .base import AgentResult, BaseAgent
 
@@ -30,14 +33,10 @@ def _load_skill_files(skills_dir: str) -> dict[str, str]:
         # Derive a readable key from the relative path, e.g.
         #   n8n-io/n8n/create-skill
         rel = skill_file.relative_to(root)
-        key = str(rel.parent).replace(os_sep_str, "/")
+        key = str(rel.parent).replace(os.sep, "/")
         skills[key] = skill_file.read_text(encoding="utf-8")
 
     return skills
-
-
-# ``os.sep`` is a single character but we need a string for ``str.replace``.
-os_sep_str = "/" if __import__("os").sep == "/" else "\\"
 
 
 class TraditionalAgent(BaseAgent):
@@ -86,13 +85,15 @@ class TraditionalAgent(BaseAgent):
     # ------------------------------------------------------------------
 
     def _estimate_tokens(self, text: str) -> int:
-        """Rough token estimate (1 token ~ 4 chars)."""
-        return len(text) // self._CHARS_PER_TOKEN
+        """Estimate token count using the Anthropic SDK, with heuristic fallback."""
+        try:
+            return self.client.count_tokens(text)
+        except Exception:
+            # Fall back to the 4-char heuristic if the SDK call fails.
+            return len(text) // self._CHARS_PER_TOKEN
 
     def _context_limit(self) -> int:
         """Return the context limit for the current model."""
-        from benchmark.config import MODEL_PRICING
-
         cfg = MODEL_PRICING.get(self.model)
         if cfg:
             return cfg["context_limit"]

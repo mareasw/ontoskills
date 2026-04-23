@@ -36,8 +36,8 @@ class BaseAgent(ABC):
     - ``run_turn()``         — execute one turn and return (message, metrics)
     """
 
-    # Anthropic reserves tokens for the response; keep a small safety margin.
-    _RESERVED_OUTPUT_TOKENS: int = 1024
+    # Anthropic reserves tokens for the response; keep a safety margin.
+    _RESERVED_OUTPUT_TOKENS: int = 4096
 
     def __init__(self, model: str, api_key: str | None = None) -> None:
         self.model = model
@@ -106,7 +106,13 @@ class BaseAgent(ABC):
         max_retries = 5
         for attempt in range(max_retries):
             try:
-                return self.client.messages.create(**kwargs)
+                response = self.client.messages.create(**kwargs)
+                if getattr(response, "stop_reason", None) == "max_tokens":
+                    print(
+                        "  WARNING: API response truncated (stop_reason='max_tokens'). "
+                        "Consider increasing _RESERVED_OUTPUT_TOKENS."
+                    )
+                return response
             except anthropic.RateLimitError:
                 wait = 2**attempt
                 print(
@@ -156,6 +162,26 @@ class BaseAgent(ABC):
 
             if not tool_use_blocks:
                 break
+
+            # Validate that the subclass has appended corresponding
+            # tool_result messages during ``run_turn``.
+            tool_ids = {b["id"] for b in tool_use_blocks}
+            last_msg = messages[-1] if messages else {}
+            result_ids: set[str] = set()
+            if isinstance(last_msg.get("content"), list):
+                result_ids = {
+                    b.get("tool_use_id", "")
+                    for b in last_msg["content"]
+                    if isinstance(b, dict) and b.get("type") == "tool_result"
+                }
+            missing = tool_ids - result_ids
+            if missing:
+                raise RuntimeError(
+                    f"run_turn() returned tool_use blocks but the last message "
+                    f"in *messages* does not contain matching tool_result blocks. "
+                    f"Missing tool_result for ids: {missing}. "
+                    f"Subclasses must append tool_result messages during run_turn()."
+                )
 
             # If there are tool calls, subclasses are expected to have already
             # appended tool_result messages during their ``run_turn``.  The
