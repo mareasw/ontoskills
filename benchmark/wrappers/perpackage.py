@@ -194,8 +194,12 @@ class PerPackageWrapper:
         self,
         agent: BaseAgent,
         task: dict,
+        mcp_client: Any = None,
     ) -> dict:
         """Run a single per-package task through *agent*.
+
+        For OntoSkillsAgent with mcp_client: single tool call then answer
+        (max 2 turns).  For TraditionalAgent: single API call.
 
         Returns a dict with:
         ``task_id``, ``model_answer``, ``metrics`` (AgentResult).
@@ -247,9 +251,9 @@ class PerPackageWrapper:
                 tool_name = block["name"]
                 tool_input = block.get("input", {})
 
-                if has_mcp and hasattr(agent, "_mcp_client") and agent._mcp_client._proc is not None:
+                if mcp_client is not None and mcp_client._proc is not None:
                     try:
-                        mcp_result = agent._mcp_client.call_tool(
+                        mcp_result = mcp_client.call_tool(
                             tool_name, tool_input
                         )
                         result_text = json.dumps(
@@ -289,14 +293,7 @@ class PerPackageWrapper:
         agent.run_turn = _patched_run_turn
 
         try:
-            # Start MCP lifecycle if OntoSkillsAgent.
-            _mcp_started = False
-            if has_mcp and hasattr(agent, "_mcp_client"):
-                agent._mcp_client.__enter__()
-                agent._mcp_client.initialize()
-                _mcp_started = True
-
-            # Custom run-loop.
+            # Custom run-loop: max 2 turns (1 tool call + 1 answer).
             messages: list[dict] = [{"role": "user", "content": prompt}]
             total_input = 0
             total_output = 0
@@ -304,7 +301,7 @@ class PerPackageWrapper:
             total_tool_calls = 0
             turns = 0
 
-            for _ in range(10):
+            for _ in range(3):
                 assistant_msg, metrics = agent.run_turn(messages)
                 turns += 1
                 total_input += metrics["input_tokens"]
@@ -362,11 +359,6 @@ class PerPackageWrapper:
         finally:
             agent.get_tools = original_get_tools
             agent.run_turn = original_run_turn
-            if _mcp_started:
-                try:
-                    agent._mcp_client.__exit__(None, None, None)
-                except Exception:
-                    pass
 
         return {
             "task_id": task["task_id"],
@@ -387,11 +379,10 @@ class PerPackageWrapper:
         """Run all (or *max_tasks*) per-package tasks through *agent*.
 
         For TraditionalAgent, creates a fresh agent per task that loads
-        only the 1-2 relevant SKILL.md files (simulating realistic usage
-        where an agent loads skills on-demand, not all at once).
+        only the 1-2 relevant SKILL.md files.
 
-        For OntoSkillsAgent, reuses the same agent (MCP search finds
-        relevant skills dynamically).
+        For OntoSkillsAgent, starts MCP subprocess ONCE and reuses it
+        across all tasks. Each task gets max 2 turns (1 tool call + answer).
         """
         tasks = self.load_tasks(package=package)
         if max_tasks is not None:
@@ -401,27 +392,42 @@ class PerPackageWrapper:
         from benchmark.agents.traditional import TraditionalAgent
         is_traditional = isinstance(agent, TraditionalAgent)
 
+        # Start MCP once for all tasks (OntoSkillsAgent).
+        mcp_client = None
+        if not is_traditional and hasattr(agent, "_mcp_client"):
+            mcp_client = agent._mcp_client
+            mcp_client.__enter__()
+            mcp_client.initialize()
+
         results: list[dict] = []
-        for i, task in enumerate(tasks, 1):
-            logger.info("Task %d/%d: %s", i, len(tasks), task["task_id"])
+        try:
+            for i, task in enumerate(tasks, 1):
+                logger.info("Task %d/%d: %s", i, len(tasks), task["task_id"])
 
-            task_agent = agent
-            if is_traditional:
-                # Create a scoped agent that loads only relevant skills.
-                task_agent = self._make_scoped_traditional_agent(
-                    agent.model, task.get("skill_ids", []),
-                )
+                task_agent = agent
+                if is_traditional:
+                    task_agent = self._make_scoped_traditional_agent(
+                        agent.model, task.get("skill_ids", []),
+                    )
 
-            try:
-                result = self.run_task(task_agent, task)
-            except Exception:
-                logger.exception("Task %s failed", task["task_id"])
-                result = {
-                    "task_id": task["task_id"],
-                    "model_answer": "",
-                    "metrics": None,
-                }
-            results.append(result)
+                try:
+                    result = self.run_task(
+                        task_agent, task, mcp_client=mcp_client,
+                    )
+                except Exception:
+                    logger.exception("Task %s failed", task["task_id"])
+                    result = {
+                        "task_id": task["task_id"],
+                        "model_answer": "",
+                        "metrics": None,
+                    }
+                results.append(result)
+        finally:
+            if mcp_client is not None:
+                try:
+                    mcp_client.__exit__(None, None, None)
+                except Exception:
+                    pass
 
         return results
 
@@ -453,15 +459,20 @@ class PerPackageWrapper:
         return agent
 
     # ------------------------------------------------------------------
-    # Scoring
+    # Scoring: LLM-as-judge
     # ------------------------------------------------------------------
 
     @staticmethod
-    def score(results: list[dict], tasks: list[dict]) -> dict:
-        """Score results using keyword matching.
+    def score(
+        results: list[dict],
+        tasks: list[dict],
+        *,
+        skills_content: dict[str, str] | None = None,
+    ) -> dict:
+        """Score results using keyword matching (fast, no API).
 
-        Each task has ``expected_keywords``; the answer must contain at
-        least half of them (case-insensitive).
+        Falls back to keyword matching when no API key is available.
+        Use ``score_with_judge`` for LLM-as-judge evaluation.
         """
         keyword_map = {t["task_id"]: t.get("expected_keywords", []) for t in tasks}
 
@@ -489,7 +500,6 @@ class PerPackageWrapper:
             matched = [kw for kw in keywords if kw.lower() in answer]
             keyword_hits += len(matched)
 
-            # Pass if at least half the keywords are present.
             passed = len(matched) >= len(keywords) / 2
 
             per_task.append({
@@ -508,5 +518,136 @@ class PerPackageWrapper:
             "keyword_coverage": keyword_coverage,
             "tasks_passed": sum(1 for t in per_task if t.get("passed")),
             "total_tasks": total,
+            "per_task": per_task,
+        }
+
+    @staticmethod
+    def score_with_judge(
+        results: list[dict],
+        tasks: list[dict],
+        model: str = "glm-5.1",
+        skills_content: dict[str, str] | None = None,
+    ) -> dict:
+        """Score results using LLM-as-judge.
+
+        For each answer, the judge evaluates on 4 dimensions (1-5 scale):
+        - correctness: advice follows the skill's documented procedures
+        - completeness: covers the key aspects the skill defines
+        - practicality: actionable, specific, not just generic advice
+        - interaction_quality: asks questions, checks prerequisites like the skill says
+
+        Returns per-task scores and overall averages.
+        """
+        import anthropic
+        import os
+
+        api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
+        base_url = os.environ.get("ANTHROPIC_BASE_URL")
+        client = anthropic.Anthropic(api_key=api_key, base_url=base_url)
+
+        task_map = {t["task_id"]: t for t in tasks}
+        dimensions = ["correctness", "completeness", "practicality", "interaction_quality"]
+        per_task: list[dict] = []
+
+        for r in results:
+            task_id = r["task_id"]
+            task = task_map.get(task_id, {})
+            answer = r.get("model_answer") or ""
+            question = task.get("question", "")
+            skill_ids = task.get("skill_ids", [])
+
+            if not answer or answer.startswith("[Agent error"):
+                per_task.append({
+                    "task_id": task_id,
+                    "scores": {d: 0 for d in dimensions},
+                    "avg_score": 0.0,
+                    "feedback": "No answer produced",
+                })
+                continue
+
+            # Build skill context for the judge.
+            skill_ctx = ""
+            if skills_content:
+                for sid in skill_ids:
+                    content = skills_content.get(f"obra/superpowers/{sid}", "")
+                    if content:
+                        skill_ctx += f"\n--- Skill: {sid} ---\n{content[:3000]}\n"
+
+            judge_prompt = f"""You are evaluating an AI agent's answer to a question about using a specific skill.
+
+QUESTION: {question}
+
+RELEVANT SKILLS: {', '.join(skill_ids)}
+{skill_ctx}
+
+AGENT'S ANSWER:
+{answer}
+
+Rate the answer on 4 dimensions (1-5 scale). Be strict: 3 = adequate, 5 = excellent.
+
+1. CORRECTNESS: Does the advice follow the skill's documented procedures and rules?
+2. COMPLETENESS: Does it cover the key aspects the skill defines?
+3. PRACTICALITY: Is the advice actionable and specific (not just generic)?
+4. INTERACTION_QUALITY: Does the agent ask clarifying questions or check prerequisites like the skill instructs?
+
+Respond in this exact format (no other text):
+CORRECTNESS: <1-5>
+COMPLETENESS: <1-5>
+PRACTICALITY: <1-5>
+INTERACTION_QUALITY: <1-5>
+FEEDBACK: <one sentence>"""
+
+            try:
+                resp = client.messages.create(
+                    model=model,
+                    max_tokens=200,
+                    messages=[{"role": "user", "content": judge_prompt}],
+                )
+                judge_text = resp.content[0].text.strip()
+                scores = {}
+                for dim in dimensions:
+                    import re
+                    match = re.search(
+                        rf"{dim.upper()[:4]}[A-Z_]*:\s*(\d)",
+                        judge_text, re.IGNORECASE,
+                    )
+                    scores[dim] = int(match.group(1)) if match else 3
+
+                # Extract feedback.
+                fb_match = re.search(r"FEEDBACK:\s*(.+)", judge_text, re.IGNORECASE)
+                feedback = fb_match.group(1).strip() if fb_match else judge_text[:100]
+
+            except Exception as exc:
+                logger.warning("Judge error on %s: %s", task_id, exc)
+                scores = {d: 0 for d in dimensions}
+                feedback = f"Judge error: {exc}"
+
+            avg = sum(scores.values()) / len(scores)
+            per_task.append({
+                "task_id": task_id,
+                "scores": scores,
+                "avg_score": avg,
+                "feedback": feedback,
+            })
+            logger.info(
+                "  %s: avg=%.1f correct=%d complete=%d practical=%d interaction=%d",
+                task_id, avg,
+                scores["correctness"], scores["completeness"],
+                scores["practicality"], scores["interaction_quality"],
+            )
+
+        # Aggregate.
+        avg_by_dim = {}
+        for dim in dimensions:
+            vals = [t["scores"][dim] for t in per_task if t["scores"][dim] > 0]
+            avg_by_dim[dim] = sum(vals) / len(vals) if vals else 0.0
+
+        overall = sum(t["avg_score"] for t in per_task) / len(per_task) if per_task else 0.0
+
+        return {
+            "scoring_method": "llm_as_judge",
+            "overall_avg": overall,
+            "avg_by_dimension": avg_by_dim,
+            "total_tasks": len(per_task),
             "per_task": per_task,
         }

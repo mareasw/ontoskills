@@ -234,10 +234,11 @@ def _run_perpackage(
     *,
     package: str = "superpowers",
     skills_dir: str | None = None,
+    model: str = "glm-5.1",
 ) -> tuple[list[dict], float | None]:
     """Run the per-package benchmark for one agent.
 
-    Returns (results_list, keyword_coverage_or_None).
+    Returns (results_list, overall_avg_score_or_None).
     """
     from benchmark.wrappers.perpackage import PerPackageWrapper
 
@@ -247,27 +248,48 @@ def _run_perpackage(
     tasks = wrapper.load_tasks(package=package)
     results = wrapper.run_benchmark(agent, package=package, max_tasks=max_tasks)
 
-    # Score.
-    score = PerPackageWrapper.score(results, tasks)
-    logger.info(
-        "Per-package %s (%s): %.1f%% pass rate, %.1f%% keyword coverage (%d/%d)",
-        package, mode, score["pass_rate"] * 100, score["keyword_coverage"] * 100,
-        score["tasks_passed"], score["total_tasks"],
+    # Load skill content for judge context.
+    skills_content: dict[str, str] = {}
+    skills_root = Path(skills_dir or str(BENCHMARK_DIR / "skills"))
+    for task in tasks:
+        for sid in task.get("skill_ids", []):
+            key = f"obra/superpowers/{sid}"
+            if key not in skills_content:
+                md = skills_root / "obra" / "superpowers" / sid / "SKILL.md"
+                if md.exists():
+                    skills_content[key] = md.read_text(encoding="utf-8")
+
+    # Score with LLM-as-judge.
+    judge_score = PerPackageWrapper.score_with_judge(
+        results, tasks, model=model, skills_content=skills_content,
     )
+    logger.info(
+        "Per-package %s (%s): avg=%.1f/5 correct=%.1f complete=%.1f practical=%.1f interaction=%.1f",
+        package, mode,
+        judge_score["overall_avg"],
+        judge_score["avg_by_dimension"]["correctness"],
+        judge_score["avg_by_dimension"]["completeness"],
+        judge_score["avg_by_dimension"]["practicality"],
+        judge_score["avg_by_dimension"]["interaction_quality"],
+    )
+
+    # Also compute keyword score for comparison.
+    kw_score = PerPackageWrapper.score(results, tasks)
 
     # Save results.
     raw_path = output_dir / "perpackage" / package / mode / "results.json"
     raw_path.parent.mkdir(parents=True, exist_ok=True)
     _save_json(results, raw_path)
 
-    # Save score.
+    # Save scores.
     score_path = output_dir / "perpackage" / package / mode / "score.json"
+    combined = {"judge": judge_score, "keyword": kw_score}
     score_path.write_text(
-        json.dumps(score, indent=2, default=str, ensure_ascii=False),
+        json.dumps(combined, indent=2, default=str, ensure_ascii=False),
         encoding="utf-8",
     )
 
-    return results, score["keyword_coverage"]
+    return results, judge_score["overall_avg"]
 
 
 # Map benchmark names to runner functions.
@@ -460,7 +482,7 @@ def main() -> None:
                 t0 = time.perf_counter()
                 results, accuracy = _run_perpackage(
                     trad_agent, "traditional", args.max_tasks, output_dir,
-                    package=package, skills_dir=args.skills_dir,
+                    package=package, skills_dir=args.skills_dir, model=args.model,
                 )
                 elapsed = time.perf_counter() - t0
                 logger.info("Traditional agent completed %s in %.1fs", bench_name, elapsed)
@@ -477,7 +499,7 @@ def main() -> None:
                 t0 = time.perf_counter()
                 results, accuracy = _run_perpackage(
                     os_agent, "ontoskills", args.max_tasks, output_dir,
-                    package=package,
+                    package=package, model=args.model,
                 )
                 elapsed = time.perf_counter() - t0
                 logger.info("OntoSkills agent completed %s in %.1fs", bench_name, elapsed)
