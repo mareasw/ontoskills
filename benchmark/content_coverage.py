@@ -148,7 +148,8 @@ def compute_knowledge_yield(ttl_dir: Path) -> dict:
 
     oc = Namespace(OC)
 
-    # Collect all .ttl files (skip the core TBox so we only count instances).
+    # Collect all .ttl files (skip the core TBox for counting, but load it
+    # for the rdfs:subClassOf hierarchy needed by SPARQL property paths).
     ttl_files = sorted(
         p for p in ttl_dir.rglob("*.ttl")
         if p.name != "core.ttl"
@@ -169,6 +170,24 @@ def compute_knowledge_yield(ttl_dir: Path) -> dict:
     # Merge all TTLs into a single graph for efficient querying.
     g = Graph()
     g.bind("oc", oc)
+
+    # Load core.ttl for the class hierarchy (rdfs:subClassOf axioms).
+    core_ttl = ttl_dir / "core.ttl"
+    if not core_ttl.exists():
+        for p in ttl_dir.rglob("core.ttl"):
+            core_ttl = p
+            break
+    # Also check the project source tree.
+    if not core_ttl.exists():
+        project_core = Path(__file__).resolve().parent.parent / "ontoskills" / "core.ttl"
+        if project_core.exists():
+            core_ttl = project_core
+    if core_ttl.exists():
+        try:
+            g.parse(str(core_ttl), format="turtle")
+        except Exception as exc:
+            print(f"  Warning: failed to parse {core_ttl}: {exc}", file=sys.stderr)
+
     for tf in ttl_files:
         try:
             g.parse(str(tf), format="turtle")

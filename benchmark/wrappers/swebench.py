@@ -121,7 +121,7 @@ class SWEBenchWrapper:
         ``instance_id``, ``repo``, ``base_commit``, ``problem_statement``,
         ``hints_text``, ``FAIL_TO_PASS``, ``PASS_TO_PASS``.
         """
-        ds = load_dataset(dataset_name, split=split, trust_remote_code=True)  # type: ignore[call-arg]
+        ds = load_dataset(dataset_name, split=split)  # type: ignore[call-arg]
 
         instances: list[dict] = []
         for row in ds:
@@ -407,9 +407,64 @@ class SWEBenchWrapper:
                 agent._mcp_client.initialize()
                 _mcp_started = True
 
-            # Use BaseAgent.run() directly so our patched run_turn
-            # is used instead of the agent's normal tool execution.
-            result: AgentResult = BaseAgent.run(agent, prompt, max_turns=15)
+            # Custom run-loop: BaseAgent.run() double-appends messages
+            # when run_turn also appends, so we manage the loop directly.
+            messages: list[dict] = [{"role": "user", "content": prompt}]
+            total_input = 0
+            total_output = 0
+            total_latency_ms = 0.0
+            total_tool_calls = 0
+            context_overflow = False
+            turns = 0
+
+            for _ in range(15):
+                assistant_msg, metrics = agent.run_turn(messages)
+                turns += 1
+                total_input += metrics["input_tokens"]
+                total_output += metrics["output_tokens"]
+                total_latency_ms += metrics["latency_ms"]
+                total_tool_calls += metrics["tool_calls"]
+
+                # Check for tool_use blocks — if present, run_turn already
+                # appended assistant_msg + tool_results to messages.
+                tool_use_blocks = [
+                    b for b in (assistant_msg.get("content") or [])
+                    if isinstance(b, dict) and b.get("type") == "tool_use"
+                ]
+
+                if tool_use_blocks:
+                    # run_turn already appended assistant_msg + tool_results.
+                    pass
+                else:
+                    # No tool calls — append assistant_msg ourselves and stop.
+                    messages.append(assistant_msg)
+                    break
+
+            # Extract the final text answer from the last assistant message.
+            answer = ""
+            for block in reversed(messages):
+                if isinstance(block, dict) and block.get("role") == "assistant":
+                    content = block.get("content", "")
+                    if isinstance(content, str):
+                        answer = content
+                    elif isinstance(content, list):
+                        texts = [
+                            b["text"]
+                            for b in content
+                            if isinstance(b, dict) and b.get("type") == "text"
+                        ]
+                        answer = "\n".join(texts)
+                    break
+
+            result = AgentResult(
+                answer=answer,
+                input_tokens=total_input,
+                output_tokens=total_output,
+                total_latency_ms=total_latency_ms,
+                tool_calls=total_tool_calls,
+                turns=turns,
+                context_overflow=context_overflow,
+            )
         except Exception as exc:
             logger.warning(
                 "Agent error on instance %s: %s", instance["instance_id"], exc
