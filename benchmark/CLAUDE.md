@@ -112,5 +112,10 @@ python benchmark/smoketest.py
 ## Current benchmark results (2026-04-24)
 
 - Content coverage: 100% parser, 5298 epistemic + 1581 operational nodes across 840 skills
-- SWE-bench (5 tasks, ontoskills only): 14.8 avg tool calls, 4/5 patches generated, ~$0.34/task (Sonnet pricing)
-- Traditional agent: broken with full skill set (context overflow)
+- SWE-bench (5 tasks, ontoskills only): 14.8 avg tool calls, 4/5 patches generated, ~$0.34/task
+- GAIA (5 tasks, ontoskills only): 5/5 completed, read_file tool routing works
+- Tau2-bench (5 tasks x 3 domains, ontoskills only): 15/15 completed
+- **Per-package superpowers (8 tasks, both agents)**:
+  - Traditional: 62.5% pass, 51.2% keyword coverage, 21K tokens, 0 tool calls
+  - OntoSkills: **100% pass, 78.0% keyword coverage**, 174K tokens, 40 tool calls
+  - OntoSkills passes ALL tasks; traditional fails brainstorming, planning, verification
