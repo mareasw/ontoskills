@@ -358,6 +358,10 @@ class ClaudeCodeAgent(BaseAgent):
         if self._mcp_config_path:
             cmd.extend(["--mcp-config", self._mcp_config_path])
 
+        # Use -- to separate flags from the positional prompt argument.
+        # Without this, --mcp-config (which accepts multiple values) would
+        # consume the prompt as another config path.
+        cmd.append("--")
         cmd.append(prompt)
 
         env = os.environ.copy()
