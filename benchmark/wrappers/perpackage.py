@@ -198,13 +198,35 @@ class PerPackageWrapper:
     ) -> dict:
         """Run a single per-package task through *agent*.
 
-        For OntoSkillsAgent with mcp_client: single tool call then answer
-        (max 2 turns).  For TraditionalAgent: single API call.
+        For OntoSkillsAgent with mcp_client: pre-fetches skill knowledge
+        via MCP and injects into system prompt, then runs max 3 turns.
+        For TraditionalAgent: single API call.
 
         Returns a dict with:
         ``task_id``, ``model_answer``, ``metrics`` (AgentResult).
         """
         prompt = task["question"]
+        skill_ids = task.get("skill_ids", [])
+
+        # Pre-fetch skill knowledge for OntoSkillsAgent.
+        prefetched = ""
+        if (
+            mcp_client is not None
+            and mcp_client._proc is not None
+            and hasattr(agent, "prefetch_skills_by_ids")
+            and skill_ids
+        ):
+            try:
+                prefetched = agent.prefetch_skills_by_ids(skill_ids)
+                if prefetched:
+                    agent._prefetched_knowledge = prefetched
+                    logger.info(
+                        "Pre-fetched %d chars for %s (%s)",
+                        len(prefetched), task["task_id"],
+                        ", ".join(skill_ids),
+                    )
+            except Exception as exc:
+                logger.warning("Pre-fetch failed for %s: %s", task["task_id"], exc)
 
         original_get_tools = agent.get_tools
         original_run_turn = agent.run_turn
@@ -256,8 +278,10 @@ class PerPackageWrapper:
                         mcp_result = mcp_client.call_tool(
                             tool_name, tool_input
                         )
-                        result_text = json.dumps(
-                            mcp_result, ensure_ascii=False
+                        # Compact MCP result to save tokens.
+                        from benchmark.agents.ontoskills import OntoSkillsAgent
+                        result_text = OntoSkillsAgent._compact_tool_result_static(
+                            tool_name, tool_input, mcp_result,
                         )
                         is_error = False
                     except Exception as exc:
@@ -359,6 +383,8 @@ class PerPackageWrapper:
         finally:
             agent.get_tools = original_get_tools
             agent.run_turn = original_run_turn
+            if prefetched:
+                agent._prefetched_knowledge = ""
 
         return {
             "task_id": task["task_id"],
@@ -375,6 +401,8 @@ class PerPackageWrapper:
         agent: BaseAgent,
         package: str = "superpowers",
         max_tasks: int | None = None,
+        shuffle: bool = True,
+        seed: int = 42,
     ) -> list[dict]:
         """Run all (or *max_tasks*) per-package tasks through *agent*.
 
@@ -384,7 +412,11 @@ class PerPackageWrapper:
         For OntoSkillsAgent, starts MCP subprocess ONCE and reuses it
         across all tasks. Each task gets max 2 turns (1 tool call + answer).
         """
+        import random
+
         tasks = self.load_tasks(package=package)
+        if shuffle:
+            random.Random(seed).shuffle(tasks)
         if max_tasks is not None:
             tasks = tasks[:max_tasks]
 

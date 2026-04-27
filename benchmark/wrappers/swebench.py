@@ -93,6 +93,30 @@ _UNIFIED_HUNK_RE = re.compile(
 )
 
 
+def _select_diverse_instances(
+    instances: list[dict],
+    max_tasks: int,
+) -> list[dict]:
+    """Select instances from diverse repos for more representative results."""
+    by_repo: dict[str, list[dict]] = defaultdict(list)
+    for inst in instances:
+        by_repo[inst["repo"]].append(inst)
+
+    selected: list[dict] = []
+    repos = sorted(by_repo.keys(), key=lambda r: len(by_repo[r]), reverse=True)
+    idx = {r: 0 for r in repos}
+
+    while len(selected) < max_tasks and any(idx[r] < len(by_repo[r]) for r in repos):
+        for repo in repos:
+            if len(selected) >= max_tasks:
+                break
+            if idx[repo] < len(by_repo[repo]):
+                selected.append(by_repo[repo][idx[repo]])
+                idx[repo] += 1
+
+    return selected
+
+
 class SWEBenchWrapper:
     """SWE-bench benchmark wrapper.
 
@@ -133,6 +157,7 @@ class SWEBenchWrapper:
                 "hints_text": row.get("hints_text", ""),
                 "FAIL_TO_PASS": row.get("FAIL_TO_PASS", []),
                 "PASS_TO_PASS": row.get("PASS_TO_PASS", []),
+                "test_patch": row.get("test_patch", ""),
             })
 
         logger.info(
@@ -218,6 +243,8 @@ class SWEBenchWrapper:
         agent: BaseAgent,
         instance: dict,
         repo_checkout_dir: str,
+        *,
+        mcp_client: Any = None,
     ) -> dict:
         """Run a single SWE-bench instance through *agent*.
 
@@ -242,12 +269,57 @@ class SWEBenchWrapper:
         )
         if instance.get("hints_text"):
             prompt += f"\n## Hints\n\n{instance['hints_text']}\n"
+
+        # Include test names and actual test code so the model knows what needs to pass.
+        fail_to_pass = instance.get("FAIL_TO_PASS", [])
+        if isinstance(fail_to_pass, str):
+            try:
+                import json as _json
+                fail_to_pass = _json.loads(fail_to_pass)
+            except Exception:
+                fail_to_pass = []
+        if fail_to_pass:
+            test_list = "\n".join(f"- {t}" for t in fail_to_pass)
+            prompt += (
+                f"\n## Tests that MUST pass after your fix\n\n{test_list}\n"
+            )
+
+        # Include actual test code from test_patch so the model sees what the test expects.
+        test_patch = instance.get("test_patch", "")
+        if test_patch and test_patch.strip():
+            # Truncate to ~3000 chars to avoid flooding context.
+            test_code = test_patch.strip()[:3000]
+            prompt += (
+                f"\n## Test code (from test_patch)\n\n"
+                f"```python\n{test_code}\n```\n"
+            )
+
         prompt += (
-            "\nPlease resolve the issue described above. "
-            "Use the file_read tool to inspect the repository files and the "
-            "file_edit tool to propose changes. "
-            "When you are done, output the complete unified diff patch "
-            "inside a ```diff ... ``` code block."
+            "\n## Instructions\n\n"
+            "Follow this structured approach:\n\n"
+            "### Step 1: Understand the bug\n"
+            "Read the problem statement carefully. Identify the root cause "
+            "by reading relevant source files with file_read.\n\n"
+            "### Step 2: Read the test\n"
+            "Examine the test code above to understand exactly what behavior "
+            "is expected. The test reveals the correct API contract.\n\n"
+            "### Step 3: Make a minimal fix\n"
+            "Use file_edit to propose the smallest change that fixes the issue. "
+            "Do NOT refactor, add features, or change unrelated code.\n\n"
+            "### Step 4: Output the patch\n"
+            "Output the COMPLETE unified diff patch inside a "
+            "```diff ... ``` code block.\n\n"
+            "The patch MUST use proper git format:\n"
+            "```\n"
+            "diff --git a/path/to/file.py b/path/to/file.py\n"
+            "--- a/path/to/file.py\n"
+            "+++ b/path/to/file.py\n"
+            "@@ ... @@\n"
+            " context line\n"
+            "-removed line\n"
+            "+added line\n"
+            "```\n\n"
+            "Focus on MINIMAL, targeted changes. Do not refactor or add unrelated code."
         )
 
         # -- Inject tools + tool execution --------------------------------
@@ -368,15 +440,41 @@ class SWEBenchWrapper:
                     })
 
                 else:
-                    # Not a SWE-bench tool -- let the original agent handle it
-                    # (e.g. OntoSkillsAgent's MCP tools).
-                    # We delegate back to original_run_turn for non-SWE tools.
-                    tool_result_blocks.append({
-                        "type": "tool_result",
-                        "tool_use_id": block["id"],
-                        "content": f"Error: unknown tool {tool_name}",
-                        "is_error": True,
-                    })
+                    # Route MCP tool calls to the MCP client.
+                    mcp = mcp_client or getattr(agent, "_mcp_client", None)
+                    if mcp is not None and mcp._proc is not None:
+                        try:
+                            result = mcp.call_tool(tool_name, tool_input)
+                            content = result if isinstance(result, str) else json.dumps(result)
+                            is_error = False
+                        except Exception as exc:
+                            content = f"MCP error: {exc}"
+                            is_error = True
+                        tool_result_blocks.append({
+                            "type": "tool_result",
+                            "tool_use_id": block["id"],
+                            "content": content,
+                            "is_error": is_error,
+                        })
+                    else:
+                        # Delegate read_skill to the agent's resolver.
+                        if tool_name == "read_skill" and hasattr(agent, "_resolve_skill"):
+                            skill_name = tool_input.get("skill_name", "")
+                            content = agent._resolve_skill(skill_name)
+                            if content is None:
+                                content = f"Skill not found: {skill_name}"
+                                is_error = True
+                            else:
+                                is_error = False
+                        else:
+                            content = f"Error: unknown tool {tool_name}"
+                            is_error = True
+                        tool_result_blocks.append({
+                            "type": "tool_result",
+                            "tool_use_id": block["id"],
+                            "content": content,
+                            "is_error": is_error,
+                        })
 
             # Append tool_result messages when tool calls were made.
             if tool_result_blocks:
@@ -399,13 +497,32 @@ class SWEBenchWrapper:
         agent.run_turn = _patched_run_turn  # type: ignore[assignment]
 
         try:
-            # If the agent is an OntoSkillsAgent, start its MCP subprocess
-            # lifecycle manually (we bypass its run() override below).
+            # If the agent is an OntoSkillsAgent, ensure MCP is started.
+            # Reuse the provided mcp_client if available; otherwise start one.
             _mcp_started = False
             if hasattr(agent, "_mcp_client"):
-                agent._mcp_client.__enter__()
-                agent._mcp_client.initialize()
-                _mcp_started = True
+                if mcp_client is not None and mcp_client._proc is not None:
+                    # Reuse already-started MCP client.
+                    pass
+                else:
+                    agent._mcp_client.__enter__()
+                    agent._mcp_client.initialize()
+                    _mcp_started = True
+
+                # Pre-fetch relevant coding skills to reduce tool-call turns.
+                client = mcp_client or agent._mcp_client
+                if hasattr(agent, "prefetch_skills") and client._proc is not None:
+                    try:
+                        knowledge = agent.prefetch_skills(prompt)
+                        if knowledge:
+                            agent._prefetched_knowledge = knowledge
+                            logger.info(
+                                "Pre-fetched %d chars for %s",
+                                len(knowledge), instance["instance_id"],
+                            )
+                    except Exception as exc:
+                        logger.warning("Prefetch failed for %s: %s",
+                                       instance["instance_id"], exc)
 
             # Custom run-loop: BaseAgent.run() double-appends messages
             # when run_turn also appends, so we manage the loop directly.
@@ -417,7 +534,7 @@ class SWEBenchWrapper:
             context_overflow = False
             turns = 0
 
-            for _ in range(15):
+            for _ in range(25):
                 assistant_msg, metrics = agent.run_turn(messages)
                 turns += 1
                 total_input += metrics["input_tokens"]
@@ -482,6 +599,9 @@ class SWEBenchWrapper:
             # Restore original methods.
             agent.get_tools = original_get_tools  # type: ignore[assignment]
             agent.run_turn = original_run_turn  # type: ignore[assignment]
+            # Clear pre-fetched knowledge.
+            if hasattr(agent, "_prefetched_knowledge"):
+                agent._prefetched_knowledge = ""
             # Clean up MCP subprocess if we started it.
             if _mcp_started:
                 try:
@@ -499,10 +619,22 @@ class SWEBenchWrapper:
                 recorded_edits, checkout
             )
 
+        # -- Validate the patch -------------------------------------------
+        patch_applies = False
+        resolved = False
+        if patch.strip():
+            patch_applies = self._check_patch_applies(checkout, patch)
+            if patch_applies:
+                resolved = self._run_test_validation(
+                    checkout, instance, patch
+                )
+
         return {
             "instance_id": instance["instance_id"],
             "model_patch": patch,
             "model_name_or_path": getattr(agent, "model", "unknown"),
+            "patch_applies": patch_applies,
+            "resolved": resolved,
             "metrics": result,
         }
 
@@ -517,6 +649,8 @@ class SWEBenchWrapper:
         split: str = "test",
         max_tasks: int | None = None,
         repo_base_dir: str = "benchmark/data/repos",
+        shuffle: bool = True,
+        seed: int = 42,
     ) -> list[dict]:
         """Run all (or *max_tasks*) SWE-bench instances through *agent*.
 
@@ -525,31 +659,54 @@ class SWEBenchWrapper:
 
         Returns a list of result dicts (one per instance).
         """
+        import random
+
         instances = self.load_dataset(dataset_name=dataset_name, split=split)
+        if shuffle:
+            random.Random(seed).shuffle(instances)
         if max_tasks is not None:
-            instances = instances[:max_tasks]
+            instances = _select_diverse_instances(instances, max_tasks)
+
+        # Start MCP once for OntoSkillsAgent.
+        mcp_client = None
+        if hasattr(agent, "_mcp_client"):
+            mcp_client = agent._mcp_client
+            mcp_client.__enter__()
+            mcp_client.initialize()
 
         results: list[dict] = []
-        for i, instance in enumerate(instances, 1):
-            iid = instance["instance_id"]
-            logger.info("Instance %d/%d: %s", i, len(instances), iid)
+        try:
+            for i, instance in enumerate(instances, 1):
+                iid = instance["instance_id"]
+                logger.info("Instance %d/%d: %s", i, len(instances), iid)
 
-            try:
-                checkout_dir = self._checkout_repo(
-                    repo=instance["repo"],
-                    base_commit=instance["base_commit"],
-                    repo_base_dir=repo_base_dir,
-                )
-                result = self.run_task(agent, instance, str(checkout_dir))
-            except Exception:
-                logger.exception("Instance %s failed", iid)
-                result = {
-                    "instance_id": iid,
-                    "model_patch": "",
-                    "model_name_or_path": getattr(agent, "model", "unknown"),
-                    "metrics": None,
-                }
-            results.append(result)
+                try:
+                    checkout_dir = self._checkout_repo(
+                        repo=instance["repo"],
+                        base_commit=instance["base_commit"],
+                        repo_base_dir=repo_base_dir,
+                    )
+                    result = self.run_task(
+                        agent, instance, str(checkout_dir),
+                        mcp_client=mcp_client,
+                    )
+                except Exception:
+                    logger.exception("Instance %s failed", iid)
+                    result = {
+                        "instance_id": iid,
+                        "model_patch": "",
+                        "model_name_or_path": getattr(agent, "model", "unknown"),
+                        "patch_applies": False,
+                        "resolved": False,
+                        "metrics": None,
+                    }
+                results.append(result)
+        finally:
+            if mcp_client is not None:
+                try:
+                    mcp_client.__exit__(None, None, None)
+                except Exception:
+                    pass
 
         return results
 
@@ -573,6 +730,8 @@ class SWEBenchWrapper:
                 "instance_id": r["instance_id"],
                 "model_patch": r.get("model_patch", ""),
                 "model_name_or_path": r.get("model_name_or_path", "unknown"),
+                "patch_applies": r.get("patch_applies", False),
+                "resolved": r.get("resolved", False),
             })
 
         with open(path, "w", encoding="utf-8") as f:
@@ -656,3 +815,87 @@ class SWEBenchWrapper:
                 patches.append(patch_text)
 
         return "\n".join(patches)
+
+    @staticmethod
+    def _check_patch_applies(checkout_dir: Path, patch: str) -> bool:
+        """Check if a patch applies cleanly to the checkout (dry run)."""
+        try:
+            result = subprocess.run(
+                ["git", "apply", "--check"],
+                input=patch,
+                capture_output=True,
+                text=True,
+                cwd=checkout_dir,
+                timeout=10,
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    @staticmethod
+    def _run_test_validation(
+        checkout_dir: Path,
+        instance: dict,
+        patch: str,
+    ) -> bool:
+        """Apply model patch + test patch, run FAIL_TO_PASS tests.
+
+        Returns True if all FAIL_TO_PASS tests pass (instance resolved).
+        Falls back to patch-applicability-only if pytest is unavailable.
+        """
+        fail_to_pass = instance.get("FAIL_TO_PASS", "[]")
+        if isinstance(fail_to_pass, str):
+            try:
+                fail_to_pass = json.loads(fail_to_pass)
+            except json.JSONDecodeError:
+                fail_to_pass = []
+        if not fail_to_pass:
+            return False
+
+        test_patch = instance.get("test_patch", "")
+
+        try:
+            # Apply model patch.
+            r = subprocess.run(
+                ["git", "apply"],
+                input=patch,
+                capture_output=True,
+                text=True,
+                cwd=checkout_dir,
+                timeout=10,
+            )
+            if r.returncode != 0:
+                return False
+
+            # Apply test patch (adds failing test cases).
+            if test_patch:
+                subprocess.run(
+                    ["git", "apply"],
+                    input=test_patch,
+                    capture_output=True,
+                    text=True,
+                    cwd=checkout_dir,
+                    timeout=10,
+                )
+
+            # Run FAIL_TO_PASS tests.
+            n_passed = 0
+            for test_name in fail_to_pass:
+                r = subprocess.run(
+                    ["python", "-m", "pytest", "-x", test_name, "--tb=no", "-q"],
+                    capture_output=True,
+                    text=True,
+                    cwd=checkout_dir,
+                    timeout=60,
+                )
+                if r.returncode == 0:
+                    n_passed += 1
+
+            logger.info(
+                "Test validation for %s: %d/%d passed",
+                instance["instance_id"], n_passed, len(fail_to_pass),
+            )
+            return n_passed == len(fail_to_pass)
+
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            return False

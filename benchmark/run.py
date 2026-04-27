@@ -86,6 +86,12 @@ def _run_gaia(
     mode: str,
     max_tasks: int | None,
     output_dir: Path,
+    *,
+    skills_dir: str | None = None,
+    model: str = "glm-5.1",
+    gaia_level: str | None = None,
+    shuffle: bool = True,
+    seed: int = 42,
 ) -> tuple[list[dict], float | None]:
     """Run the GAIA benchmark for one agent.
 
@@ -94,23 +100,39 @@ def _run_gaia(
     from benchmark.wrappers.gaia import GAIAWrapper
 
     wrapper = GAIAWrapper(data_dir=str(BENCHMARK_DIR / "data" / "gaia"))
+
+    level = gaia_level or BENCHMARK_CONFIG["gaia"]["levels"][0]
+
     results = wrapper.run_benchmark(
         agent,
-        level=BENCHMARK_CONFIG["gaia"]["levels"][0],
+        level=level,
         max_tasks=max_tasks,
+        shuffle=shuffle,
+        seed=seed,
     )
 
-    # Score — GAIA gold answers may not be available (gated dataset).
+    # Score — try test split first, fall back to validation split.
+    # Test split gold answers are "?" (withheld); validation has real answers.
     gold: dict[str, str] = {}
-    for r in results:
-        task = next(
-            (t for t in wrapper.load_dataset(
-                level=BENCHMARK_CONFIG["gaia"]["levels"][0],
-            ) if t["task_id"] == r["task_id"]),
-            None,
-        )
-        if task and task.get("gold_answer"):
-            gold[task["task_id"]] = task["gold_answer"]
+
+    for split in ("test", "validation"):
+        try:
+            scoring_tasks = wrapper.load_dataset(level=level, split=split)
+        except Exception:
+            continue
+        # Build lookup once.
+        task_gold = {
+            t["task_id"]: t["gold_answer"]
+            for t in scoring_tasks
+            if t.get("gold_answer")
+        }
+        for r in results:
+            tid = r.get("task_id", "")
+            if tid in task_gold:
+                gold[tid] = task_gold[tid]
+        if gold:
+            logger.info("GAIA scoring using %s split (%d gold answers)", split, len(gold))
+            break
 
     accuracy = None
     if gold:
@@ -135,6 +157,11 @@ def _run_swebench(
     mode: str,
     max_tasks: int | None,
     output_dir: Path,
+    *,
+    skills_dir: str | None = None,
+    model: str = "glm-5.1",
+    shuffle: bool = True,
+    seed: int = 42,
 ) -> tuple[list[dict], float | None]:
     """Run the SWE-bench benchmark for one agent.
 
@@ -144,11 +171,14 @@ def _run_swebench(
     from benchmark.wrappers.swebench import SWEBenchWrapper
 
     wrapper = SWEBenchWrapper(data_dir=str(BENCHMARK_DIR / "data" / "swebench"))
+
     results = wrapper.run_benchmark(
         agent,
         dataset_name=BENCHMARK_CONFIG["swebench"]["dataset"],
         max_tasks=max_tasks,
         repo_base_dir=str(BENCHMARK_DIR / "data" / "repos"),
+        shuffle=shuffle,
+        seed=seed,
     )
 
     # Save predictions.
@@ -159,8 +189,21 @@ def _run_swebench(
     pred_path = output_dir / "swebench" / mode / "predictions.json"
     SWEBenchWrapper.write_predictions(results, str(pred_path))
 
-    logger.info("SWE-bench (%s): %d instances completed", mode, len(results))
-    return results, None  # SWE-bench eval is external
+    # Compute patch_applies rate as accuracy metric.
+    patch_rate = (
+        sum(1 for r in results if r.get("patch_applies")) / len(results)
+        if results else None
+    )
+    resolved_rate = (
+        sum(1 for r in results if r.get("resolved")) / len(results)
+        if results else None
+    )
+    logger.info(
+        "SWE-bench (%s): %d instances, patch_rate=%.1f%%, resolved=%.1f%%",
+        mode, len(results),
+        (patch_rate or 0) * 100, (resolved_rate or 0) * 100,
+    )
+    return results, patch_rate
 
 
 def _run_tau2bench(
@@ -168,6 +211,11 @@ def _run_tau2bench(
     mode: str,
     max_tasks: int | None,
     output_dir: Path,
+    *,
+    skills_dir: str | None = None,
+    model: str = "glm-5.1",
+    shuffle: bool = True,
+    seed: int = 42,
 ) -> tuple[list[dict], float | None]:
     """Run the Tau2-Bench benchmark for one agent.
 
@@ -187,21 +235,33 @@ def _run_tau2bench(
             agent,
             domain=domain,
             max_tasks=max_tasks,
+            shuffle=shuffle,
+            seed=seed,
         )
         all_results.extend(results)
 
         # Score per domain.
         expected: dict[str, list[str]] = {}
+        expected_actions: dict[str, list[dict]] = {}
         try:
-            tasks = wrapper.load_dataset(domain=domain)
-            for t in tasks:
+            tasks_for_scoring = wrapper.load_dataset(domain=domain)
+            for t in tasks_for_scoring:
                 if t.get("expected_outputs"):
                     expected[t["task_id"]] = t["expected_outputs"]
+                # Extract expected actions from raw evaluation_criteria.
+                crit = t.get("metadata", {}).get("evaluation_criteria")
+                if crit:
+                    actions = Tau2BenchWrapper._flatten_expected_actions(crit)
+                    if actions:
+                        expected_actions[t["task_id"]] = actions
         except ImportError:
             pass
 
-        if expected:
-            score = Tau2BenchWrapper.score(results, expected)
+        if expected or expected_actions:
+            score = Tau2BenchWrapper.score(
+                results, expected,
+                expected_actions_by_task=expected_actions,
+            )
             total_correct += score["correct"]
             total_scored += score["total"]
             logger.info(
@@ -235,6 +295,8 @@ def _run_perpackage(
     package: str = "superpowers",
     skills_dir: str | None = None,
     model: str = "glm-5.1",
+    shuffle: bool = True,
+    seed: int = 42,
 ) -> tuple[list[dict], float | None]:
     """Run the per-package benchmark for one agent.
 
@@ -246,7 +308,10 @@ def _run_perpackage(
         skills_dir=skills_dir or str(BENCHMARK_DIR / "skills"),
     )
     tasks = wrapper.load_tasks(package=package)
-    results = wrapper.run_benchmark(agent, package=package, max_tasks=max_tasks)
+    results = wrapper.run_benchmark(
+        agent, package=package, max_tasks=max_tasks,
+        shuffle=shuffle, seed=seed,
+    )
 
     # Load skill content for judge context.
     skills_content: dict[str, str] = {}
@@ -292,11 +357,112 @@ def _run_perpackage(
     return results, judge_score["overall_avg"]
 
 
+def _run_skillsbench(
+    agent,
+    mode: str,
+    max_tasks: int | None,
+    output_dir: Path,
+    *,
+    skills_dir: str | None = None,
+    model: str = "glm-5.1",
+    shuffle: bool = True,
+    seed: int = 42,
+    skillsbench_repo: str = "/tmp/skillsbench_full",
+    workers: int = 3,
+) -> tuple[list[dict], float | None]:
+    """Run the SkillsBench benchmark with deterministic Docker-based evaluation.
+
+    Returns (results_list, pass_rate).
+    """
+    from benchmark.wrappers.skillsbench import SkillsBenchWrapper
+
+    wrapper = SkillsBenchWrapper(repo_path=skillsbench_repo)
+    results = wrapper.run_benchmark(
+        agent, max_tasks=max_tasks, shuffle=shuffle, seed=seed,
+        workers=workers,
+    )
+
+    # Score from Docker reward.txt (deterministic).
+    tasks = wrapper.load_tasks(max_tasks=max_tasks, shuffle=shuffle, seed=seed)
+    score = SkillsBenchWrapper.score(results, tasks)
+    logger.info(
+        "SkillsBench (%s): %d/%d passed (%.1f%%)",
+        mode,
+        score["tasks_passed"],
+        score["total_tasks"],
+        score["pass_rate"] * 100,
+    )
+
+    # Save results.
+    raw_path = output_dir / "skillsbench" / mode / "results.json"
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+    _save_json(results, raw_path)
+
+    # Save scores.
+    score_path = output_dir / "skillsbench" / mode / "score.json"
+    score_path.write_text(
+        json.dumps(score, indent=2, default=str, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    return results, score["pass_rate"]
+
+
+def _run_skillsbench_claudecode(
+    agent,
+    mode: str,
+    max_tasks: int | None,
+    output_dir: Path,
+    *,
+    skills_dir: str | None = None,
+    model: str = "glm-5.1",
+    shuffle: bool = True,
+    seed: int = 42,
+    skillsbench_repo: str = "/tmp/skillsbench_full",
+    workers: int = 3,
+) -> tuple[list[dict], float | None]:
+    """Run SkillsBench using the Claude Code CLI for realistic evaluation.
+
+    Returns (results_list, pass_rate).
+    """
+    from benchmark.wrappers.skillsbench import SkillsBenchWrapper
+
+    wrapper = SkillsBenchWrapper(repo_path=skillsbench_repo)
+    results = wrapper.run_benchmark_claudecode(
+        agent, max_tasks=max_tasks, shuffle=shuffle, seed=seed,
+        workers=workers,
+    )
+
+    # Score from Docker reward.txt (deterministic).
+    tasks = wrapper.load_tasks(max_tasks=max_tasks, shuffle=shuffle, seed=seed)
+    score = SkillsBenchWrapper.score(results, tasks)
+    logger.info(
+        "SkillsBench ClaudeCode (%s): %d/%d passed (%.1f%%)",
+        mode,
+        score["tasks_passed"],
+        score["total_tasks"],
+        score["pass_rate"] * 100,
+    )
+
+    # Save results.
+    raw_path = output_dir / "skillsbench" / mode / "results.json"
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+    _save_json(results, raw_path)
+
+    # Save scores.
+    score_path = output_dir / "skillsbench" / mode / "score.json"
+    score_path.write_text(
+        json.dumps(score, indent=2, default=str, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    return results, score["pass_rate"]
+
+
 # Map benchmark names to runner functions.
 _BENCHMARK_RUNNERS = {
     "gaia": _run_gaia,
     "swebench": _run_swebench,
-    "tau2bench": _run_tau2bench,
 }
 
 
@@ -360,7 +526,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--benchmark",
-        choices=["gaia", "swebench", "tau2bench", "perpackage", "all"],
+        choices=["gaia", "swebench", "perpackage", "skillsbench", "all"],
         default="all",
         help="Which benchmark to run (default: all)",
     )
@@ -371,9 +537,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mode",
-        choices=["traditional", "ontoskills", "both"],
+        choices=["traditional", "ontoskills", "both", "claudecode", "claudecode-mcp"],
         default="both",
-        help="Which agent mode to run (default: both)",
+        help=(
+            "Which agent mode to run (default: both). "
+            "'claudecode' = Claude Code CLI with skills in .claude/skills/. "
+            "'claudecode-mcp' = Claude Code CLI with OntoSkills MCP tools."
+        ),
     )
     parser.add_argument(
         "--skills-dir",
@@ -398,13 +568,47 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--max-tasks",
         type=int,
+        default=25,
+        help="Maximum number of tasks to run per benchmark (default: 25)",
+    )
+    parser.add_argument(
+        "--shuffle",
+        action="store_true",
+        default=True,
+        help="Shuffle tasks before selection (default: True)",
+    )
+    parser.add_argument(
+        "--no-shuffle",
+        action="store_false",
+        dest="shuffle",
+        help="Disable task shuffling (deterministic order)",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed for task shuffling (default: 42)",
+    )
+    parser.add_argument(
+        "--gaia-level",
         default=None,
-        help="Maximum number of tasks to run per benchmark (default: all)",
+        help="GAIA level (default: first level from config)",
     )
     parser.add_argument(
         "--output-dir",
         default=str(BENCHMARK_DIR / "results"),
         help="Directory to write results to (default: benchmark/results/)",
+    )
+    parser.add_argument(
+        "--skillsbench-repo",
+        default="/tmp/skillsbench_full",
+        help="Path to local clone of benchflow-ai/skillsbench (for Docker eval)",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=3,
+        help="Parallel Docker verification workers (default: 3)",
     )
     parser.add_argument(
         "-v", "--verbose",
@@ -483,6 +687,7 @@ def main() -> None:
                 results, accuracy = _run_perpackage(
                     trad_agent, "traditional", args.max_tasks, output_dir,
                     package=package, skills_dir=args.skills_dir, model=args.model,
+                    shuffle=args.shuffle, seed=args.seed,
                 )
                 elapsed = time.perf_counter() - t0
                 logger.info("Traditional agent completed %s in %.1fs", bench_name, elapsed)
@@ -500,23 +705,106 @@ def main() -> None:
                 results, accuracy = _run_perpackage(
                     os_agent, "ontoskills", args.max_tasks, output_dir,
                     package=package, model=args.model,
+                    shuffle=args.shuffle, seed=args.seed,
                 )
                 elapsed = time.perf_counter() - t0
                 logger.info("OntoSkills agent completed %s in %.1fs", bench_name, elapsed)
                 ontoskills_results[bench_name] = results
                 ontoskills_accuracies[bench_name] = accuracy
 
+        elif bench_name == "skillsbench":
+            # SkillsBench: wrapper fetches tasks from GitHub, scopes skills per task.
+            if args.mode in ("claudecode", "claudecode-mcp"):
+                # Claude Code CLI mode — realistic agent evaluation.
+                from benchmark.agents.claudecode import ClaudeCodeAgent
+                cc_mode = "traditional" if args.mode == "claudecode" else "ontoskills"
+                cc_tag = args.mode  # for output directory naming
+                logger.info(
+                    "Creating Claude Code agent (mode=%s, model=%s, SkillsBench)...",
+                    cc_mode, args.model,
+                )
+                cc_agent = ClaudeCodeAgent(
+                    model=args.model,
+                    mode=cc_mode,
+                    skills_dir=args.skills_dir,
+                    ontomcp_bin=args.ontomcp_bin,
+                )
+                t0 = time.perf_counter()
+                results, accuracy = _run_skillsbench_claudecode(
+                    cc_agent, cc_tag, args.max_tasks, output_dir,
+                    skills_dir=args.skills_dir, model=args.model,
+                    shuffle=args.shuffle, seed=args.seed,
+                    skillsbench_repo=args.skillsbench_repo,
+                    workers=args.workers,
+                )
+                elapsed = time.perf_counter() - t0
+                logger.info("Claude Code (%s) completed %s in %.1fs", cc_tag, bench_name, elapsed)
+                traditional_results[bench_name] = results
+                traditional_accuracies[bench_name] = accuracy
+
+            else:
+                if args.mode in ("traditional", "both"):
+                    logger.info(
+                        "Creating traditional agent (model=%s, SkillsBench)...",
+                        args.model,
+                    )
+                    trad_agent = _make_traditional_agent(
+                        model=args.model,
+                        skills_dir=args.skills_dir,
+                    )
+                    t0 = time.perf_counter()
+                    results, accuracy = _run_skillsbench(
+                        trad_agent, "traditional", args.max_tasks, output_dir,
+                        skills_dir=args.skills_dir, model=args.model,
+                        shuffle=args.shuffle, seed=args.seed,
+                        skillsbench_repo=args.skillsbench_repo,
+                        workers=args.workers,
+                    )
+                    elapsed = time.perf_counter() - t0
+                    logger.info("Traditional agent completed %s in %.1fs", bench_name, elapsed)
+                    traditional_results[bench_name] = results
+                    traditional_accuracies[bench_name] = accuracy
+
+                if args.mode in ("ontoskills", "both"):
+                    logger.info("Creating OntoSkills agent (model=%s)...", args.model)
+                    os_agent = _make_ontoskills_agent(
+                        model=args.model,
+                        ttl_dir=args.ttl_dir,
+                        ontomcp_bin=args.ontomcp_bin,
+                    )
+                    t0 = time.perf_counter()
+                    results, accuracy = _run_skillsbench(
+                        os_agent, "ontoskills", args.max_tasks, output_dir,
+                        model=args.model,
+                        shuffle=args.shuffle, seed=args.seed,
+                        skillsbench_repo=args.skillsbench_repo,
+                        workers=args.workers,
+                    )
+                    elapsed = time.perf_counter() - t0
+                    logger.info("OntoSkills agent completed %s in %.1fs", bench_name, elapsed)
+                    ontoskills_results[bench_name] = results
+                    ontoskills_accuracies[bench_name] = accuracy
+
         else:
             runner = _BENCHMARK_RUNNERS[bench_name]
 
             if args.mode in ("traditional", "both"):
-                logger.info("Creating traditional agent (model=%s)...", args.model)
+                # GAIA/SWE-bench: per-task scoped skill loading (2-3 relevant skills).
+                logger.info(
+                    "Creating traditional agent (model=%s, per-task skill scoping)...",
+                    args.model,
+                )
                 trad_agent = _make_traditional_agent(
                     model=args.model,
                     skills_dir=args.skills_dir,
                 )
                 t0 = time.perf_counter()
-                results, accuracy = runner(trad_agent, "traditional", args.max_tasks, output_dir)
+                results, accuracy = runner(
+                    trad_agent, "traditional", args.max_tasks, output_dir,
+                    skills_dir=args.skills_dir, model=args.model,
+                    shuffle=args.shuffle, seed=args.seed,
+                    gaia_level=args.gaia_level,
+                )
                 elapsed = time.perf_counter() - t0
                 logger.info("Traditional agent completed %s in %.1fs", bench_name, elapsed)
                 traditional_results[bench_name] = results
@@ -530,7 +818,11 @@ def main() -> None:
                     ontomcp_bin=args.ontomcp_bin,
                 )
                 t0 = time.perf_counter()
-                results, accuracy = runner(os_agent, "ontoskills", args.max_tasks, output_dir)
+                results, accuracy = runner(
+                    os_agent, "ontoskills", args.max_tasks, output_dir,
+                    shuffle=args.shuffle, seed=args.seed,
+                    gaia_level=args.gaia_level,
+                )
                 elapsed = time.perf_counter() - t0
                 logger.info("OntoSkills agent completed %s in %.1fs", bench_name, elapsed)
                 ontoskills_results[bench_name] = results

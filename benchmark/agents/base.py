@@ -37,7 +37,7 @@ class BaseAgent(ABC):
     """
 
     # Anthropic reserves tokens for the response; keep a safety margin.
-    _RESERVED_OUTPUT_TOKENS: int = 4096
+    _RESERVED_OUTPUT_TOKENS: int = 8192
 
     def __init__(self, model: str, api_key: str | None = None) -> None:
         self.model = model
@@ -47,7 +47,11 @@ class BaseAgent(ABC):
                 "An Anthropic API key is required. "
                 "Pass api_key= or set ANTHROPIC_API_KEY."
             )
-        self.client = anthropic.Anthropic(api_key=self.api_key)
+        import httpx
+        self.client = anthropic.Anthropic(
+            api_key=self.api_key,
+            timeout=httpx.Timeout(300.0, connect=30.0),
+        )
 
     # ------------------------------------------------------------------
     # Abstract interface
@@ -90,17 +94,18 @@ class BaseAgent(ABC):
     def _call_api(self, messages: list[dict]) -> anthropic.types.Message:
         """Call the Anthropic Messages API with system prompt + tools.
 
-        Retries on ``RateLimitError`` with exponential back-off (up to 5
-        attempts).
+        Retries on ``RateLimitError`` and server errors (5xx) with
+        exponential back-off (up to 5 attempts).
         """
         kwargs: dict = {
             "model": self.model,
             "max_tokens": self._RESERVED_OUTPUT_TOKENS,
             "system": self.get_system_prompt(),
             "messages": messages,
+            "temperature": 0.0,
         }
         tools = self.get_tools()
-        if tools:
+        if tools is not None and len(tools) > 0:
             kwargs["tools"] = tools
 
         max_retries = 5
@@ -120,6 +125,26 @@ class BaseAgent(ABC):
                     f"waiting {wait}s..."
                 )
                 time.sleep(wait)
+            except anthropic.APIStatusError as exc:
+                if exc.status_code >= 500 and attempt < max_retries - 1:
+                    wait = 2**attempt
+                    print(
+                        f"  Server error {exc.status_code} (attempt {attempt + 1}/{max_retries}), "
+                        f"retrying in {wait}s..."
+                    )
+                    time.sleep(wait)
+                else:
+                    raise
+            except anthropic.APIConnectionError:
+                if attempt < max_retries - 1:
+                    wait = 2**attempt
+                    print(
+                        f"  Connection error (attempt {attempt + 1}/{max_retries}), "
+                        f"retrying in {wait}s..."
+                    )
+                    time.sleep(wait)
+                else:
+                    raise
 
         raise anthropic.RateLimitError("Exceeded max retries on rate limit")
 

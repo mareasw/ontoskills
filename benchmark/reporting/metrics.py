@@ -70,13 +70,19 @@ def _extract_metrics(result: dict) -> dict | None:
     if m is None:
         return None
 
+    # Support both AgentResult objects and plain dicts (e.g. from JSON reload).
+    def _get(key, default=0):
+        if isinstance(m, dict):
+            return m.get(key, default)
+        return getattr(m, key, default)
+
     return {
-        "input_tokens": getattr(m, "input_tokens", 0),
-        "output_tokens": getattr(m, "output_tokens", 0),
-        "total_latency_ms": getattr(m, "total_latency_ms", 0.0),
-        "tool_calls": getattr(m, "tool_calls", 0),
-        "turns": getattr(m, "turns", 0),
-        "context_overflow": getattr(m, "context_overflow", False),
+        "input_tokens": _get("input_tokens"),
+        "output_tokens": _get("output_tokens"),
+        "total_latency_ms": _get("total_latency_ms", 0.0),
+        "tool_calls": _get("tool_calls"),
+        "turns": _get("turns"),
+        "context_overflow": _get("context_overflow", False),
     }
 
 

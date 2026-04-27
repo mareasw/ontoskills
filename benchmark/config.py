@@ -95,8 +95,9 @@ BENCHMARK_CONFIG = {
     "swebench": {
         "dataset": "princeton-nlp/SWE-bench_Verified",
     },
-    "tau2bench": {
-        "environments": ["airline", "retail", "telecom"],
+    "skillsbench": {
+        "repo": "benchflow-ai/skillsbench",
+        "branch": "main",
     },
 }
 

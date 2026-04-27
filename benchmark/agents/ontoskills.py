@@ -3,16 +3,24 @@
 Uses the 4 MCP tools (search, get_skill_context, evaluate_execution_plan,
 query_epistemic_rules) via the Anthropic tool-use API to answer questions
 about skills.
+
+Supports an optional **prefetch** mode that retrieves relevant skill
+knowledge before the first API call and injects it into the system prompt.
+This eliminates multi-turn tool-call overhead and frees turns for
+interaction (asking clarifying questions, checking prerequisites).
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import time
 
 from benchmark.mcp_client.client import MCPClient
 
 from .base import AgentResult, BaseAgent
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Tool definitions (mirrors ontomcp src/main.rs:720-794)
@@ -131,7 +139,23 @@ _TOOL_DEFINITIONS: list[dict] = [
 
 
 class OntoSkillsAgent(BaseAgent):
-    """Agent that uses 4 MCP tools to query the OntoSkills knowledge base."""
+    """Agent that uses 4 MCP tools to query the OntoSkills knowledge base.
+
+    Parameters
+    ----------
+    model:
+        Anthropic model ID.
+    ontology_root:
+        Path to compiled TTL packages.
+    ontomcp_bin:
+        Path to the ontomcp binary.
+    api_key:
+        Anthropic API key.
+    prefetch:
+        When True, skill knowledge is retrieved via MCP before the first
+        API call and injected into the system prompt.  This eliminates
+        multi-turn tool-call overhead and frees turns for interaction.
+    """
 
     def __init__(
         self,
@@ -139,9 +163,12 @@ class OntoSkillsAgent(BaseAgent):
         ontology_root: str,
         ontomcp_bin: str | None = None,
         api_key: str | None = None,
+        prefetch: bool = False,
     ) -> None:
         super().__init__(model=model, api_key=api_key)
         self.ontology_root = ontology_root
+        self.prefetch = prefetch
+        self._prefetched_knowledge: str = ""
         # Create the client but do NOT start it yet (started in run()).
         self._mcp_client = MCPClient(
             ontomcp_bin=ontomcp_bin,
@@ -153,6 +180,8 @@ class OntoSkillsAgent(BaseAgent):
     # ------------------------------------------------------------------
 
     def get_system_prompt(self) -> str:
+        if self._prefetched_knowledge:
+            return self._build_enriched_system_prompt()
         return (
             "You are an AI agent with access to a knowledge base of skills "
             "via 4 tools:\n"
@@ -169,7 +198,315 @@ class OntoSkillsAgent(BaseAgent):
         )
 
     def get_tools(self) -> list[dict] | None:
+        if self._prefetched_knowledge:
+            return None  # No tools needed when knowledge is pre-loaded
         return _TOOL_DEFINITIONS
+
+    # ------------------------------------------------------------------
+    # Pre-fetch helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _compact_context(skill_id: str, mcp_result: dict) -> str:
+        """Extract compact text from verbose MCP get_skill_context result.
+
+        Drops URIs, null fields, repeated source identifiers, and the
+        payload section (when unavailable).  Returns a markdown-like
+        string that should be ≤ raw SKILL.md token count.
+        """
+        # Prefer structuredContent (no double-encoding); fall back to
+        # parsing content[0].text.
+        data = mcp_result.get("structuredContent")
+        if not data:
+            content = mcp_result.get("content", [])
+            if content and isinstance(content, list) and content[0].get("text"):
+                try:
+                    data = json.loads(content[0]["text"])
+                except (json.JSONDecodeError, TypeError):
+                    return ""
+        if not data or not isinstance(data, dict):
+            return ""
+
+        lines: list[str] = []
+        lines.append(f"## {skill_id}")
+
+        # Skill metadata.
+        skill = data.get("skill", {})
+        if skill.get("differentia"):
+            genus = skill.get("genus", "")
+            lines.append(f"{genus} — {skill['differentia']}")
+        if skill.get("intents"):
+            lines.append("Intents: " + "; ".join(skill["intents"]))
+        requirements = skill.get("requirements", [])
+        if requirements:
+            reqs = [r["value"] for r in requirements if r.get("value")]
+            if reqs:
+                lines.append("Requires: " + "; ".join(reqs))
+
+        # Knowledge nodes — the core value.
+        nodes = data.get("knowledge_nodes", [])
+        if nodes:
+            lines.append("")
+            # Sort by step_order if present, then by kind priority.
+            kind_order = {
+                "procedure": 0,
+                "constraint": 1,
+                "design_principle": 2,
+                "heuristic": 3,
+                "anti_pattern": 4,
+                "recovery_tactic": 5,
+                "best_practice": 6,
+                "rule": 7,
+            }
+            def _sort_key(n):
+                return (
+                    n.get("step_order", 999) or 999,
+                    kind_order.get(n.get("kind", ""), 99),
+                )
+            nodes_sorted = sorted(nodes, key=_sort_key)
+
+            for node in nodes_sorted:
+                kind = node.get("kind", "")
+                content_text = node.get("directive_content", "")
+                if not content_text:
+                    continue
+
+                ctx = node.get("applies_to_context", "")
+                severity = node.get("severity_level")
+                rationale = node.get("rationale")
+
+                # Compact header: kind + context + severity.
+                parts = [kind.replace("_", " ").upper()]
+                if ctx:
+                    parts.append(f"({ctx})")
+                if severity and severity in ("CRITICAL", "HIGH"):
+                    parts.append(f"[{severity}]")
+                lines.append("  ".join(parts) + ":")
+                lines.append(f"  {content_text}")
+
+        return "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # Tool result compaction
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _parse_mcp_result(raw: dict) -> dict | None:
+        """Extract the data payload from a raw MCP response."""
+        data = raw.get("structuredContent")
+        if data:
+            return data if isinstance(data, dict) else {"result": data}
+        content = raw.get("content", [])
+        if content and isinstance(content, list) and content[0].get("text"):
+            try:
+                return json.loads(content[0]["text"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return None
+
+    def _compact_tool_result(
+        self, tool_name: str, tool_input: dict, raw: dict,
+    ) -> str:
+        """Compact an MCP tool result into token-efficient text."""
+        data = self._parse_mcp_result(raw)
+        if data is None:
+            return json.dumps(raw, ensure_ascii=False)
+
+        if tool_name == "search":
+            return self._compact_search(data)
+        if tool_name == "get_skill_context":
+            skill_id = tool_input.get("skill_id", "")
+            compact = self._compact_context(skill_id, raw)
+            return compact if compact else json.dumps(raw, ensure_ascii=False)
+        if tool_name == "query_epistemic_rules":
+            return self._compact_epistemic_rules(data)
+        if tool_name == "evaluate_execution_plan":
+            return self._compact_plan(data)
+        return json.dumps(raw, ensure_ascii=False)
+
+    @staticmethod
+    def _compact_tool_result_static(
+        tool_name: str, tool_input: dict, raw: dict,
+    ) -> str:
+        """Static wrapper for use outside the agent (e.g. perpackage wrapper)."""
+        data = OntoSkillsAgent._parse_mcp_result(raw)
+        if data is None:
+            return json.dumps(raw, ensure_ascii=False)
+
+        if tool_name == "search":
+            return OntoSkillsAgent._compact_search(data)
+        if tool_name == "get_skill_context":
+            skill_id = tool_input.get("skill_id", "")
+            compact = OntoSkillsAgent._compact_context(skill_id, raw)
+            return compact if compact else json.dumps(raw, ensure_ascii=False)
+        if tool_name == "query_epistemic_rules":
+            return OntoSkillsAgent._compact_epistemic_rules(data)
+        if tool_name == "evaluate_execution_plan":
+            return OntoSkillsAgent._compact_plan(data)
+        return json.dumps(raw, ensure_ascii=False)
+
+    @staticmethod
+    def _compact_search(data: dict) -> str:
+        """Compact search results into concise text."""
+        lines: list[str] = []
+        mode = data.get("mode", "")
+        lines.append(f"Search mode: {mode}")
+
+        # BM25 results
+        results = data.get("results", [])
+        if results:
+            for r in results[:5]:
+                sid = r.get("skill_id", "")
+                intents = "; ".join(r.get("intents", [])[:2])
+                tier = r.get("trust_tier", "")
+                lines.append(f"- {sid} [{tier}]: {intents}")
+
+        # Semantic matches
+        matches = data.get("matches", [])
+        if matches:
+            for m in matches[:3]:
+                intent = m.get("intent", "")
+                score = m.get("score", 0)
+                skills = ", ".join(m.get("skills", [])[:3])
+                lines.append(f"- {intent} (score={score:.2f}): {skills}")
+
+        # Structured results
+        skills = data.get("skills", [])
+        if skills:
+            for s in skills[:5]:
+                sid = s.get("id", "")
+                nature = s.get("nature", "")
+                lines.append(f"- {sid} ({nature})")
+
+        return "\n".join(lines) if len(lines) > 1 else json.dumps(data, ensure_ascii=False)
+
+    @staticmethod
+    def _compact_epistemic_rules(data: dict) -> str:
+        """Compact epistemic rules into concise text."""
+        # Handle multiple response shapes: result (array), nodes, knowledge_nodes
+        nodes = data.get("result", data.get("nodes", data.get("knowledge_nodes", [])))
+        if isinstance(nodes, dict):
+            nodes = nodes.get("nodes", nodes.get("knowledge_nodes", []))
+        if not nodes:
+            return "No knowledge nodes found."
+
+        lines: list[str] = []
+        for node in nodes:
+            kind = node.get("kind", "").replace("_", " ").upper()
+            content = node.get("directive_content", "")
+            if not content:
+                continue
+            ctx = node.get("applies_to_context", "")
+            severity = node.get("severity_level", "")
+            parts = [kind]
+            if ctx:
+                parts.append(f"({ctx})")
+            if severity and severity in ("CRITICAL", "HIGH"):
+                parts.append(f"[{severity}]")
+            lines.append("  ".join(parts) + ":")
+            lines.append(f"  {content}")
+
+        return "\n".join(lines) if lines else json.dumps(data, ensure_ascii=False)
+
+    @staticmethod
+    def _compact_plan(data: dict) -> str:
+        """Compact execution plan evaluation into concise text."""
+        lines: list[str] = []
+        applicable = data.get("applicable", False)
+        lines.append(f"Applicable: {'Yes' if applicable else 'No'}")
+
+        recommended = data.get("recommended_skill")
+        if recommended:
+            lines.append(f"Recommended: {recommended}")
+
+        steps = data.get("plan_steps", [])
+        if steps:
+            lines.append("Plan:")
+            for i, step in enumerate(steps, 1):
+                lines.append(f"  {i}. {step.get('skill_id', '')}: {step.get('purpose', '')}")
+
+        missing = data.get("missing_states", [])
+        if missing:
+            lines.append(f"Missing states: {', '.join(missing)}")
+
+        warnings = data.get("dependency_warnings", [])
+        if warnings:
+            lines.append(f"Warnings: {'; '.join(warnings[:3])}")
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def _extract_skill_ids(search_result: dict) -> list[str]:
+        """Extract skill_id values from an MCP search result."""
+        data = search_result.get("structuredContent")
+        if not data:
+            content = search_result.get("content", [])
+            if content and isinstance(content, list) and content[0].get("text"):
+                try:
+                    data = json.loads(content[0]["text"])
+                except (json.JSONDecodeError, TypeError):
+                    return []
+        if not data:
+            return []
+        results = data.get("results", [])
+        return [r["skill_id"] for r in results if "skill_id" in r]
+
+    def prefetch_skills(self, task_prompt: str) -> str:
+        """Pre-fetch relevant skill knowledge via MCP.
+
+        Calls search + get_skill_context and returns compact text
+        suitable for injecting into the system prompt.
+        """
+        search_result = self._mcp_client.call_tool(
+            "search", {"query": task_prompt, "top_k": 3},
+        )
+        skill_ids = self._extract_skill_ids(search_result)
+        if not skill_ids:
+            return ""
+
+        parts: list[str] = []
+        for sid in skill_ids[:2]:
+            try:
+                ctx = self._mcp_client.call_tool(
+                    "get_skill_context", {"skill_id": sid},
+                )
+                compact = self._compact_context(sid, ctx)
+                if compact:
+                    parts.append(compact)
+            except Exception as exc:
+                logger.warning("prefetch get_skill_context(%s) failed: %s", sid, exc)
+
+        return "\n\n".join(parts)
+
+    def prefetch_skills_by_ids(self, skill_ids: list[str]) -> str:
+        """Pre-fetch skill knowledge by known skill IDs (skip search).
+
+        Used when skill_ids are already known (e.g. per-package tasks).
+        """
+        parts: list[str] = []
+        for sid in skill_ids:
+            try:
+                ctx = self._mcp_client.call_tool(
+                    "get_skill_context", {"skill_id": sid},
+                )
+                compact = self._compact_context(sid, ctx)
+                if compact:
+                    parts.append(compact)
+            except Exception as exc:
+                logger.warning("prefetch get_skill_context(%s) failed: %s", sid, exc)
+        return "\n\n".join(parts)
+
+    def _build_enriched_system_prompt(self) -> str:
+        """Build system prompt with pre-fetched skill knowledge."""
+        return (
+            "You are an AI agent with expert skill knowledge pre-loaded below.\n"
+            "Use this knowledge directly to complete the task.\n"
+            "Follow the skill's procedures, constraints, and best practices.\n"
+            "\n"
+            "--- Pre-loaded Skill Knowledge ---\n"
+            f"{self._prefetched_knowledge}\n"
+            "--- End of Pre-loaded Knowledge ---\n"
+        )
 
     def run_turn(self, messages: list[dict]) -> tuple[dict, dict]:
         """Execute one turn: call the API, execute any tool calls via MCP.
@@ -222,9 +559,10 @@ class OntoSkillsAgent(BaseAgent):
             tool_input = block.get("input", {})
             try:
                 mcp_result = self._mcp_client.call_tool(tool_name, tool_input)
-                # The MCP result has a "content" list; serialize it for the
-                # tool_result payload.
-                result_text = json.dumps(mcp_result, ensure_ascii=False)
+                # Compact the MCP result to save tokens.
+                result_text = self._compact_tool_result(
+                    tool_name, tool_input, mcp_result,
+                )
                 is_error = False
             except Exception as exc:
                 result_text = f"Error calling {tool_name}: {exc}"
@@ -273,19 +611,29 @@ class OntoSkillsAgent(BaseAgent):
         Overrides the base ``run`` to:
         1. Wrap the loop in a ``with MCPClient`` context manager.
         2. Send the MCP ``initialize`` handshake before the first turn.
-        3. Manage the conversation loop directly (the base class assumes
-           the subclass does not append messages during ``run_turn``,
-           but this agent must append tool_result messages to support
-           multi-turn tool use).
-        4. Validate that tool_result messages are present for every
+        3. When ``prefetch=True``, retrieve skill knowledge via MCP
+           before the first API call and inject into system prompt.
+        4. Manage the conversation loop directly.
+        5. Validate that tool_result messages are present for every
            tool_use block (C1).
-        5. Break out of the loop early if the MCP subprocess has
+        6. Break out of the loop early if the MCP subprocess has
            crashed (I2).
         """
         self._subprocess_dead = False
+        self._prefetched_knowledge = ""
 
         with self._mcp_client:
             self._mcp_client.initialize()
+
+            # Pre-fetch skill knowledge when enabled.
+            if self.prefetch:
+                knowledge = self.prefetch_skills(task_prompt)
+                if knowledge:
+                    self._prefetched_knowledge = knowledge
+                    logger.info(
+                        "Pre-fetched %d chars of skill knowledge",
+                        len(knowledge),
+                    )
 
             messages: list[dict] = [
                 {"role": "user", "content": task_prompt},
