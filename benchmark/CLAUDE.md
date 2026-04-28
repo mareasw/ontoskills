@@ -12,6 +12,13 @@
 datasets    — HuggingFace dataset loading (installed)
 anthropic   — API client (installed)
 rdflib      — TTL parsing for content coverage (installed)
+requests    — HTTP client for API calls (installed)
+pdfplumber  — PDF text extraction (installed)
+python-docx — Word document creation (installed)
+python-pptx — PowerPoint generation (installed)
+pandas      — Data manipulation (installed)
+youtube-transcript-api — YouTube transcript fetching (installed)
+toml        — TOML config parsing (installed)
 ```
 
 ### NOT available
@@ -30,17 +37,23 @@ benchmark/
 ├── config.py               # Model pricing, benchmark definitions
 ├── agents/
 │   ├── base.py             # BaseAgent with Anthropic API, run-loop, retry
+│   ├── claudecode.py       # ClaudeCodeAgent: CLI-based agent (--print --bare mode)
 │   ├── traditional.py      # Skill registry + read_skill tool (like Claude Code)
-│   └── ontoskills.py       # 4 MCP tools (search, get_skill_context, etc.)
+│   ├── ontoskills.py       # 4 MCP tools (search, get_skill_context, etc.)
+│   └── utils.py            # Shared utilities (extract_python_code)
 ├── wrappers/
 │   ├── gaia.py             # GAIA: Q&A with file attachments
+│   ├── perpackage.py       # Per-package: run selected packages only
 │   ├── skillsbench.py      # SkillsBench: Docker-based deterministic eval (podman + pytest)
-│   └── swebench.py         # SWE-bench: repo checkout + diff patch generation
+│   ├── swebench.py         # SWE-bench: repo checkout + diff patch generation
+│   └── tau2bench.py        # tau2-bench: agent benchmarking wrapper
 ├── reporting/
 │   ├── metrics.py          # compute_comparison()
-│   └── comparison.py       # generate_comparison_report()
+│   ├── comparison.py       # generate_comparison_report()
+│   └── chart_data.py       # chart-ready JSON generation (Chart.js/D3)
 ├── mcp_client/
 │   └── client.py           # JSON-RPC MCP client for ontomcp subprocess
+├── tests/                  # Unit tests for benchmark framework
 ├── data/                   # Downloaded datasets (currently empty)
 └── results/                # Benchmark output (JSON + comparison.md)
 ```
@@ -83,7 +96,7 @@ SkillsBench uses deterministic Docker evaluation:
 3. Task's pytest test suite verifies the output files
 4. Fractional scoring from CTRF report (passed/total tests) with binary reward.txt fallback
 
-5 tasks are skipped due to exotic base images (bugswarm, suricata, oss-fuzz, erlang).
+6 tasks are skipped: 5 exotic base images (bugswarm, suricata, oss-fuzz, erlang) + 1 Podman/BuildKit incompatibility (organize-messy-files).
 
 #### Agent design for SkillsBench
 
@@ -108,9 +121,6 @@ The SWE-bench wrapper patches `agent.run_turn` to intercept file_read/file_edit.
 
 ### Content coverage: core.ttl must be loaded
 The knowledge yield Level 2 SPARQL uses `rdfs:subClassOf*` property paths to resolve leaf types (e.g., `oc:AntiPattern`) to top-level dimensions (e.g., `oc:NormativeRule`). This requires `core.ttl` loaded in the graph. The file is at `ontoskills/core.ttl` in the project root, NOT in `~/.ontoskills/packages/`.
-
-### `trust_remote_code` deprecation
-HuggingFace datasets no longer supports `trust_remote_code=True`. The SWE-bench wrapper has been fixed to not pass it. GAIA wrapper still passes it — will get a warning but works.
 
 ## Test verification
 
@@ -164,22 +174,49 @@ The TraditionalAgent works like Claude Code:
 - Multi-turn loop: model reads relevant skills then answers
 - Both GAIA and SWE-bench wrappers delegate `read_skill` to `agent._resolve_skill()`
 
-## Current benchmark results (2026-04-27, SkillsBench redesign)
+## ClaudeCodeAgent
 
-### SkillsBench
-- 73/82 tasks usable (9 skipped: skills not compiled to TTL due to compiler bug)
-- 5 tasks skipped: exotic Docker images (bugswarm, suricata, oss-fuzz, erlang)
-- Tasks shuffled with seed=7 before selection
-- OntoSkills uses SkillsBench-only ontology root (185 TTLs, 1.4s MCP startup)
-- Docker verification: podman + pytest CTRF fractional scoring
+Uses the Claude Code CLI in `--print --bare --output-format json` mode for realistic evaluation.
 
-_Results pending — first corrected run in progress._
+Two modes:
+- `traditional` — SKILL.md files in `.claude/skills/`, no MCP
+- `ontoskills` — MCP config for ontomcp + ontomcp-driver SKILL.md in `.claude/skills/`
+
+Key files: `benchmark/agents/claudecode.py`, `benchmark/agents/utils.py`
+
+## Current benchmark results (2026-04-28, SkillsBench redesign)
+
+### SkillsBench (Claude Code CLI, seed=7, glm-5.1)
+
+#### Traditional (skills in .claude/skills/)
+| Task | Result |
+|------|--------|
+| reserves-at-risk-calc (financial) | PASS (5/5 tests) |
+| offer-letter-generator (docx) | PASS (4/4 tests) |
+| lab-unit-harmonization (healthcare) | FAIL (0/8 tests) |
+| travel-planning | FAIL (0/11 tests) |
+| paper-anonymizer (PDF) | FAIL (no solution) |
+
+**Traditional: 2/5 (40%), avg_reward=0.40**
+
+#### OntoSkills MCP (ontomcp-driver skill + MCP tools)
+| Task | Result |
+|------|--------|
+| reserves-at-risk-calc (financial) | PASS (5/5 tests) |
+| offer-letter-generator (docx) | PASS (4/4 tests) |
+| lab-unit-harmonization (healthcare) | PARTIAL (7/8 tests) |
+| travel-planning | FAIL (0/11 tests) |
+| paper-anonymizer (PDF) | PASS (6/6 tests) |
+
+**OntoSkills MCP: 3/5 (60%), avg_reward=0.775**
+
+**Delta: +50% pass rate, +93.75% avg reward**
 
 ### GAIA
-_Results pending — run with compaction enabled._
+_Results pending — run with Claude Code mode._
 
 ### SWE-bench
-_Results pending — run with compaction enabled._
+_Results pending — run with Claude Code mode._
 
 ### Compiler bug (unrelated to benchmark)
 11 skills across 9 tasks failed to compile to TTL. Root cause: `ontocore compile`
@@ -188,4 +225,8 @@ relative path. The 11 missing skills are:
 civ6lib, map-optimization-strategy, sqlite-map-parser, pymatgen, lean4-memories,
 gemini-video-understanding, senior-data-scientist, gmail-skill, threejs,
 data-reconciliation.
+
+## Chart data output
+
+All benchmark runs produce `chart_data.json` alongside `results.json` and `score.json`. This file contains per-task metrics in a format suitable for Chart.js/D3 visualization on the OntoSkills website.
 
