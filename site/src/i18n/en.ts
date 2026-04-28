@@ -84,6 +84,7 @@ export default {
   header: {
     ontostore: 'OntoStore',
     howItWorks: 'How it works',
+    benchmark: 'Benchmark',
     docs: 'Docs',
     getStarted: 'Get started',
   },

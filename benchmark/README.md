@@ -1,115 +1,132 @@
 # OntoSkills Benchmarks
 
-Benchmark suite comparing OntoSkills (SPARQL) vs traditional LLM skill reading.
+Benchmark suite comparing **OntoSkills** (MCP-powered skill queries) vs **Traditional** (stuffing skill docs into the prompt) across three standard agent benchmarks.
+
+## Benchmarks
+
+### GAIA
+
+General AI Assistant benchmark. Agents answer questions that may include file attachments.
+
+- **Dataset**: `gaia-benchmark/GAIA` (HuggingFace)
+- **Levels**: `2023_level1`, `2023_level2`, `2023_level3`
+- **Metric**: Exact-match accuracy against gold answers
+- **Tools injected**: `read_file` (for file attachments)
+
+### SWE-bench
+
+Software engineering benchmark. Agents produce unified-diff patches to resolve GitHub issues.
+
+- **Dataset**: `princeton-nlp/SWE-bench_Verified` (HuggingFace)
+- **Metric**: Resolve rate (requires external `swebench.harness` evaluation)
+- **Tools injected**: `file_read`, `file_edit` (operate on checked-out repos)
+- **Output**: `predictions.json` compatible with the SWE-bench harness
+
+### Tau2-Bench
+
+Tool-use benchmark in simulated customer-service environments.
+
+- **Domains**: airline, retail, banking
+- **Metric**: String-match accuracy + pass^k metric
+- **Tools injected**: Domain-specific tools from the tau2-bench dataset
 
 ## Quick Start
 
 ```bash
-# Run with real skill directories
-python run.py --skills-dir /path/to/skills --ttl-dir /path/to/ttls
+# Run all benchmarks with both agents (default)
+python run.py
 
-# Only OntoMCP (no API key needed)
-python run.py --ttl-dir /path/to/ttls --ontomcp-only
+# Run a specific benchmark
+python run.py --benchmark gaia --mode both
 
-# Only traditional (needs ANTHROPIC_API_KEY)
-python run.py --skills-dir /path/to/skills --traditional-only
+# Only the OntoSkills agent
+python run.py --benchmark swebench --mode ontoskills --ttl-dir /path/to/ttls
 
-# Custom iterations and runs
-python run.py --skills-dir /path/to/skills --ttl-dir /path/to/ttls --iterations 100 --runs 3
+# Only the traditional agent (needs ANTHROPIC_API_KEY)
+python run.py --benchmark gaia --mode traditional --skills-dir /path/to/skills
+
+# Limit tasks for a quick test
+python run.py --benchmark gaia --mode both --max-tasks 5
 ```
+
+## CLI Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--benchmark` | `all` | `gaia`, `swebench`, `tau2bench`, or `all` |
+| `--mode` | `both` | `traditional`, `ontoskills`, or `both` |
+| `--skills-dir` | `benchmark/skills/` | SKILL.md files for traditional agent |
+| `--ttl-dir` | `~/.ontoskills/packages` | TTL ontology packages for OntoSkills agent |
+| `--ontomcp-bin` | `~/.ontoskills/bin/ontomcp` | Path to ontomcp binary |
+| `--model` | First Anthropic model | Anthropic model ID |
+| `--max-tasks` | all | Limit tasks per benchmark |
+| `--output-dir` | `benchmark/results/` | Where to write results |
+| `-v` | off | Verbose logging |
 
 ## Structure
 
 ```
 benchmark/
-├── run.py                   # Main runner — orchestrates both benchmarks
-├── config.py                # Model pricing, context limits, task definitions
-├── compare.py               # Generate Markdown comparison report
-├── ontomcp-bench/           # Rust SPARQL benchmark
-│   ├── Cargo.toml
-│   └── src/main.rs
-├── traditional-bench/       # Python LLM benchmark (Anthropic only)
-│   ├── bench.py
-│   └── requirements.txt
-└── results/                 # Output (gitignored)
-    ├── ontomcp-bench.json
-    ├── traditional-bench.json
+├── run.py                    # Main CLI orchestrator
+├── config.py                 # Model pricing, benchmark definitions
+├── agents/
+│   ├── base.py               # Abstract BaseAgent (run-loop, API helper)
+│   ├── traditional.py        # Stuff-all-skills-into-prompt agent
+│   └── ontoskills.py         # MCP-powered agent (4 tools)
+├── wrappers/
+│   ├── gaia.py               # GAIA benchmark wrapper
+│   ├── swebench.py           # SWE-bench benchmark wrapper
+│   └── tau2bench.py          # Tau2-Bench benchmark wrapper
+├── mcp_client/
+│   └── client.py             # JSON-RPC 2.0 client for ontomcp binary
+├── reporting/
+│   ├── metrics.py            # Metric aggregation and comparison logic
+│   └── comparison.py         # Markdown report generator
+├── ontomcp-bench/            # Rust SPARQL microbenchmark (legacy)
+├── content_coverage.py       # SKILL.md RDF coverage analysis
+└── results/                  # Output (gitignored)
+    ├── gaia/
+    │   ├── traditional/
+    │   └── ontoskills/
+    ├── swebench/
+    ├── tau2bench/
     └── comparison.md
 ```
 
-## What it measures
+## What Gets Measured
 
-### OntoSkills (Rust SPARQL)
-- **Latency**: sub-ms query times for each SPARQL operation
-- **Queries**: search by intent, search by type, get context, epistemic rules, planning, full scan
-- **Iterations**: 1000 per query (configurable via `--iterations`)
-- **Accuracy**: queries are materialized (solutions consumed) to measure full execution, not lazy setup
+For each benchmark and agent mode, the following metrics are collected:
 
-### Traditional (LLM reads files)
-- **Latency**: wall-clock time for each skill-related question
-- **Tokens**: exact count via `client.count_tokens()`, input + output per query
-- **Cost**: computed for 6 models (Claude Opus/Sonnet, GPT-5.4/mini, Gemini Pro/Flash)
-- **Determinism**: same question N times, count unique answers
-- **Context overflow**: flagged when prompt tokens + reserved output tokens (1024) exceed context window
-- **Rate limit resilience**: exponential backoff retry on `anthropic.RateLimitError`
-- **Runs**: 5 per task (configurable via `--runs`)
+- **Quality**: Accuracy / resolve rate / pass rate per benchmark
+- **Tokens**: Input, output, and total tokens per task
+- **Latency**: Wall-clock time per task (ms)
+- **Cost**: Projected cost across 7 models using `config.MODEL_PRICING`
+- **Tool calls**: Number of tool invocations per task
+- **Turns**: Number of agent-LLM turns per task
+- **Context overflow**: Whether the prompt exceeded the model's context window
 
-### Tasks compared
+When both modes are run, a comparison report is generated at `results/comparison.md` with:
 
-| Task | OntoSkills | Traditional |
-|------|-----------|-------------|
-| Find skill by intent | SPARQL `search` | LLM reads all files, answers |
-| Get skill context | SPARQL `get_skill_context` | LLM reads all files, answers |
-| Plan execution | SPARQL `evaluate_execution_plan` | LLM reads all files, plans |
-| Check dependencies | SPARQL full scan | LLM reads all files, answers |
-
-### Cost comparison models
-
-Only Anthropic models are called via API. Other models are price-comparison only (same token counts, different pricing):
-
-| Model | Input ($/MTok) | Output ($/MTok) |
-|-------|----------------|-----------------|
-| Claude Opus 4.6 | $5.00 | $25.00 |
-| Claude Sonnet 4.6 | $3.00 | $15.00 |
-| GPT-5.4 | $2.50 | $15.00 |
-| GPT-5.4 mini | $0.75 | $4.50 |
-| Gemini 3.1 Pro (≤200K tokens) | $2.00 | $12.00 |
-| Gemini 3.1 Pro (>200K tokens) | $4.00 | $18.00 |
-| Gemini 3.1 Flash | $0.75 | $4.50 |
+1. **Quality** -- accuracy delta per benchmark
+2. **Efficiency** -- tokens, latency, turns comparison
+3. **Cost** -- per-model cost projections
+4. **Aggregate** -- weighted averages, overall improvement
+5. **Workflow** -- tool usage patterns
 
 ## Prerequisites
 
-- Rust toolchain (for `ontomcp-bench`)
-- Python 3.10+ with `anthropic` package (for `traditional-bench`)
-- `ANTHROPIC_API_KEY` env var (for traditional benchmark and skeleton LLM)
-- `libclang-dev` package (for oxrocksdb-sys compilation)
+- Python 3.10+ with `anthropic`, `datasets` packages
+- `ANTHROPIC_API_KEY` env var (required for both agents)
+- `ontomcp` binary (for OntoSkills agent) at `~/.ontoskills/bin/ontomcp`
+- TTL ontology packages at `~/.ontoskills/packages/`
+- Optional: `tau2-bench` package for Tau2-Bench
 
 ## Content Coverage Benchmark
 
-Measures how much of each SKILL.md is captured as typed RDF content blocks. Target: ≥95% line-level coverage across 30 real skills (14 superpowers + 16 Anthropic).
-
-### What it measures
-
-- **Line-level coverage**: percentage of non-blank lines that fall within an extracted `FlatBlock`'s line range
-- **Block type coverage**: verifies all expected block types (heading, paragraph, code_block, bullet_list, etc.) appear across the skill corpus
-
-### Usage
+Separate tool that measures how much of each SKILL.md is captured as typed RDF content blocks.
 
 ```bash
-# Verbose per-skill report (no API key needed for flat extraction only)
 python benchmark/content_coverage.py --verbose
-
-# With skeleton LLM enhancement (needs API key)
-ANTHROPIC_API_KEY=sk-ant-... python benchmark/content_coverage.py --verbose
-
-# JSON output for CI
-python benchmark/content_coverage.py --json results/coverage.json
-
-# Custom target
-python benchmark/content_coverage.py --target 90
 ```
 
-### Skill directories
-
-By default, `benchmark/content_coverage.py` reads skills from `./.agents/skills/`. Override with:
-- `ONTOSKILLS_BENCH_DIR` — path to the skills directory to analyze
+Target: 95%+ line-level coverage across real skills.

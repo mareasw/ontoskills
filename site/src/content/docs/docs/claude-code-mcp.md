@@ -68,6 +68,7 @@ Once connected, Claude Code can call:
 - `get_skill_context`
 - `evaluate_execution_plan`
 - `query_epistemic_rules`
+- `prefetch_knowledge` — one-call knowledge loading (recommended first call)
 
 ## Troubleshooting
 

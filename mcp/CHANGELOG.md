@@ -4,6 +4,19 @@ All notable changes to ontomcp (Rust MCP Server) will be documented in this file
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.0] - 2026-04-28
+
+### Added
+
+- **Compact response format** — New `compact.rs` module (457 lines) producing token-efficient markdown-like text for all tool responses. 88% average token reduction: search 90%, get_skill_context 79%, evaluate_execution_plan 96%, query_epistemic_rules 79%. Full JSON preserved in `structuredContent` (zero knowledge loss)
+- **`prefetch_knowledge` tool** — One-call knowledge retrieval combining search + get_skill_context. Accepts explicit `skill_ids` or `query` parameter. Returns compact text ready for the model, eliminating multi-turn tool discovery
+- **`format` parameter on all tools** — Every tool accepts `format: "compact"` (default) or `format: "raw"` for verbose JSON. Enables debugging and backward compatibility
+
+### Changed
+
+- **Simplified `ontomcp-driver` skill** — Reduced from 113 to 32 lines (~950 token saving per turn). Compact responses are self-descriptive, making verbose per-tool documentation unnecessary
+- **Sparse serialization** — `skip_serializing_if` annotations on catalog structs reduce JSON output for unavailable payloads and empty fields
+
 ## [0.11.0] - 2026-04-15
 
 ### Added

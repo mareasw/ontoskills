@@ -65,7 +65,7 @@ export function NodeDetailPanel({ node, skills, pkgId, prefix, edges, allNodes, 
               <span className="text-xs text-[#8a8a8a]">{pkgSkillCount} {pkgSkillCount === 1 ? t.skill_one : t.skill_other}</span>
             )}
           </div>
-          <button onClick={() => onSelectNode(null)} aria-label="Close" className="p-1.5 rounded-lg hover:bg-white/10 text-[#8a8a8a] transition-colors">
+          <button onClick={() => onSelectNode(null)} aria-label="Close" className="self-center p-1.5 rounded-lg hover:bg-white/10 text-[#8a8a8a] transition-colors shrink-0">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
