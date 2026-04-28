@@ -148,6 +148,12 @@ class SkillsBenchWrapper:
         test_sh_path = task_dir / "tests" / "test.sh"
         test_sh = test_sh_path.read_text(encoding="utf-8") if test_sh_path.exists() else ""
 
+        # Read test file for prompt injection.
+        test_py_path = task_dir / "tests" / "test_outputs.py"
+        test_content = test_py_path.read_text(encoding="utf-8") if test_py_path.exists() else ""
+
+        agent_meta = metadata.get("agent", {})
+
         return {
             "task_id": task_id,
             "difficulty": meta.get("difficulty", "unknown"),
@@ -156,9 +162,11 @@ class SkillsBenchWrapper:
             "instruction": instruction,
             "dockerfile": dockerfile,
             "test_sh": test_sh,
+            "test_content": test_content,
             "skill_ids": skill_ids,
             "skills_content": skills_content,
             "task_dir": str(task_dir),
+            "agent_timeout_sec": int(agent_meta.get("timeout_sec", 900)),
         }
 
     def load_tasks(
@@ -241,6 +249,40 @@ class SkillsBenchWrapper:
     # ------------------------------------------------------------------
     # Docker / podman helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _prepull_base_images() -> None:
+        """Pull common base images to warm the podman cache."""
+        base_images = ["ubuntu:24.04", "python:3.12-slim"]
+        for img in base_images:
+            result = SkillsBenchWrapper._podman_cmd("pull", img, timeout=300)
+            if result.returncode == 0:
+                logger.info("Pre-pulled base image: %s", img)
+            else:
+                logger.warning("Failed to pre-pull %s: %s", img, result.stderr[:200])
+
+    def prebuild_images(self, tasks: list[dict], workers: int = 3) -> list[dict]:
+        """Pre-build Docker images for all tasks. Returns buildable tasks only."""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        buildable: list[dict] = []
+
+        def _build_one(t: dict) -> tuple[dict, bool]:
+            image_tag = self._build_image(t["task_id"], t["task_dir"])
+            return t, image_tag is not None
+
+        logger.info("Phase 0: Pre-building %d Docker images (%d workers)", len(tasks), workers)
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_build_one, t): t for t in tasks}
+            for future in as_completed(futures):
+                task, ok = future.result()
+                if ok:
+                    buildable.append(task)
+                else:
+                    logger.warning("Phase 0: Skipping %s (image build failed)", task["task_id"])
+
+        logger.info("Phase 0: %d/%d tasks have valid images", len(buildable), len(tasks))
+        return buildable
 
     @staticmethod
     def _podman_cmd(*args: str, timeout: int = 600) -> subprocess.CompletedProcess:
@@ -516,6 +558,21 @@ class SkillsBenchWrapper:
             container_info += "\n- Files copied into container:\n  " + "\n  ".join(copy_lines[:5])
 
         skill_names = ", ".join(skill_ids) if skill_ids else "none"
+
+        # Inject test specification for test-first prompting.
+        test_content = task.get("test_content", "")
+        if len(test_content) > 3000:
+            test_content = test_content[:3000] + "\n# ... (truncated)"
+        test_section = ""
+        if test_content:
+            test_section = f"""
+
+TEST SPECIFICATION (your solution must pass these tests):
+```python
+{test_content}
+```
+"""
+
         prompt = f"""You are an AI assistant solving a task. You must write a COMPLETE, self-contained Python 3 script that solves the task.
 
 IMPORTANT RULES:
@@ -528,7 +585,7 @@ IMPORTANT RULES:
 7. If skill helper scripts are mentioned below, import them via sys.path.append before importing{syspath_info}
 8. Load the relevant skills using your available tools BEFORE writing code. Skills for this task: {skill_names}
 {packages_info}{container_info}
-
+{test_section}
 ---
 
 TASK INSTRUCTION:
@@ -769,10 +826,11 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
         work_dir = cc_agent.setup_task_env(task)
 
         try:
+            task_timeout = task.get("agent_timeout_sec", timeout)
             cli_result = cc_agent.run_with_cli(
                 task,
                 max_budget=max_budget,
-                timeout=timeout,
+                timeout=task_timeout,
             )
 
             # Read solution script.
@@ -821,6 +879,10 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
             max_tasks=max_tasks, shuffle=shuffle, seed=seed,
             packages_root=packages_root, skip_first=skip_first,
         )
+
+        # Phase 0: Pre-warm cache and build images before spending agent time.
+        self._prepull_base_images()
+        tasks = self.prebuild_images(tasks, workers=workers)
 
         results: list[dict] = []
         incremental_path = os.environ.get("BENCHMARK_INCREMENTAL_PATH")
