@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""Content coverage benchmark — line-level metric against real skills.
+"""Content coverage benchmark — line-level and knowledge-yield metrics.
 
-Measures how much of each SKILL.md is captured as typed RDF nodes.
-Target: ≥95% line-level coverage.
+Level 1 — Parser coverage: what % of non-blank SKILL.md lines fall within a
+FlatBlock range.  Target: >=95%.
+
+Level 2 — Knowledge yield (optional, requires --ttl-dir): for compiled skills
+(TTL files), count epistemic and operational knowledge nodes by type and
+compute operational density and type coverage.
 
 Usage:
     python benchmark/content_coverage.py --verbose
     python benchmark/content_coverage.py --json results.json
+    python benchmark/content_coverage.py --ttl-dir ./ontoskills --verbose
     python benchmark/content_coverage.py --target 95
 """
 
@@ -21,6 +26,59 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core" / "src"))
 
 from compiler.content_parser import extract_flat_blocks, extract_structural_content
 
+# ---------------------------------------------------------------------------
+# Level 2 constants
+# ---------------------------------------------------------------------------
+
+OC = "https://ontoskills.sh/ontology#"
+
+EPISTEMIC_DIMENSIONS = [
+    "Observability", "ResilienceTactic", "ResourceProfile", "TrustMetric",
+    "CognitiveBoundary", "ExecutionPhysics", "LifecycleHook", "NormativeRule",
+    "SecurityGuardrail", "StrategicInsight",
+]
+
+OPERATIONAL_TYPES = [
+    "Procedure", "CodePattern", "OutputFormat", "Command", "Prerequisite",
+]
+
+# SPARQL: count instances of any rdfs:subClassOf a given top-level dimension.
+# We enumerate the top-level class directly plus all known subclasses via
+# property-path rdfs:subClassOf*.
+_SPARQL_EPISTEMIC = """
+PREFIX oc: <https://ontoskills.sh/ontology#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?dimension (COUNT(?node) AS ?cnt) WHERE {
+    ?node a ?dtype .
+    ?dtype rdfs:subClassOf* ?dimension .
+    FILTER (?dimension IN (
+        oc:Observability, oc:ResilienceTactic, oc:ResourceProfile,
+        oc:TrustMetric, oc:CognitiveBoundary, oc:ExecutionPhysics,
+        oc:LifecycleHook, oc:NormativeRule, oc:SecurityGuardrail,
+        oc:StrategicInsight
+    ))
+} GROUP BY ?dimension
+"""
+
+_SPARQL_OPERATIONAL = """
+PREFIX oc: <https://ontoskills.sh/ontology#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?otype (COUNT(?node) AS ?cnt) WHERE {
+    ?node a ?dtype .
+    ?dtype rdfs:subClassOf* ?otype .
+    FILTER (?otype IN (
+        oc:Procedure, oc:CodePattern, oc:OutputFormat,
+        oc:Command, oc:Prerequisite
+    ))
+} GROUP BY ?otype
+"""
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _env_path(name, fallback):
     value = os.environ.get(name)
@@ -61,14 +119,136 @@ def calc_line_coverage(md, blocks):
     return covered_content / total_content * 100 if total_content else 100.0
 
 
-def run_benchmark(target=95.0, verbose=False, json_output=None):
+# ---------------------------------------------------------------------------
+# Level 2 — Knowledge Yield
+# ---------------------------------------------------------------------------
+
+def _local_name(uri: str) -> str:
+    """Extract the fragment after '#' or last '/' from a URI."""
+    return uri.split("#")[-1] if "#" in uri else uri.rsplit("/", 1)[-1]
+
+
+def compute_knowledge_yield(ttl_dir: Path) -> dict:
+    """Analyse compiled TTL files and return knowledge-yield statistics.
+
+    Parameters
+    ----------
+    ttl_dir : Path
+        Directory (searched recursively) containing .ttl files with compiled
+        skill instance data.
+
+    Returns
+    -------
+    dict
+        ``total_epistemic``, ``total_operational``, ``avg_operational_per_skill``,
+        ``type_distribution``, ``operational_density``, ``epistemic_distribution``,
+        ``skills_analyzed``, ``type_coverage_avg``.
+    """
+    from rdflib import Graph, Namespace
+
+    oc = Namespace(OC)
+
+    # Collect all .ttl files (skip the core TBox for counting, but load it
+    # for the rdfs:subClassOf hierarchy needed by SPARQL property paths).
+    ttl_files = sorted(
+        p for p in ttl_dir.rglob("*.ttl")
+        if p.name != "core.ttl"
+    )
+
+    if not ttl_files:
+        return {
+            "skills_analyzed": 0,
+            "total_epistemic": 0,
+            "total_operational": 0,
+            "avg_operational_per_skill": 0.0,
+            "operational_density": 0.0,
+            "type_coverage_avg": 0.0,
+            "type_distribution": {},
+            "epistemic_distribution": {},
+        }
+
+    # Merge all TTLs into a single graph for efficient querying.
+    g = Graph()
+    g.bind("oc", oc)
+
+    # Load core.ttl for the class hierarchy (rdfs:subClassOf axioms).
+    core_ttl = ttl_dir / "core.ttl"
+    if not core_ttl.exists():
+        for p in ttl_dir.rglob("core.ttl"):
+            core_ttl = p
+            break
+    # Also check the project source tree.
+    if not core_ttl.exists():
+        project_core = Path(__file__).resolve().parent.parent / "ontoskills" / "core.ttl"
+        if project_core.exists():
+            core_ttl = project_core
+    if core_ttl.exists():
+        try:
+            g.parse(str(core_ttl), format="turtle")
+        except Exception as exc:
+            print(f"  Warning: failed to parse {core_ttl}: {exc}", file=sys.stderr)
+
+    for tf in ttl_files:
+        try:
+            g.parse(str(tf), format="turtle")
+        except Exception as exc:
+            print(f"  Warning: failed to parse {tf}: {exc}", file=sys.stderr)
+
+    # --- Epistemic counts ---
+    epistemic_raw: dict[str, int] = {}
+    for row in g.query(_SPARQL_EPISTEMIC):
+        dim = _local_name(str(row.dimension))
+        epistemic_raw[dim] = int(row.cnt)
+
+    # Fill zeros for dimensions with no instances.
+    for dim in EPISTEMIC_DIMENSIONS:
+        epistemic_raw.setdefault(dim, 0)
+
+    total_epistemic = sum(epistemic_raw.values())
+
+    # --- Operational counts ---
+    operational_raw: dict[str, int] = {}
+    for row in g.query(_SPARQL_OPERATIONAL):
+        otype = _local_name(str(row.otype))
+        operational_raw[otype] = int(row.cnt)
+
+    for otype in OPERATIONAL_TYPES:
+        operational_raw.setdefault(otype, 0)
+
+    total_operational = sum(operational_raw.values())
+
+    # --- Derived metrics ---
+    n_skills = len(ttl_files)
+    avg_operational = round(total_operational / n_skills, 2) if n_skills else 0.0
+    operational_density = round(total_operational / total_epistemic, 2) if total_epistemic else 0.0
+
+    types_present = sum(1 for v in operational_raw.values() if v > 0)
+    type_coverage_avg = round(types_present / len(OPERATIONAL_TYPES) * 100, 1)
+
+    return {
+        "skills_analyzed": n_skills,
+        "total_epistemic": total_epistemic,
+        "total_operational": total_operational,
+        "avg_operational_per_skill": avg_operational,
+        "operational_density": operational_density,
+        "type_coverage_avg": type_coverage_avg,
+        "type_distribution": operational_raw,
+        "epistemic_distribution": epistemic_raw,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Main benchmark runner
+# ---------------------------------------------------------------------------
+
+def run_benchmark(target=95.0, verbose=False, json_output=None, ttl_dir=None):
     paths = collect_skill_paths()
     if len(paths) < 10:
         print(f"Warning: only {len(paths)} skills found. Expected 30+.")
 
     results = []
     for source, path in paths:
-        md = path.read_text()
+        md = path.read_text(encoding="utf-8")
         blocks = extract_flat_blocks(md)
         coverage = calc_line_coverage(md, blocks)
         results.append({"source": source, "name": path.parent.name, "coverage": round(coverage, 1)})
@@ -76,9 +256,18 @@ def run_benchmark(target=95.0, verbose=False, json_output=None):
     avg = sum(r["coverage"] for r in results) / len(results) if results else 0
     below_target = [r for r in results if r["coverage"] < target]
 
+    # --- Level 2 (optional) ---
+    knowledge_yield = None
+    if ttl_dir is not None:
+        ttl_path = Path(ttl_dir)
+        if ttl_path.is_dir():
+            knowledge_yield = compute_knowledge_yield(ttl_path)
+        else:
+            print(f"Warning: --ttl-dir {ttl_dir} is not a directory; skipping Level 2.")
+
     if verbose:
         print(f"\n{'=' * 70}")
-        print(f"CONTENT COVERAGE — {len(results)} skills")
+        print(f"LEVEL 1: PARSER COVERAGE — {len(results)} skills")
         print(f"{'=' * 70}")
         has_api_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
         print(f"  Skeleton LLM: {'ACTIVE' if has_api_key else 'INACTIVE (set ANTHROPIC_API_KEY)'}")
@@ -89,11 +278,41 @@ def run_benchmark(target=95.0, verbose=False, json_output=None):
         print(f"\n  Average: {avg:.1f}%")
         if below_target:
             print(f"  Below {target}%: {len(below_target)} skills")
-        print(f"{'=' * 70}")
+
+        if knowledge_yield and knowledge_yield["skills_analyzed"] > 0:
+            ky = knowledge_yield
+            print(f"\n{'=' * 70}")
+            print(f"LEVEL 2: KNOWLEDGE YIELD — {ky['skills_analyzed']} compiled skills")
+            print(f"{'=' * 70}")
+            print(f"  Total epistemic nodes : {ky['total_epistemic']}")
+            print(f"  Total operational nodes: {ky['total_operational']}")
+            print(f"  Operational density    : {ky['operational_density']}")
+            print(f"  Avg operational/skill  : {ky['avg_operational_per_skill']}")
+            print(f"  Type coverage          : {ky['type_coverage_avg']}%\n")
+
+            print("  Epistemic distribution:")
+            for dim in EPISTEMIC_DIMENSIONS:
+                count = ky["epistemic_distribution"].get(dim, 0)
+                print(f"    {dim:<22} {count}")
+
+            print("\n  Operational distribution:")
+            for otype in OPERATIONAL_TYPES:
+                count = ky["type_distribution"].get(otype, 0)
+                print(f"    {otype:<22} {count}")
+
+        print(f"\n{'=' * 70}")
 
     if json_output:
+        payload = {
+            "parser_coverage_avg": round(avg, 1),
+            "target": target,
+            "skills_analyzed": len(results),
+            "skills": results,
+        }
+        if knowledge_yield:
+            payload["knowledge_yield"] = knowledge_yield
         with open(json_output, "w") as f:
-            json.dump({"average": round(avg, 1), "target": target, "skills": results}, f, indent=2)
+            json.dump(payload, f, indent=2)
         if verbose:
             print(f"  Results written to {json_output}")
 
@@ -111,6 +330,8 @@ def main():
     parser.add_argument("--verbose", "-v", action="store_true", help="Per-skill report")
     parser.add_argument("--json", dest="json_output", help="Write results to JSON file")
     parser.add_argument("--target", type=float, default=95.0, help="Coverage target %% (default: 95)")
+    parser.add_argument("--ttl-dir", default=None,
+                        help="Directory with compiled .ttl files for Level 2 knowledge yield")
     args = parser.parse_args()
 
     if not _SKILLS_DIR.is_dir():
@@ -118,7 +339,12 @@ def main():
         print(f"Set ONTOSKILLS_BENCH_DIR to override.")
         sys.exit(1)
 
-    sys.exit(run_benchmark(target=args.target, verbose=args.verbose, json_output=args.json_output))
+    sys.exit(run_benchmark(
+        target=args.target,
+        verbose=args.verbose,
+        json_output=args.json_output,
+        ttl_dir=args.ttl_dir,
+    ))
 
 
 if __name__ == "__main__":
