@@ -20,6 +20,15 @@ import BenchmarkReact from '../../components/benchmark/BenchmarkApp.tsx';
       </div>
     </section>
 
+    <!-- What is SkillsBench -->
+    <section class="content-section">
+      <div class="section-shell">
+        <h2>什么是 SkillsBench？</h2>
+        <p><a href="https://skillsbench.ai" target="_blank" rel="noopener">SkillsBench</a> 是一个开源基准测试，用于衡量 AI 编程代理在给定技能文档时执行真实任务的能力。每个任务要求代理生成一个可工作的 Python 脚本——无需人工判断。</p>
+        <p>SkillsBench 是 <a href="https://github.com/benchflow-ai/skillsbench" target="_blank" rel="noopener">BenchFlow</a> 评估套件的一部分。它使用<strong>确定性 Docker 评估</strong>：代理的输出在容器中执行，由 pytest 评分。测试通过或失败——没有歧义。</p>
+      </div>
+    </section>
+
     <!-- The Question -->
     <section class="content-section">
       <div class="section-shell">
@@ -31,7 +40,7 @@ import BenchmarkReact from '../../components/benchmark/BenchmarkApp.tsx';
     </section>
 
     <!-- Methodology -->
-    <section class="content-section section-alt">
+    <section class="content-section">
       <div class="section-shell">
         <h2>评估方法</h2>
 
@@ -82,7 +91,7 @@ import BenchmarkReact from '../../components/benchmark/BenchmarkApp.tsx';
     </section>
 
     <!-- Why -->
-    <section class="content-section section-alt">
+    <section class="content-section">
       <div class="section-shell">
         <h2>为什么结构化知识胜出</h2>
         <p>传统 SKILL.md 文件将指令、示例、注意事项和反模式混合在非结构化文本中。代理必须一次性解析所有内容，无法区分关键信息和可选信息。</p>
@@ -127,7 +136,11 @@ import BenchmarkReact from '../../components/benchmark/BenchmarkApp.tsx';
 </LandingLayout>
 
 <style>
-  .benchmark-page { padding-top: 80px; }
+  .benchmark-page { padding-top: 64px; }
+
+  @media (max-width: 768px) {
+    .benchmark-page { padding-top: 48px; }
+  }
 
   .section-shell {
     max-width: 72rem;
@@ -142,54 +155,161 @@ import BenchmarkReact from '../../components/benchmark/BenchmarkApp.tsx';
     .section-shell { padding: 0 2rem; }
   }
 
-  .hero-section { padding: 5rem 0 3rem; text-align: center; }
+  /* Hero */
+  .hero-section {
+    padding: 3rem 0 2rem;
+    text-align: center;
+  }
+  @media (max-width: 768px) {
+    .hero-section { padding: 2rem 0 1.5rem; }
+  }
   .hero-content h1 {
-    font-size: 2.5rem; font-weight: 800;
+    font-size: 2.5rem;
+    font-weight: 800;
     background: var(--gradient-brand);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
     margin: 12px 0 16px;
   }
   .hero-subtitle {
-    font-size: 1.1rem; color: var(--text-secondary);
-    max-width: 640px; margin: 0 auto; line-height: 1.7;
+    font-size: 1.15rem;
+    color: var(--text-secondary);
+    max-width: 640px;
+    margin: 0 auto;
+    line-height: 1.75;
   }
 
-  .content-section { padding: 3rem 0; }
-  .section-alt { background: var(--bg-secondary); }
-  .content-section h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 20px; color: var(--text-primary); }
-  .content-section h3 { font-size: 1.1rem; font-weight: 600; margin: 0 0 12px; color: var(--text-primary); }
-  .content-section p { line-height: 1.7; margin-bottom: 12px; color: var(--text-secondary); }
-  .content-section ol, .content-section ul { margin: 12px 0 12px 24px; color: var(--text-secondary); }
-  .content-section li { margin-bottom: 8px; line-height: 1.6; }
+  /* Sections */
+  .content-section {
+    padding: 3rem 0;
+  }
+  @media (max-width: 768px) {
+    .content-section { padding: 2rem 0; }
+  }
+  .content-section h2 {
+    font-size: 1.65rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: var(--text-primary);
+  }
+  .content-section h3 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin: 0 0 12px;
+    color: var(--text-primary);
+  }
+  .content-section p {
+    font-size: 1.05rem;
+    line-height: 1.8;
+    margin-bottom: 14px;
+    color: var(--text-secondary);
+  }
+  .content-section a {
+    color: var(--accent-cyan);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .content-section a:hover {
+    color: var(--text-primary);
+  }
+  .content-section ol, .content-section ul {
+    margin: 12px 0 12px 24px;
+    color: var(--text-secondary);
+    font-size: 1.05rem;
+  }
+  .content-section li { margin-bottom: 8px; line-height: 1.7; }
   .content-section code {
-    font-family: 'JetBrains Mono Variable', monospace; font-size: 0.85em;
-    background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px;
+    font-family: 'JetBrains Mono Variable', monospace;
+    font-size: 0.85em;
+    background: rgba(255,255,255,0.06);
+    padding: 2px 6px;
+    border-radius: 4px;
   }
 
-  .method-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0 24px; }
-  @media (max-width: 768px) { .method-grid { grid-template-columns: 1fr; } }
+  /* Method grid */
+  .method-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 16px 0 24px;
+  }
+  @media (max-width: 768px) {
+    .method-grid { grid-template-columns: 1fr; }
+  }
   .method-card { padding: 20px; }
   .method-card ol { padding-left: 20px; }
-  .method-card p { font-size: 0.9rem; margin-bottom: 8px; }
+  .method-card p { font-size: 1rem; margin-bottom: 8px; }
 
   .setup-table { width: 100%; border-collapse: collapse; }
-  .setup-table td { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
-  .setup-table td:first-child { font-weight: 600; white-space: nowrap; color: var(--text-muted); padding-right: 16px; }
+  .setup-table td {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 1rem;
+  }
+  .setup-table td:first-child {
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--text-muted);
+    padding-right: 16px;
+  }
 
-  .mode-grid { display: flex; align-items: center; gap: 12px; margin: 24px 0 12px; }
-  .mode-card { flex: 1; padding: 20px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-elevated); }
-  .mode-card p { font-size: 0.88rem; color: var(--text-secondary); margin: 8px 0 0; line-height: 1.6; }
-  .mode-label { font-weight: 700; font-size: 0.95rem; }
-  .mode-vs { color: var(--text-muted); font-size: 0.85rem; font-weight: 600; }
-  @media (max-width: 768px) { .mode-grid { flex-direction: column; } .mode-vs { display: none; } }
+  /* Mode comparison */
+  .mode-grid {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 24px 0 12px;
+  }
+  .mode-card {
+    flex: 1;
+    padding: 20px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+  }
+  .mode-card p {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    margin: 8px 0 0;
+    line-height: 1.7;
+  }
+  .mode-label {
+    font-weight: 700;
+    font-size: 1rem;
+  }
+  .mode-vs {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  @media (max-width: 768px) {
+    .mode-grid { flex-direction: column; }
+    .mode-vs { display: none; }
+  }
 
-  .note { font-size: 0.85rem !important; color: var(--text-muted) !important; text-align: center; margin-top: 16px !important; }
+  .note {
+    font-size: 0.9rem !important;
+    color: var(--text-muted) !important;
+    text-align: center;
+    margin-top: 16px !important;
+  }
 
+  /* CTA */
   .cta-section { padding: 3rem 0 4rem; }
-  .cta-box { text-align: center; color: var(--text-secondary); }
+  .cta-box {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 1.05rem;
+  }
   .command-shell {
-    display: inline-block; padding: 12px 24px; border-radius: 8px;
-    background: var(--bg-elevated); border: 1px solid var(--border);
-    font-family: 'JetBrains Mono Variable', monospace; font-size: 0.82rem; color: var(--accent-cyan);
+    display: inline-block;
+    padding: 12px 24px;
+    border-radius: 8px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    font-family: 'JetBrains Mono Variable', monospace;
+    font-size: 0.82rem;
+    color: var(--accent-cyan);
   }
 </style>

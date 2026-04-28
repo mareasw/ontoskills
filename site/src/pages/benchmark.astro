@@ -20,6 +20,15 @@ import BenchmarkReact from '../components/benchmark/BenchmarkApp.tsx';
       </div>
     </section>
 
+    <!-- What is SkillsBench -->
+    <section class="content-section">
+      <div class="section-shell">
+        <h2>What is SkillsBench?</h2>
+        <p><a href="https://skillsbench.ai" target="_blank" rel="noopener">SkillsBench</a> is an open-source benchmark that measures how well AI coding agents perform on real-world tasks when given skill documentation. Each task requires the agent to generate a working Python script — no human judgment involved.</p>
+        <p>SkillsBench is part of the <a href="https://github.com/benchflow-ai/skillsbench" target="_blank" rel="noopener">BenchFlow</a> evaluation suite. It uses <strong>deterministic Docker evaluation</strong>: the agent's output is executed inside a container and scored by pytest. Either the tests pass or they don't — no ambiguity.</p>
+      </div>
+    </section>
+
     <!-- The Question -->
     <section class="content-section">
       <div class="section-shell">
@@ -31,7 +40,7 @@ import BenchmarkReact from '../components/benchmark/BenchmarkApp.tsx';
     </section>
 
     <!-- Methodology -->
-    <section class="content-section section-alt">
+    <section class="content-section">
       <div class="section-shell">
         <h2>Methodology</h2>
 
@@ -82,7 +91,7 @@ import BenchmarkReact from '../components/benchmark/BenchmarkApp.tsx';
     </section>
 
     <!-- Why -->
-    <section class="content-section section-alt">
+    <section class="content-section">
       <div class="section-shell">
         <h2>Why Structured Knowledge Wins</h2>
         <p>Traditional SKILL.md files mix instructions, examples, caveats, and anti-patterns in unstructured text. The agent must parse everything at once with no indication of what's critical.</p>
@@ -127,7 +136,11 @@ import BenchmarkReact from '../components/benchmark/BenchmarkApp.tsx';
 </LandingLayout>
 
 <style>
-  .benchmark-page { padding-top: 80px; }
+  .benchmark-page { padding-top: 64px; }
+
+  @media (max-width: 768px) {
+    .benchmark-page { padding-top: 48px; }
+  }
 
   .section-shell {
     max-width: 72rem;
@@ -144,8 +157,11 @@ import BenchmarkReact from '../components/benchmark/BenchmarkApp.tsx';
 
   /* Hero */
   .hero-section {
-    padding: 5rem 0 3rem;
+    padding: 3rem 0 2rem;
     text-align: center;
+  }
+  @media (max-width: 768px) {
+    .hero-section { padding: 2rem 0 1.5rem; }
   }
   .hero-content h1 {
     font-size: 2.5rem;
@@ -157,38 +173,52 @@ import BenchmarkReact from '../components/benchmark/BenchmarkApp.tsx';
     margin: 12px 0 16px;
   }
   .hero-subtitle {
-    font-size: 1.1rem;
+    font-size: 1.15rem;
     color: var(--text-secondary);
     max-width: 640px;
     margin: 0 auto;
-    line-height: 1.7;
+    line-height: 1.75;
   }
 
   /* Sections */
-  .content-section { padding: 3rem 0; }
-  .section-alt { background: var(--bg-secondary); }
+  .content-section {
+    padding: 3rem 0;
+  }
+  @media (max-width: 768px) {
+    .content-section { padding: 2rem 0; }
+  }
   .content-section h2 {
-    font-size: 1.5rem;
+    font-size: 1.65rem;
     font-weight: 700;
     margin-bottom: 20px;
     color: var(--text-primary);
   }
   .content-section h3 {
-    font-size: 1.1rem;
+    font-size: 1.15rem;
     font-weight: 600;
     margin: 0 0 12px;
     color: var(--text-primary);
   }
   .content-section p {
-    line-height: 1.7;
-    margin-bottom: 12px;
+    font-size: 1.05rem;
+    line-height: 1.8;
+    margin-bottom: 14px;
     color: var(--text-secondary);
+  }
+  .content-section a {
+    color: var(--accent-cyan);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .content-section a:hover {
+    color: var(--text-primary);
   }
   .content-section ol, .content-section ul {
     margin: 12px 0 12px 24px;
     color: var(--text-secondary);
+    font-size: 1.05rem;
   }
-  .content-section li { margin-bottom: 8px; line-height: 1.6; }
+  .content-section li { margin-bottom: 8px; line-height: 1.7; }
   .content-section code {
     font-family: 'JetBrains Mono Variable', monospace;
     font-size: 0.85em;
@@ -209,13 +239,13 @@ import BenchmarkReact from '../components/benchmark/BenchmarkApp.tsx';
   }
   .method-card { padding: 20px; }
   .method-card ol { padding-left: 20px; }
-  .method-card p { font-size: 0.9rem; margin-bottom: 8px; }
+  .method-card p { font-size: 1rem; margin-bottom: 8px; }
 
   .setup-table { width: 100%; border-collapse: collapse; }
   .setup-table td {
-    padding: 6px 0;
+    padding: 8px 0;
     border-bottom: 1px solid var(--border);
-    font-size: 0.9rem;
+    font-size: 1rem;
   }
   .setup-table td:first-child {
     font-weight: 600;
@@ -239,14 +269,14 @@ import BenchmarkReact from '../components/benchmark/BenchmarkApp.tsx';
     background: var(--bg-elevated);
   }
   .mode-card p {
-    font-size: 0.88rem;
+    font-size: 0.95rem;
     color: var(--text-secondary);
     margin: 8px 0 0;
-    line-height: 1.6;
+    line-height: 1.7;
   }
   .mode-label {
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: 1rem;
   }
   .mode-vs {
     color: var(--text-muted);
@@ -259,7 +289,7 @@ import BenchmarkReact from '../components/benchmark/BenchmarkApp.tsx';
   }
 
   .note {
-    font-size: 0.85rem !important;
+    font-size: 0.9rem !important;
     color: var(--text-muted) !important;
     text-align: center;
     margin-top: 16px !important;
@@ -270,6 +300,7 @@ import BenchmarkReact from '../components/benchmark/BenchmarkApp.tsx';
   .cta-box {
     text-align: center;
     color: var(--text-secondary);
+    font-size: 1.05rem;
   }
   .command-shell {
     display: inline-block;
