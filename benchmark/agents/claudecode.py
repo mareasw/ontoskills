@@ -101,6 +101,8 @@ class ClaudeCodeAgent(BaseAgent):
         in ``.claude/skills/`` — the agent discovers skills via MCP tools).
         """
         task_dir = Path(task["task_dir"])
+        if self._work_dir and self._work_dir.exists():
+            shutil.rmtree(self._work_dir, ignore_errors=True)
         work_dir = Path(tempfile.mkdtemp(prefix=f"sb_cc_{self.mode}_"))
         self._work_dir = work_dir
 
@@ -228,9 +230,13 @@ class ClaudeCodeAgent(BaseAgent):
             return None
 
         dst = Path(tempfile.gettempdir()) / "skillsbench_ontology" / "skillsbench"
-        if not dst.is_dir():
-            shutil.copytree(str(src), str(dst))
-            logger.info("Prepared SkillsBench ontology root at %s", dst.parent)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if not dst.exists():
+            try:
+                shutil.copytree(str(src), str(dst))
+                logger.info("Prepared SkillsBench ontology root at %s", dst.parent)
+            except FileExistsError:
+                pass  # Another process created it concurrently
 
         self._ontology_root = str(dst.parent)
         return self._ontology_root
@@ -254,7 +260,7 @@ class ClaudeCodeAgent(BaseAgent):
         copy_lines: list[str] = []
         dockerfile_path = work_dir / "Dockerfile.reference"
         if dockerfile_path.exists():
-            for line in dockerfile_path.read_text().splitlines():
+            for line in dockerfile_path.read_text(encoding="utf-8").splitlines():
                 stripped = line.strip()
                 if stripped.upper().startswith("WORKDIR"):
                     parts = stripped.split(None, 1)
@@ -397,32 +403,53 @@ class ClaudeCodeAgent(BaseAgent):
 
         start = time.perf_counter()
         try:
-            proc = subprocess.run(
+            proc = subprocess.Popen(
                 cmd,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 cwd=str(work_dir),
                 env=env,
             )
+            try:
+                stdout, stderr = proc.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                try:
+                    proc.kill()
+                except OSError:
+                    pass
+                stdout, stderr = proc.communicate()
+                duration_ms = (time.perf_counter() - start) * 1000
+                logger.warning("Claude Code timed out after %ds", timeout)
+                return {
+                    "result": "[timeout]",
+                    "work_dir": str(work_dir),
+                    "solution_path": str(work_dir / "solution.py"),
+                    "duration_ms": duration_ms,
+                    "usage": {},
+                    "num_turns": 0,
+                    "total_cost_usd": 0,
+                }
+
             duration_ms = (time.perf_counter() - start) * 1000
+            stdout_text = stdout.decode("utf-8", errors="replace")
+            stderr_text = stderr.decode("utf-8", errors="replace")
 
             # Parse JSON output.
             cli_result: dict = {}
             try:
-                parsed = json.loads(proc.stdout)
+                parsed = json.loads(stdout_text)
                 cli_result["result"] = parsed.get("result", "")
                 cli_result["usage"] = parsed.get("usage", {})
                 cli_result["num_turns"] = parsed.get("num_turns", 0)
                 cli_result["total_cost_usd"] = parsed.get("total_cost_usd", 0)
             except json.JSONDecodeError:
-                cli_result["result"] = proc.stdout
+                cli_result["result"] = stdout_text
                 cli_result["usage"] = {}
                 cli_result["num_turns"] = 0
                 cli_result["total_cost_usd"] = 0
 
-            if proc.returncode != 0 and proc.stderr:
-                logger.warning("Claude Code stderr: %s", proc.stderr[:500])
+            if proc.returncode != 0 and stderr_text:
+                logger.warning("Claude Code stderr: %s", stderr_text[:500])
 
             cli_result["duration_ms"] = duration_ms
             cli_result["work_dir"] = str(work_dir)
@@ -440,11 +467,11 @@ class ClaudeCodeAgent(BaseAgent):
 
             return cli_result
 
-        except subprocess.TimeoutExpired:
+        except Exception as exc:
             duration_ms = (time.perf_counter() - start) * 1000
-            logger.warning("Claude Code timed out after %ds", timeout)
+            logger.warning("Claude Code error: %s", exc)
             return {
-                "result": "[timeout]",
+                "result": f"[error: {exc}]",
                 "work_dir": str(work_dir),
                 "solution_path": str(work_dir / "solution.py"),
                 "duration_ms": duration_ms,

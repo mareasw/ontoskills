@@ -55,9 +55,11 @@ ONTOMCP_ONTOLOGY_ROOT=~/.ontoskills/ontologies
 
 ## Tool reference
 
-OntoMCP exposes **4 tools** for skill discovery, context retrieval, and reasoning.
+OntoMCP exposes **5 tools** for skill discovery, context retrieval, and reasoning.
 
 > **Sparse serialization**: null values and empty arrays are omitted from responses. Only fields with actual values are included. This keeps responses compact and avoids cluttering the context window with empty data.
+
+> **Compact format**: All tools return compact responses by default (88% token reduction vs. verbose JSON). Use the `format` parameter to control output: `"compact"` (default) or `"raw"` for full JSON. Compact mode preserves all knowledge in `structuredContent` — zero information loss.
 
 ### `search`
 
@@ -90,28 +92,9 @@ Search skills by semantic query, alias, or structured filters. The tool dispatch
 | `category` | string | Filter by skill category (e.g., `automation`, `document`, `marketing`) |
 | `is_user_invocable` | boolean | Filter by whether the skill is directly invocable by users |
 | `limit` | integer | Max results (1-100, default 25) |
+| `format` | string | `"compact"` (default) or `"raw"` |
 
 **Example response:**
-
-```json
-{
-  "skills": [
-    {
-      "id": "pdf",
-      "qualified_id": "obra/superpowers/test-driven-development",
-      "package_id": "superpowers",
-      "trust_tier": "core",
-      "nature": "A skill for test-driven development",
-      "intents": ["write tests first", "practice TDD"],
-      "requires_state": ["oc:CodeReady"],
-      "yields_state": ["oc:TestsPassing"]
-    }
-  ],
-  "total": 1
-}
-```
-
-#### Semantic intent search
 
 When the `query` parameter is provided, the search tool uses **BM25** as the default search engine. BM25 is an in-memory keyword ranking algorithm that operates directly on Catalog data — it is always available and requires no additional dependencies.
 
@@ -126,6 +109,7 @@ When the `query` parameter is provided, the search tool uses **BM25** as the def
 |-----------|------|-------------|
 | `query` | string | **Required.** Natural language query |
 | `top_k` | integer | Number of results (default 5) |
+| `format` | string | `"compact"` (default) or `"raw"` |
 
 **BM25 response example** (default mode):
 
@@ -186,6 +170,7 @@ Semantic results use **hybrid scoring** (cosine similarity x trust-tier quality 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `alias` | string | **Required.** Alias to resolve (case-insensitive) |
+| `format` | string | `"compact"` (default) or `"raw"` |
 
 **Example response:**
 
@@ -220,6 +205,7 @@ Fetch the full execution context for a skill, including requirements, transition
 |-----------|------|-------------|
 | `skill_id` | string | **Required.** Short id (`test-driven-development`) or qualified (`obra/superpowers/test-driven-development`) |
 | `include_inherited_knowledge` | boolean | Include knowledge from extended skills (default true) |
+| `format` | string | `"compact"` (default) or `"raw"` |
 
 **Example response:**
 
@@ -263,19 +249,63 @@ Fetch the full execution context for a skill, including requirements, transition
 
 ---
 
+### `prefetch_knowledge`
+
+One-call knowledge loading combining search and context retrieval. This is the recommended entry point for agents — it performs search + `get_skill_context` in a single MCP call and returns compact, prioritized knowledge.
+
+```json
+{
+  "query": "create a PDF with tables and charts",
+  "skill_ids": ["pdf"],
+  "limit": 3
+}
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `query` | string | Search query (uses BM25) |
+| `skill_ids` | array | Explicit skill IDs to load (skips search) |
+| `limit` | integer | Max skills to load (default 5) |
+| `format` | string | `"compact"` (default) or `"raw"` |
+
+**Example compact response:**
+
+```markdown
+# pdf
+
+## Knowledge (8 nodes, sorted by priority)
+[CRITICAL] Do not accept file paths from untrusted input (file handling)
+[HIGH] Verify wkhtmltopdf is installed (Before PDF generation)
+...
+
+## Requirements
+- Tool: wkhtmltopdf (required)
+- EnvVar: OUTPUT_DIR (optional)
+
+## Execution
+executor: shell | timeout: 30s
+```
+
+This single call replaces the `search` → `get_skill_context` sequence, saving 1-2 round trips.
+
+---
+
 ### Agent workflow
 
-The 4 tools form a complete workflow that replaces reading raw SKILL.md files:
+The 5 tools form a complete workflow that replaces reading raw SKILL.md files:
 
 ```
-search → get_skill_context → evaluate_execution_plan → query_epistemic_rules
-discovery   understanding     plan validation          compliance
+prefetch_knowledge → evaluate_execution_plan → query_epistemic_rules
+  discovery + context      plan validation          compliance
 ```
 
-1. **`search`** — Find the right skill by intent, keyword, or alias
-2. **`get_skill_context`** — Get the full context including knowledge nodes, requirements, dependencies, and execution payload
-3. **`evaluate_execution_plan`** — Validate that the plan is feasible (states, dependencies)
-4. **`query_epistemic_rules`** — Check specific rules and constraints during execution
+1. **`prefetch_knowledge`** — Load skill knowledge in one call (recommended first call)
+2. **`evaluate_execution_plan`** — Validate that the plan is feasible (states, dependencies)
+3. **`query_epistemic_rules`** — Check specific rules and constraints during execution
+
+For granular control, you can also use the individual tools:
+- **`search`** — Find the right skill by intent, keyword, or alias
+- **`get_skill_context`** — Get the full context for a specific skill
 
 Each tool loads only the data it needs. The agent never reads the full SKILL.md — it queries the ontology store via SPARQL and gets deterministic, structured results in sub-millisecond time.
 
@@ -299,6 +329,7 @@ Evaluate whether an intent or skill can be executed from the current states. Ret
 | `skill_id` | string | Target skill (use either `intent` or `skill_id`) |
 | `current_states` | array | Current state URIs or compact values |
 | `max_depth` | integer | Max plan depth (1-10, default 10) |
+| `format` | string | `"compact"` (default) or `"raw"` |
 
 **Example response:**
 
@@ -363,12 +394,7 @@ Query normalized knowledge nodes with guided filters.
 | `applies_to_context` | string | Context filter |
 | `include_inherited` | boolean | Include extended skills (default true) |
 | `limit` | integer | Max results (1-100, default 25) |
-
-**Example response:**
-
-```json
-{
-  "rules": [
+| `format` | string | `"compact"` (default) or `"raw"` |
     {
       "skill_id": "pdf",
       "node_type": "AntiPattern",

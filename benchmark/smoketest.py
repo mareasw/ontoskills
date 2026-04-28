@@ -65,12 +65,12 @@ def main() -> int:
             tools = client.list_tools()
             tool_names = [t["name"] for t in tools]
             print(f"  tools: {tool_names}")
-            expected = {"search", "get_skill_context", "evaluate_execution_plan", "query_epistemic_rules"}
+            expected = {"search", "get_skill_context", "evaluate_execution_plan", "query_epistemic_rules", "prefetch_knowledge"}
             if set(tool_names) != expected:
                 print(f"  FAIL: expected {expected}, got {set(tool_names)}")
                 errors += 1
             else:
-                print("  OK: all 4 tools present")
+                print("  OK: all 5 tools present")
             print()
 
             # Step 4: Search for skills

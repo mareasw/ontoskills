@@ -55,9 +55,11 @@ ONTOMCP_ONTOLOGY_ROOT=~/.ontoskills/ontologies
 
 ## 工具参考
 
-OntoMCP 暴露 **4 个工具** 用于技能发现、上下文检索和推理。
+OntoMCP 暴露 **5 个工具** 用于技能发现、上下文检索和推理。
 
 > **稀疏序列化**：响应中省略空值和空数组。仅包含有实际值的字段。这使响应保持紧凑，避免用空数据填充上下文窗口。
+
+> **紧凑格式**：所有工具默认返回紧凑响应（相比详细 JSON 减少 88% 的 token）。使用 `format` 参数控制输出：`"compact"`（默认）或 `"raw"` 获取完整 JSON。紧凑模式在 `structuredContent` 中保留所有知识 — 零信息损失。
 
 ### `search`
 
@@ -90,28 +92,9 @@ OntoMCP 暴露 **4 个工具** 用于技能发现、上下文检索和推理。
 | `category` | string | 按技能类别过滤（如 `automation`、`document`、`marketing`）|
 | `is_user_invocable` | boolean | 按技能是否可由用户直接调用过滤 |
 | `limit` | integer | 最大结果数（1-100，默认 25）|
+| `format` | string | `"compact"`（默认）或 `"raw"` |
 
 **示例响应：**
-
-```json
-{
-  "skills": [
-    {
-      "id": "pdf",
-      "qualified_id": "obra/superpowers/test-driven-development",
-      "package_id": "superpowers",
-      "trust_tier": "core",
-      "nature": "创建 PDF 文档的技能",
-      "intents": ["create_pdf", "export_pdf"],
-      "requires_state": ["oc:ContentReady"],
-      "yields_state": ["oc:PdfGenerated"]
-    }
-  ],
-  "total": 1
-}
-```
-
-#### 意图搜索
 
 当提供 `query` 参数时，搜索工具使用 **BM25** 作为默认搜索引擎。BM25 是一种内存关键词排序算法，直接在 Catalog 数据上运行 — 始终可用，无需额外依赖。
 
@@ -126,6 +109,7 @@ OntoMCP 暴露 **4 个工具** 用于技能发现、上下文检索和推理。
 |------|------|------|
 | `query` | string | **必需。** 自然语言查询 |
 | `top_k` | integer | 返回结果数（默认 5）|
+| `format` | string | `"compact"`（默认）或 `"raw"` |
 
 **BM25 响应示例**（默认模式）：
 
@@ -186,6 +170,7 @@ OntoMCP 暴露 **4 个工具** 用于技能发现、上下文检索和推理。
 | 参数 | 类型 | 描述 |
 |------|------|------|
 | `alias` | string | **必需。** 要解析的别名（不区分大小写）|
+| `format` | string | `"compact"`（默认）或 `"raw"` |
 
 **示例响应：**
 
@@ -220,6 +205,7 @@ OntoMCP 暴露 **4 个工具** 用于技能发现、上下文检索和推理。
 |------|------|------|
 | `skill_id` | string | **必需。** 短 id（`pdf`）或限定 id（`obra/superpowers/test-driven-development`）|
 | `include_inherited_knowledge` | boolean | 包含扩展技能的知识（默认 true）|
+| `format` | string | `"compact"`（默认）或 `"raw"` |
 
 **示例响应：**
 
@@ -262,19 +248,63 @@ OntoMCP 暴露 **4 个工具** 用于技能发现、上下文检索和推理。
 
 ### 代理工作流
 
-4 个工具构成完整的工作流，替代读取原始 SKILL.md 文件：
+5 个工具构成完整的工作流，替代读取原始 SKILL.md 文件：
 
 ```
-search → get_skill_context → evaluate_execution_plan → query_epistemic_rules
-发现       理解需求             计划验证                 合规检查
+prefetch_knowledge → evaluate_execution_plan → query_epistemic_rules
+  发现 + 上下文           计划验证                 合规检查
 ```
 
-1. **`search`** — 通过意图、关键词或别名找到正确的技能
-2. **`get_skill_context`** — 获取完整上下文，包括知识节点、需求、依赖和执行负载
-3. **`evaluate_execution_plan`** — 验证计划是否可行（状态、依赖）
-4. **`query_epistemic_rules`** — 在执行期间检查特定规则和约束
+1. **`prefetch_knowledge`** — 一次调用加载技能知识（推荐的首次调用）
+2. **`evaluate_execution_plan`** — 验证计划是否可行（状态、依赖）
+3. **`query_epistemic_rules`** — 在执行期间检查特定规则和约束
+
+如需精细控制，也可以使用单独的工具：
+- **`search`** — 通过意图、关键词或别名找到正确的技能
+- **`get_skill_context`** — 获取特定技能的完整上下文
 
 每个工具仅加载所需的数据。代理从不读取完整的 SKILL.md — 它通过 SPARQL 查询本体存储，并在亚毫秒时间内获得确定性的结构化结果。
+
+---
+
+### `prefetch_knowledge`
+
+一次性知识加载，结合搜索和上下文检索。这是代理推荐的入口点 — 它在单个 MCP 调用中执行搜索 + `get_skill_context`，返回紧凑的、优先排序的知识。
+
+```json
+{
+  "query": "创建带表格和图表的 PDF",
+  "skill_ids": ["pdf"],
+  "limit": 3
+}
+```
+
+| 参数 | 类型 | 描述 |
+|------|------|------|
+| `query` | string | 搜索查询（使用 BM25）|
+| `skill_ids` | array | 要加载的显式技能 ID（跳过搜索）|
+| `limit` | integer | 最大加载数（默认 5）|
+| `format` | string | `"compact"`（默认）或 `"raw"` |
+
+**紧凑响应示例：**
+
+```markdown
+# pdf
+
+## Knowledge (8 nodes, sorted by priority)
+[CRITICAL] 不要接受来自不可信输入的文件路径 (文件处理)
+[HIGH] 验证 wkhtmltopdf 已安装 (PDF 生成之前)
+...
+
+## Requirements
+- Tool: wkhtmltopdf (required)
+- EnvVar: OUTPUT_DIR (optional)
+
+## Execution
+executor: shell | timeout: 30s
+```
+
+此单次调用替代 `search` → `get_skill_context` 序列，节省 1-2 次往返。
 
 ---
 
@@ -296,6 +326,7 @@ search → get_skill_context → evaluate_execution_plan → query_epistemic_rul
 | `skill_id` | string | 目标技能（使用 `intent` 或 `skill_id`）|
 | `current_states` | array | 当前状态 URI 或紧凑值 |
 | `max_depth` | integer | 最大计划深度（1-10，默认 10）|
+| `format` | string | `"compact"`（默认）或 `"raw"` |
 
 **示例响应：**
 
@@ -360,12 +391,7 @@ search → get_skill_context → evaluate_execution_plan → query_epistemic_rul
 | `applies_to_context` | string | 上下文过滤器 |
 | `include_inherited` | boolean | 包含扩展技能（默认 true）|
 | `limit` | integer | 最大结果数（1-100，默认 25）|
-
-**示例响应：**
-
-```json
-{
-  "rules": [
+| `format` | string | `"compact"`（默认）或 `"raw"` |
     {
       "skill_id": "pdf",
       "node_type": "AntiPattern",

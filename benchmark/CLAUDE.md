@@ -18,7 +18,6 @@ python-docx — Word document creation (installed)
 python-pptx — PowerPoint generation (installed)
 pandas      — Data manipulation (installed)
 youtube-transcript-api — YouTube transcript fetching (installed)
-toml        — TOML config parsing (installed)
 ```
 
 ### NOT available
@@ -26,7 +25,7 @@ toml        — TOML config parsing (installed)
 
 ### Binary prerequisites
 - `ontomcp` at `~/.ontoskills/bin/ontomcp` — Rust MCP server, rebuild from `mcp/` if outdated
-- Compiled TTLs at `~/.ontoskills/packages/` — 840 files (408 skills + sub-skills), 11 author packages
+- Compiled TTLs at `~/.ontoskills/packages/` — 1058 TTL files (640 skills + sub-skills), 11 author packages
 
 ## Architecture
 
@@ -111,7 +110,7 @@ contains only the task instruction + Dockerfile metadata (89% smaller). Skill kn
 This tests OntoSkills' core advantage: **structured skill knowledge via MCP vs. raw SKILL.md**.
 
 The MCP server uses a SkillsBench-only ontology root (`/tmp/skillsbench_ontology/`) containing
-only the 218 SkillsBench TTLs (vs. 626 total). This reduces MCP startup from 10s to 1.8s and
+only the 218 SkillsBench TTLs (vs. 840 total). This reduces MCP startup from 10s to 1.8s and
 query time from 3.8s to 0.27s per skill.
 
 ## Known issues
@@ -171,7 +170,7 @@ Tools accept a `format` parameter: `"compact"` (default) or `"raw"`.
 ## Traditional agent design
 
 The TraditionalAgent works like Claude Code:
-- System prompt contains a **skill registry** with all 425 skill names + descriptions (~27K tokens)
+- System prompt contains a **skill registry** with all skill names + descriptions (~27K tokens)
 - Model has a `read_skill` tool to load full SKILL.md content on demand
 - Multi-turn loop: model reads relevant skills then answers
 - Both GAIA and SWE-bench wrappers delegate `read_skill` to `agent._resolve_skill()`
@@ -210,9 +209,9 @@ _Results pending — run with Claude Code mode._
 _Results pending — run with Claude Code mode._
 
 ### Compiler bug (unrelated to benchmark)
-11 skills across 9 tasks failed to compile to TTL. Root cause: `ontocore compile`
+10 skills across 10 tasks failed to compile to TTL. Root cause: `ontocore compile`
 with `-o` flag resolves `state_dir` incorrectly, creating `/state` instead of
-relative path. The 11 missing skills are:
+relative path. The 10 missing skills are:
 civ6lib, map-optimization-strategy, sqlite-map-parser, pymatgen, lean4-memories,
 gemini-video-understanding, senior-data-scientist, gmail-skill, threejs,
 data-reconciliation.

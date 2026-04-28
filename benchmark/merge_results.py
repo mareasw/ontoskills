@@ -77,7 +77,7 @@ def merge_results(
             if task_dir.is_dir():
                 tasks.append({"task_id": tid, "task_dir": str(task_dir)})
 
-        score = SkillsBenchWrapper.score(all_results, tasks)
+        score = SkillsBenchWrapper.score(all_results)
         score_path = output_dir / "score.json"
         score_path.write_text(
             json.dumps(score, indent=2, default=str, ensure_ascii=False),

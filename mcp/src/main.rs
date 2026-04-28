@@ -429,7 +429,7 @@ fn handle_tool_call(
 
     // Handle prefetch_knowledge separately — it combines search + context.
     if tool_name == "prefetch_knowledge" {
-        return handle_prefetch(catalog, bm25_engine, &arguments);
+        return handle_prefetch(catalog, bm25_engine, &arguments, use_compact);
     }
 
     let (structured, compact_text) = match tool_name {
@@ -593,6 +593,7 @@ fn handle_prefetch(
     catalog: &Catalog,
     bm25_engine: &Bm25Engine,
     arguments: &Value,
+    use_compact: bool,
 ) -> Result<Value, String> {
     let max_skills = optional_usize(arguments, "max_skills")
         .unwrap_or(3)
@@ -636,7 +637,15 @@ fn handle_prefetch(
 
     let text = sections.join("\n\n");
     let structured = json!({ "prefetched_skills": skill_ids, "results": structured_skills });
-    Ok(build_response(structured, text))
+    if use_compact {
+        Ok(build_response(structured, text))
+    } else {
+        Ok(json!({
+            "content": [{ "type": "text", "text": serde_json::to_string_pretty(&structured).unwrap_or_default() }],
+            "structuredContent": structured,
+            "isError": false
+        }))
+    }
 }
 
 fn normalize_structured_content(value: Value) -> Value {
@@ -887,7 +896,8 @@ fn tool_definitions() -> Vec<Value> {
                         "items": { "type": "string" },
                         "description": "Explicit skill IDs to fetch (skips search). Use either 'query' or 'skill_ids'."
                     },
-                    "max_skills": { "type": "integer", "description": "Maximum skills to fetch (default 3, max 5)", "default": 3, "minimum": 1, "maximum": 5 }
+                    "max_skills": { "type": "integer", "description": "Maximum skills to fetch (default 3, max 5)", "default": 3, "minimum": 1, "maximum": 5 },
+                    "format": { "type": "string", "enum": ["compact", "raw"], "description": "Response format: 'compact' (default, token-efficient) or 'raw' (full JSON)", "default": "compact" }
                 }
             }),
         ),

@@ -1,7 +1,7 @@
 """OntoSkills MCP agent for the benchmark.
 
-Uses the 4 MCP tools (search, get_skill_context, evaluate_execution_plan,
-query_epistemic_rules) via the Anthropic tool-use API to answer questions
+Uses the 5 MCP tools (search, get_skill_context, evaluate_execution_plan,
+query_epistemic_rules, prefetch_knowledge) via the Anthropic tool-use API to answer questions
 about skills.
 
 Supports an optional **prefetch** mode that retrieves relevant skill

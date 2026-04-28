@@ -385,8 +385,7 @@ def _run_skillsbench(
     )
 
     # Score from Docker reward.txt (deterministic).
-    tasks = wrapper.load_tasks(max_tasks=max_tasks, shuffle=shuffle, seed=seed, skip_first=skip_first)
-    score = SkillsBenchWrapper.score(results, tasks)
+    score = SkillsBenchWrapper.score(results)
     logger.info(
         "SkillsBench (%s): %d/%d passed (%.1f%%)",
         mode,
@@ -441,8 +440,7 @@ def _run_skillsbench_claudecode(
     )
 
     # Score from Docker reward.txt (deterministic).
-    tasks = wrapper.load_tasks(max_tasks=max_tasks, shuffle=shuffle, seed=seed, skip_first=skip_first)
-    score = SkillsBenchWrapper.score(results, tasks)
+    score = SkillsBenchWrapper.score(results)
     logger.info(
         "SkillsBench ClaudeCode (%s): %d/%d passed (%.1f%%)",
         mode,

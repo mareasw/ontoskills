@@ -4,6 +4,13 @@ All notable changes to OntoCore (Python package) will be documented in this file
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.0] - 2026-04-28
+
+### Changed
+
+- **Ontology format bumped to 1.0** — Stable format with compact MCP responses, prefetch_knowledge tool, lazy content extraction, and relaxed SHACL validation
+- **Version aligned** — OntoCore 1.0.0 matches OntoMCP 1.0.0
+
 ## [0.11.0] - 2026-04-20
 
 ### Added

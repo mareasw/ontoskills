@@ -15,7 +15,7 @@ import BenchmarkApp from '../../components/benchmark/BenchmarkApp.astro';
 
 AI coding agents like Claude Code rely on skill documentation to solve specialized tasks — generating DOCX files, processing PDFs, analyzing financial data. Today, these skills are delivered as plain markdown files (`SKILL.md`). The agent reads the raw text and must extract instructions, heuristics, and anti-patterns on its own.
 
-**OntoSkills** takes a different approach: skill knowledge is compiled into structured OWL 2 ontologies and delivered via MCP tools. The agent queries `search`, `get_skill_context`, `evaluate_execution_plan`, and `query_epistemic_rules` — receiving typed knowledge nodes with severity ratings, epistemic rules, and execution plan evaluations.
+**OntoSkills** takes a different approach: skill knowledge is compiled into structured OWL 2 ontologies and delivered via MCP tools. The agent uses `prefetch_knowledge` to load structured skill knowledge in one call — receiving typed knowledge nodes with severity ratings, epistemic rules, and execution plan evaluations.
 
 Which approach produces better results?
 
@@ -46,7 +46,7 @@ This is not LLM-as-judge. The evaluation is fully deterministic and reproducible
 
 **Traditional** — Skill documentation placed in `.claude/skills/` as SKILL.md files. The agent uses Claude Code's native file reading to discover and load skills — exactly how skills work in production.
 
-**OntoSkills MCP** — Skills compiled to OWL 2 ontologies, served via OntoMCP. The agent discovers skills through MCP tools (`search`, `get_skill_context`). An `ontomcp-driver` skill teaches the agent the optimal workflow for querying the ontology.
+**OntoSkills MCP** — Skills compiled to OWL 2 ontologies, served via OntoMCP. The agent discovers skills through MCP tools (`prefetch_knowledge`, `search`, `get_skill_context`). An `ontomcp-driver` skill teaches the agent the optimal workflow for querying the ontology.
 
 Both modes use the same Claude Code agent, the same model, the same prompts. The only difference is **how skill knowledge is delivered**.
 

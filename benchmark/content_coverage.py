@@ -248,7 +248,7 @@ def run_benchmark(target=95.0, verbose=False, json_output=None, ttl_dir=None):
 
     results = []
     for source, path in paths:
-        md = path.read_text()
+        md = path.read_text(encoding="utf-8")
         blocks = extract_flat_blocks(md)
         coverage = calc_line_coverage(md, blocks)
         results.append({"source": source, "name": path.parent.name, "coverage": round(coverage, 1)})

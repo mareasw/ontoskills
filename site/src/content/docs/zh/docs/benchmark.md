@@ -15,7 +15,7 @@ import BenchmarkApp from '../../../components/benchmark/BenchmarkApp.astro';
 
 像 Claude Code 这样的 AI 编程代理依赖技能文档来完成专业任务——生成 DOCX 文件、处理 PDF、分析金融数据。如今，这些技能以纯 Markdown 文件（`SKILL.md`）的形式提供。代理必须阅读原始文本并自行提取指令、启发式规则和反模式。
 
-**OntoSkills** 采用了不同的方法：技能知识被编译成结构化的 OWL 2 本体，通过 MCP 工具传递。代理使用 `search`、`get_skill_context`、`evaluate_execution_plan` 和 `query_epistemic_rules` 四个工具——接收带有严重性评级、认知规则和执行计划评估的类型化知识节点。
+**OntoSkills** 采用了不同的方法：技能知识被编译成结构化的 OWL 2 本体，通过 MCP 工具传递。代理使用 `prefetch_knowledge` 一次性加载结构化技能知识——接收带有严重性评级、认知规则和执行计划评估的类型化知识节点。
 
 哪种方法效果更好？
 
@@ -46,7 +46,7 @@ import BenchmarkApp from '../../../components/benchmark/BenchmarkApp.astro';
 
 **传统模式** — 技能文档以 SKILL.md 文件形式放置在 `.claude/skills/` 中。代理使用 Claude Code 的原生文件读取功能发现和加载技能——与生产环境中的工作方式完全一致。
 
-**OntoSkills MCP 模式** — 技能编译为 OWL 2 本体，通过 OntoMCP 提供。代理通过 MCP 工具（`search`、`get_skill_context`）发现技能。`ontomcp-driver` 技能教导代理查询本体的最佳工作流程。
+**OntoSkills MCP 模式** — 技能编译为 OWL 2 本体，通过 OntoMCP 提供。代理通过 MCP 工具（`prefetch_knowledge`、`search`、`get_skill_context`）发现技能。`ontomcp-driver` 技能教导代理查询本体的最佳工作流程。
 
 两种模式使用相同的 Claude Code 代理、相同的模型、相同的提示。唯一的区别是**技能知识的传递方式**。
 

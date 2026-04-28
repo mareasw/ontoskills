@@ -76,6 +76,14 @@ def _parse_toml_simple(text: str) -> dict:
         key = key.strip()
         value = value.strip()
 
+        # Strip inline comment (TOML # comment after value).
+        # But only outside quoted strings.
+        if not value.startswith(('"', "'", "[")):
+            if " #" in value:
+                value = value[: value.index(" #")].rstrip()
+            elif "\t#" in value:
+                value = value[: value.index("\t#")].rstrip()
+
         if value.startswith('"') and value.endswith('"'):
             current_section[key] = value[1:-1]
         elif value.startswith("'") and value.endswith("'"):
@@ -166,7 +174,7 @@ class SkillsBenchWrapper:
             "skill_ids": skill_ids,
             "skills_content": skills_content,
             "task_dir": str(task_dir),
-            "agent_timeout_sec": int(agent_meta.get("timeout_sec", 900)),
+            "agent_timeout_sec": int(float(agent_meta.get("timeout_sec", 900))),
         }
 
     def load_tasks(
@@ -639,13 +647,6 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
 
         original_run_turn = agent.run_turn
 
-        # Check if agent has MCP tools.
-        agent_tools = agent.get_tools()
-        has_mcp = agent_tools is not None and any(
-            t.get("name") in ("search", "get_skill_context")
-            for t in agent_tools
-        )
-
         def _patched_run_turn(messages: list[dict]) -> tuple[dict, dict]:
             """Execute one turn, routing MCP tool calls to MCP client."""
             start = time.perf_counter()
@@ -1091,9 +1092,12 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
         if dst.is_dir():
             return str(dst.parent)
 
+        dst.parent.mkdir(parents=True, exist_ok=True)
         try:
             shutil.copytree(str(src), str(dst))
             logger.info("Prepared SkillsBench ontology root at %s", dst.parent)
+            return str(dst.parent)
+        except FileExistsError:
             return str(dst.parent)
         except Exception as exc:
             logger.warning("Failed to prepare SkillsBench ontology root: %s", exc)
@@ -1151,7 +1155,7 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
     # ------------------------------------------------------------------
 
     @staticmethod
-    def score(results: list[dict], tasks: list[dict]) -> dict:
+    def score(results: list[dict]) -> dict:
         """Compute scores from Docker verification results.
 
         Uses fractional rewards from pytest CTRF reports (passed/total tests)
