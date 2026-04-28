@@ -23,6 +23,8 @@ interface Summary {
   avg_input_tokens: number;
   avg_output_tokens: number;
   total_cost_usd: number;
+  tasks_partial?: number;
+  tasks_failed?: number;
 }
 
 interface ComparisonData {
@@ -91,12 +93,12 @@ const MODELS: Record<string, ModelPrice> = {
 
 const TOTAL_INPUT_TRAD = DATA.traditional.total_tasks * DATA.traditional.avg_input_tokens;
 const TOTAL_OUTPUT_TRAD = DATA.traditional.total_tasks * DATA.traditional.avg_output_tokens;
-const TOTAL_INPUT_ONT0 = DATA.ontoskills.total_tasks * DATA.ontoskills.avg_input_tokens;
-const TOTAL_OUTPUT_ONT0 = DATA.ontoskills.total_tasks * DATA.ontoskills.avg_output_tokens;
+const TOTAL_INPUT_ONTO = DATA.ontoskills.total_tasks * DATA.ontoskills.avg_input_tokens;
+const TOTAL_OUTPUT_ONTO = DATA.ontoskills.total_tasks * DATA.ontoskills.avg_output_tokens;
 
 function modelCost(m: ModelPrice, mode: 'traditional' | 'ontoskills'): number {
-  const inp = mode === 'traditional' ? TOTAL_INPUT_TRAD : TOTAL_INPUT_ONT0;
-  const out = mode === 'traditional' ? TOTAL_OUTPUT_TRAD : TOTAL_OUTPUT_ONT0;
+  const inp = mode === 'traditional' ? TOTAL_INPUT_TRAD : TOTAL_INPUT_ONTO;
+  const out = mode === 'traditional' ? TOTAL_OUTPUT_TRAD : TOTAL_OUTPUT_ONTO;
   return (inp * m.input + out * m.output) / 1_000_000;
 }
 
@@ -177,8 +179,8 @@ function RewardChart() {
           width={40}
         />
         <Tooltip
-          formatter={(value: number, name: string) => [
-            `${(value * 100).toFixed(0)}%`,
+          formatter={(value: number | undefined, name: string) => [
+            `${((value ?? 0) * 100).toFixed(0)}%`,
             name,
           ]}
           contentStyle={{
@@ -194,13 +196,13 @@ function RewardChart() {
         <Bar dataKey="Traditional" fill={TRAD} radius={[3, 3, 0, 0]} maxBarSize={28}>
           <LabelList dataKey="Traditional" position="top" fontSize={10} fontWeight={600}
             fill="var(--text-muted)"
-            formatter={(v: number) => v === 0 ? '' : `${(v * 100).toFixed(0)}%`}
+            formatter={(v: number | string) => !v || v === 0 ? '' : `${(Number(v) * 100).toFixed(0)}%`}
           />
         </Bar>
         <Bar dataKey="OntoSkills" fill={ONTO} radius={[3, 3, 0, 0]} maxBarSize={28}>
           <LabelList dataKey="OntoSkills" position="top" fontSize={10} fontWeight={600}
             fill="var(--text-muted)"
-            formatter={(v: number) => v === 0 ? '' : `${(v * 100).toFixed(0)}%`}
+            formatter={(v: number | string) => !v || v === 0 ? '' : `${(Number(v) * 100).toFixed(0)}%`}
           />
         </Bar>
       </BarChart>
