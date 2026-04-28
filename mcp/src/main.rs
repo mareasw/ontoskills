@@ -1,5 +1,6 @@
 mod catalog;
 mod bm25_engine;
+mod compact;
 #[cfg(feature = "embeddings")]
 mod embeddings;
 mod schema;
@@ -419,13 +420,20 @@ fn handle_tool_call(
         .cloned()
         .unwrap_or_else(|| json!({}));
 
-    let structured = match tool_name {
+    // Read format preference: "compact" (default) or "raw" (verbose JSON).
+    let raw_format = arguments
+        .get("format")
+        .and_then(Value::as_str)
+        .unwrap_or("compact");
+    let use_compact = raw_format != "raw";
+
+    // Handle prefetch_knowledge separately — it combines search + context.
+    if tool_name == "prefetch_knowledge" {
+        return handle_prefetch(catalog, bm25_engine, &arguments);
+    }
+
+    let (structured, compact_text) = match tool_name {
         "search" => {
-            // Dispatch based on which parameters are provided:
-            // - query → semantic search if embeddings available, otherwise BM25
-            // - alias → alias resolution
-            // - otherwise → structured skill search
-            // query and alias are mutually exclusive.
             let has_query = arguments.get("query").and_then(Value::as_str).is_some();
             let has_alias = arguments.get("alias").and_then(Value::as_str).is_some();
 
@@ -433,7 +441,7 @@ fn handle_tool_call(
                 return Err("Parameters 'query' and 'alias' are mutually exclusive. Provide one or the other.".to_string());
             }
 
-            if has_query {
+            let structured = if has_query {
                 let query = arguments
                     .get("query")
                     .and_then(Value::as_str)
@@ -443,14 +451,13 @@ fn handle_tool_call(
                     .and_then(Value::as_u64)
                     .unwrap_or(5) as usize;
 
-                // Prefer semantic search when embeddings are available
                 #[cfg(feature = "embeddings")]
                 if let Some(engine) = embedding_engine {
                     let matches = engine
                         .search(query, top_k)
                         .map_err(|e| format!("Search failed: {}", e))?;
                     if !matches.is_empty() {
-                        return Ok(json!({
+                        let val = json!({
                             "mode": "semantic",
                             "query": query,
                             "matches": matches.iter().map(|m| json!({
@@ -458,11 +465,16 @@ fn handle_tool_call(
                                 "score": m.score,
                                 "skills": m.skills
                             })).collect::<Vec<_>>()
-                        }));
+                        });
+                        let text = if use_compact {
+                            compact::compact_search(&val)
+                        } else {
+                            serde_json::to_string_pretty(&val).unwrap_or_default()
+                        };
+                        return Ok(build_response(val, text));
                     }
                 }
 
-                // Fallback: BM25 keyword search (always available)
                 let bm25_results = bm25_engine.search(query, top_k);
                 json!({
                     "mode": "bm25",
@@ -492,17 +504,29 @@ fn handle_tool_call(
                     limit: optional_usize(&arguments, "limit").unwrap_or(25),
                 };
                 json!({ "mode": "structured", "skills": catalog.search_skills(params).map_err(public_error)? })
-            }
+            };
+
+            let text = if use_compact {
+                compact::compact_search(&structured)
+            } else {
+                serde_json::to_string_pretty(&structured).unwrap_or_default()
+            };
+            (structured, text)
         }
         "get_skill_context" => {
             let skill_id = required_string(&arguments, "skill_id")?;
             let include_inherited_knowledge =
                 optional_bool(&arguments, "include_inherited_knowledge").unwrap_or(true);
-            json!(
-                catalog
-                    .get_skill_context(skill_id, include_inherited_knowledge)
-                    .map_err(public_error)?
-            )
+            let ctx = catalog
+                .get_skill_context(&skill_id, include_inherited_knowledge)
+                .map_err(public_error)?;
+            let structured = json!(ctx);
+            let text = if use_compact {
+                compact::compact_context(&skill_id, &ctx)
+            } else {
+                serde_json::to_string_pretty(&structured).unwrap_or_default()
+            };
+            (structured, text)
         }
         "evaluate_execution_plan" => {
             let params = EvaluateExecutionPlanParams {
@@ -511,11 +535,16 @@ fn handle_tool_call(
                 current_states: string_list(&arguments, "current_states"),
                 max_depth: optional_usize(&arguments, "max_depth").unwrap_or(10),
             };
-            json!(
-                catalog
-                    .evaluate_execution_plan(params)
-                    .map_err(public_error)?
-            )
+            let plan = catalog
+                .evaluate_execution_plan(params)
+                .map_err(public_error)?;
+            let structured = json!(plan);
+            let text = if use_compact {
+                compact::compact_plan(&plan)
+            } else {
+                serde_json::to_string_pretty(&structured).unwrap_or_default()
+            };
+            (structured, text)
         }
         "query_epistemic_rules" => {
             let params = EpistemicQueryParams {
@@ -527,27 +556,87 @@ fn handle_tool_call(
                 include_inherited: optional_bool(&arguments, "include_inherited").unwrap_or(true),
                 limit: optional_usize(&arguments, "limit").unwrap_or(25),
             };
-            json!(
-                catalog
-                    .query_epistemic_rules(params)
-                    .map_err(public_error)?
-            )
+            let nodes = catalog
+                .query_epistemic_rules(params)
+                .map_err(public_error)?;
+            let structured = json!({ "nodes": &nodes });
+            let text = if use_compact {
+                compact::compact_epistemic_rules(&nodes)
+            } else {
+                serde_json::to_string_pretty(&structured).unwrap_or_default()
+            };
+            (structured, text)
         }
         _ => return Err(format!("Unknown tool: {tool_name}")),
     };
 
-    let structured_content = normalize_structured_content(structured.clone());
+    Ok(build_response(structured, compact_text))
+}
 
-    Ok(json!({
+/// Build an MCP tool response with both compact text and full structured content.
+fn build_response(structured: Value, compact_text: String) -> Value {
+    let structured_content = normalize_structured_content(structured);
+    json!({
         "content": [
             {
                 "type": "text",
-                "text": serde_json::to_string_pretty(&structured).unwrap_or_else(|_| structured.to_string())
+                "text": compact_text
             }
         ],
         "structuredContent": structured_content,
         "isError": false
-    }))
+    })
+}
+
+/// Handle `prefetch_knowledge`: search + fetch context + compact in one call.
+fn handle_prefetch(
+    catalog: &Catalog,
+    bm25_engine: &Bm25Engine,
+    arguments: &Value,
+) -> Result<Value, String> {
+    let max_skills = optional_usize(arguments, "max_skills")
+        .unwrap_or(3)
+        .min(5);
+
+    // Determine skill IDs: either explicitly provided or via search.
+    let skill_ids: Vec<String> = if let Some(ids) = arguments.get("skill_ids").and_then(Value::as_array) {
+        ids.iter()
+            .filter_map(Value::as_str)
+            .map(String::from)
+            .take(max_skills)
+            .collect()
+    } else if let Some(query) = arguments.get("query").and_then(Value::as_str) {
+        let results = bm25_engine.search(query, max_skills);
+        results.into_iter().map(|r| r.skill_id).collect()
+    } else {
+        return Err("prefetch_knowledge requires either 'query' or 'skill_ids'".to_string());
+    };
+
+    if skill_ids.is_empty() {
+        return Ok(build_response(
+            json!({ "skills": [] }),
+            "No matching skills found.".to_string(),
+        ));
+    }
+
+    let mut sections: Vec<String> = Vec::new();
+    let mut structured_skills: Vec<Value> = Vec::new();
+
+    for sid in &skill_ids {
+        match catalog.get_skill_context(sid, true) {
+            Ok(ctx) => {
+                structured_skills.push(json!(ctx));
+                sections.push(compact::compact_context(sid, &ctx));
+            }
+            Err(_) => {
+                sections.push(format!("## {}\nSkill not found.", sid));
+            }
+        }
+    }
+
+    let text = sections.join("\n\n");
+    let structured = json!({ "prefetched_skills": skill_ids, "results": structured_skills });
+    Ok(build_response(structured, text))
 }
 
 fn normalize_structured_content(value: Value) -> Value {
@@ -734,7 +823,8 @@ fn tool_definitions() -> Vec<Value> {
                     "skill_type": { "type": "string", "enum": ["executable", "declarative"] },
                     "category": { "type": "string", "description": "Filter by skill category (e.g., automation, document, marketing)." },
                     "is_user_invocable": { "type": "boolean", "description": "Filter by whether the skill is directly invocable by users." },
-                    "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
+                    "limit": { "type": "integer", "minimum": 1, "maximum": 100 },
+                    "format": { "type": "string", "enum": ["compact", "raw"], "description": "Response format: 'compact' (default, token-efficient) or 'raw' (full JSON)", "default": "compact" }
                 }
             }),
         ),
@@ -745,7 +835,8 @@ fn tool_definitions() -> Vec<Value> {
                 "type": "object",
                 "properties": {
                     "skill_id": { "type": "string", "description": "Short id like 'xlsx' or qualified id like 'marea/office/xlsx'." },
-                    "include_inherited_knowledge": { "type": "boolean", "default": true }
+                    "include_inherited_knowledge": { "type": "boolean", "default": true },
+                    "format": { "type": "string", "enum": ["compact", "raw"], "description": "Response format: 'compact' (default, token-efficient) or 'raw' (full JSON)", "default": "compact" }
                 },
                 "required": ["skill_id"]
             }),
@@ -762,7 +853,8 @@ fn tool_definitions() -> Vec<Value> {
                         "type": "array",
                         "items": { "type": "string" }
                     },
-                    "max_depth": { "type": "integer", "minimum": 1, "maximum": 10 }
+                    "max_depth": { "type": "integer", "minimum": 1, "maximum": 10 },
+                    "format": { "type": "string", "enum": ["compact", "raw"], "description": "Response format: 'compact' (default, token-efficient) or 'raw' (full JSON)", "default": "compact" }
                 }
             }),
         ),
@@ -778,7 +870,24 @@ fn tool_definitions() -> Vec<Value> {
                     "severity_level": { "type": "string" },
                     "applies_to_context": { "type": "string" },
                     "include_inherited": { "type": "boolean", "default": true },
-                    "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
+                    "limit": { "type": "integer", "minimum": 1, "maximum": 100 },
+                    "format": { "type": "string", "enum": ["compact", "raw"], "description": "Response format: 'compact' (default, token-efficient) or 'raw' (full JSON)", "default": "compact" }
+                }
+            }),
+        ),
+        tool(
+            "prefetch_knowledge",
+            "One-call knowledge retrieval. Searches for skills matching a query (or uses explicit skill_ids), fetches full context for each, and returns compact text ready for the model. Use this instead of calling search + get_skill_context separately.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "Natural language query to find relevant skills (e.g., 'create an Excel spreadsheet')" },
+                    "skill_ids": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Explicit skill IDs to fetch (skips search). Use either 'query' or 'skill_ids'."
+                    },
+                    "max_skills": { "type": "integer", "description": "Maximum skills to fetch (default 3, max 5)", "default": 3, "minimum": 1, "maximum": 5 }
                 }
             }),
         ),
