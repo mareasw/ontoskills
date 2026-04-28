@@ -198,7 +198,7 @@ class ClaudeCodeAgent(BaseAgent):
         self._mcp_config_path = str(config_path)
 
         # Copy ontomcp-driver skill to teach Claude Code how to use MCP tools.
-        driver_src = Path("site/public/agent-skills/ontomcp-driver/SKILL.md")
+        driver_src = Path(__file__).resolve().parent.parent.parent / "site" / "public" / "agent-skills" / "ontomcp-driver" / "SKILL.md"
         if driver_src.exists():
             driver_dest = work_dir / ".claude" / "skills" / "ontomcp-driver"
             driver_dest.mkdir(parents=True, exist_ok=True)

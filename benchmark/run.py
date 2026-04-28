@@ -573,8 +573,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--model",
-        default=ANTHROPIC_MODELS[0] if ANTHROPIC_MODELS else "claude-sonnet-4-6",
-        help="Anthropic model ID to use (default: first Anthropic model from config)",
+        default="glm-5.1",
+        help="Model ID to use (default: glm-5.1 via API proxy)",
     )
     parser.add_argument(
         "--max-tasks",
@@ -756,8 +756,10 @@ def main() -> None:
                 )
                 elapsed = time.perf_counter() - t0
                 logger.info("Claude Code (%s) completed %s in %.1fs", cc_tag, bench_name, elapsed)
-                traditional_results[bench_name] = results
-                traditional_accuracies[bench_name] = accuracy
+                results_dict = ontoskills_results if cc_mode == "ontoskills" else traditional_results
+                accuracy_dict = ontoskills_accuracies if cc_mode == "ontoskills" else traditional_accuracies
+                results_dict[bench_name] = results
+                accuracy_dict[bench_name] = accuracy
 
             else:
                 if args.mode in ("traditional", "both"):

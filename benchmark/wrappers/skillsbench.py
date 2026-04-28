@@ -228,7 +228,7 @@ class SkillsBenchWrapper:
         if skip_first > 0:
             tasks = tasks[skip_first:]
             if max_tasks is not None:
-                max_tasks = max_tasks - skip_first
+                max_tasks = max(0, max_tasks - skip_first)
         if max_tasks is not None:
             tasks = tasks[:max_tasks]
 
