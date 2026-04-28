@@ -7,6 +7,7 @@ import { InstallBar } from '../components/InstallBar';
 import { getCategoryColor, STAT_COLORS } from '../uiColors';
 import { FileTree } from './FileTree';
 import { GraphButton } from '../components/GraphButton';
+import { GraphErrorBoundary } from '../components/GraphErrorBoundary';
 
 const GraphExplorer = lazy(() => import('../graph/GraphExplorer').then(m => ({ default: m.GraphExplorer })));
 
@@ -33,6 +34,7 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
   return (
     <>
       {showGraph && (
+        <GraphErrorBoundary>
         <Suspense fallback={<div className="fixed inset-0 z-50 bg-[#090909] flex items-center justify-center"><div className="w-6 h-6 border-2 border-[#52c7e8]/30 border-t-[#52c7e8] rounded-full animate-spin" /></div>}>
           <GraphExplorer
             skills={skills}
@@ -48,6 +50,7 @@ export function SkillDetailView({ skills, packages, pkgId, skillId, t, prefix, n
             onClose={() => setShowGraph(false)}
           />
         </Suspense>
+        </GraphErrorBoundary>
       )}
 
       {/* Breadcrumb */}

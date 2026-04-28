@@ -84,6 +84,7 @@ export default {
   header: {
     ontostore: 'OntoStore',
     howItWorks: '工作原理',
+    benchmark: '基准测试',
     docs: '文档',
     getStarted: '开始使用',
   },

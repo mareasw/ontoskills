@@ -2,7 +2,7 @@
 
 ## Ontology Format
 
-Current format version: `0.11`
+Current format version: `1.0`
 
 Both OntoCore and OntoMCP must support the same ontology format version to work together.
 
@@ -10,12 +10,13 @@ Both OntoCore and OntoMCP must support the same ontology format version to work 
 
 | OntoCore | OntoMCP | Ontology Format | Status   |
 |----------|---------|-----------------|----------|
-| 0.11.0   | 0.11.0  | 0.11            | Current  |
+| 1.0.0    | 1.0.0   | 1.0             | Current  |
+| 0.11.0   | 0.11.0  | 0.11            | Compatible |
 | 0.10.0   | 0.9.1   | 0.10            | Compatible |
 | 0.9.1    | 0.9.1   | 0.9             | Compatible |
 | 0.9.0    | 0.9.0   | 0.9             | Compatible |
 
-> **Note:** OntoMCP 0.11.0 requires ontology format 0.11. The `oc:dependsOnSkill` predicate is used for dependency edges (replacing `oc:dependsOn`), and per-skill embeddings are required for semantic search. Older ontologies using `oc:dependsOn` will have missing dependency edges. Upgrade both packages together.
+> **Note:** OntoMCP 1.0.0 introduces compact response format (88% token reduction) and `prefetch_knowledge` tool. The `format` parameter on all tools supports `"compact"` (default) and `"raw"` for backward compatibility. Ontology format 1.0 is backward-compatible with 0.11 compiled TTLs.
 
 ## Breaking Changes
 

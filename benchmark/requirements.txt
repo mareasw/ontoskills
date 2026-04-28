@@ -1,0 +1,10 @@
+anthropic>=0.40.0
+datasets
+rdflib>=6.0.0
+swebench
+requests
+pdfplumber
+python-docx
+python-pptx
+pandas
+youtube-transcript-api
