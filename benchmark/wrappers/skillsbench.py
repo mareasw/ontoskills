@@ -28,6 +28,8 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+
+from benchmark.agents.utils import extract_python_code
 from typing import Any
 
 from benchmark.agents.base import AgentResult, BaseAgent
@@ -89,21 +91,6 @@ def _parse_toml_simple(text: str) -> dict:
             except ValueError:
                 current_section[key] = value
     return result
-
-
-def _extract_python_code(response: str) -> str:
-    """Extract the main Python code block from the agent's response.
-
-    Looks for ```python ... ``` blocks. If multiple, returns the longest.
-    Returns empty string if no code blocks found.
-    """
-    blocks = re.findall(r"```(?:python)?\s*\n(.*?)```", response, re.DOTALL)
-    if not blocks:
-        logger.warning("No Python code blocks found in response (%d chars)", len(response))
-        return ""
-
-    # Return the longest code block (most likely the full solution).
-    return max(blocks, key=len).strip()
 
 
 class SkillsBenchWrapper:
@@ -721,7 +708,7 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
                     break
 
             # Extract Python code from the response.
-            solution_script = _extract_python_code(answer)
+            solution_script = extract_python_code(answer)
 
             result = AgentResult(
                 answer=answer,
@@ -730,7 +717,6 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
                 total_latency_ms=total_latency_ms,
                 tool_calls=total_tool_calls,
                 turns=turns,
-                context_overflow=False,
             )
         except Exception as exc:
             logger.warning("Agent error on task %s: %s", task["task_id"], exc)
@@ -741,7 +727,6 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
                 total_latency_ms=0.0,
                 tool_calls=0,
                 turns=0,
-                context_overflow=False,
             )
             solution_script = ""
         finally:
@@ -1051,7 +1036,6 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
         agent.skills_dir = ""
         agent._skill_registry = "\n".join(entries)
         agent._skills_by_name = skills_by_name
-        agent._context_overflow = False
         agent._system_prompt = agent._build_system_prompt()
         # Ensure read_skill tool is available (no override).
         if hasattr(agent, "_tools_override"):

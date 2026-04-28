@@ -25,6 +25,7 @@ import time
 from pathlib import Path
 
 from .base import AgentResult, BaseAgent
+from .utils import extract_python_code
 
 logger = logging.getLogger(__name__)
 
@@ -176,7 +177,7 @@ class ClaudeCodeAgent(BaseAgent):
         work_dir: Path,
         skill_ids: list[str],
     ) -> None:
-        """Create MCP config for ontomcp.  No skills in .claude/skills/."""
+        """Create MCP config for ontomcp + copy ontomcp-driver skill."""
         ontology_root = self._ontology_root or self._prepare_ontology_root()
         if not ontology_root:
             logger.warning("OntoSkills: no ontology root available, MCP disabled")
@@ -195,6 +196,14 @@ class ClaudeCodeAgent(BaseAgent):
         config_path = work_dir / ".mcp_config.json"
         config_path.write_text(json.dumps(mcp_config, indent=2), encoding="utf-8")
         self._mcp_config_path = str(config_path)
+
+        # Copy ontomcp-driver skill to teach Claude Code how to use MCP tools.
+        driver_src = Path("site/public/agent-skills/ontomcp-driver/SKILL.md")
+        if driver_src.exists():
+            driver_dest = work_dir / ".claude" / "skills" / "ontomcp-driver"
+            driver_dest.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(driver_src, driver_dest / "SKILL.md")
+            logger.debug("Copied ontomcp-driver skill to %s", driver_dest)
 
         logger.debug(
             "OntoSkills mode: MCP config at %s (ontology_root=%s)",
@@ -405,7 +414,7 @@ class ClaudeCodeAgent(BaseAgent):
             # Fallback: extract code from response if no file written.
             if not (work_dir / "solution.py").exists():
                 answer = cli_result.get("result", "")
-                code = _extract_python_code(answer)
+                code = extract_python_code(answer)
                 if code:
                     (work_dir / "solution.py").write_text(code, encoding="utf-8")
                     logger.info("Extracted solution.py from response text (%d chars)", len(code))
@@ -436,12 +445,3 @@ class ClaudeCodeAgent(BaseAgent):
 
     def run_turn(self, messages: list[dict]) -> tuple[dict, dict]:
         raise NotImplementedError("Use run_with_cli() for ClaudeCodeAgent")
-
-
-def _extract_python_code(response: str) -> str:
-    """Extract Python code block from response text."""
-    import re
-    blocks = re.findall(r"```(?:python)?\s*\n(.*?)```", response, re.DOTALL)
-    if blocks:
-        return max(blocks, key=len).strip()
-    return ""

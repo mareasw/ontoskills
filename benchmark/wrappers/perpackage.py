@@ -367,7 +367,6 @@ class PerPackageWrapper:
                 total_latency_ms=total_latency_ms,
                 tool_calls=total_tool_calls,
                 turns=turns,
-                context_overflow=False,
             )
         except Exception as exc:
             logger.warning("Agent error on task %s: %s", task["task_id"], exc)
@@ -378,7 +377,6 @@ class PerPackageWrapper:
                 total_latency_ms=0.0,
                 tool_calls=0,
                 turns=0,
-                context_overflow=False,
             )
         finally:
             agent.get_tools = original_get_tools
@@ -471,23 +469,48 @@ class PerPackageWrapper:
         Each skill_id like "test-driven-development" maps to
         ``<skills_dir>/obra/superpowers/<skill_id>/SKILL.md``.
         """
-        from benchmark.agents.traditional import TraditionalAgent
+        from benchmark.agents.traditional import TraditionalAgent, _parse_frontmatter
 
-        # Build a temporary skills dict with only the relevant files.
-        scoped_skills: dict[str, str] = {}
+        # Build a skills dict with only the relevant files.
+        skills_content: dict[str, str] = {}
         for sid in skill_ids:
             skill_file = self.skills_dir / "obra" / "superpowers" / sid / "SKILL.md"
             if skill_file.exists():
-                scoped_skills[f"obra/superpowers/{sid}"] = skill_file.read_text(encoding="utf-8")
+                skills_content[f"obra/superpowers/{sid}"] = skill_file.read_text(encoding="utf-8")
 
-        # Create agent and override its skills.
-        import os
         api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
         agent = TraditionalAgent.__new__(TraditionalAgent)
         BaseAgent.__init__(agent, model=model, api_key=api_key)
-        agent.skills = scoped_skills
-        agent._context_overflow = False
+
+        # Build skill registry + lookup from content (mirrors skillsbench.py).
+        entries: list[str] = []
+        skills_by_name: dict[str, str] = {}
+        for sid, content in skills_content.items():
+            fm = _parse_frontmatter(content)
+            name = fm.get("name", sid)
+            desc = fm.get("description", "")
+            entries.append(f"- {name}: {desc}" if desc else f"- {name}")
+            skills_by_name[name] = content
+            skills_by_name[sid] = content
+
+        agent.skills_dir = ""
+        agent._skill_registry = "\n".join(entries)
+        agent._skills_by_name = skills_by_name
         agent._system_prompt = agent._build_system_prompt()
+        if hasattr(agent, "_tools_override"):
+            del agent._tools_override
+
+        def _resolve_from_content(query: str) -> str | None:
+            q = query.strip()
+            val = skills_by_name.get(q)
+            if val:
+                return val
+            for name, content in skills_by_name.items():
+                if name.startswith(q) or q in name:
+                    return content
+            return None
+
+        agent._resolve_skill = _resolve_from_content
         return agent
 
     # ------------------------------------------------------------------
