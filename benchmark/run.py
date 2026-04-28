@@ -370,6 +370,7 @@ def _run_skillsbench(
     seed: int = 42,
     skillsbench_repo: str = "/tmp/skillsbench_full",
     workers: int = 3,
+    skip_first: int = 0,
 ) -> tuple[list[dict], float | None]:
     """Run the SkillsBench benchmark with deterministic Docker-based evaluation.
 
@@ -380,11 +381,11 @@ def _run_skillsbench(
     wrapper = SkillsBenchWrapper(repo_path=skillsbench_repo)
     results = wrapper.run_benchmark(
         agent, max_tasks=max_tasks, shuffle=shuffle, seed=seed,
-        workers=workers,
+        workers=workers, skip_first=skip_first,
     )
 
     # Score from Docker reward.txt (deterministic).
-    tasks = wrapper.load_tasks(max_tasks=max_tasks, shuffle=shuffle, seed=seed)
+    tasks = wrapper.load_tasks(max_tasks=max_tasks, shuffle=shuffle, seed=seed, skip_first=skip_first)
     score = SkillsBenchWrapper.score(results, tasks)
     logger.info(
         "SkillsBench (%s): %d/%d passed (%.1f%%)",
@@ -425,6 +426,7 @@ def _run_skillsbench_claudecode(
     seed: int = 42,
     skillsbench_repo: str = "/tmp/skillsbench_full",
     workers: int = 3,
+    skip_first: int = 0,
 ) -> tuple[list[dict], float | None]:
     """Run SkillsBench using the Claude Code CLI for realistic evaluation.
 
@@ -435,11 +437,11 @@ def _run_skillsbench_claudecode(
     wrapper = SkillsBenchWrapper(repo_path=skillsbench_repo)
     results = wrapper.run_benchmark_claudecode(
         agent, max_tasks=max_tasks, shuffle=shuffle, seed=seed,
-        workers=workers,
+        workers=workers, skip_first=skip_first,
     )
 
     # Score from Docker reward.txt (deterministic).
-    tasks = wrapper.load_tasks(max_tasks=max_tasks, shuffle=shuffle, seed=seed)
+    tasks = wrapper.load_tasks(max_tasks=max_tasks, shuffle=shuffle, seed=seed, skip_first=skip_first)
     score = SkillsBenchWrapper.score(results, tasks)
     logger.info(
         "SkillsBench ClaudeCode (%s): %d/%d passed (%.1f%%)",
@@ -599,6 +601,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Random seed for task shuffling (default: 42)",
     )
     parser.add_argument(
+        "--skip-first",
+        type=int,
+        default=0,
+        help="Skip the first N tasks (combine with previous results)",
+    )
+    parser.add_argument(
         "--gaia-level",
         default=None,
         help="GAIA level (default: first level from config)",
@@ -744,7 +752,7 @@ def main() -> None:
                     skills_dir=args.skills_dir, model=args.model,
                     shuffle=args.shuffle, seed=args.seed,
                     skillsbench_repo=args.skillsbench_repo,
-                    workers=args.workers,
+                    workers=args.workers, skip_first=args.skip_first,
                 )
                 elapsed = time.perf_counter() - t0
                 logger.info("Claude Code (%s) completed %s in %.1fs", cc_tag, bench_name, elapsed)
@@ -767,7 +775,7 @@ def main() -> None:
                         skills_dir=args.skills_dir, model=args.model,
                         shuffle=args.shuffle, seed=args.seed,
                         skillsbench_repo=args.skillsbench_repo,
-                        workers=args.workers,
+                        workers=args.workers, skip_first=args.skip_first,
                     )
                     elapsed = time.perf_counter() - t0
                     logger.info("Traditional agent completed %s in %.1fs", bench_name, elapsed)
@@ -787,7 +795,7 @@ def main() -> None:
                         model=args.model,
                         shuffle=args.shuffle, seed=args.seed,
                         skillsbench_repo=args.skillsbench_repo,
-                        workers=args.workers,
+                        workers=args.workers, skip_first=args.skip_first,
                     )
                     elapsed = time.perf_counter() - t0
                     logger.info("OntoSkills agent completed %s in %.1fs", bench_name, elapsed)

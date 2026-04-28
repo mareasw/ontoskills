@@ -167,6 +167,7 @@ class SkillsBenchWrapper:
         shuffle: bool = True,
         seed: int = 42,
         packages_root: str | None = None,
+        skip_first: int = 0,
     ) -> list[dict]:
         """Load SkillsBench tasks from the local repo clone.
 
@@ -176,6 +177,9 @@ class SkillsBenchWrapper:
             Path to compiled TTL packages (e.g. ``~/.ontoskills/packages``).
             When provided, tasks whose skills are not fully compiled are
             skipped (logged as warnings).
+        skip_first:
+            Skip the first N tasks after shuffling. Use to continue from
+            a previous run (e.g. ``skip_first=10`` to run tasks 11+).
         """
         if not self.tasks_dir.is_dir():
             raise FileNotFoundError(
@@ -221,6 +225,10 @@ class SkillsBenchWrapper:
 
         if shuffle:
             random.Random(seed).shuffle(tasks)
+        if skip_first > 0:
+            tasks = tasks[skip_first:]
+            if max_tasks is not None:
+                max_tasks = max_tasks - skip_first
         if max_tasks is not None:
             tasks = tasks[:max_tasks]
 
@@ -805,12 +813,13 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
         workers: int = 3,
         timeout: int = 900,
         max_budget: float = 2.00,
+        skip_first: int = 0,
     ) -> list[dict]:
         """Run SkillsBench tasks via Claude Code CLI, then verify with Docker."""
         packages_root = os.path.expanduser("~/.ontoskills/packages")
         tasks = self.load_tasks(
             max_tasks=max_tasks, shuffle=shuffle, seed=seed,
-            packages_root=packages_root,
+            packages_root=packages_root, skip_first=skip_first,
         )
 
         results: list[dict] = []
@@ -919,12 +928,13 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
         shuffle: bool = True,
         seed: int = 42,
         workers: int = 3,
+        skip_first: int = 0,
     ) -> list[dict]:
         """Run SkillsBench tasks: generate solutions, then verify with Docker."""
         packages_root = os.path.expanduser("~/.ontoskills/packages")
         tasks = self.load_tasks(
             max_tasks=max_tasks, shuffle=shuffle, seed=seed,
-            packages_root=packages_root,
+            packages_root=packages_root, skip_first=skip_first,
         )
 
         from benchmark.agents.traditional import TraditionalAgent
