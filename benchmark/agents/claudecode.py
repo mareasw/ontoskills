@@ -70,6 +70,7 @@ class ClaudeCodeAgent(BaseAgent):
         self._work_dir: Path | None = None
         self._mcp_config_path: str | None = None
         self._ontology_root: str | None = None
+        self._test_content: str = ""
 
     @staticmethod
     def _find_claude_bin() -> str:
@@ -129,6 +130,11 @@ class ClaudeCodeAgent(BaseAgent):
         tests_src = task_dir / "tests"
         if tests_src.is_dir():
             shutil.copytree(tests_src, work_dir / "tests")
+
+        # --- Read test file for prompt injection ---
+        self._test_content = task.get("test_content", "")
+        if len(self._test_content) > 3000:
+            self._test_content = self._test_content[:3000] + "\n# ... (truncated)"
 
         # --- Write instruction ---
         instruction = task.get("instruction", "")
@@ -239,8 +245,8 @@ class ClaudeCodeAgent(BaseAgent):
             )
         else:
             skill_section = (
-                "- MCP tools — use `search` and `get_skill_context` to load "
-                "structured skill knowledge from the ontology.\n"
+                "- MCP tools — use `prefetch_knowledge` as your FIRST call to load "
+                "structured skill knowledge in one shot.\n"
             )
 
         # Parse WORKDIR and COPY lines from Dockerfile.reference.
@@ -335,17 +341,25 @@ class ClaudeCodeAgent(BaseAgent):
         else:
             skill_hint = (
                 f"Relevant skills: {', '.join(skill_ids)}. "
-                f"Use MCP tools (search, get_skill_context) to load skill knowledge."
+                f"Call prefetch_knowledge with query describing the task to load skill knowledge."
             ) if skill_ids else ""
 
+        test_section = ""
+        if self._test_content:
+            test_section = (
+                "\n\n### Test Specification (your solution must pass these tests):\n"
+                "```python\n" + self._test_content + "\n```\n"
+                "Your solution.py must produce output that passes ALL tests above.\n"
+            )
+
         prompt = (
-            "Read TASK_INSTRUCTION.md and tests/test_outputs.py to understand the task.\n"
-            "Then write a solution.py script that produces all required output files.\n"
+            "Read TASK_INSTRUCTION.md to understand the task.\n"
+            "Write a solution.py script that produces all required output files.\n"
             "The script runs inside a Docker container with: python3 solution.py\n"
             "IMPORTANT: Use CONTAINER paths in your code (e.g., /root/data.csv), "
             "NOT host paths (e.g., /tmp/sb_cc_...). Read Dockerfile.reference for the container file layout.\n"
-            "Output paths must match what tests/test_outputs.py expects.\n"
-            f"{skill_hint}\n\n"
+            f"{skill_hint}\n"
+            f"{test_section}\n"
             f"TASK: {instruction}"
         )
 
