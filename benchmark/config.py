@@ -99,6 +99,9 @@ BENCHMARK_CONFIG = {
         "repo": "benchflow-ai/skillsbench",
         "branch": "main",
     },
+    "tau2bench": {
+        "environments": ["airline", "retail", "telecom"],
+    },
 }
 
 ONTOMCP_BIN_PATH = os.path.expanduser("~/.ontoskills/bin/ontomcp")

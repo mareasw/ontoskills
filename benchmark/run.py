@@ -2,7 +2,7 @@
 """Main orchestrator: run benchmarks and generate comparison report.
 
 Usage:
-    python run.py --benchmark {gaia,swebench,tau2bench,all} --mode {traditional,ontoskills,both}
+    python run.py --benchmark {gaia,swebench,perpackage,skillsbench,all} --mode {traditional,ontoskills,both}
                   --skills-dir <path> --ttl-dir <path> --ontomcp-bin <path>
                   --model <model_id> --max-tasks <N> --output-dir <path>
 
@@ -42,6 +42,7 @@ from benchmark.config import (
     ONTOMCP_BIN_PATH,
     TTL_ROOT,
 )
+from benchmark.reporting.chart_data import generate_chart_data, save_chart_data
 
 logger = logging.getLogger(__name__)
 
@@ -405,6 +406,10 @@ def _run_skillsbench(
         encoding="utf-8",
     )
 
+    # Save chart data.
+    chart = generate_chart_data("skillsbench", mode, results, score, model=getattr(agent, "model", ""))
+    save_chart_data(chart, str(output_dir / "skillsbench" / mode / "chart_data.json"))
+
     return results, score["pass_rate"]
 
 
@@ -455,6 +460,10 @@ def _run_skillsbench_claudecode(
         json.dumps(score, indent=2, default=str, ensure_ascii=False),
         encoding="utf-8",
     )
+
+    # Save chart data.
+    chart = generate_chart_data("skillsbench", mode, results, score, model=getattr(agent, "model", ""))
+    save_chart_data(chart, str(output_dir / "skillsbench" / mode / "chart_data.json"))
 
     return results, score["pass_rate"]
 
@@ -634,7 +643,7 @@ def main() -> None:
 
     # Determine which benchmarks to run.
     if args.benchmark == "all":
-        benchmarks = list(_BENCHMARK_RUNNERS.keys())
+        benchmarks = ["gaia", "swebench", "perpackage", "skillsbench"]
     else:
         benchmarks = [args.benchmark]
 

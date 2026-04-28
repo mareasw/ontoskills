@@ -188,8 +188,8 @@ class TestAgentDispatch:
             MockClient.return_value.messages.create.return_value = mock_response
             MockClient.return_value.count_tokens.return_value = 50
 
-            # Patch _load_skill_files to return an empty dict (no skills dir needed)
-            with patch("benchmark.agents.traditional._load_skill_files", return_value={}):
+            # Patch _load_skill_registry to return empty registry (no skills dir needed)
+            with patch("benchmark.agents.traditional._load_skill_registry", return_value=("", {})):
                 from benchmark.agents.traditional import TraditionalAgent
                 agent = TraditionalAgent(model="claude-sonnet-4-6", skills_dir="/tmp/nonexistent", api_key="test-key")
                 result = agent.run("What is 6*7?")
@@ -201,8 +201,7 @@ class TestAgentDispatch:
         assert result.output_tokens == 50
 
     def test_traditional_agent_ignores_tool_use(self):
-        """TraditionalAgent.run() returns text content even if model emits tool_use."""
-        # Build a response with both text and tool_use blocks
+        """TraditionalAgent.run() raises when model emits tool_use without tool_result."""
         text_block = MagicMock()
         text_block.type = "text"
         text_block.text = "Here is my answer."
@@ -222,37 +221,11 @@ class TestAgentDispatch:
             MockClient.return_value.messages.create.return_value = mock_response
             MockClient.return_value.count_tokens.return_value = 50
 
-            with patch("benchmark.agents.traditional._load_skill_files", return_value={}):
+            with patch("benchmark.agents.traditional._load_skill_registry", return_value=("", {})):
                 from benchmark.agents.traditional import TraditionalAgent
                 agent = TraditionalAgent(model="claude-sonnet-4-6", skills_dir="/tmp/nonexistent", api_key="test-key")
-                result = agent.run("Do something")
-
-        # Should return the text content, not crash
-        assert "Here is my answer." in result.answer
-        assert result.tool_calls == 0
-        assert result.turns == 1
-
-    def test_traditional_agent_context_overflow(self):
-        """Very large system prompt triggers context_overflow flag and truncation."""
-        # Build a huge skills dict to create a large system prompt
-        huge_content = "x" * 1_000_000  # ~250k tokens by heuristic
-        huge_skills = {"vendor/pkg/skill": huge_content}
-
-        mock_response = _make_anthropic_text_response("truncated answer")
-
-        with patch("benchmark.agents.base.anthropic.Anthropic") as MockClient:
-            MockClient.return_value.messages.create.return_value = mock_response
-            # Mock count_tokens to return a large number that exceeds context limit
-            MockClient.return_value.count_tokens.return_value = 300_000
-
-            with patch("benchmark.agents.traditional._load_skill_files", return_value=huge_skills):
-                from benchmark.agents.traditional import TraditionalAgent
-                agent = TraditionalAgent(model="claude-sonnet-4-6", skills_dir="/tmp/nonexistent", api_key="test-key")
-                result = agent.run("What?")
-
-        assert result.context_overflow is True
-        # System prompt should be truncated (shorter than the original huge prompt)
-        assert len(agent._system_prompt) < len(huge_content)
+                with pytest.raises(RuntimeError, match="Missing tool_result"):
+                    agent.run("Do something")
 
     def test_ontoskills_agent_tool_dispatch(self):
         """OntoSkillsAgent dispatches tool_use to MCP client and sends back tool_result."""
@@ -386,7 +359,7 @@ class TestMetrics:
 
     @staticmethod
     def _make_result(input_tokens, output_tokens, latency_ms=100.0,
-                     tool_calls=0, turns=1, context_overflow=False):
+                     tool_calls=0, turns=1):
         """Create a mock AgentResult-like object for metrics tests."""
         m = MagicMock()
         m.input_tokens = input_tokens
@@ -394,7 +367,6 @@ class TestMetrics:
         m.total_latency_ms = latency_ms
         m.tool_calls = tool_calls
         m.turns = turns
-        m.context_overflow = context_overflow
         return {"task_id": "t1", "model_answer": "a", "metrics": m}
 
     def test_compute_agent_metrics_basic(self):
@@ -404,7 +376,7 @@ class TestMetrics:
         results = [
             self._make_result(100, 50, latency_ms=200.0, tool_calls=1, turns=1),
             self._make_result(200, 100, latency_ms=400.0, tool_calls=2, turns=2),
-            self._make_result(300, 150, latency_ms=600.0, tool_calls=3, turns=3, context_overflow=True),
+            self._make_result(300, 150, latency_ms=600.0, tool_calls=3, turns=3),
         ]
 
         metrics = compute_agent_metrics("traditional", "gaia", results, accuracy=0.66)
@@ -417,8 +389,6 @@ class TestMetrics:
         assert metrics.avg_latency_ms == 400.0  # (200+400+600)/3
         assert metrics.avg_tool_calls == 2.0  # (1+2+3)/3
         assert metrics.avg_turns == 2.0  # (1+2+3)/3
-        assert metrics.context_overflow_count == 1
-        assert abs(metrics.context_overflow_pct - 100 / 3) < 0.01  # ~33.3%
 
     def test_compute_agent_metrics_empty(self):
         """Empty results list returns zeroed metrics."""
@@ -433,8 +403,6 @@ class TestMetrics:
         assert metrics.avg_latency_ms == 0.0
         assert metrics.avg_tool_calls == 0.0
         assert metrics.avg_turns == 0.0
-        assert metrics.context_overflow_count == 0
-        assert metrics.context_overflow_pct == 0.0
 
     def test_compute_comparison(self):
         """Traditional has 100 tokens, OntoSkills has 40; token_reduction_pct is ~60%."""
