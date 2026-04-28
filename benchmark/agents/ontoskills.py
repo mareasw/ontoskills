@@ -283,6 +283,8 @@ class OntoSkillsAgent(BaseAgent):
                     parts.append(f"[{severity}]")
                 lines.append("  ".join(parts) + ":")
                 lines.append(f"  {content_text}")
+                if severity in ("CRITICAL", "HIGH") and rationale:
+                    lines.append(f"  Why: {rationale}")
 
         return "\n".join(lines)
 
@@ -308,21 +310,7 @@ class OntoSkillsAgent(BaseAgent):
         self, tool_name: str, tool_input: dict, raw: dict,
     ) -> str:
         """Compact an MCP tool result into token-efficient text."""
-        data = self._parse_mcp_result(raw)
-        if data is None:
-            return json.dumps(raw, ensure_ascii=False)
-
-        if tool_name == "search":
-            return self._compact_search(data)
-        if tool_name == "get_skill_context":
-            skill_id = tool_input.get("skill_id", "")
-            compact = self._compact_context(skill_id, raw)
-            return compact if compact else json.dumps(raw, ensure_ascii=False)
-        if tool_name == "query_epistemic_rules":
-            return self._compact_epistemic_rules(data)
-        if tool_name == "evaluate_execution_plan":
-            return self._compact_plan(data)
-        return json.dumps(raw, ensure_ascii=False)
+        return self._compact_tool_result_static(tool_name, tool_input, raw)
 
     @staticmethod
     def _compact_tool_result_static(
@@ -718,5 +706,4 @@ class OntoSkillsAgent(BaseAgent):
                 total_latency_ms=total_latency_ms,
                 tool_calls=total_tool_calls,
                 turns=turns,
-                context_overflow=False,
             )
