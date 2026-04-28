@@ -1,0 +1,284 @@
+---
+import LandingLayout from '../layouts/LandingLayout.astro';
+import Header from '../components/landing/Header.astro';
+import Footer from '../components/landing/Footer.astro';
+import BenchmarkReact from '../components/benchmark/BenchmarkApp.tsx';
+---
+
+<LandingLayout title="Benchmark Results — OntoSkills" description="OntoSkills MCP vs traditional skills — deterministic evaluation results">
+  <Header />
+
+  <main class="benchmark-page">
+    <!-- Hero -->
+    <section class="hero-section">
+      <div class="section-shell">
+        <div class="hero-content">
+          <span class="section-kicker">SkillsBench</span>
+          <h1>Benchmark Results</h1>
+          <p class="hero-subtitle">Does structured knowledge delivered via MCP tools help agents complete tasks better than raw markdown files? We ran a controlled experiment to find out.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- The Question -->
+    <section class="content-section">
+      <div class="section-shell">
+        <h2>The Question</h2>
+        <p>AI coding agents like Claude Code rely on skill documentation to solve specialized tasks — generating DOCX files, processing PDFs, analyzing financial data. Today, these skills are delivered as plain markdown files (<code>SKILL.md</code>). The agent reads the raw text and must extract instructions, heuristics, and anti-patterns on its own.</p>
+        <p><strong>OntoSkills</strong> takes a different approach: skill knowledge is compiled into structured OWL 2 ontologies and delivered via MCP tools. The agent queries <code>search</code>, <code>get_skill_context</code>, <code>evaluate_execution_plan</code>, and <code>query_epistemic_rules</code> — receiving typed knowledge nodes with severity ratings and execution plan evaluations.</p>
+        <p>Which approach produces better results?</p>
+      </div>
+    </section>
+
+    <!-- Methodology -->
+    <section class="content-section section-alt">
+      <div class="section-shell">
+        <h2>Methodology</h2>
+
+        <div class="method-grid">
+          <div class="method-card glass-panel">
+            <h3>Evaluation</h3>
+            <p>We use <a href="https://github.com/benchflow-ai/skillsbench" target="_blank">SkillsBench</a>, which measures an agent's ability to generate working code for real-world tasks.</p>
+            <ol>
+              <li>Agent receives task description + skill docs</li>
+              <li>Generates a Python solution script</li>
+              <li>Script runs inside the task's <strong>Docker container</strong></li>
+              <li><strong>pytest</strong> verifies output — deterministic, no human judgment</li>
+            </ol>
+          </div>
+
+          <div class="method-card glass-panel">
+            <h3>Setup</h3>
+            <table class="setup-table">
+              <tr><td>Agent</td><td>Claude Code CLI (<code>--print --bare</code>)</td></tr>
+              <tr><td>Model</td><td>glm-5.1 (via API proxy)</td></tr>
+              <tr><td>Tasks</td><td>10 (seed=7), pool of 70+</td></tr>
+              <tr><td>Scoring</td><td>Docker + pytest CTRF</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <div class="mode-grid">
+          <div class="mode-card">
+            <span class="mode-label" style="color: var(--accent-purple);">Traditional</span>
+            <p>SKILL.md files in <code>.claude/skills/</code>. Agent uses Claude Code's native file reading — same as production.</p>
+          </div>
+          <div class="mode-vs">vs</div>
+          <div class="mode-card">
+            <span class="mode-label" style="color: var(--accent-cyan);">OntoSkills MCP</span>
+            <p>Skills compiled to OWL 2, served via MCP tools (<code>search</code>, <code>get_skill_context</code>). Agent discovers skills through structured queries.</p>
+          </div>
+        </div>
+        <p class="note">Same agent, same model, same prompts. The only difference is <strong>how skill knowledge is delivered</strong>.</p>
+      </div>
+    </section>
+
+    <!-- Results -->
+    <section class="content-section">
+      <div class="section-shell">
+        <h2>Results</h2>
+        <BenchmarkReact client:only="react" />
+      </div>
+    </section>
+
+    <!-- Why -->
+    <section class="content-section section-alt">
+      <div class="section-shell">
+        <h2>Why Structured Knowledge Wins</h2>
+        <p>Traditional SKILL.md files mix instructions, examples, caveats, and anti-patterns in unstructured text. The agent must parse everything at once with no indication of what's critical.</p>
+        <p>OntoSkills delivers knowledge as <strong>typed nodes with severity ratings</strong>:</p>
+        <ul>
+          <li><code>CRITICAL</code> rules highlighted first</li>
+          <li>Anti-patterns with explicit <code>rationale</code> explaining <em>why</em></li>
+          <li>Execution plan evaluation catches mistakes before coding</li>
+          <li>Curated, prioritized view instead of a wall of text</li>
+        </ul>
+        <p>Especially valuable for complex domains like PDF processing (paper-anonymizer) where correct vs. incorrect output depends on subtle configuration details.</p>
+      </div>
+    </section>
+
+    <!-- Limitations -->
+    <section class="content-section">
+      <div class="section-shell">
+        <h2>Limitations</h2>
+        <ul>
+          <li><strong>Sample size</strong>: 10 tasks from 70+ pool. Results should be confirmed with larger runs.</li>
+          <li><strong>Single model</strong>: All results use glm-5.1 via API proxy. Other models may differ.</li>
+          <li><strong>Single benchmark</strong>: SkillsBench tests code generation. Other benchmarks planned.</li>
+          <li><strong>Seed-dependent</strong>: Task selection varies by seed. We report seed=7 for reproducibility.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+      <div class="section-shell">
+        <div class="cta-box">
+          <p style="margin-bottom: 12px;">All benchmark code is open source. Run it yourself:</p>
+          <div class="command-shell">
+            <code>python benchmark/run.py --benchmark skillsbench --mode claudecode --max-tasks 25 --model glm-5.1 --seed 7</code>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+</LandingLayout>
+
+<style>
+  .benchmark-page { padding-top: 80px; }
+
+  .section-shell {
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .section-shell { padding: 0 1.5rem; }
+  }
+  @media (min-width: 1024px) {
+    .section-shell { padding: 0 2rem; }
+  }
+
+  /* Hero */
+  .hero-section {
+    padding: 5rem 0 3rem;
+    text-align: center;
+  }
+  .hero-content h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    background: var(--gradient-brand);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 12px 0 16px;
+  }
+  .hero-subtitle {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    max-width: 640px;
+    margin: 0 auto;
+    line-height: 1.7;
+  }
+
+  /* Sections */
+  .content-section { padding: 3rem 0; }
+  .section-alt { background: var(--bg-secondary); }
+  .content-section h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: var(--text-primary);
+  }
+  .content-section h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0 0 12px;
+    color: var(--text-primary);
+  }
+  .content-section p {
+    line-height: 1.7;
+    margin-bottom: 12px;
+    color: var(--text-secondary);
+  }
+  .content-section ol, .content-section ul {
+    margin: 12px 0 12px 24px;
+    color: var(--text-secondary);
+  }
+  .content-section li { margin-bottom: 8px; line-height: 1.6; }
+  .content-section code {
+    font-family: 'JetBrains Mono Variable', monospace;
+    font-size: 0.85em;
+    background: rgba(255,255,255,0.06);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  /* Method grid */
+  .method-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 16px 0 24px;
+  }
+  @media (max-width: 768px) {
+    .method-grid { grid-template-columns: 1fr; }
+  }
+  .method-card { padding: 20px; }
+  .method-card ol { padding-left: 20px; }
+  .method-card p { font-size: 0.9rem; margin-bottom: 8px; }
+
+  .setup-table { width: 100%; border-collapse: collapse; }
+  .setup-table td {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+  .setup-table td:first-child {
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--text-muted);
+    padding-right: 16px;
+  }
+
+  /* Mode comparison */
+  .mode-grid {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 24px 0 12px;
+  }
+  .mode-card {
+    flex: 1;
+    padding: 20px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+  }
+  .mode-card p {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    margin: 8px 0 0;
+    line-height: 1.6;
+  }
+  .mode-label {
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+  .mode-vs {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  @media (max-width: 768px) {
+    .mode-grid { flex-direction: column; }
+    .mode-vs { display: none; }
+  }
+
+  .note {
+    font-size: 0.85rem !important;
+    color: var(--text-muted) !important;
+    text-align: center;
+    margin-top: 16px !important;
+  }
+
+  /* CTA */
+  .cta-section { padding: 3rem 0 4rem; }
+  .cta-box {
+    text-align: center;
+    color: var(--text-secondary);
+  }
+  .command-shell {
+    display: inline-block;
+    padding: 12px 24px;
+    border-radius: 8px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    font-family: 'JetBrains Mono Variable', monospace;
+    font-size: 0.82rem;
+    color: var(--accent-cyan);
+  }
+</style>

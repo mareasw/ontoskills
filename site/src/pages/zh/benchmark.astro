@@ -1,0 +1,195 @@
+---
+import LandingLayout from '../../layouts/LandingLayout.astro';
+import Header from '../../components/landing/Header.astro';
+import Footer from '../../components/landing/Footer.astro';
+import BenchmarkReact from '../../components/benchmark/BenchmarkApp.tsx';
+---
+
+<LandingLayout title="基准测试结果 — OntoSkills" description="OntoSkills MCP 与传统技能的对比 — 确定性评估结果" lang="zh">
+  <Header lang="zh" />
+
+  <main class="benchmark-page">
+    <!-- Hero -->
+    <section class="hero-section">
+      <div class="section-shell">
+        <div class="hero-content">
+          <span class="section-kicker">SkillsBench</span>
+          <h1>基准测试结果</h1>
+          <p class="hero-subtitle">通过 MCP 工具传递的结构化知识是否真的能帮助 AI 代理比原始 Markdown 文件更好地完成任务？我们进行了一项对照实验来验证。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- The Question -->
+    <section class="content-section">
+      <div class="section-shell">
+        <h2>核心问题</h2>
+        <p>像 Claude Code 这样的 AI 编程代理依赖技能文档来完成专业任务——生成 DOCX 文件、处理 PDF、分析金融数据。如今，这些技能以纯 Markdown 文件（<code>SKILL.md</code>）的形式提供。代理必须阅读原始文本并自行提取指令、启发式规则和反模式。</p>
+        <p><strong>OntoSkills</strong> 采用了不同的方法：技能知识被编译成结构化的 OWL 2 本体，通过 MCP 工具传递。代理使用 <code>search</code>、<code>get_skill_context</code>、<code>evaluate_execution_plan</code> 和 <code>query_epistemic_rules</code> 四个工具——接收带有严重性评级和执行计划评估的类型化知识节点。</p>
+        <p>哪种方法效果更好？</p>
+      </div>
+    </section>
+
+    <!-- Methodology -->
+    <section class="content-section section-alt">
+      <div class="section-shell">
+        <h2>评估方法</h2>
+
+        <div class="method-grid">
+          <div class="method-card glass-panel">
+            <h3>评估方式</h3>
+            <p>我们使用 <a href="https://github.com/benchflow-ai/skillsbench" target="_blank">SkillsBench</a> 进行评估，该基准测试衡量代理为真实任务生成可用代码的能力。</p>
+            <ol>
+              <li>代理接收任务描述和相关的技能文档</li>
+              <li>生成一个 Python 解决方案脚本</li>
+              <li>脚本在任务的 <strong>Docker 容器</strong>中运行</li>
+              <li><strong>pytest</strong> 验证输出——完全确定性，无需人工判断</li>
+            </ol>
+          </div>
+
+          <div class="method-card glass-panel">
+            <h3>实验设置</h3>
+            <table class="setup-table">
+              <tr><td>代理</td><td>Claude Code CLI（<code>--print --bare</code> 模式）</td></tr>
+              <tr><td>模型</td><td>glm-5.1（通过 API 代理）</td></tr>
+              <tr><td>任务数</td><td>10（seed=7），来自 70+ 个可用任务池</td></tr>
+              <tr><td>评分</td><td>Docker + pytest CTRF 报告</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <div class="mode-grid">
+          <div class="mode-card">
+            <span class="mode-label" style="color: var(--accent-purple);">传统模式</span>
+            <p>技能文档以 SKILL.md 文件形式放置在 <code>.claude/skills/</code> 中。代理使用原生文件读取功能——与生产环境完全一致。</p>
+          </div>
+          <div class="mode-vs">vs</div>
+          <div class="mode-card">
+            <span class="mode-label" style="color: var(--accent-cyan);">OntoSkills MCP</span>
+            <p>技能编译为 OWL 2 本体，通过 MCP 工具（<code>search</code>、<code>get_skill_context</code>）发现技能。结构化查询替代文本阅读。</p>
+          </div>
+        </div>
+        <p class="note">相同的代理、相同的模型、相同的提示。唯一的区别是<strong>技能知识的传递方式</strong>。</p>
+      </div>
+    </section>
+
+    <!-- Results -->
+    <section class="content-section">
+      <div class="section-shell">
+        <h2>结果</h2>
+        <BenchmarkReact client:only="react" />
+      </div>
+    </section>
+
+    <!-- Why -->
+    <section class="content-section section-alt">
+      <div class="section-shell">
+        <h2>为什么结构化知识胜出</h2>
+        <p>传统 SKILL.md 文件将指令、示例、注意事项和反模式混合在非结构化文本中。代理必须一次性解析所有内容，无法区分关键信息和可选信息。</p>
+        <p>OntoSkills 以<strong>带有严重性评级的类型化节点</strong>传递知识：</p>
+        <ul>
+          <li><code>CRITICAL</code>（关键）规则优先突出显示</li>
+          <li>反模式附带明确的 <code>rationale</code>（原因），解释<em>为什么</em>要避免</li>
+          <li>执行计划评估在编码前捕获常见错误</li>
+          <li>经过筛选、优先排序的知识视图，而非文本墙</li>
+        </ul>
+        <p>这对于 PDF 处理（paper-anonymizer）等复杂领域尤其有价值，正确与错误输出之间的差异取决于细微的配置细节。</p>
+      </div>
+    </section>
+
+    <!-- Limitations -->
+    <section class="content-section">
+      <div class="section-shell">
+        <h2>局限性</h2>
+        <ul>
+          <li><strong>样本量</strong>：10 个任务来自 70+ 个任务池。结果应通过更大规模的运行来确认。</li>
+          <li><strong>单一模型</strong>：所有结果使用 glm-5.1 通过 API 代理。其他模型的表现可能不同。</li>
+          <li><strong>单一基准</strong>：SkillsBench 测试代码生成。其他基准已计划中。</li>
+          <li><strong>种子依赖</strong>：任务选择因种子而异。我们报告 seed=7 以确保可重复性。</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+      <div class="section-shell">
+        <div class="cta-box">
+          <p style="margin-bottom: 12px;">所有基准测试代码均为开源。您可以自行运行：</p>
+          <div class="command-shell">
+            <code>python benchmark/run.py --benchmark skillsbench --mode claudecode --max-tasks 25 --model glm-5.1 --seed 7</code>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer lang="zh" />
+</LandingLayout>
+
+<style>
+  .benchmark-page { padding-top: 80px; }
+
+  .section-shell {
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .section-shell { padding: 0 1.5rem; }
+  }
+  @media (min-width: 1024px) {
+    .section-shell { padding: 0 2rem; }
+  }
+
+  .hero-section { padding: 5rem 0 3rem; text-align: center; }
+  .hero-content h1 {
+    font-size: 2.5rem; font-weight: 800;
+    background: var(--gradient-brand);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    margin: 12px 0 16px;
+  }
+  .hero-subtitle {
+    font-size: 1.1rem; color: var(--text-secondary);
+    max-width: 640px; margin: 0 auto; line-height: 1.7;
+  }
+
+  .content-section { padding: 3rem 0; }
+  .section-alt { background: var(--bg-secondary); }
+  .content-section h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 20px; color: var(--text-primary); }
+  .content-section h3 { font-size: 1.1rem; font-weight: 600; margin: 0 0 12px; color: var(--text-primary); }
+  .content-section p { line-height: 1.7; margin-bottom: 12px; color: var(--text-secondary); }
+  .content-section ol, .content-section ul { margin: 12px 0 12px 24px; color: var(--text-secondary); }
+  .content-section li { margin-bottom: 8px; line-height: 1.6; }
+  .content-section code {
+    font-family: 'JetBrains Mono Variable', monospace; font-size: 0.85em;
+    background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px;
+  }
+
+  .method-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0 24px; }
+  @media (max-width: 768px) { .method-grid { grid-template-columns: 1fr; } }
+  .method-card { padding: 20px; }
+  .method-card ol { padding-left: 20px; }
+  .method-card p { font-size: 0.9rem; margin-bottom: 8px; }
+
+  .setup-table { width: 100%; border-collapse: collapse; }
+  .setup-table td { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+  .setup-table td:first-child { font-weight: 600; white-space: nowrap; color: var(--text-muted); padding-right: 16px; }
+
+  .mode-grid { display: flex; align-items: center; gap: 12px; margin: 24px 0 12px; }
+  .mode-card { flex: 1; padding: 20px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-elevated); }
+  .mode-card p { font-size: 0.88rem; color: var(--text-secondary); margin: 8px 0 0; line-height: 1.6; }
+  .mode-label { font-weight: 700; font-size: 0.95rem; }
+  .mode-vs { color: var(--text-muted); font-size: 0.85rem; font-weight: 600; }
+  @media (max-width: 768px) { .mode-grid { flex-direction: column; } .mode-vs { display: none; } }
+
+  .note { font-size: 0.85rem !important; color: var(--text-muted) !important; text-align: center; margin-top: 16px !important; }
+
+  .cta-section { padding: 3rem 0 4rem; }
+  .cta-box { text-align: center; color: var(--text-secondary); }
+  .command-shell {
+    display: inline-block; padding: 12px 24px; border-radius: 8px;
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    font-family: 'JetBrains Mono Variable', monospace; font-size: 0.82rem; color: var(--accent-cyan);
+  }
+</style>
