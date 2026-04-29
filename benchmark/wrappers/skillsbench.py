@@ -330,6 +330,7 @@ class SkillsBenchWrapper:
         task_id: str,
         solution_script: str,
         task_dir: str,
+        work_dir: str | None = None,
     ) -> dict:
         """Run the agent's solution script inside the task container, then verify.
 
@@ -387,6 +388,17 @@ class SkillsBenchWrapper:
                     return results
             finally:
                 os.unlink(tmp_script)
+
+            # Copy skill_scripts into container if present.
+            if work_dir:
+                scripts_src = Path(work_dir) / "skill_scripts"
+                if scripts_src.is_dir():
+                    self._podman_cmd(
+                        "exec", container_name, "mkdir", "-p", "/tmp/skill_scripts",
+                    )
+                    self._podman_cmd(
+                        "cp", str(scripts_src) + "/.", f"{container_name}:/tmp/skill_scripts/",
+                    )
 
             # Run the solution script.
             logger.info("Running solution for %s...", task_id)
@@ -966,6 +978,7 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
                 return
             verification = self._run_solution(
                 image_tag, task_id, r["solution_script"], task["task_dir"],
+                work_dir=r.get("work_dir"),
             )
             r["reward"] = verification["reward"]
             r["verification"] = verification
