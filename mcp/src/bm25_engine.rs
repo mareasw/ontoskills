@@ -9,7 +9,7 @@ use bm25::{Document, Language, SearchEngineBuilder};
 use serde::Serialize;
 use std::collections::HashMap;
 
-use crate::catalog::{quality_multiplier, Catalog, CatalogError, SkillSummary};
+use crate::catalog::{quality_multiplier, Catalog, CatalogError, KnowledgeNodeInfo, SkillSummary};
 
 /// A single BM25 search result.
 #[derive(Debug, Serialize, Clone)]
@@ -115,6 +115,84 @@ impl Bm25Engine {
 
 }
 
+/// In-memory BM25 engine for ranking knowledge nodes within a skill.
+///
+/// Indexes each node's `directive_content` + `applies_to_context` + `rationale`
+/// as a separate document. Used by `compact_context()` to return only the
+/// most relevant nodes for a given query.
+pub struct NodeBm25Engine {
+    engine: bm25::SearchEngine<usize>,
+    total_nodes: usize,
+}
+
+impl NodeBm25Engine {
+    /// Build a node-level BM25 engine from a skill's knowledge nodes.
+    pub fn from_nodes(skill_id: &str, nodes: &[KnowledgeNodeInfo]) -> Self {
+        let _ = skill_id;
+
+        let mut documents = Vec::with_capacity(nodes.len());
+
+        for (i, node) in nodes.iter().enumerate() {
+            let mut parts = Vec::new();
+            parts.push(node.directive_content.clone());
+            if let Some(ctx) = &node.applies_to_context {
+                if !ctx.is_empty() {
+                    parts.push(ctx.clone());
+                }
+            }
+            if let Some(why) = &node.rationale {
+                if !why.is_empty() {
+                    parts.push(why.clone());
+                }
+            }
+
+            documents.push(bm25::Document {
+                id: i,
+                contents: parts.join(" "),
+            });
+        }
+
+        let engine = if documents.is_empty() {
+            SearchEngineBuilder::<usize>::with_avgdl(10.0).build()
+        } else {
+            SearchEngineBuilder::<usize>::with_documents(Language::English, documents).build()
+        };
+
+        Self {
+            engine,
+            total_nodes: nodes.len(),
+        }
+    }
+
+    /// Rank nodes by BM25 relevance to the query.
+    ///
+    /// Returns (node_index, score) pairs sorted by score descending.
+    /// Returns at most 8 results. For empty queries, returns all node indices with score 0.0.
+    pub fn rank_nodes(&self, query: &str) -> Vec<(usize, f32)> {
+        if query.is_empty() {
+            return (0..self.total_nodes).map(|i| (i, 0.0)).collect();
+        }
+
+        let max_nodes = 8;
+        let results = self.engine.search(query, max_nodes * 2);
+
+        let mut ranked: Vec<(usize, f32)> = results
+            .into_iter()
+            .filter_map(|r| {
+                if r.score > 0.0 {
+                    Some((r.document.id, r.score))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        ranked.truncate(max_nodes);
+        ranked
+    }
+}
+
 /// Adaptive cutoff for search results.
 ///
 /// Returns the number of results to keep, based on:
@@ -199,5 +277,72 @@ mod tests {
             aliases: vec![],
             trust_tier: "local".to_string(),
         }
+    }
+
+    use crate::catalog::KnowledgeNodeInfo;
+
+    fn make_test_node(content: &str, context: Option<&str>, rationale: Option<&str>) -> KnowledgeNodeInfo {
+        KnowledgeNodeInfo {
+            uri: String::new(),
+            label: None,
+            kind: "heuristic".to_string(),
+            dimension: None,
+            directive_content: content.to_string(),
+            rationale: rationale.map(String::from),
+            applies_to_context: context.map(String::from),
+            severity_level: None,
+            source_skill_id: "test-skill".to_string(),
+            source_qualified_id: None,
+            inherited: false,
+            code_language: None,
+            step_order: None,
+            template_variables: None,
+        }
+    }
+
+    #[test]
+    fn test_node_bm25_ranks_relevant_higher() {
+        let nodes = vec![
+            make_test_node("Always validate user input before processing files", Some("file handling"), None),
+            make_test_node("Use caching for repeated database queries", Some("database"), None),
+            make_test_node("Never trust user-provided file paths", Some("file handling"), Some("Prevents path traversal")),
+            make_test_node("Prefer streaming for large dataset downloads", Some("network"), None),
+        ];
+
+        let engine = NodeBm25Engine::from_nodes("test-skill", &nodes);
+        let results = engine.rank_nodes("file path validation");
+
+        assert!(!results.is_empty());
+        let find_rank = |content_substring: &str| -> Option<usize> {
+            results.iter().position(|(idx, _)| {
+                nodes[*idx].directive_content.contains(content_substring)
+            })
+        };
+        let file_path_rank = find_rank("file paths").expect("file paths node should be found");
+        // The database node may not appear in results at all (correctly filtered out),
+        // or if it does, it should rank lower than the file paths node.
+        if let Some(db_rank) = find_rank("database queries") {
+            assert!(file_path_rank < db_rank, "file paths node should rank higher than database node");
+        }
+        // If database node is absent, file paths node still ranks first — that's correct.
+    }
+
+    #[test]
+    fn test_node_bm25_returns_top_n() {
+        let nodes: Vec<KnowledgeNodeInfo> = (0..15)
+            .map(|i| make_test_node(&format!("Node {} about topic {}", i, i % 3), None, None))
+            .collect();
+
+        let engine = NodeBm25Engine::from_nodes("test-skill", &nodes);
+        let results = engine.rank_nodes("topic 0");
+        assert!(results.len() <= 8, "Should return at most 8 nodes, got {}", results.len());
+    }
+
+    #[test]
+    fn test_node_bm25_empty_query() {
+        let nodes = vec![make_test_node("test content", None, None)];
+        let engine = NodeBm25Engine::from_nodes("test-skill", &nodes);
+        let results = engine.rank_nodes("");
+        assert_eq!(results.len(), 1);
     }
 }
