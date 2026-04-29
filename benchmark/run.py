@@ -426,6 +426,7 @@ def _run_skillsbench_claudecode(
     skillsbench_repo: str = "/tmp/skillsbench_full",
     workers: int = 3,
     skip_first: int = 0,
+    max_attempts: int = 1,
 ) -> tuple[list[dict], float | None]:
     """Run SkillsBench using the Claude Code CLI for realistic evaluation.
 
@@ -436,7 +437,7 @@ def _run_skillsbench_claudecode(
     wrapper = SkillsBenchWrapper(repo_path=skillsbench_repo)
     results = wrapper.run_benchmark_claudecode(
         agent, max_tasks=max_tasks, shuffle=shuffle, seed=seed,
-        workers=workers, skip_first=skip_first,
+        workers=workers, skip_first=skip_first, max_attempts=max_attempts,
     )
 
     # Score from Docker reward.txt (deterministic).
@@ -579,6 +580,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=25,
         help="Maximum number of tasks to run per benchmark (default: 25)",
+    )
+    parser.add_argument(
+        "--attempts",
+        type=int,
+        default=1,
+        help="Attempts per task: 1=single (like Harbor), 3=multi-turn with asymmetric budget (default: 1)",
     )
     parser.add_argument(
         "--shuffle",
@@ -751,6 +758,7 @@ def main() -> None:
                     shuffle=args.shuffle, seed=args.seed,
                     skillsbench_repo=args.skillsbench_repo,
                     workers=args.workers, skip_first=args.skip_first,
+                    max_attempts=args.attempts,
                 )
                 elapsed = time.perf_counter() - t0
                 logger.info("Claude Code (%s) completed %s in %.1fs", cc_tag, bench_name, elapsed)
