@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import signal
 import shutil
 import subprocess
 import tempfile
@@ -231,12 +232,16 @@ class ClaudeCodeAgent(BaseAgent):
 
         dst = Path(tempfile.gettempdir()) / "skillsbench_ontology" / "skillsbench"
         dst.parent.mkdir(parents=True, exist_ok=True)
-        if not dst.exists():
+        src_mtime = src.stat().st_mtime if src.exists() else 0
+        dst_mtime = dst.stat().st_mtime if dst.exists() else 0
+        if not dst.exists() or src_mtime > dst_mtime:
+            if dst.exists():
+                shutil.rmtree(str(dst))
             try:
                 shutil.copytree(str(src), str(dst))
                 logger.info("Prepared SkillsBench ontology root at %s", dst.parent)
             except FileExistsError:
-                pass  # Another process created it concurrently
+                pass
 
         self._ontology_root = str(dst.parent)
         return self._ontology_root
@@ -409,13 +414,14 @@ class ClaudeCodeAgent(BaseAgent):
                 stderr=subprocess.PIPE,
                 cwd=str(work_dir),
                 env=env,
+                start_new_session=True,
             )
             try:
                 stdout, stderr = proc.communicate(timeout=timeout)
             except subprocess.TimeoutExpired:
                 try:
-                    proc.kill()
-                except OSError:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                except (OSError, ProcessLookupError):
                     pass
                 stdout, stderr = proc.communicate()
                 duration_ms = (time.perf_counter() - start) * 1000
@@ -537,13 +543,14 @@ class ClaudeCodeAgent(BaseAgent):
                 stderr=subprocess.PIPE,
                 cwd=str(work_dir),
                 env=env,
+                start_new_session=True,
             )
             try:
                 stdout, stderr = proc.communicate(timeout=timeout)
             except subprocess.TimeoutExpired:
                 try:
-                    proc.kill()
-                except OSError:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                except (OSError, ProcessLookupError):
                     pass
                 stdout, stderr = proc.communicate()
                 duration_ms = (time.perf_counter() - start) * 1000
