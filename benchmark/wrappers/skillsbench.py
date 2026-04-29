@@ -347,7 +347,7 @@ class SkillsBenchWrapper:
         Returns dict with fractional reward (0.0-1.0 from pytest pass rate),
         per-test details, and diagnostic output.
         """
-        container_name = f"sb-{task_id}-{int(time.time())}"
+        container_name = f"sb-{task_id}-{int(time.time())}-{os.getpid()}"
         results: dict = {
             "task_id": task_id,
             "reward": 0.0,
