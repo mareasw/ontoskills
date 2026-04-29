@@ -1227,10 +1227,14 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
             return None
 
         dst = Path(tempfile.gettempdir()) / "skillsbench_ontology" / "skillsbench"
-        if dst.is_dir():
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        src_mtime = src.stat().st_mtime
+        dst_mtime = dst.stat().st_mtime if dst.exists() else 0
+        if dst.is_dir() and src_mtime <= dst_mtime:
             return str(dst.parent)
 
-        dst.parent.mkdir(parents=True, exist_ok=True)
+        if dst.exists():
+            shutil.rmtree(str(dst))
         try:
             shutil.copytree(str(src), str(dst))
             logger.info("Prepared SkillsBench ontology root at %s", dst.parent)
