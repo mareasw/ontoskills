@@ -127,8 +127,7 @@ pub struct NodeBm25Engine {
 
 impl NodeBm25Engine {
     /// Build a node-level BM25 engine from a skill's knowledge nodes.
-    pub fn from_nodes(skill_id: &str, nodes: &[KnowledgeNodeInfo]) -> Self {
-        let _ = skill_id;
+    pub fn from_nodes(_skill_id: &str, nodes: &[KnowledgeNodeInfo]) -> Self {
 
         let mut documents = Vec::with_capacity(nodes.len());
 
