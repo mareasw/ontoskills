@@ -559,6 +559,10 @@ class ClaudeCodeAgent(BaseAgent):
 
             duration_ms = (time.perf_counter() - start) * 1000
             stdout_text = stdout.decode("utf-8", errors="replace")
+            stderr_text = stderr.decode("utf-8", errors="replace") if stderr else ""
+
+            if proc.returncode != 0 and stderr_text:
+                logger.warning("Claude Code feedback stderr: %s", stderr_text[:500])
 
             cli_result: dict = {}
             try:
