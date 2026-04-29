@@ -324,6 +324,19 @@ class SkillsBenchWrapper:
         logger.info("Built image %s", image_tag)
         return image_tag
 
+    @staticmethod
+    def _get_image_tag(task_id: str) -> str | None:
+        """Get the Docker image tag for a task (from pre-built images)."""
+        tag = f"sb-{task_id}"
+        try:
+            result = subprocess.run(
+                ["podman", "image", "exists", tag],
+                capture_output=True, timeout=10,
+            )
+            return tag if result.returncode == 0 else None
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            return None
+
     def _run_solution(
         self,
         image_tag: str,
@@ -873,6 +886,123 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
                 "metrics": {},
             }
 
+    def run_task_claudecode_with_retry(
+        self,
+        cc_agent,  # ClaudeCodeAgent
+        task: dict,
+        timeout: int = 900,
+        max_budget: float = 2.00,
+        max_attempts: int = 3,
+    ) -> dict:
+        """Run a task with multi-turn Docker feedback (up to max_attempts).
+
+        Flow: agent generates solution -> Docker verifies -> if failed, feed
+        back errors -> agent fixes -> Docker re-verifies. Returns best result.
+        """
+        budget_per_attempt = max_budget / max_attempts
+        timeout_per_attempt = timeout // max_attempts
+
+        best_result = None
+        best_reward = -1.0
+
+        task_dir = Path(task["task_dir"])
+        task_id = task["task_id"]
+
+        # First attempt — standard run.
+        result = self.run_task_claudecode(
+            cc_agent, task, timeout=timeout_per_attempt, max_budget=budget_per_attempt,
+        )
+
+        for attempt in range(max_attempts):
+            # Docker verification.
+            image_tag = self._get_image_tag(task_id)
+            if not image_tag:
+                logger.warning("No Docker image for %s, skipping verification", task_id)
+                return result
+
+            verification = self._run_solution(
+                image_tag=image_tag,
+                task_id=task_id,
+                solution_script=result.get("solution_script", ""),
+                task_dir=str(task_dir),
+                work_dir=result.get("work_dir"),
+            )
+            reward = verification.get("reward", 0.0)
+
+            if reward > best_reward:
+                best_reward = reward
+                best_result = result.copy()
+                best_result["verification"] = verification
+                best_result["reward"] = reward
+                best_result["attempts"] = attempt + 1
+
+            if reward >= 1.0:
+                logger.info("Task %s: PASSED on attempt %d", task_id, attempt + 1)
+                return best_result
+
+            if attempt < max_attempts - 1:
+                # Build feedback prompt.
+                feedback_parts = []
+                details = verification.get("test_details", [])
+                failed_tests = [t for t in details if t.get("status") == "failed"]
+                if failed_tests:
+                    feedback_parts.append("### Failed Tests")
+                    for t in failed_tests[:5]:
+                        feedback_parts.append(f"- {t.get('name', '?')}: {t.get('message', '')[:200]}")
+
+                sol_errors = verification.get("solution_errors", "")
+                if sol_errors:
+                    feedback_parts.append(f"### Solution Errors\n{sol_errors[-1000:]}")
+
+                test_output = verification.get("test_output", "")
+                if test_output and "AssertionError" in test_output:
+                    lines = [l for l in test_output.split("\n") if "AssertionError" in l or "assert" in l]
+                    if lines:
+                        feedback_parts.append("### Assertion Failures\n" + "\n".join(lines[:5]))
+
+                feedback = "\n\n".join(feedback_parts)
+                if not feedback.strip():
+                    break
+
+                logger.info(
+                    "Task %s: attempt %d reward=%.3f, retrying with feedback",
+                    task_id, attempt + 1, reward,
+                )
+
+                cli_result = cc_agent.run_with_feedback(
+                    task,
+                    feedback=feedback,
+                    max_budget=budget_per_attempt,
+                    timeout=timeout_per_attempt,
+                )
+
+                solution_path = Path(cli_result["solution_path"])
+                solution_script = ""
+                if solution_path.exists():
+                    solution_script = solution_path.read_text(encoding="utf-8")
+
+                result = {
+                    "task_id": task_id,
+                    "model_answer": cli_result.get("result", ""),
+                    "solution_script": solution_script,
+                    "work_dir": cli_result.get("work_dir", ""),
+                    "metrics": {
+                        "input_tokens": result.get("metrics", {}).get("input_tokens", 0)
+                            + cli_result.get("usage", {}).get("input_tokens", 0),
+                        "output_tokens": result.get("metrics", {}).get("output_tokens", 0)
+                            + cli_result.get("usage", {}).get("output_tokens", 0),
+                        "latency_ms": result.get("metrics", {}).get("latency_ms", 0)
+                            + cli_result.get("duration_ms", 0),
+                        "tool_calls": result.get("metrics", {}).get("tool_calls", 0)
+                            + cli_result.get("num_turns", 0),
+                        "cost_usd": result.get("metrics", {}).get("cost_usd", 0)
+                            + cli_result.get("total_cost_usd", 0),
+                    },
+                }
+
+        logger.info("Task %s: best reward=%.3f after %d attempts", task_id, best_reward, max_attempts)
+        return best_result or result
+
     def run_benchmark_claudecode(
         self,
         cc_agent: "ClaudeCodeAgent",  # noqa: F821
@@ -907,7 +1037,7 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
                     "Claude Code [%d/%d]: %s (%s)",
                     i, len(tasks), task["task_id"], task.get("category", ""),
                 )
-                result = self.run_task_claudecode(
+                result = self.run_task_claudecode_with_retry(
                     cc_agent, task, timeout=timeout, max_budget=max_budget,
                 )
                 results.append(result)
@@ -923,9 +1053,7 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
                     )
                     logger.info("Incremental save: %d results -> %s", len(results), _path)
 
-            # Phase 2: Docker verification (deterministic scoring, parallel).
-            logger.info("=== Docker verification phase (%d workers) ===", workers)
-            results = self.verify_with_docker(results, tasks, workers=workers)
+            # Docker verification is done inline per-task (multi-turn with retry).
 
         finally:
             cc_agent.cleanup()
