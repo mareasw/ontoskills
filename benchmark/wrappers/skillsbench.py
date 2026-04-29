@@ -883,6 +883,9 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
                 "metrics": {},
             }
 
+    # Asymmetric budget weights for multi-attempt.
+    _ATTEMPT_WEIGHTS = [0.60, 0.25, 0.15]
+
     def run_task_claudecode_with_retry(
         self,
         cc_agent,  # ClaudeCodeAgent
@@ -895,9 +898,13 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
 
         Flow: agent generates solution -> Docker verifies -> if failed, feed
         back errors -> agent fixes -> Docker re-verifies. Returns best result.
+
+        Uses asymmetric budget: 60/25/15 across 3 attempts.
         """
-        budget_per_attempt = max_budget / max_attempts
-        timeout_per_attempt = timeout // max_attempts
+        weights = self._ATTEMPT_WEIGHTS[:max_attempts]
+        # Normalize if max_attempts < 3
+        wsum = sum(weights)
+        weights = [w / wsum for w in weights]
 
         best_result = None
         best_reward = -1.0
@@ -905,9 +912,11 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
         task_dir = Path(task["task_dir"])
         task_id = task["task_id"]
 
-        # First attempt — standard run.
+        # First attempt — standard run with 60% budget.
+        budget_1 = max_budget * weights[0]
+        timeout_1 = int(timeout * weights[0])
         result = self.run_task_claudecode(
-            cc_agent, task, timeout=timeout_per_attempt, max_budget=budget_per_attempt,
+            cc_agent, task, timeout=timeout_1, max_budget=budget_1,
         )
 
         for attempt in range(max_attempts):
@@ -917,10 +926,22 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
                 logger.warning("No Docker image for %s, skipping verification", task_id)
                 return result
 
+            solution_script = result.get("solution_script", "")
+
+            # Skip Docker run if no solution was produced (timeout/error).
+            if not solution_script.strip():
+                logger.info("Task %s: attempt %d produced no solution, skipping verification", task_id, attempt + 1)
+                if attempt == 0:
+                    best_result = result.copy()
+                    best_result["verification"] = {"reward": 0.0, "test_details": []}
+                    best_result["reward"] = 0.0
+                    best_result["attempts"] = 1
+                break
+
             verification = self._run_solution(
                 image_tag=image_tag,
                 task_id=task_id,
-                solution_script=result.get("solution_script", ""),
+                solution_script=solution_script,
                 task_dir=str(task_dir),
                 work_dir=result.get("work_dir"),
             )
@@ -966,11 +987,16 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
                     task_id, attempt + 1, reward,
                 )
 
+                # Asymmetric budget for subsequent attempts.
+                w = weights[attempt + 1] if attempt + 1 < len(weights) else weights[-1]
+                budget_next = max_budget * w
+                timeout_next = int(timeout * w)
+
                 cli_result = cc_agent.run_with_feedback(
                     task,
                     feedback=feedback,
-                    max_budget=budget_per_attempt,
-                    timeout=timeout_per_attempt,
+                    max_budget=budget_next,
+                    timeout=timeout_next,
                 )
 
                 solution_path = Path(cli_result["solution_path"])
@@ -1010,8 +1036,14 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
         timeout: int = 900,
         max_budget: float = 2.00,
         skip_first: int = 0,
+        max_attempts: int = 1,
     ) -> list[dict]:
-        """Run SkillsBench tasks via Claude Code CLI, then verify with Docker."""
+        """Run SkillsBench tasks via Claude Code CLI, then verify with Docker.
+
+        Args:
+            max_attempts: 1 for single-attempt (like Harbor), 3 for multi-turn
+                with asymmetric budget (60/25/15).
+        """
         packages_root = os.path.expanduser("~/.ontoskills/packages")
         tasks = self.load_tasks(
             max_tasks=max_tasks, shuffle=shuffle, seed=seed,
@@ -1034,9 +1066,34 @@ Write your solution as a SINGLE Python script. Output ONLY the Python code insid
                     "Claude Code [%d/%d]: %s (%s)",
                     i, len(tasks), task["task_id"], task.get("category", ""),
                 )
-                result = self.run_task_claudecode_with_retry(
-                    cc_agent, task, timeout=timeout, max_budget=max_budget,
-                )
+
+                if max_attempts > 1:
+                    result = self.run_task_claudecode_with_retry(
+                        cc_agent, task, timeout=timeout, max_budget=max_budget,
+                        max_attempts=max_attempts,
+                    )
+                else:
+                    # Single-attempt: all budget in one call, then verify once.
+                    result = self.run_task_claudecode(
+                        cc_agent, task, timeout=timeout, max_budget=max_budget,
+                    )
+                    # Verify with Docker.
+                    image_tag = self._get_image_tag(task["task_id"])
+                    if image_tag and result.get("solution_script", "").strip():
+                        verification = self._run_solution(
+                            image_tag=image_tag,
+                            task_id=task["task_id"],
+                            solution_script=result["solution_script"],
+                            task_dir=str(Path(task["task_dir"])),
+                            work_dir=result.get("work_dir"),
+                        )
+                        result["verification"] = verification
+                        result["reward"] = verification.get("reward", 0.0)
+                        result["attempts"] = 1
+                    else:
+                        result["verification"] = {"reward": 0.0, "test_details": []}
+                        result["reward"] = 0.0
+                        result["attempts"] = 1
                 results.append(result)
 
                 # Save incrementally after each task so progress isn't lost on crash.

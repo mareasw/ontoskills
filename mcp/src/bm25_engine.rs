@@ -165,15 +165,16 @@ impl NodeBm25Engine {
 
     /// Rank nodes by BM25 relevance to the query.
     ///
-    /// Returns (node_index, score) pairs sorted by score descending.
-    /// Returns at most 8 results. For empty queries, returns all node indices with score 0.0.
+    /// Uses bottom-percentile cutoff: discards only the worst 20% of scored nodes,
+    /// but always keeps at least `min(10, total_nodes)` nodes.
+    /// If there are ≤10 nodes, all are returned.
+    /// For empty queries, returns all node indices with score 0.0.
     pub fn rank_nodes(&self, query: &str) -> Vec<(usize, f32)> {
         if query.is_empty() {
             return (0..self.total_nodes).map(|i| (i, 0.0)).collect();
         }
 
-        let max_nodes = 8;
-        let results = self.engine.search(query, max_nodes * 2);
+        let results = self.engine.search(query, self.total_nodes * 2);
 
         let mut ranked: Vec<(usize, f32)> = results
             .into_iter()
@@ -187,7 +188,15 @@ impl NodeBm25Engine {
             .collect();
 
         ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        ranked.truncate(max_nodes);
+
+        // Bottom-percentile: keep all if ≤10, otherwise discard bottom 20%
+        let min_keep = self.total_nodes.min(10);
+        let n_scored = ranked.len();
+        if n_scored <= min_keep {
+            return ranked;
+        }
+        let cutoff = min_keep.max(n_scored - (n_scored as f64 * 0.2).floor() as usize);
+        ranked.truncate(cutoff);
         ranked
     }
 }
@@ -327,14 +336,29 @@ mod tests {
     }
 
     #[test]
-    fn test_node_bm25_returns_top_n() {
+    fn test_node_bm25_bottom_percentile_cutoff() {
+        // 15 nodes: bottom-percentile should keep at least 10 (min(10, 15))
         let nodes: Vec<KnowledgeNodeInfo> = (0..15)
             .map(|i| make_test_node(&format!("Node {} about topic {}", i, i % 3), None, None))
             .collect();
 
         let engine = NodeBm25Engine::from_nodes("test-skill", &nodes);
         let results = engine.rank_nodes("topic 0");
-        assert!(results.len() <= 8, "Should return at most 8 nodes, got {}", results.len());
+        assert!(results.len() >= 10, "Should keep at least 10 nodes with bottom-percentile, got {}", results.len());
+        assert!(results.len() <= 15, "Should not exceed total nodes, got {}", results.len());
+    }
+
+    #[test]
+    fn test_node_bm25_few_nodes_keeps_all() {
+        // 5 nodes: min(10, 5) = 5, so all should be returned
+        let nodes: Vec<KnowledgeNodeInfo> = (0..5)
+            .map(|i| make_test_node(&format!("Node {} about topic {}", i, i % 3), None, None))
+            .collect();
+
+        let engine = NodeBm25Engine::from_nodes("test-skill", &nodes);
+        let results = engine.rank_nodes("topic 0");
+        // All scored nodes should be returned since 5 <= min_keep(5)
+        assert!(results.len() <= 5, "Should keep all nodes when ≤10, got {}", results.len());
     }
 
     #[test]
