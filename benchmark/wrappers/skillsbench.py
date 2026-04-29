@@ -329,10 +329,7 @@ class SkillsBenchWrapper:
         """Get the Docker image tag for a task (from pre-built images)."""
         tag = f"localhost/skillsbench/{task_id}:latest"
         try:
-            result = subprocess.run(
-                ["podman", "image", "exists", tag],
-                capture_output=True, timeout=10,
-            )
+            result = SkillsBenchWrapper._podman_cmd("image", "exists", tag)
             return tag if result.returncode == 0 else None
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return None

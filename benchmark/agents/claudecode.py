@@ -496,8 +496,13 @@ class ClaudeCodeAgent(BaseAgent):
         if not work_dir:
             raise RuntimeError("Call setup_task_env() first")
 
+        task_instruction = task.get("instruction", "")
         prompt = (
             "Your previous solution.py failed verification inside a Docker container.\n\n"
+        )
+        if task_instruction:
+            prompt += f"Original task: {task_instruction[:500]}\n\n"
+        prompt += (
             f"{feedback}\n\n"
             "Write a corrected solution.py that fixes the errors above.\n"
             "IMPORTANT: Use CONTAINER paths (e.g., /root/data.csv), NOT host paths.\n"

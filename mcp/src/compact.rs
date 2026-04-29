@@ -123,30 +123,26 @@ pub fn compact_context_with_query(
     if !nodes.is_empty() {
         lines.push(String::new());
 
+        let fallback_indices = || -> Vec<usize> {
+            let mut indexed: Vec<(usize, i64, u8)> = nodes
+                .iter()
+                .enumerate()
+                .map(|(i, n)| (i, n.step_order.unwrap_or(999), kind_priority(&n.kind)))
+                .collect();
+            indexed.sort_by_key(|&(_, order, priority)| (order, priority));
+            indexed.into_iter().map(|(i, _, _)| i).collect()
+        };
+
         let indices: Vec<usize> = match (query, node_engine) {
             (Some(q), Some(engine)) if !q.is_empty() => {
                 let ranked = engine.rank_nodes(q);
                 if ranked.is_empty() {
-                    let mut indexed: Vec<(usize, i64, u8)> = nodes
-                        .iter()
-                        .enumerate()
-                        .map(|(i, n)| (i, n.step_order.unwrap_or(999), kind_priority(&n.kind)))
-                        .collect();
-                    indexed.sort_by_key(|&(_, order, priority)| (order, priority));
-                    indexed.into_iter().map(|(i, _, _)| i).collect()
+                    fallback_indices()
                 } else {
                     ranked.into_iter().map(|(idx, _)| idx).collect()
                 }
             }
-            _ => {
-                let mut indexed: Vec<(usize, i64, u8)> = nodes
-                    .iter()
-                    .enumerate()
-                    .map(|(i, n)| (i, n.step_order.unwrap_or(999), kind_priority(&n.kind)))
-                    .collect();
-                indexed.sort_by_key(|&(_, order, priority)| (order, priority));
-                indexed.into_iter().map(|(i, _, _)| i).collect()
-            }
+            _ => fallback_indices(),
         };
 
         for idx in &indices {
