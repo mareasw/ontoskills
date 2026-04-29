@@ -327,7 +327,7 @@ class SkillsBenchWrapper:
     @staticmethod
     def _get_image_tag(task_id: str) -> str | None:
         """Get the Docker image tag for a task (from pre-built images)."""
-        tag = f"sb-{task_id}"
+        tag = f"localhost/skillsbench/{task_id}:latest"
         try:
             result = subprocess.run(
                 ["podman", "image", "exists", tag],
