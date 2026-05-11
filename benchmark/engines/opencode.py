@@ -41,6 +41,7 @@ class OpencodeEngine(AgentEngine):
         return {
             "OPENCODE_API_KEY": os.environ.get("OPENCODE_API_KEY", ""),
             "HOME": "/root",
+            "XDG_DATA_HOME": "/tmp/opencode-data",
         }
 
     def build_run_cmd(self, instruction: str) -> str:
