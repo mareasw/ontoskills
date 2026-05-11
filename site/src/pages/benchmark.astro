@@ -59,8 +59,9 @@ import BenchmarkReact from '../components/benchmark/BenchmarkApp.tsx';
           <div class="method-card glass-panel">
             <h3>Setup</h3>
             <table class="setup-table">
-              <tr><td>Agent</td><td>Claude Code (<code>claude</code> CLI, native binary)</td></tr>
-              <tr><td>Model</td><td>glm-5.1 (via API proxy)</td></tr>
+              <tr><td>Engine</td><td><code>--engine claude</code> or <code>--engine opencode</code></td></tr>
+              <tr><td>Claude model</td><td>glm-5.1 (via API proxy)</td></tr>
+              <tr><td>Opencode model</td><td>opencode-go/deepseek-v4-flash</td></tr>
               <tr><td>Infrastructure</td><td>Docker (BenchFlow Trial) + Harbor Verifier</td></tr>
               <tr><td>Scoring</td><td>Docker + pytest CTRF</td></tr>
               <tr><td>Retries</td><td>5 per task</td></tr>
@@ -76,15 +77,15 @@ import BenchmarkReact from '../components/benchmark/BenchmarkApp.tsx';
             <div class="mode-vs">vs</div>
             <div class="mode-card">
               <span class="mode-label" style="color: var(--accent-purple);">Traditional</span>
-              <p>SKILL.md files in <code>~/.claude/skills/</code>. Agent reads raw markdown — same as production Claude Code setup.</p>
+              <p>SKILL.md files deployed to the engine's skills directory (<code>$HOME/.claude/skills/</code> or <code>$HOME/.opencode/skills/</code>). Agent reads raw markdown.</p>
             </div>
             <div class="mode-vs">vs</div>
             <div class="mode-card">
               <span class="mode-label" style="color: var(--accent-cyan);">OntoSkills MCP</span>
-              <p>Skills compiled to OWL 2, served via <strong>OntoMCP</strong>. Agent uses a single <code>mcp__onto__skill</code> MCP tool to query structured knowledge.</p>
+              <p>Skills compiled to OWL 2, served via <strong>OntoMCP</strong>. Agent queries structured knowledge via MCP — tool name is <code>mcp__onto__skill</code> (Claude) or <code>onto_skill</code> (opencode).</p>
             </div>
           </div>
-        <p class="note">Same agent, same model, same BenchFlow container management, same Harbor Verifier. The only difference is <strong>how skill knowledge is delivered</strong>.</p>
+        <p class="note">Same engine abstraction, same BenchFlow container management, same Harbor Verifier. The only difference is <strong>how skill knowledge is delivered</strong>.</p>
       </div>
     </section>
 
@@ -117,10 +118,11 @@ import BenchmarkReact from '../components/benchmark/BenchmarkApp.tsx';
       <div class="section-shell">
         <h2>Limitations</h2>
         <ul>
-          <li><strong>Sample size</strong>: Results from a pool of 70+ eligible tasks.</li>
-          <li><strong>Single model</strong>: All results use glm-5.1 via API proxy. Other models may differ.</li>
-          <li><strong>Single benchmark</strong>: SkillsBench tests code generation. Other benchmarks planned.</li>
-        </ul>
+            <li><strong>Sample size</strong>: Results from a pool of 70+ eligible tasks.</li>
+            <li><strong>Engine support</strong>: Two engines are available — <code>--engine claude</code> (glm-5.1 via Anthropic proxy) and <code>--engine opencode</code> (opencode-go/deepseek-v4-flash). Results vary by engine.</li>
+            <li><strong>MCP naming</strong>: Claude exposes MCP tools as <code>mcp__onto__skill</code>; opencode exposes them as <code>onto_skill</code>. Both query the same ontology.</li>
+            <li><strong>Single benchmark</strong>: SkillsBench tests code generation. Other benchmarks planned.</li>
+          </ul>
       </div>
     </section>
 
@@ -129,8 +131,11 @@ import BenchmarkReact from '../components/benchmark/BenchmarkApp.tsx';
       <div class="section-shell">
         <div class="cta-box">
           <p style="margin-bottom: 12px;">All benchmark code is open source. Run it yourself:</p>
+          <div class="command-shell" style="margin-bottom: 8px;">
+              <code>python benchmark/run.py --mode taskwise --engine claude --max-tasks 25 --attempts 5 --workers 2</code>
+          </div>
           <div class="command-shell">
-              <code>python benchmark/run.py --mode acp --max-tasks 25 --model glm-5.1 --attempts 5 --workers 2</code>
+              <code>python benchmark/run.py --mode taskwise --engine opencode --max-tasks 25 --attempts 5 --workers 2</code>
           </div>
         </div>
       </div>

@@ -59,8 +59,9 @@ import BenchmarkReact from '../../components/benchmark/BenchmarkApp.tsx';
           <div class="method-card glass-panel">
             <h3>实验设置</h3>
             <table class="setup-table">
-              <tr><td>代理</td><td>Claude Code（<code>claude</code> CLI 原生二进制）</td></tr>
-              <tr><td>模型</td><td>glm-5.1（通过 API 代理）</td></tr>
+              <tr><td>引擎</td><td><code>--engine claude</code> 或 <code>--engine opencode</code></td></tr>
+              <tr><td>Claude 模型</td><td>glm-5.1（通过 API 代理）</td></tr>
+              <tr><td>Opencode 模型</td><td>opencode-go/deepseek-v4-flash</td></tr>
               <tr><td>任务数</td><td>10，来自 70+ 个可用任务池</td></tr>
               <tr><td>评分</td><td>Docker + pytest CTRF 报告</td></tr>
             </table>
@@ -69,21 +70,21 @@ import BenchmarkReact from '../../components/benchmark/BenchmarkApp.tsx';
 
         <div class="mode-grid">
           <div class="mode-card">
-            <span class="mode-label" style="color: var(--accent-cyan);">基线</span>
-            <p>仅代理 — 无技能文档。测量代理在每项任务上的原始性能。</p>
+              <span class="mode-label" style="color: var(--accent-cyan);">基线</span>
+              <p>仅代理 — 无技能文档。测量代理在每项任务上的原始性能。</p>
+            </div>
+            <div class="mode-vs">vs</div>
+            <div class="mode-card">
+              <span class="mode-label" style="color: var(--accent-purple);">传统模式</span>
+              <p>SKILL.md 文件部署到引擎的技能目录（<code>$HOME/.claude/skills/</code> 或 <code>$HOME/.opencode/skills/</code>）。代理读取原始 Markdown。</p>
+            </div>
+            <div class="mode-vs">vs</div>
+            <div class="mode-card">
+              <span class="mode-label" style="color: var(--accent-cyan);">OntoSkills MCP</span>
+              <p>技能编译为 OWL 2 本体，通过 MCP 工具查询结构化知识 — Claude 使用 <code>mcp__onto__skill</code>，opencode 使用 <code>onto_skill</code>。</p>
+            </div>
           </div>
-          <div class="mode-vs">vs</div>
-          <div class="mode-card">
-            <span class="mode-label" style="color: var(--accent-purple);">传统模式</span>
-            <p>技能文档以 SKILL.md 文件形式放置在 <code>~/.claude/skills/</code> 中。代理使用原生文件读取功能。</p>
-          </div>
-          <div class="mode-vs">vs</div>
-          <div class="mode-card">
-            <span class="mode-label" style="color: var(--accent-cyan);">OntoSkills MCP</span>
-            <p>技能编译为 OWL 2 本体，通过 <code>mcp__onto__skill</code> MCP 工具查询结构化知识。</p>
-          </div>
-        </div>
-        <p class="note">相同的代理、相同的模型、相同的提示。唯一的区别是<strong>技能知识的传递方式</strong>。</p>
+        <p class="note">相同的引擎抽象层、相同的 BenchFlow 容器管理、相同的 Harbor Verifier。唯一的区别是<strong>技能知识的传递方式</strong>。</p>
       </div>
     </section>
 
@@ -116,11 +117,11 @@ import BenchmarkReact from '../../components/benchmark/BenchmarkApp.tsx';
       <div class="section-shell">
         <h2>局限性</h2>
         <ul>
-          <li><strong>样本量</strong>：10 个任务来自 70+ 个任务池。结果应通过更大规模的运行来确认。</li>
-          <li><strong>单一模型</strong>：所有结果使用 glm-5.1 通过 API 代理。其他模型的表现可能不同。</li>
-          <li><strong>单一基准</strong>：SkillsBench 测试代码生成。其他基准已计划中。</li>
-          <li><strong>种子依赖</strong>：任务选择因种子而异。我们报告 seed=7 以确保可重复性。</li>
-        </ul>
+            <li><strong>样本量</strong>：10 个任务来自 70+ 个任务池。结果应通过更大规模的运行来确认。</li>
+            <li><strong>引擎支持</strong>：两个引擎可用 — <code>--engine claude</code>（glm-5.1 通过 Anthropic 代理）和 <code>--engine opencode</code>（opencode-go/deepseek-v4-flash）。结果因引擎而异。</li>
+            <li><strong>MCP 命名差异</strong>：Claude 的 MCP 工具名为 <code>mcp__onto__skill</code>；opencode 的为 <code>onto_skill</code>。两者查询相同的本体。</li>
+            <li><strong>单一基准</strong>：SkillsBench 测试代码生成。其他基准已计划中。</li>
+          </ul>
       </div>
     </section>
 
@@ -129,8 +130,11 @@ import BenchmarkReact from '../../components/benchmark/BenchmarkApp.tsx';
       <div class="section-shell">
         <div class="cta-box">
           <p style="margin-bottom: 12px;">所有基准测试代码均为开源。您可以自行运行：</p>
+          <div class="command-shell" style="margin-bottom: 8px;">
+            <code>python benchmark/run.py --mode taskwise --engine claude --max-tasks 25 --attempts 5 --workers 2</code>
+          </div>
           <div class="command-shell">
-            <code>python benchmark/run.py --mode acp --max-tasks 25 --model glm-5.1 --attempts 5 --workers 2</code>
+            <code>python benchmark/run.py --mode taskwise --engine opencode --max-tasks 25 --attempts 5 --workers 2</code>
           </div>
         </div>
       </div>
