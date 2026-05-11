@@ -2,6 +2,8 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
   CartesianGrid, LabelList,
 } from 'recharts';
+import { useState } from 'react';
+import BenchmarkDetail from './BenchmarkDetail';
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -233,10 +235,34 @@ export default function BenchmarkApp() {
   const deltaReward = o.avg_reward - t.avg_reward;
   const deltaTokenPct = (((t.avg_input_tokens + t.avg_output_tokens) - (o.avg_input_tokens + o.avg_output_tokens)) / (t.avg_input_tokens + t.avg_output_tokens) * 100);
 
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+
   const totalTasks = t.total_tasks;
   const tradPassed = DATA.per_task.filter(x => x.traditional_passed).length;
   const ontoPassed = DATA.per_task.filter(x => x.ontoskills_passed).length;
   const ontoOnly = DATA.per_task.filter(x => x.ontoskills_passed && !x.traditional_passed).length;
+
+  const selectedTask = selectedTaskId
+    ? DATA.per_task.find(x => x.task_id === selectedTaskId) ?? null
+    : null;
+
+  // Build minimal TaskData for the detail view
+  const buildTaskDetail = (pt: typeof DATA.per_task[0]): TaskData => ({
+    task_id: pt.task_id,
+    best_reward: Math.max(pt.traditional_reward, pt.ontoskills_reward),
+    cases: {
+      'acp+hints': {
+        engine: DATA.model, model: DATA.model, mode: 'acp', hints: true,
+        best_reward: pt.traditional_reward, passed: pt.traditional_passed,
+        attempts: [], attempts_completed: 0,
+      },
+      'acp-mcp+hints': {
+        engine: DATA.model, model: DATA.model, mode: 'acp-mcp', hints: true,
+        best_reward: pt.ontoskills_reward, passed: pt.ontoskills_passed,
+        attempts: [], attempts_completed: 0,
+      },
+    },
+  });
 
   return (
     <div style={{ width: '100%', minWidth: 0 }}>
@@ -395,40 +421,56 @@ export default function BenchmarkApp() {
       </Section>
 
       {/* -- Per-task detail table -- */}
-      <Section title="Task Results">
-        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 420 }}>
-          <thead>
-            <tr style={{ borderBottom: '2px solid var(--border)' }}>
-              <th style={{ textAlign: 'left', padding: '8px 8px', fontWeight: 600 }}>Task</th>
-              <th style={{ textAlign: 'center', padding: '8px 8px', fontWeight: 600, color: TRAD, minWidth: 80 }}>Traditional</th>
-              <th style={{ textAlign: 'center', padding: '8px 8px', fontWeight: 600, color: ONTO, minWidth: 80 }}>OntoSkills</th>
-              <th style={{ textAlign: 'center', padding: '8px 8px', fontWeight: 600, minWidth: 60 }}>Delta</th>
-            </tr>
-          </thead>
-          <tbody>
-            {DATA.per_task.map(t => {
-              const delta = t.ontoskills_reward - t.traditional_reward;
-              return (
-                <tr key={t.task_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <td style={{ padding: '8px 8px', fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
-                    {t.task_id}
-                  </td>
-                  <td style={{ textAlign: 'center', padding: '8px 8px' }}>{rewardCell(t.traditional_reward)}</td>
-                  <td style={{ textAlign: 'center', padding: '8px 8px' }}>{rewardCell(t.ontoskills_reward)}</td>
-                  <td style={{ textAlign: 'center', padding: '8px 8px', fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
-                    color: delta > 0 ? PASS : delta < 0 ? '#f87171' : 'var(--text-muted)',
-                    fontWeight: delta !== 0 ? 600 : 400,
-                  }}>
-                    {delta > 0 ? '+' : ''}{delta > 0 ? `${(delta * 100).toFixed(0)}%` : delta < 0 ? `${(delta * 100).toFixed(0)}%` : '-'}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        </div>
-      </Section>
+      {selectedTaskId && selectedTask ? (
+        <BenchmarkDetail
+          task={buildTaskDetail(selectedTask)}
+          onBack={() => setSelectedTaskId(null)}
+        />
+      ) : (
+        <Section title="Task Results — click a row for details">
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 420 }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                <th style={{ textAlign: 'left', padding: '8px 8px', fontWeight: 600 }}>Task</th>
+                <th style={{ textAlign: 'center', padding: '8px 8px', fontWeight: 600, color: TRAD, minWidth: 80 }}>Traditional</th>
+                <th style={{ textAlign: 'center', padding: '8px 8px', fontWeight: 600, color: ONTO, minWidth: 80 }}>OntoSkills</th>
+                <th style={{ textAlign: 'center', padding: '8px 8px', fontWeight: 600, minWidth: 60 }}>Delta</th>
+              </tr>
+            </thead>
+            <tbody>
+              {DATA.per_task.map(t => {
+                const delta = t.ontoskills_reward - t.traditional_reward;
+                return (
+                  <tr key={t.task_id}
+                    onClick={() => setSelectedTaskId(t.task_id)}
+                    style={{
+                      borderBottom: '1px solid rgba(255,255,255,0.04)',
+                      cursor: 'pointer',
+                      transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <td style={{ padding: '8px 8px', fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+                      {t.task_id}
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '8px 8px' }}>{rewardCell(t.traditional_reward)}</td>
+                    <td style={{ textAlign: 'center', padding: '8px 8px' }}>{rewardCell(t.ontoskills_reward)}</td>
+                    <td style={{ textAlign: 'center', padding: '8px 8px', fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
+                      color: delta > 0 ? PASS : delta < 0 ? '#f87171' : 'var(--text-muted)',
+                      fontWeight: delta !== 0 ? 600 : 400,
+                    }}>
+                      {delta > 0 ? '+' : ''}{delta > 0 ? `${(delta * 100).toFixed(0)}%` : delta < 0 ? `${(delta * 100).toFixed(0)}%` : '-'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          </div>
+        </Section>
+      )}
     </div>
   );
 }

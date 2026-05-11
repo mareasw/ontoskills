@@ -161,6 +161,7 @@ async def _run_agent_and_parse(
     except Exception as exc:
         logger.warning("%s warm-up failed for %s: %s — continuing anyway", engine.name, task["task_id"], exc)
 
+    t_start = time.perf_counter()
     cmd = engine.build_run_cmd(instruction)
     result = await trial._env.exec(
         cmd,
@@ -168,10 +169,13 @@ async def _run_agent_and_parse(
         user="agent",
         env=env,
     )
+    duration_sec = time.perf_counter() - t_start
     stdout = (result.stdout or "").strip()
     stderr = (result.stderr or "").strip()
     parsed = engine.parse_output(stdout)
     trial._n_tool_calls = parsed.num_turns
+    trial._tool_calls = parsed.tool_calls
+    trial._duration_sec = duration_sec
     logger.info(
         "%s: %s done — n_tool_calls=%d stdout_len=%d stderr_len=%d "
         "tools=%s stdout_head=%s",
@@ -195,6 +199,8 @@ async def _run_agent_and_parse(
 
 def _build_trial_result(trial, task_id: str, error: str | None) -> dict:
     """Build result dict from Trial, handling setup failures."""
+    tool_calls = getattr(trial, "_tool_calls", {})
+    duration_sec = getattr(trial, "_duration_sec", 0.0)
     if trial._trial_dir is None:
         return {
             "task_id": task_id,
@@ -204,6 +210,8 @@ def _build_trial_result(trial, task_id: str, error: str | None) -> dict:
             "verifier_error": None,
             "build_ok": False,
             "n_tool_calls": 0,
+            "tool_calls": {},
+            "duration_sec": 0.0,
         }
     result = trial._build_result()
     reward = result.rewards.get("reward", 0.0) if result.rewards else 0.0
@@ -215,6 +223,8 @@ def _build_trial_result(trial, task_id: str, error: str | None) -> dict:
         "verifier_error": result.verifier_error,
         "build_ok": error is None,
         "n_tool_calls": result.n_tool_calls,
+        "tool_calls": tool_calls,
+        "duration_sec": duration_sec,
     }
 
 
