@@ -16,12 +16,14 @@ _CLAUDE_BIN_PATH = os.environ.get("CLAUDE_BIN_PATH") or str(
 
 
 class ClaudeEngine(AgentEngine):
-    name = "claude"
-    bin_name = "claude"
-    bin_path = _CLAUDE_BIN_PATH
-    model = "glm-5.1"
-    skills_path = "$HOME/.claude/skills"
-    download_url = None  # uploaded from host binary
+    def __init__(self) -> None:
+        super().__init__()
+        self.name = "claude"
+        self.bin_name = "claude"
+        self.bin_path = _CLAUDE_BIN_PATH
+        self.model = "glm-5.1"
+        self.skills_path = "$HOME/.claude/skills"
+        self.download_url = None
 
     @property
     def env_vars(self) -> dict[str, str]:

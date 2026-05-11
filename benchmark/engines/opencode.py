@@ -22,14 +22,19 @@ _OPENCODE_DOWNLOAD_URL = (
 )
 
 
+_DEFAULT_OPENCODE_MODEL = os.environ.get("OPENCODE_MODEL") or "opencode-go/deepseek-v4-flash"
+
+
 class OpencodeEngine(AgentEngine):
-    name = "opencode"
-    bin_name = "opencode"
-    bin_path = _OPENCODE_BIN_PATH
-    model = "opencode-go/deepseek-v4-flash"
-    skills_path = "$HOME/.opencode/skills"
-    download_url = _OPENCODE_DOWNLOAD_URL
-    mcp_tool_name = "onto_skill"
+    def __init__(self) -> None:
+        super().__init__()
+        self.name = "opencode"
+        self.bin_name = "opencode"
+        self.bin_path = _OPENCODE_BIN_PATH
+        self.model = _DEFAULT_OPENCODE_MODEL
+        self.skills_path = "$HOME/.opencode/skills"
+        self.download_url = _OPENCODE_DOWNLOAD_URL
+        self.mcp_tool_name = "onto_skill"
 
     @property
     def env_vars(self) -> dict[str, str]:
@@ -53,7 +58,6 @@ class OpencodeEngine(AgentEngine):
 
         tool_counts: dict[str, int] = {}
         total_tokens: dict = {}
-        seen_step_finish = False
 
         for line in stdout.strip().split("\n"):
             line = line.strip()
@@ -81,7 +85,6 @@ class OpencodeEngine(AgentEngine):
                     cost = part.get("cost", 0.0)
                     if isinstance(cost, (int, float)):
                         output.cost = cost
-                    seen_step_finish = True
 
         output.tool_calls = tool_counts
         output.tokens = total_tokens

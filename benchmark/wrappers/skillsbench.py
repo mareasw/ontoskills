@@ -29,6 +29,7 @@ import re
 import shlex
 import shutil
 import signal
+import inspect
 import tempfile
 import time
 import tomllib
@@ -51,7 +52,6 @@ def _register_agent(engine: AgentEngine) -> None:
         return
     try:
         from benchflow.agents.registry import register_agent
-        import inspect
         sig = inspect.signature(register_agent)
         kwargs = {}
         if "skill_paths" in sig.parameters:
@@ -180,7 +180,7 @@ async def _run_agent_and_parse(
         parsed.tool_calls or {},
         stdout[:200],
     )
-    _save_claude_logs(
+    _save_agent_logs(
         Path(task["task_dir"]).parent.parent / ".benchflow_jobs",
         stdout, stderr, task["task_id"], mode=mode,
     )
@@ -243,7 +243,7 @@ def _log_tool_usage(stdout: str) -> dict[str, int]:
     return counts
 
 
-def _save_claude_logs(trial_dir: Path, stdout: str, stderr: str, task_id: str, mode: str = "") -> None:
+def _save_agent_logs(trial_dir: Path, stdout: str, stderr: str, task_id: str, mode: str = "") -> None:
     """Save agent stdout/stderr to trial directory for later analysis."""
     try:
         trial_dir.mkdir(parents=True, exist_ok=True)
