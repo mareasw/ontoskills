@@ -98,8 +98,8 @@ const MODELS: Record<string, ModelPrice> = {
   "glm-5-turbo":    { label: "GLM-5 Turbo",      input: 1.20, output: 4.00, used: false },
   "glm-4.7":        { label: "GLM-4.7",          input: 0.60, output: 2.20, used: false },
   "claude-opus":    { label: "Claude Opus 4.7",   input: 15.00, output: 75.00, used: false },
-  "claude-sonnet":  { label: "Claude Sonnet 4.6", input: 3.00, output: 15.00, used: false },
-  "claude-haiku":   { label: "Claude Haiku 4.5",  input: 0.80, output: 4.00, used: false },
+  "claude-sonnet":  { label: "Claude Sonnet 4.6",     input: 3.00, output: 15.00, used: false },
+  "claude-haiku":   { label: "Claude Haiku 4.5",      input: 0.80, output: 4.00, used: false },
   "gpt-5.4":        { label: "GPT-5.4",           input: 2.50, output: 15.00, used: false },
   "gpt-5.4-mini":   { label: "GPT-5.4 mini",      input: 0.75, output: 4.50, used: false },
 };
@@ -308,7 +308,7 @@ export default function BenchmarkApp() {
       </Section>
 
       {/* -- Token usage -- */}
-      <Section title="Token Usage" note={`Per-task averages measured from ${DATA.model} benchmark (${totalTasks} tasks, seed=7). OntoSkills uses MCP tool calls instead of reading full markdown files.`}>
+      <Section title="Token Usage" note={`Per-task averages measured from ${DATA.model} (claude engine, ${totalTasks} tasks, seed=7). OntoSkills uses MCP tool calls instead of reading full markdown files.`}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
           {[
             { label: 'Input Tokens / Task', trad: t.avg_input_tokens, onto: o.avg_input_tokens },
