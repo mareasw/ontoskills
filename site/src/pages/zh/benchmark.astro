@@ -68,8 +68,8 @@ import BenchmarkReact from '../../components/benchmark/BenchmarkApp.tsx';
           </div>
         </div>
 
-        <div class="mode-grid">
-          <div class="mode-card">
+          <div class="mode-grid">
+            <div class="mode-card">
               <span class="mode-label" style="color: var(--accent-cyan);">基线</span>
               <p>仅代理 — 无技能文档。测量代理在每项任务上的原始性能。</p>
             </div>
@@ -84,7 +84,7 @@ import BenchmarkReact from '../../components/benchmark/BenchmarkApp.tsx';
               <p>技能编译为 OWL 2 本体，通过 MCP 工具查询结构化知识 — Claude 使用 <code>mcp__onto__skill</code>，opencode 使用 <code>onto_skill</code>。</p>
             </div>
           </div>
-        <p class="note">相同的引擎抽象层、相同的 BenchFlow 容器管理、相同的 Harbor Verifier。唯一的区别是<strong>技能知识的传递方式</strong>。</p>
+        <p class="note">相同的基础指令、相同的模型、相同的 BenchFlow 容器管理、相同的 Harbor Verifier。所有提示都以 <em>"Implement the complete solution by writing the required output files"</em> 结尾。唯一的区别是<strong>技能知识的传递方式</strong>（或基线模式中没有技能）。</p>
       </div>
     </section>
 

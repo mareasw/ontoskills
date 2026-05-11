@@ -85,7 +85,7 @@ import BenchmarkReact from '../components/benchmark/BenchmarkApp.tsx';
               <p>Skills compiled to OWL 2, served via <strong>OntoMCP</strong>. Agent queries structured knowledge via MCP — tool name is <code>mcp__onto__skill</code> (Claude) or <code>onto_skill</code> (opencode).</p>
             </div>
           </div>
-        <p class="note">Same engine abstraction, same BenchFlow container management, same Harbor Verifier. The only difference is <strong>how skill knowledge is delivered</strong>.</p>
+        <p class="note">Same base instruction, same model, same BenchFlow container management, same Harbor Verifier. All prompts end with <em>"Implement the complete solution by writing the required output files"</em>. The only difference is <strong>how skill knowledge is delivered</strong> (or absent for baseline).</p>
       </div>
     </section>
 
