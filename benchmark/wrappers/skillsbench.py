@@ -84,7 +84,7 @@ def _build_agent_instruction(
     instr_path = task_path / "instruction.md"
     try:
         instruction = instr_path.read_text(encoding="utf-8").strip()
-    except (OSError, FileNotFoundError):
+    except OSError:
         instruction = ""
 
     if skill_nudge and task.get("skill_ids"):
@@ -175,7 +175,6 @@ async def _run_agent_and_parse(
     stdout = (result.stdout or "").strip()
     stderr = (result.stderr or "").strip()
     parsed = engine.parse_output(stdout)
-    trial._n_tool_calls = parsed.num_turns
     logger.info(
         "%s: %s done — n_tool_calls=%d stdout_len=%d stderr_len=%d "
         "tools=%s stdout_head=%s",
