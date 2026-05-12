@@ -41,7 +41,7 @@ class AgentEngine:
         raise NotImplementedError
 
     def warmup_cmd(self) -> str:
-        return f"{self.bin_name} --version 2>/dev/null; echo 'WARMUP_DONE_oc29kLx8'"
+        return f"echo WARMUP_$RANDOM$RANDOM; {self.bin_name} --version 2>/dev/null"
 
     def parse_output(self, stdout: str) -> EngineOutput:
         raise NotImplementedError
