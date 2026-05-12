@@ -82,7 +82,10 @@ def _build_agent_instruction(
     """Build the instruction prompt for the agent CLI with optional skill nudge."""
     task_path = Path(task["task_dir"])
     instr_path = task_path / "instruction.md"
-    instruction = instr_path.read_text(encoding="utf-8").strip() if instr_path.exists() else ""
+    try:
+        instruction = instr_path.read_text(encoding="utf-8").strip()
+    except (OSError, FileNotFoundError):
+        instruction = ""
 
     if skill_nudge and task.get("skill_ids"):
         names = ", ".join(task["skill_ids"])
@@ -173,8 +176,6 @@ async def _run_agent_and_parse(
     stderr = (result.stderr or "").strip()
     parsed = engine.parse_output(stdout)
     trial._n_tool_calls = parsed.num_turns
-    trial._tool_calls = parsed.tool_calls
-    trial._duration_sec = duration_sec
     logger.info(
         "%s: %s done — n_tool_calls=%d stdout_len=%d stderr_len=%d "
         "tools=%s stdout_head=%s",
@@ -193,13 +194,18 @@ async def _run_agent_and_parse(
             "startup error. Stderr: %.500s",
             engine.name, task["task_id"], mode, stderr,
         )
-    return stdout, stderr
+    return stdout, stderr, parsed.tool_calls, duration_sec
 
 
-def _build_trial_result(trial, task_id: str, error: str | None) -> dict:
+def _build_trial_result(
+    trial,
+    task_id: str,
+    error: str | None,
+    *,
+    tool_calls: dict[str, int] | None = None,
+    duration_sec: float | None = None,
+) -> dict:
     """Build result dict from Trial, handling setup failures."""
-    tool_calls = getattr(trial, "_tool_calls", {})
-    duration_sec = getattr(trial, "_duration_sec", 0.0)
     if trial._trial_dir is None:
         return {
             "task_id": task_id,
@@ -209,8 +215,8 @@ def _build_trial_result(trial, task_id: str, error: str | None) -> dict:
             "verifier_error": None,
             "build_ok": False,
             "n_tool_calls": 0,
-            "tool_calls": {},
-            "duration_sec": 0.0,
+            "tool_calls": tool_calls or {},
+            "duration_sec": duration_sec or 0.0,
         }
     result = trial._build_result()
     reward = result.rewards.get("reward", 0.0) if result.rewards else 0.0
@@ -222,8 +228,8 @@ def _build_trial_result(trial, task_id: str, error: str | None) -> dict:
         "verifier_error": result.verifier_error,
         "build_ok": error is None,
         "n_tool_calls": result.n_tool_calls,
-        "tool_calls": tool_calls,
-        "duration_sec": duration_sec,
+        "tool_calls": tool_calls or {},
+        "duration_sec": duration_sec or 0.0,
     }
 
 
@@ -514,13 +520,17 @@ class SkillsBenchWrapper:
 
         trial = await Trial.create(config)
         error = None
+        tool_calls: dict[str, int] = {}
+        duration_sec = 0.0
         try:
             await trial.setup()
             await trial.start()
             await _install_agent_binary(trial._env, self._engine)
             await trial.install_agent()
             instruction = _build_agent_instruction(task, skill_nudge, self._engine)
-            await _run_agent_and_parse(trial, task, instruction, mode="acp", engine=self._engine)
+            _, _, tool_calls, duration_sec = await _run_agent_and_parse(
+                trial, task, instruction, mode="acp", engine=self._engine,
+            )
             await trial.verify()
         except (TimeoutError, ConnectionError) as e:
             error = str(e)
@@ -535,7 +545,7 @@ class SkillsBenchWrapper:
             except Exception as cleanup_exc:
                 logger.warning("Cleanup failed for %s: %s", task_id, cleanup_exc)
 
-        return _build_trial_result(trial, task_id, error)
+        return _build_trial_result(trial, task_id, error, tool_calls=tool_calls, duration_sec=duration_sec)
 
     async def _inject_mcp_into_container(self, env, task: dict) -> None:
         """Inject ontomcp binary + TTL files + MCP config into container."""
@@ -624,13 +634,17 @@ class SkillsBenchWrapper:
 
         trial = await Trial.create(config)
         error = None
+        tool_calls: dict[str, int] = {}
+        duration_sec = 0.0
         try:
             await trial.setup()
             await trial.start()
             await _install_agent_binary(trial._env, self._engine)
             await self._inject_mcp_into_container(trial._env, task)
             await trial.install_agent()
-            await _run_agent_and_parse(trial, task, instruction, mode="acp-mcp", engine=self._engine)
+            _, _, tool_calls, duration_sec = await _run_agent_and_parse(
+                trial, task, instruction, mode="acp-mcp", engine=self._engine,
+            )
             await trial.verify()
         except (TimeoutError, ConnectionError) as e:
             error = str(e)
@@ -645,7 +659,7 @@ class SkillsBenchWrapper:
             except Exception as cleanup_exc:
                 logger.warning("MCP cleanup failed for %s: %s", task_id, cleanup_exc)
 
-        return _build_trial_result(trial, task_id, error)
+        return _build_trial_result(trial, task_id, error, tool_calls=tool_calls, duration_sec=duration_sec)
 
     async def _handle_attempt_result(
         self,

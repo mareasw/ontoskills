@@ -162,6 +162,13 @@ python benchmark/run.py --benchmark swebench --mode both --max-tasks 25 --model 
 
 ## Known issues
 
+### API key exposed in Docker container env
+
+The API key (`ANTHROPIC_API_KEY` or `OPENCODE_API_KEY`) is passed to the Docker
+container via ``env.exec(env=...)`` and is visible via ``docker exec`` or
+``/proc`` inside the container. This is an accepted risk for the isolated
+benchmark environment — do not reuse these containers in multi-tenant setups.
+
 ### MCP naming differs between engines
 
 Claude Code exposes MCP tools as ``mcp__<server>__<tool>`` (e.g. ``mcp__onto__skill``).
