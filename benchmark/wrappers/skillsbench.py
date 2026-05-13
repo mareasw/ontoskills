@@ -521,6 +521,7 @@ class SkillsBenchWrapper:
         error = None
         tool_calls: dict[str, int] = {}
         duration_sec = 0.0
+        t0 = time.perf_counter()
         try:
             await trial.setup()
             await trial.start()
@@ -530,9 +531,11 @@ class SkillsBenchWrapper:
             _, _, tool_calls, duration_sec = await _run_agent_and_parse(
                 trial, task, instruction, mode="acp", engine=self._engine,
             )
+            duration_sec = time.perf_counter() - t0
             await trial.verify()
         except (TimeoutError, ConnectionError) as e:
             error = str(e)
+            duration_sec = time.perf_counter() - t0
             logger.error("Trial error for %s: %s", task_id, error)
         except Exception as exc:
             error = str(exc)
@@ -635,6 +638,7 @@ class SkillsBenchWrapper:
         error = None
         tool_calls: dict[str, int] = {}
         duration_sec = 0.0
+        t0 = time.perf_counter()
         try:
             await trial.setup()
             await trial.start()
@@ -644,9 +648,11 @@ class SkillsBenchWrapper:
             _, _, tool_calls, duration_sec = await _run_agent_and_parse(
                 trial, task, instruction, mode="acp-mcp", engine=self._engine,
             )
+            duration_sec = time.perf_counter() - t0
             await trial.verify()
         except (TimeoutError, ConnectionError) as e:
             error = str(e)
+            duration_sec = time.perf_counter() - t0
             logger.error("MCP Trial error for %s: %s", task_id, error)
         except Exception as exc:
             error = str(exc)
