@@ -149,7 +149,7 @@ def _run_skillsbench(
     *,
     cases: list[tuple[str, bool]],
     repo_path: str | None = None,
-    model: str = "glm-5.1",
+    model: str | None = None,
     engine_name: str = "claude",
     max_tasks: int | None = None,
     shuffle: bool = True,
@@ -168,6 +168,8 @@ def _run_skillsbench(
     Multiple cases -> uses _run_pooled_task_first (per-case states, taskwise iteration).
     """
     engine = create_engine(engine_name)
+    if model is None:
+        model = engine.model
     wrapper = SkillsBenchWrapper(repo_path=repo_path or _DEFAULT_REPO, engine=engine)
 
     packages_root = os.path.expanduser("~/.ontoskills/packages")
@@ -224,14 +226,13 @@ def _run_skillsbench_acp(
     *,
     mode: str = "acp",
     label: str | None = None,
-    model: str = "glm-5.1",
+    model: str | None = None,
     engine_name: str = "claude",
     max_tasks: int | None = None,
     shuffle: bool = True,
     seed: int = 42,
     skip_first: int = 0,
     max_attempts: int = 5,
-    skill_hints: bool = True,
     skillsbench_repo: str | None = None,
     only_tasks: list[str] | None = None,
     workers: int = 2,
@@ -263,7 +264,7 @@ def _run_skillsbench_acp(
 def _run_skillsbench_taskwise(
     output_dir: Path,
     *,
-    model: str = "glm-5.1",
+    model: str | None = None,
     engine_name: str = "claude",
     max_tasks: int | None = None,
     shuffle: bool = True,
@@ -293,7 +294,7 @@ def _run_skillsbench_taskwise(
 def _run_skillsbench_task_first(
     output_dir: Path,
     *,
-    model: str = "glm-5.1",
+    model: str | None = None,
     engine_name: str = "claude",
     max_tasks: int | None = None,
     shuffle: bool = True,
@@ -432,7 +433,7 @@ def build_parser() -> argparse.ArgumentParser:
             "'all5' = all 5 cases, 'taskwise' = 3 cases per task"
         ),
     )
-    parser.add_argument("--model", default="glm-5.1")
+    parser.add_argument("--model", default=None)
     parser.add_argument(
         "--engine", default="claude", choices=["claude", "opencode"],
         help="Agent engine: claude (default, needs ANTHROPIC_API_KEY) or opencode (needs OPENCODE_API_KEY)",
