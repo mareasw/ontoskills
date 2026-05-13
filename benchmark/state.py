@@ -59,7 +59,6 @@ class BenchmarkState:
             self._data["mode"] == mode
             and self._data["skill_hints"] == skill_hints
             and (not engine or self._data.get("engine") == engine)
-            and (not model or self._data.get("model") == model or not self._data.get("model"))
         )
 
     def is_empty(self) -> bool:
