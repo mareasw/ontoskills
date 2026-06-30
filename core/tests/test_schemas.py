@@ -62,6 +62,27 @@ def test_state_transition_defaults():
     assert st.handles_failure == []
 
 
+def test_social_account_action_can_require_approval_state():
+    """Account-changing social skills can model approval as an explicit state."""
+    st = StateTransition(
+        requires_state=["oc:UserApprovalRequired"],
+        yields_state=["oc:SocialActionApproved"],
+        handles_failure=["oc:ApprovalDenied"],
+    )
+    skill = ExtractedSkill(
+        id="approval-gated-social-action",
+        hash="social123",
+        nature="Approval-gated social account action",
+        genus="Social automation",
+        differentia="requires approval before publishing",
+        intents=["draft approved social action"],
+        state_transitions=st,
+    )
+    assert skill.state_transitions.requires_state == ["oc:UserApprovalRequired"]
+    assert skill.state_transitions.yields_state == ["oc:SocialActionApproved"]
+    assert skill.state_transitions.handles_failure == ["oc:ApprovalDenied"]
+
+
 def test_state_transition_uri_validation():
     """Test that invalid URIs raise ValidationError."""
     with pytest.raises(ValidationError) as exc_info:
