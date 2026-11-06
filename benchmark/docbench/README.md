@@ -54,7 +54,8 @@ benchmark/docbench/
 - [ ] D1 annotated
 - [ ] D2 annotated
 - [ ] D3 annotated
-- [ ] 30 questions written
+- [ ] D4 annotated
+- [ ] 40 questions written
 - [ ] B0/B1/B2 run
 - [ ] Scored
 - [ ] Go/no-go decision recorded

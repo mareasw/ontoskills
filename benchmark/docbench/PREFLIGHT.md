@@ -70,13 +70,14 @@ A compiled claim layer with per-claim evidence, locator, and context beats both 
 
 ## 2. Corpus for the paper prototype
 
-Three documents, all published in 2026, all public, none of them a famous document that a model is likely to have memorised end-to-end.
+Four documents, all published in 2026, all public, none of them a famous document that a model is likely to have memorised end-to-end.
 
 | ID | Document | Type | Why it is a good test | Licence / reuse |
 |---|---|---|---|---|
 | **D1** | Commission Implementing Regulation (EU) 2026/1755 of 20 July 2026 (AI Act evaluations and proceedings) | Regulation | Obligations, deadlines, roles, conditions, procedural safeguards | EU reuse policy (Commission Decision 2011/833/EU) |
 | **D2** | Loyola University New Orleans, *University Artificial Intelligence Policy & Guidance*, AY 26-27 | Institutional policy | Permissions, prohibitions, exceptions, review cadence, roles | Copyright Loyola University; research use only, do not redistribute |
 | **D3** | OWASP Agentic Skills Top 10, *Incident Response Playbook* (updated March 2026) | Operational procedure | Steps, severity levels, response times, escalation, notification duties | CC BY-SA 4.0; attribution and share-alike |
+| **D4** | County of Greene, Virginia, *RFP #2026-001 — Professional Engineering Services* (issued 22 January 2026) | Procurement solicitation | Mandatory submission requirements, hard deadlines, evaluation criteria, contract terms — and an internal deadline inconsistency between the cover and section 6 | Public procurement record; research use, verify local reuse policy |
 
 URLs:
 
@@ -84,19 +85,20 @@ URLs:
 - D1 (reader): https://artificialintelligenceact.eu/ai-act-explorer/proceedings/
 - D2: https://academicaffairs.loyno.edu/sites/default/files/university_ai_policy_ay_26-27_0.pdf
 - D3: https://owasp.github.io/www-project-agentic-skills-top-10/incident-response
+- D4: https://greenecountyva.gov/DocumentCenter/View/1577
 
 **Rule:** do not commit full document text. Download into `benchmark/docbench/private/` (gitignored) or keep outside the repo. Commit only URLs, SHA-256 hashes, and short quotes for evaluation.
 
-### Why these three
+### Why these four
 
-- They cover three different claim types: regulatory obligation, institutional permission/prohibition, operational step.
+- They cover four different claim types: regulatory obligation, institutional permission/prohibition, operational step, procurement requirement.
 - They are recent enough to be a fair test against memorisation.
-- They are short enough to annotate by hand (D1 ~10 pages, D2 ~10 pages, D3 ~1 long page).
-- They contain dates, roles, conditions and exceptions, which is exactly what the claim model must capture.
+- They are short enough to annotate by hand (D1 ~10 pages, D2 ~10 pages, D3 ~1 long page, D4 ~10 pages).
+- D4 contains a conflicting deadline: the cover and section 6 disagree. That is not a bug to smooth over; it is exactly the kind of conflict the claim layer must surface with context.
 
-### What is still missing
+### Known limitation
 
-One **real internal document** from the target domain (anonymised). Public documents test the pipeline; a private document tests whether the product solves a real problem and is not in any training set. This is the one thing we need from the user.
+We do not have a private internal document for this pre-flight. D4 is a niche public document, which gives some protection against memorisation, but it is not the same as an unseen internal policy. Fairness is therefore approximate, and the result should be read as a pipeline test, not as a market test.
 
 ---
 
@@ -115,7 +117,7 @@ See `benchmark/docbench/gold/schema.json`. Required fields:
 | Field | Meaning |
 |---|---|
 | `claim_id` | Stable ID, e.g. `D1-0007` |
-| `doc_id` | `D1`, `D2`, `D3` |
+| `doc_id` | `D1`, `D2`, `D3`, `D4` |
 | `quote` | Verbatim text from the source |
 | `locator` | Page/bbox, section path, char span, or URL#anchor |
 | `statement` | Normalised claim in one sentence |
@@ -234,9 +236,10 @@ Record: document type, frequency (`Q`), stakes, current workaround, trust requir
 
 ## 7. What we need from the user
 
-1. **One real internal document** (anonymised) from the target domain, ideally a policy or procedure with obligations and versions. Keep it local; do not commit it.
-2. **3-5 conversations** with people who actually use such documents.
-3. **Confirmation of the first domain**: policy/procedure, runbooks, or contracts.
+1. **3-5 conversations** with people who actually use such documents. This is the only part that cannot be done from public sources.
+2. **Confirmation of the first domain**: policy/procedure, runbooks, or contracts.
+
+A private document would strengthen the test, but it is optional for the pre-flight. The corpus above is sufficient to decide whether the claim layer is worth building.
 
 ---
 
@@ -244,9 +247,9 @@ Record: document type, frequency (`Q`), stakes, current workaround, trust requir
 
 | Day | Deliverable |
 |---|---|
-| 1 | Download D1-D3, hash them, fill `sources.md`, confirm licences |
+| 1 | Download D1-D4, hash them, fill `sources.md`, confirm licences |
 | 2 | Annotate 10 claims for D1 and D2 |
-| 3 | Annotate 10 claims for D3; write 30 questions |
+| 3 | Annotate 10 claims for D3 and D4; write 40 questions |
 | 4 | Build minimal Turtle; run B0/B1/B2 |
 | 5 | Score, write the result, decide go/no-go |
 
