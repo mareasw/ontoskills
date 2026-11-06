@@ -1,0 +1,10 @@
+PREFIX oc: <https://ontoskills.sh/ontology#>
+
+# Obligations ordered by actor and declared deadline.
+SELECT ?claim ?actor ?deadline ?statement WHERE {
+  ?claim oc:hasModality oc:Obligation ;
+         oc:hasActor ?actor ;
+         oc:hasStatement ?statement .
+  OPTIONAL { ?claim oc:hasDeadline ?deadline }
+}
+ORDER BY ?actor ?deadline
