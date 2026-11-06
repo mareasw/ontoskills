@@ -20,6 +20,21 @@ benchmark/docbench/
 └── runs/                   # local run outputs (gitignored)
 ```
 
+## Scripts
+
+```bash
+# Validate every claim: verbatim quote, PDF page, JSON schema
+python benchmark/docbench/check_claims.py
+
+# Fix PDF page numbers in place (only when the quote is correct)
+python benchmark/docbench/check_claims.py --fix-pages
+
+# Build the minimal Turtle graph (documents, contexts, claims, evidence)
+python benchmark/docbench/build_ttl.py --out benchmark/docbench/runs/docbench.ttl
+```
+
+The generated graph can be queried with the files in `queries/`.
+
 ## Rules
 
 1. **No quote, no claim.** A claim without a verbatim quote and a resolving locator is invalid.
@@ -51,11 +66,16 @@ benchmark/docbench/
 
 ## Status
 
-- [ ] D1 annotated
-- [ ] D2 annotated
-- [ ] D3 annotated
-- [ ] D4 annotated
-- [ ] 40 questions written
+- [x] D1 annotated (10 claims)
+- [x] D2 annotated (10 claims)
+- [x] D3 annotated (10 claims)
+- [x] D4 annotated (11 claims, including the deadline conflict)
+- [x] 40 questions written (5 direct, 3 multi-hop, 2 unanswerable per document)
+- [x] Minimal Turtle graph builds and parses (41 claims, 767 triples)
 - [ ] B0/B1/B2 run
 - [ ] Scored
 - [ ] Go/no-go decision recorded
+
+The full annotations (`gold/claims.jsonl`, `gold/questions.jsonl`) and the
+generated graph (`runs/`) are local and gitignored because they quote
+third-party documents. The committed `*.example.jsonl` files show the format.
