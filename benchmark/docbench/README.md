@@ -31,9 +31,32 @@ python benchmark/docbench/check_claims.py --fix-pages
 
 # Build the minimal Turtle graph (documents, contexts, claims, evidence)
 python benchmark/docbench/build_ttl.py --out benchmark/docbench/runs/docbench.ttl
+
+# Inspect the three baseline prompts without calling a model
+python benchmark/docbench/run_baselines.py --dry-run
+
+# Run the baselines (requires the chosen SDK and an API key in the environment)
+python benchmark/docbench/run_baselines.py --backend anthropic --model <model>
+python benchmark/docbench/run_baselines.py --backend openai --model <model>
+
+# Score the latest run
+python benchmark/docbench/score.py
 ```
 
-The generated graph can be queried with the files in `queries/`.
+The generated graph can be queried with the files in `queries/`. The
+`--backend mock` option exists only to test the plumbing; mock answers are
+never a real evaluation.
+
+## Baselines
+
+| Condition | Context |
+|---|---|
+| **B0** | The full document |
+| **B1** | Top-5 paragraphs retrieved with BM25 |
+| **B2** | The compiled claims for the document, with quote and locator |
+
+All three use the same system prompt, the same question, temperature 0 and the
+same JSON output contract. Only the context differs.
 
 ## Rules
 
@@ -72,8 +95,10 @@ The generated graph can be queried with the files in `queries/`.
 - [x] D4 annotated (11 claims, including the deadline conflict)
 - [x] 40 questions written (5 direct, 3 multi-hop, 2 unanswerable per document)
 - [x] Minimal Turtle graph builds and parses (41 claims, 767 triples)
-- [ ] B0/B1/B2 run
-- [ ] Scored
+- [x] B0/B1/B2 harness builds and dry-runs (120 prompts, ~456k input tokens)
+- [x] End-to-end plumbing tested with the mock backend
+- [ ] B0/B1/B2 run with a real model
+- [ ] Scored (automatic triage + blind manual review)
 - [ ] Go/no-go decision recorded
 
 The full annotations (`gold/claims.jsonl`, `gold/questions.jsonl`) and the
