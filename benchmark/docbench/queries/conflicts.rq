@@ -1,0 +1,8 @@
+PREFIX oc: <https://ontoskills.sh/ontology#>
+
+# Claims that explicitly conflict with another claim.
+SELECT ?claim ?statement ?other WHERE {
+  ?claim oc:conflictsWith ?other ;
+         oc:hasStatement ?statement .
+}
+ORDER BY ?claim ?other
