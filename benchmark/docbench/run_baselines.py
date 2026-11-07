@@ -20,8 +20,8 @@ Usage:
     OPENAI_API_KEY=... python benchmark/docbench/run_baselines.py \
         --model gpt-5.1 --backend openai
 
-No key is read from disk. The runner reads the standard environment variables
-of the chosen SDK and never prints them.
+The runner reads the standard environment variables of the chosen SDK, plus an
+optional repo-root `.env`, and never prints a key.
 """
 
 from __future__ import annotations
@@ -58,6 +58,26 @@ SYSTEM = (
 
 MAX_CLAIMS_IN_CONTEXT = 12
 RAG_TOP_K = 5
+DEFAULT_MAX_TOKENS = 2048
+RETRIES = 3
+
+
+def load_dotenv(path: Path | None = None) -> None:
+    """Load the repo-root .env without overriding existing variables."""
+    env_path = path or ROOT.parent.parent / ".env"
+    if not env_path.exists():
+        return
+    for raw in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):].strip()
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key:
+            os.environ.setdefault(key, value)
 
 
 def norm(text: str) -> str:
@@ -157,11 +177,16 @@ def make_prompt(context: str, question: str) -> str:
     return f"CONTEXT:\n{context}\n\nQUESTION: {question}"
 
 
-def call_model(backend: str, model: str, prompt: str, base_url: str = "") -> tuple[str, int, int]:
-    started = time.monotonic()
+def call_model(
+    backend: str,
+    model: str,
+    prompt: str,
+    base_url: str = "",
+    max_tokens: int = DEFAULT_MAX_TOKENS,
+) -> tuple[str, int, int, int]:
     if backend == "mock":
         # Plumbing test only: never use mock answers for a real evaluation.
-        return '{"answer":"UNKNOWN","citation":"","claim_ids":[]}', 0, 0
+        return '{"answer":"UNKNOWN","citation":"","claim_ids":[]}', 0, 0, 0
     if backend == "http":
         # OpenAI-compatible HTTP endpoint without the openai SDK. Works with
         # Ollama, vLLM, LM Studio, LocalAI and any compatible server.
@@ -177,19 +202,44 @@ def call_model(backend: str, model: str, prompt: str, base_url: str = "") -> tup
         payload = {
             "model": model,
             "temperature": 0,
-            "max_tokens": 1024,
+            "max_tokens": max_tokens,
             "messages": [
                 {"role": "system", "content": SYSTEM},
                 {"role": "user", "content": prompt},
             ],
         }
-        resp = requests.post(f"{url}/chat/completions", headers=headers, json=payload, timeout=180)
-        if resp.status_code >= 400:
-            raise SystemExit(f"HTTP {resp.status_code} from {url}: {resp.text[:400]}")
-        data = resp.json()
-        text = data["choices"][0]["message"].get("content") or ""
-        usage = data.get("usage") or {}
-        return text, int(usage.get("prompt_tokens", 0)), int(usage.get("completion_tokens", 0))
+        last_error = ""
+        for attempt in range(RETRIES):
+            try:
+                resp = requests.post(f"{url}/chat/completions", headers=headers, json=payload, timeout=300)
+            except requests.RequestException as exc:
+                last_error = str(exc)
+                time.sleep(2 * (attempt + 1))
+                continue
+            if resp.status_code in {408, 409, 429, 500, 502, 503, 504}:
+                last_error = f"HTTP {resp.status_code}"
+                time.sleep(2 * (attempt + 1))
+                continue
+            if resp.status_code >= 400:
+                raise SystemExit(f"HTTP {resp.status_code} from {url}: {resp.text[:400]}")
+            data = resp.json()
+            choice = (data.get("choices") or [{}])[0]
+            text = (choice.get("message") or {}).get("content") or ""
+            usage = data.get("usage") or {}
+            details = usage.get("completion_tokens_details") or {}
+            reasoning = int(details.get("reasoning_tokens", 0) or 0)
+            if not text.strip():
+                # A reasoning model can spend the whole budget on reasoning.
+                last_error = f"empty content (finish_reason={choice.get('finish_reason')})"
+                time.sleep(2 * (attempt + 1))
+                continue
+            return (
+                text,
+                int(usage.get("prompt_tokens", 0)),
+                int(usage.get("completion_tokens", 0)),
+                reasoning,
+            )
+        raise SystemExit(f"no usable answer after {RETRIES} attempts: {last_error}")
     if backend == "anthropic":
         try:
             import anthropic
@@ -198,14 +248,14 @@ def call_model(backend: str, model: str, prompt: str, base_url: str = "") -> tup
         client = anthropic.Anthropic()
         resp = client.messages.create(
             model=model,
-            max_tokens=1024,
+            max_tokens=max_tokens,
             temperature=0,
             system=SYSTEM,
             messages=[{"role": "user", "content": prompt}],
         )
         text = "".join(block.text for block in resp.content if getattr(block, "type", "") == "text")
         usage = resp.usage
-        return text, usage.input_tokens, usage.output_tokens
+        return text, usage.input_tokens, usage.output_tokens, 0
 
     if backend == "openai":
         try:
@@ -215,13 +265,13 @@ def call_model(backend: str, model: str, prompt: str, base_url: str = "") -> tup
         client = openai.OpenAI(base_url=base_url or os.environ.get("OPENAI_BASE_URL") or None)
         resp = client.chat.completions.create(
             model=model,
-            max_tokens=1024,
+            max_tokens=max_tokens,
             temperature=0,
             messages=[{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}],
         )
         text = resp.choices[0].message.content or ""
         usage = resp.usage
-        return text, usage.prompt_tokens, usage.completion_tokens
+        return text, usage.prompt_tokens, usage.completion_tokens, 0
 
     raise SystemExit(f"unknown backend: {backend}")
 
@@ -252,7 +302,11 @@ def main() -> int:
                     help="OpenAI-compatible base URL, e.g. http://localhost:11434/v1")
     ap.add_argument("--conditions", default="B0,B1,B2")
     ap.add_argument("--only-docs", default="", help="Comma-separated doc ids, e.g. D1,D4")
+    ap.add_argument("--max-tokens", type=int, default=DEFAULT_MAX_TOKENS)
+    ap.add_argument("--resume", default="", help="Resume a run directory, skipping answered pairs")
     args = ap.parse_args()
+
+    load_dotenv()
 
     questions = load_jsonl(GOLD / "questions.jsonl")
     claims = load_jsonl(GOLD / "claims.jsonl")
@@ -263,9 +317,15 @@ def main() -> int:
 
     conditions = [c.strip() for c in args.conditions.split(",") if c.strip()]
 
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    outdir = RUNS / stamp
-    outdir.mkdir(parents=True, exist_ok=True)
+    if args.resume:
+        outdir = Path(args.resume)
+        if not outdir.is_dir():
+            raise SystemExit(f"--resume: not a directory: {outdir}")
+        stamp = outdir.name
+    else:
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        outdir = RUNS / stamp
+        outdir.mkdir(parents=True, exist_ok=True)
 
     manifest = {
         "stamp": stamp,
@@ -275,13 +335,22 @@ def main() -> int:
         "conditions": conditions,
         "rag_top_k": RAG_TOP_K,
         "max_claims_in_context": MAX_CLAIMS_IN_CONTEXT,
+        "max_tokens": args.max_tokens,
         "questions": len(questions),
         "dry_run": args.dry_run,
     }
     (outdir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
+    answers_path = outdir / "answers.jsonl"
+    done: set[tuple[str, str]] = set()
+    if args.resume and answers_path.exists():
+        for row in load_jsonl(answers_path):
+            done.add((row["condition"], row["question_id"]))
+        print(f"resume: {len(done)} answers already in {answers_path}")
+
     prompts = []
     answers = []
+    answered = answers_path.open("a", encoding="utf-8") if (args.resume and not args.dry_run) else None
     for condition in conditions:
         for q in questions:
             source = SOURCES[q["doc_id"]].read_text(encoding="utf-8", errors="ignore")
@@ -300,10 +369,14 @@ def main() -> int:
                 continue
             if not args.model:
                 raise SystemExit("--model is required unless --dry-run")
+            if (condition, q["question_id"]) in done:
+                continue
             started = time.monotonic()
-            raw, in_tok, out_tok = call_model(args.backend, args.model, prompt, args.base_url)
+            raw, in_tok, out_tok, reasoning_tok = call_model(
+                args.backend, args.model, prompt, args.base_url, args.max_tokens
+            )
             answer, citation, claim_ids = parse_answer(raw)
-            answers.append({
+            row = {
                 "condition": condition,
                 "question_id": q["question_id"],
                 "doc_id": q["doc_id"],
@@ -312,10 +385,16 @@ def main() -> int:
                 "claim_ids": claim_ids,
                 "input_tokens": in_tok,
                 "output_tokens": out_tok,
+                "reasoning_tokens": reasoning_tok,
                 "latency_ms": round((time.monotonic() - started) * 1000, 1),
                 "raw": raw,
-            })
-            print(f"{condition} {q['question_id']}: {answer[:80]!r}")
+            }
+            answers.append(row)
+            if answered is not None:
+                answered.write(json.dumps(row, ensure_ascii=False) + "\n")
+                answered.flush()
+                done.add((condition, q["question_id"]))
+            print(f"{condition} {q['question_id']}: {answer[:80]!r} ({in_tok} tok in, {out_tok} out)")
 
     if args.dry_run:
         (outdir / "prompts.jsonl").write_text(
@@ -329,10 +408,15 @@ def main() -> int:
         print(f"wrote {outdir / 'prompts.jsonl'}")
         return 0
 
-    (outdir / "answers.jsonl").write_text(
+    if answered is not None:
+        answered.close()
+        print(f"appended {len(answers)} answers to {answers_path}")
+        return 0
+
+    answers_path.write_text(
         "".join(json.dumps(a, ensure_ascii=False) + "\n" for a in answers), encoding="utf-8"
     )
-    print(f"wrote {len(answers)} answers to {outdir / 'answers.jsonl'}")
+    print(f"wrote {len(answers)} answers to {answers_path}")
     return 0
 
 
