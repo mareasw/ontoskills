@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: core (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: core/pyproject.toml
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e "./core[dev]"
+
+      - name: Lint (syntax and undefined names)
+        run: ruff check core/src core/tests --select E9,F63,F7,F82
+
+      - name: Test
+        working-directory: core
+        run: python -m pytest -q --timeout=180
+
+  docbench:
+    name: docbench (schema and graph)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: pip install jsonschema rdflib
+
+      - name: Compile scripts
+        run: python -m py_compile benchmark/docbench/*.py
+
+      - name: Validate example claims against the schema
+        run: python benchmark/docbench/check_claims.py --schema-only benchmark/docbench/gold/claims.example.jsonl
+
+      - name: Build and parse the Turtle graph
+        run: |
+          python benchmark/docbench/build_ttl.py \
+            --claims benchmark/docbench/gold/claims.example.jsonl \
+            --out /tmp/docbench.ttl
+          python - <<'PY'
+          import rdflib
+          graph = rdflib.Graph()
+          graph.parse("/tmp/docbench.ttl", format="turtle")
+          print(f"{len(graph)} triples")
+          assert len(graph) > 0
+          PY
+
+  mcp:
+    name: mcp (Rust)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: mcp
+
+      - name: Test
+        run: cargo test --locked --manifest-path mcp/Cargo.toml
