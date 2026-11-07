@@ -57,9 +57,12 @@ def resolve_ontology_root(path: str | Path) -> Path:
             return parent
     return candidate
 
-# Anthropic API model configurations
-ANTHROPIC_MODEL = os.getenv('ANTHROPIC_MODEL', 'claude-opus-4-6')
-SECURITY_MODEL = os.getenv('SECURITY_MODEL', 'claude-opus-4-6')
+# LLM model configuration (OpenAI-compatible).
+# Reads OPENAI_MODEL via compiler.llm.default_model().
+from compiler.llm import default_model  # noqa: E402  (dopo load_local_env)
+
+LLM_MODEL = default_model()
+SECURITY_MODEL = os.getenv('SECURITY_MODEL') or LLM_MODEL
 
 # Default author for skills without an author in directory structure
 DEFAULT_SKILLS_AUTHOR = os.environ.get('DEFAULT_SKILLS_AUTHOR')

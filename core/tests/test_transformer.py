@@ -1,11 +1,12 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from compiler.transformer import (
-    tool_result,
+    OPENAI_TOOLS,
     execute_tool,
     tool_use_loop,
     TOOLS,
     build_sub_skill_context_prompt,
 )
+from compiler.llm import LLMResponse, ToolCall, tool_message
 from compiler.schemas import ExtractedSkill
 
 
@@ -17,13 +18,21 @@ def test_tools_defined():
     assert "extract_skill" in tool_names
 
 
-def test_tool_result():
-    """Test tool result message creation."""
-    result = tool_result("tool_123", '{"files": ["SKILL.md"]}')
-    assert result["role"] == "user"
-    assert result["content"][0]["type"] == "tool_result"
-    assert result["content"][0]["tool_use_id"] == "tool_123"
-    assert result["content"][0]["content"] == '{"files": ["SKILL.md"]}'
+def test_tool_message():
+    """Test tool result message creation (OpenAI shape)."""
+    result = tool_message("tool_123", '{"files": ["SKILL.md"]}')
+    assert result["role"] == "tool"
+    assert result["tool_call_id"] == "tool_123"
+    assert result["content"] == '{"files": ["SKILL.md"]}'
+
+
+def test_openai_tools_shape():
+    """Canonical tools are converted to OpenAI function specs."""
+    names = [t["function"]["name"] for t in OPENAI_TOOLS]
+    assert names == [t["name"] for t in TOOLS]
+    for tool in OPENAI_TOOLS:
+        assert tool["type"] == "function"
+        assert tool["function"]["parameters"]["type"] == "object"
 
 
 def test_execute_tool_list_files(tmp_path):
@@ -82,27 +91,14 @@ def test_execute_tool_extract_skill(tmp_path):
     assert data["status"] == "success"
 
 
-@patch("compiler.transformer.client")
-def test_tool_use_loop_success(mock_client, tmp_path):
+@patch("compiler.transformer.chat")
+def test_tool_use_loop_success(mock_chat, tmp_path):
     """Test successful tool-use loop."""
     skill_dir = tmp_path / "test-skill"
     skill_dir.mkdir()
     (skill_dir / "SKILL.md").write_text("# Test")
 
-    # Mock the API response sequence
-    list_response = MagicMock()
-    list_response.content = [MagicMock(type="tool_use", name="list_files", id="t1")]
-    list_response.stop_reason = "tool_use"
-
-    read_response = MagicMock()
-    read_response.content = [MagicMock(type="tool_use", name="read_file", id="t2", input={"path": "SKILL.md"})]
-    read_response.stop_reason = "tool_use"
-
-    extract_response = MagicMock()
-    extract_block = MagicMock()
-    extract_block.type = "tool_use"
-    extract_block.name = "extract_skill"
-    extract_block.input = {
+    extraction = {
         "id": "test-skill",
         "hash": "abc123",
         "nature": "Test",
@@ -114,14 +110,50 @@ def test_tool_use_loop_success(mock_client, tmp_path):
         "execution_payload": None,
         "provenance": None,
     }
-    extract_response.content = [extract_block]
-    extract_response.stop_reason = "tool_use"
 
-    mock_client.messages.create.side_effect = [list_response, read_response, extract_response]
+    responses = [
+        LLMResponse(
+            text="",
+            tool_calls=(ToolCall(id="t1", name="list_files", arguments={}),),
+            finish_reason="tool_calls",
+        ),
+        LLMResponse(
+            text="",
+            tool_calls=(
+                ToolCall(id="t2", name="read_file", arguments={"path": "SKILL.md"}),
+            ),
+            finish_reason="tool_calls",
+        ),
+        LLMResponse(
+            text="",
+            tool_calls=(
+                ToolCall(id="t3", name="extract_skill", arguments=extraction),
+            ),
+            finish_reason="tool_calls",
+        ),
+    ]
+
+    # Snapshot the messages at call time: the loop mutates the same list.
+    seen: list[list[dict]] = []
+
+    def fake_chat(**kwargs):
+        seen.append(list(kwargs["messages"]))
+        return responses.pop(0)
+
+    mock_chat.side_effect = fake_chat
 
     result = tool_use_loop(skill_dir, "abc123hash", "test-skill")
     assert isinstance(result, ExtractedSkill)
     assert result.id == "test-skill"
+
+    # Every tool call must be preceded by the assistant turn and followed by
+    # a tool-result message (OpenAI rejects orphan tool messages).
+    second_call = seen[1]
+    assert second_call[-2]["role"] == "assistant"
+    assert second_call[-2]["tool_calls"][0]["id"] == "t1"
+    assert second_call[-1] == tool_message(
+        "t1", '{"files": ["SKILL.md"]}'
+    )
 
 
 def test_system_prompt_includes_state_extraction():
@@ -136,20 +168,16 @@ def test_system_prompt_includes_state_extraction():
     assert "URIs" in SYSTEM_PROMPT
 
 
-@patch("compiler.transformer.client")
-def test_tool_use_loop_sets_generated_by(mock_client, tmp_path):
+@patch("compiler.transformer.chat")
+def test_tool_use_loop_sets_generated_by(mock_chat, tmp_path):
     """Test that tool_use_loop sets generated_by field."""
-    from compiler.config import ANTHROPIC_MODEL
+    from compiler.config import LLM_MODEL
 
     skill_dir = tmp_path / "test-skill"
     skill_dir.mkdir()
     (skill_dir / "SKILL.md").write_text("# Test")
 
-    extract_response = MagicMock()
-    extract_block = MagicMock()
-    extract_block.type = "tool_use"
-    extract_block.name = "extract_skill"
-    extract_block.input = {
+    extraction = {
         "id": "test-skill",
         "hash": "abc123",
         "nature": "Test",
@@ -161,13 +189,14 @@ def test_tool_use_loop_sets_generated_by(mock_client, tmp_path):
         "execution_payload": None,
         "provenance": None,
     }
-    extract_response.content = [extract_block]
-    extract_response.stop_reason = "tool_use"
-
-    mock_client.messages.create.return_value = extract_response
+    mock_chat.return_value = LLMResponse(
+        text="",
+        tool_calls=(ToolCall(id="t1", name="extract_skill", arguments=extraction),),
+        finish_reason="tool_calls",
+    )
 
     result = tool_use_loop(skill_dir, "abc123hash", "test-skill")
-    assert result.generated_by == ANTHROPIC_MODEL
+    assert result.generated_by == LLM_MODEL
 
 
 def test_build_sub_skill_context_prompt():

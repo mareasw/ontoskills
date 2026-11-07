@@ -8,32 +8,23 @@ Defense-in-depth security checks for skill content:
 """
 
 import json
-import os
 import re
 import unicodedata
 import logging
 from dataclasses import dataclass
 from typing import Optional
 
-import anthropic
-from anthropic import Anthropic
-
+from compiler.config import SECURITY_MODEL
 from compiler.env import load_local_env
+from compiler.llm import LLMError, chat
 from compiler.exceptions import SecurityError
 
 logger = logging.getLogger(__name__)
 
 load_local_env()
 
-# Security model for LLM-as-judge
-SECURITY_MODEL = os.getenv("SECURITY_MODEL", "claude-opus-4-6")
+# Timeout for the LLM-as-judge review
 SECURITY_TIMEOUT = 30  # seconds
-
-# Initialize Anthropic client
-client = Anthropic(
-    api_key=os.getenv("ANTHROPIC_API_KEY"),
-    base_url=os.getenv("ANTHROPIC_BASE_URL")
-)
 
 
 @dataclass
@@ -206,15 +197,15 @@ Respond in JSON format:
 {{"safe": true/false, "reason": "explanation"}}"""
 
     try:
-        response = client.messages.create(
+        response = chat(
             model=SECURITY_MODEL,
             max_tokens=256,
             messages=[{"role": "user", "content": prompt}],
-            timeout=SECURITY_TIMEOUT
+            timeout=SECURITY_TIMEOUT,
         )
 
         # Parse JSON response
-        text = response.content[0].text
+        text = response.text
         # Extract JSON from response (handle markdown code blocks)
         json_match = re.search(r'\{[^}]+\}', text, re.DOTALL)
         if json_match:
@@ -228,7 +219,7 @@ Respond in JSON format:
             logger.error(f"Could not parse LLM security response: {text}")
             return LLMSecurityResult(safe=False, reason="Could not parse security review")
 
-    except anthropic.APIError as e:
+    except LLMError as e:
         logger.error(f"LLM security review failed: {e}")
         # Fail-closed: any error means block the content
         raise SecurityError(f"Security review failed: {e}")
