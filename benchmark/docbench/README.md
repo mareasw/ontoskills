@@ -1,6 +1,6 @@
 # DocBench (pre-flight)
 
-**Status: pre-flight.** This directory is a protocol and a set of examples, not a working benchmark yet.
+**Status: first full run done (2026-11-07).** See [`RESULTS.md`](RESULTS.md) for the numbers, the manual review and the limitations. The corpus and the full gold set stay local; the protocol and the examples are public.
 
 The goal is to test, on a small hand-built corpus, whether a compiled claim layer with per-claim evidence beats full-document reading and RAG on citation accuracy and answer accuracy with citation.
 
@@ -109,9 +109,10 @@ same JSON output contract. Only the context differs.
 - [x] B0/B1/B2 harness builds and dry-runs (120 prompts, ~456k input tokens)
 - [x] End-to-end plumbing tested with the mock backend
 - [x] OpenAI-compatible HTTP backend tested against a local stub
-- [ ] B0/B1/B2 run with a real model
-- [ ] Scored (automatic triage + blind manual review)
-- [ ] Go/no-go decision recorded
+- [x] B0/B1/B2 run with a real model (`deepseek-v4.1-flash`, 120 calls)
+- [x] Scored: automatic triage + manual review of all 120 answers
+- [ ] Independently re-scored by a reviewer who did not build the harness
+- [ ] Go/no-go decision recorded (technical gate passed; market gate open)
 
 The full annotations (`gold/claims.jsonl`, `gold/questions.jsonl`) and the
 generated graph (`runs/`) are local and gitignored because they quote
