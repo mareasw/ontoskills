@@ -3,7 +3,7 @@
 These tests are skipped by default. Run with:
     pytest -m integration tests/test_integration.py -v
 
-Requires ANTHROPIC_API_KEY environment variable.
+Requires OPENAI_API_KEY environment variable.
 """
 import os
 import pytest
@@ -11,8 +11,8 @@ from pathlib import Path
 
 # Skip all tests in this module if no API key
 pytestmark = pytest.mark.skipif(
-    not os.getenv("ANTHROPIC_API_KEY"),
-    reason="ANTHROPIC_API_KEY not set"
+    not os.getenv("OPENAI_API_KEY"),
+    reason="OPENAI_API_KEY not set",
 )
 
 
@@ -29,7 +29,7 @@ def xlsx_skill_dir():
 def test_real_extraction_xlsx(xlsx_skill_dir, tmp_path):
     """Test real LLM extraction on xlsx skill.
 
-    This test actually calls the Anthropic API to extract skill metadata.
+    This test actually calls the configured LLM API to extract skill metadata.
     It validates the entire extraction pipeline end-to-end.
     """
     from compiler.extractor import generate_skill_id, compute_skill_hash
