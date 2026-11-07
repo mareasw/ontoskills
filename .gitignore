@@ -23,6 +23,12 @@ ontoskills/system/
 benchmark_results.log
 .log
 
+# DocBench: source documents and real annotations stay local
+benchmark/docbench/private/
+benchmark/docbench/runs/
+benchmark/docbench/gold/claims.jsonl
+benchmark/docbench/gold/questions.jsonl
+
 # Astro build cache
 .astro/
 
