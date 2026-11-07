@@ -9,6 +9,7 @@ import json
 import os
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import anthropic
 from anthropic import Anthropic
@@ -18,6 +19,10 @@ from compiler.schemas import ContentExtraction, ExtractedSkill
 from compiler.exceptions import ExtractionError
 from compiler.config import ANTHROPIC_MODEL, MAX_ITERATIONS, EXTRACTION_TIMEOUT
 from compiler.prompts import SYSTEM_PROMPT
+
+if TYPE_CHECKING:
+    from compiler.schemas import DocumentSkeleton, FlatBlock, Section
+    from compiler.skill_registry import SkillRegistry
 
 logger = logging.getLogger(__name__)
 
