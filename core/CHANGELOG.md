@@ -4,6 +4,17 @@ All notable changes to OntoCore (Python package) will be documented in this file
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+
+- **LLM client is OpenAI-compatible** — `compiler.llm` wraps the OpenAI SDK and reads
+  the standard `OPENAI_BASE_URL` / `OPENAI_API_KEY` / `OPENAI_MODEL`; point the
+  base URL at OpenAI, Cascade, or any compatible gateway. The tool-use loop
+  (`transformer.py`), the LLM security review and the skeleton parser no longer
+  depend on the Anthropic SDK; `anthropic` is replaced by `openai` in the
+  package dependencies.
+
 ## [1.1.0] - 2026-05-04
 
 ### Added
