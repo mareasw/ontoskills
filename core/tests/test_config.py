@@ -71,23 +71,23 @@ def test_custom_output_dir():
         assert config.OUTPUT_DIR == custom_dir
 
 
-def test_default_anthropic_model():
-    """Verify ANTHROPIC_MODEL is configured (from env var or hardcoded default)."""
+def test_default_llm_model():
+    """Verify LLM_MODEL is configured (from env var or hardcoded default)."""
     from compiler import config
-    assert config.ANTHROPIC_MODEL is not None
-    assert isinstance(config.ANTHROPIC_MODEL, str)
+    assert config.LLM_MODEL is not None
+    assert isinstance(config.LLM_MODEL, str)
 
 
-def test_custom_anthropic_model():
-    """Verify custom ANTHROPIC_MODEL from environment variable."""
-    custom_model = 'claude-3-opus-20250201'
+def test_custom_llm_model():
+    """Verify custom OPENAI_MODEL from environment variable."""
+    custom_model = 'test-model-id'
 
-    with patch.dict(os.environ, {'ANTHROPIC_MODEL': custom_model}):
+    with patch.dict(os.environ, {'OPENAI_MODEL': custom_model}):
         import importlib
         from compiler import config
         importlib.reload(config)
 
-        assert config.ANTHROPIC_MODEL == custom_model
+        assert config.LLM_MODEL == custom_model
 
 
 def test_default_security_model():
@@ -99,7 +99,7 @@ def test_default_security_model():
 
 def test_custom_security_model():
     """Verify custom SECURITY_MODEL from environment variable."""
-    custom_model = 'claude-3-haiku-20250301'
+    custom_model = 'test-security-model'
 
     with patch.dict(os.environ, {'SECURITY_MODEL': custom_model}):
         import importlib

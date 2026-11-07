@@ -137,12 +137,11 @@ def _try_skeleton_tree(blocks: list[FlatBlock], markdown: str) -> list[Section] 
     (missing API key, API error, parse error). Caller falls back
     to deterministic tree building.
     """
-    import os
-    import json
     import logging
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
+    from compiler.llm import api_key as llm_api_key
+
+    if not llm_api_key():
         return None
 
     logger = logging.getLogger(__name__)
@@ -155,23 +154,21 @@ def _try_skeleton_tree(blocks: list[FlatBlock], markdown: str) -> list[Section] 
         user_prompt = build_skeleton_prompt(blocks)
         blocks_index = {b.block_id: b for b in blocks}
 
-        import anthropic
-        from compiler.config import ANTHROPIC_MODEL
-        model = os.environ.get("ANTHROPIC_MODEL", ANTHROPIC_MODEL)
-        client = anthropic.Anthropic(
-            api_key=api_key,
-            base_url=os.environ.get("ANTHROPIC_BASE_URL"),
-        )
-        response = client.messages.create(
-            model=model,
+        from compiler.config import LLM_MODEL
+        from compiler.llm import chat
+
+        response = chat(
+            model=LLM_MODEL,
             max_tokens=4096,
-            system=SKELETON_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_prompt}],
+            messages=[
+                {"role": "system", "content": SKELETON_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
             temperature=0,
             timeout=60.0,
         )
 
-        text = response.content[0].text.strip()
+        text = response.text.strip()
         # Strip markdown code fences if present
         if text.startswith("```"):
             text = text.split("\n", 1)[-1]
@@ -198,7 +195,7 @@ def _try_skeleton_tree(blocks: list[FlatBlock], markdown: str) -> list[Section] 
 def extract_structural_content(markdown: str) -> ContentExtraction:
     """Parse markdown into a section tree with typed content blocks.
 
-    Attempts LLM-enhanced skeleton tree if ANTHROPIC_API_KEY is available,
+    Attempts LLM-enhanced skeleton tree if an API key is available,
     falls back to deterministic tree building otherwise.
     """
     blocks = extract_flat_blocks(markdown)
