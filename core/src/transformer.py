@@ -8,6 +8,7 @@ structured skill data from markdown files.
 import json
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from compiler.env import load_local_env
 from compiler.schemas import ContentExtraction, ExtractedSkill
@@ -21,6 +22,10 @@ from compiler.llm import (
     tool_to_openai,
 )
 from compiler.prompts import SYSTEM_PROMPT
+
+if TYPE_CHECKING:
+    from compiler.schemas import DocumentSkeleton, FlatBlock, Section
+    from compiler.skill_registry import SkillRegistry
 
 logger = logging.getLogger(__name__)
 
