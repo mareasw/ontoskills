@@ -16,6 +16,7 @@ from .models import (
     PackageManifest,
     RegistryIndex,
     RegistryPackageEntry,
+    RegistrySources,
     RegistrySource,
     TrustTier,
     SourceKind,

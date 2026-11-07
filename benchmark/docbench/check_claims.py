@@ -50,17 +50,23 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("claims", nargs="?", default=str(ROOT / "gold" / "claims.jsonl"))
     ap.add_argument("--fix-pages", action="store_true", help="Rewrite PDF page numbers in place")
+    ap.add_argument(
+        "--schema-only",
+        action="store_true",
+        help="Validate JSON schema only; do not require the source texts",
+    )
     args = ap.parse_args()
 
     claims_path = Path(args.claims)
     claims = [json.loads(line) for line in claims_path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
     texts = {}
-    for doc, path in SOURCES.items():
-        if not path.exists():
-            print(f"MISSING source text: {path}", file=sys.stderr)
-            return 2
-        texts[doc] = path.read_text(encoding="utf-8", errors="ignore")
+    if not args.schema_only:
+        for doc, path in SOURCES.items():
+            if not path.exists():
+                print(f"MISSING source text: {path}", file=sys.stderr)
+                return 2
+            texts[doc] = path.read_text(encoding="utf-8", errors="ignore")
 
     jsonschema = None
     schema = None
@@ -89,6 +95,9 @@ def main() -> int:
             except Exception as exc:  # noqa: BLE001 - report and continue
                 print(f"SCHEMA  {cid}: {getattr(exc, 'message', exc)}")
                 failures += 1
+
+        if args.schema_only:
+            continue
 
         source = texts[doc]
         quote = norm(claim["quote"])

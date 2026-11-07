@@ -8,8 +8,13 @@ node_modules/
 .agents/
 mcp/target/
 .env
+.env.*
+!.env.example
 *.egg-info/
-__pycache__
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
 docs
 
 # ONNX test fixtures (large files)
