@@ -66,12 +66,17 @@ ontocore init-core
 
 ### 2. 配置 LLM
 
-OntoCore 需要 LLM 来提取关系。创建 `.env` 文件或导出密钥：
+OntoCore 需要 LLM 来提取关系。任何兼容 OpenAI Chat Completions 的端点都可以。
+创建 `.env` 文件或导出密钥：
 
 ```bash
-export ANTHROPIC_API_KEY="sk-..."
+export OPENAI_BASE_URL="https://your-gateway.example/v1"
+export OPENAI_API_KEY="..."
+export OPENAI_MODEL="your-model-id"
 ```
-*（也支持 OpenAI：`OPENAI_API_KEY`）*
+
+`OPENAI_BASE_URL` 可以指向 OpenAI、Cascade 推理平面或任何其他兼容 OpenAI 的网关。
+安全审查可以通过 `SECURITY_MODEL` 使用不同的模型。
 
 ### 3. 编译技能
 
