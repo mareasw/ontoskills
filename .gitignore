@@ -8,6 +8,8 @@ node_modules/
 .agents/
 mcp/target/
 .env
+.env.*
+!.env.example
 *.egg-info/
 __pycache__
 docs
