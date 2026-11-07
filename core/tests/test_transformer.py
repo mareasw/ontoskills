@@ -82,8 +82,8 @@ def test_execute_tool_extract_skill(tmp_path):
     assert data["status"] == "success"
 
 
-@patch("compiler.transformer.client")
-def test_tool_use_loop_success(mock_client, tmp_path):
+@patch("compiler.transformer.get_client")
+def test_tool_use_loop_success(mock_get_client, tmp_path):
     """Test successful tool-use loop."""
     skill_dir = tmp_path / "test-skill"
     skill_dir.mkdir()
@@ -117,7 +117,7 @@ def test_tool_use_loop_success(mock_client, tmp_path):
     extract_response.content = [extract_block]
     extract_response.stop_reason = "tool_use"
 
-    mock_client.messages.create.side_effect = [list_response, read_response, extract_response]
+    mock_get_client.return_value.messages.create.side_effect = [list_response, read_response, extract_response]
 
     result = tool_use_loop(skill_dir, "abc123hash", "test-skill")
     assert isinstance(result, ExtractedSkill)
@@ -136,8 +136,8 @@ def test_system_prompt_includes_state_extraction():
     assert "URIs" in SYSTEM_PROMPT
 
 
-@patch("compiler.transformer.client")
-def test_tool_use_loop_sets_generated_by(mock_client, tmp_path):
+@patch("compiler.transformer.get_client")
+def test_tool_use_loop_sets_generated_by(mock_get_client, tmp_path):
     """Test that tool_use_loop sets generated_by field."""
     from compiler.config import ANTHROPIC_MODEL
 
@@ -164,7 +164,7 @@ def test_tool_use_loop_sets_generated_by(mock_client, tmp_path):
     extract_response.content = [extract_block]
     extract_response.stop_reason = "tool_use"
 
-    mock_client.messages.create.return_value = extract_response
+    mock_get_client.return_value.messages.create.return_value = extract_response
 
     result = tool_use_loop(skill_dir, "abc123hash", "test-skill")
     assert result.generated_by == ANTHROPIC_MODEL
