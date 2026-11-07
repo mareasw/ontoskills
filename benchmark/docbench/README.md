@@ -35,13 +35,24 @@ python benchmark/docbench/build_ttl.py --out benchmark/docbench/runs/docbench.tt
 # Inspect the three baseline prompts without calling a model
 python benchmark/docbench/run_baselines.py --dry-run
 
-# Run the baselines (requires the chosen SDK and an API key in the environment)
+# Run against an OpenAI-compatible endpoint, with no SDK required
+python benchmark/docbench/run_baselines.py \
+  --backend http \
+  --base-url http://localhost:11434/v1 \
+  --model <model>
+
+# Run with the Anthropic or OpenAI SDK (requires the SDK in the environment)
 python benchmark/docbench/run_baselines.py --backend anthropic --model <model>
 python benchmark/docbench/run_baselines.py --backend openai --model <model>
 
 # Score the latest run
 python benchmark/docbench/score.py
 ```
+
+`--backend http` works with any OpenAI-compatible server: Ollama
+(`http://localhost:11434/v1`), vLLM (`http://localhost:8000/v1`), LM Studio
+(`http://localhost:1234/v1`), LocalAI, or a remote compatible provider. If the
+server needs a key, set `OPENAI_API_KEY`; local servers usually do not.
 
 The generated graph can be queried with the files in `queries/`. The
 `--backend mock` option exists only to test the plumbing; mock answers are
@@ -97,6 +108,7 @@ same JSON output contract. Only the context differs.
 - [x] Minimal Turtle graph builds and parses (41 claims, 767 triples)
 - [x] B0/B1/B2 harness builds and dry-runs (120 prompts, ~456k input tokens)
 - [x] End-to-end plumbing tested with the mock backend
+- [x] OpenAI-compatible HTTP backend tested against a local stub
 - [ ] B0/B1/B2 run with a real model
 - [ ] Scored (automatic triage + blind manual review)
 - [ ] Go/no-go decision recorded
