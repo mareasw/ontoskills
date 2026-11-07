@@ -145,6 +145,7 @@ def _write_error_log(output_path: Path) -> None:
     """Flush collected errors to compile-errors.json in the output directory."""
     if not _compile_errors:
         return
+    output_path.mkdir(parents=True, exist_ok=True)
     error_file = output_path / "compile-errors.json"
     existing = []
     if error_file.exists():

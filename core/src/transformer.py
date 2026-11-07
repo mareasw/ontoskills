@@ -101,11 +101,18 @@ TOOLS = [
     }
 ]
 
-# Initialize Anthropic client
-client = Anthropic(
-    api_key=os.getenv("ANTHROPIC_API_KEY"),
-    base_url=os.getenv("ANTHROPIC_BASE_URL")
-)
+def get_client() -> Anthropic:
+    """Build the client on demand.
+
+    Raises:
+        ExtractionError: when no API key is configured, so the compiler records
+            the failure and exits cleanly instead of crashing with a TypeError
+            from inside the SDK.
+    """
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise ExtractionError("no API key: set ANTHROPIC_API_KEY")
+    return Anthropic(api_key=api_key, base_url=os.getenv("ANTHROPIC_BASE_URL"))
 
 
 def tool_result(tool_id: str, content: str) -> dict:
@@ -318,7 +325,7 @@ Use the available tools to:
         logger.debug(f"Tool-use iteration {iteration + 1}/{MAX_ITERATIONS}")
 
         try:
-            response = client.messages.create(
+            response = get_client().messages.create(
                 model=ANTHROPIC_MODEL,
                 max_tokens=8192,
                 tools=TOOLS,
