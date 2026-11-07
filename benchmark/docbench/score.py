@@ -114,6 +114,7 @@ def main() -> int:
             "citation_matches_gold": citation_matches_gold,
             "input_tokens": a.get("input_tokens", 0),
             "output_tokens": a.get("output_tokens", 0),
+            "reasoning_tokens": a.get("reasoning_tokens", 0),
             "latency_ms": a.get("latency_ms", 0),
             "manual_correct": "",
             "manual_citation": "",
@@ -139,16 +140,18 @@ def main() -> int:
             "abstention_correct_rate": round(sum(r["abstention_correct"] for r in subset) / len(subset), 3),
             "avg_input_tokens": round(statistics.mean([r["input_tokens"] for r in subset]), 1),
             "avg_output_tokens": round(statistics.mean([r["output_tokens"] for r in subset]), 1),
+            "avg_reasoning_tokens": round(statistics.mean([r["reasoning_tokens"] for r in subset]), 1),
             "avg_latency_ms": round(statistics.mean([r["latency_ms"] for r in subset]), 1),
         }
 
     (run / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
-    md = ["# DocBench run", "", f"Run: `{run.name}`", "", "| Condition | n | answer recall | citation present | citation supported | citation matches gold | abstention correct | input tok | output tok | latency ms |", "|---|---|---|---|---|---|---|---|---|---|"]
+    md = ["# DocBench run", "", f"Run: `{run.name}`", "", "| Condition | n | answer recall | citation present | citation supported | citation matches gold | abstention correct | input tok | output tok | reasoning tok | latency ms |", "|---|---|---|---|---|---|---|---|---|---|---|"]
     for condition, s in summary.items():
         md.append(
             f"| {condition} | {s['n']} | {s['answer_recall_mean']:.1%} | {s['citation_present_rate']:.1%} | "
             f"{s['citation_supported_rate']:.1%} | {s['citation_matches_gold_rate']:.1%} | "
-            f"{s['abstention_correct_rate']:.1%} | {s['avg_input_tokens']:.0f} | {s['avg_output_tokens']:.0f} | {s['avg_latency_ms']:.0f} |"
+            f"{s['abstention_correct_rate']:.1%} | {s['avg_input_tokens']:.0f} | {s['avg_output_tokens']:.0f} | "
+            f"{s['avg_reasoning_tokens']:.0f} | {s['avg_latency_ms']:.0f} |"
         )
     md += ["", "Automatic metrics are triage only. Fill the `manual_*` columns in `scores.csv` before deciding.", ""]
     (run / "summary.md").write_text("\n".join(md), encoding="utf-8")
