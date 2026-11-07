@@ -67,12 +67,18 @@ ontocore init-core
 
 ### 2. Configure the LLM
 
-OntoCore needs an LLM to extract relationships. Create a `.env` file or export the keys:
+OntoCore needs an LLM to extract relationships. Any OpenAI Chat Completions
+endpoint works. Create a `.env` file or export the keys:
 
 ```bash
-export OPENAI_API_KEY="sk-..."
+export OPENAI_BASE_URL="https://your-gateway.example/v1"
+export OPENAI_API_KEY="..."
+export OPENAI_MODEL="your-model-id"
 ```
-*(Anthropic is also supported via `ANTHROPIC_API_KEY`)*
+
+`OPENAI_BASE_URL` can point at OpenAI, the Cascade inference plane, or any
+other OpenAI-compatible gateway. The security review can use a different model
+via `SECURITY_MODEL`.
 
 ### 3. Compile Skills
 

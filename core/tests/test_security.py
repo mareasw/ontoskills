@@ -1,6 +1,7 @@
 import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
+from compiler.llm import LLMResponse
 from compiler.security import (
     normalize_content,
     check_patterns,
@@ -53,23 +54,27 @@ def test_check_patterns_data_exfiltration():
     assert len(threats) > 0
 
 
-@patch("compiler.security.client")
-def test_llm_security_review_safe(mock_client):
+@patch("compiler.security.chat")
+def test_llm_security_review_safe(mock_chat):
     """Test LLM review with safe content."""
-    mock_response = MagicMock()
-    mock_response.content = [MagicMock(text='{"safe": true, "reason": ""}')]
-    mock_client.messages.create.return_value = mock_response
+    mock_chat.return_value = LLMResponse(
+        text='{"safe": true, "reason": ""}',
+        tool_calls=(),
+        finish_reason="stop",
+    )
 
     result = llm_security_review("Normal content", [])
     assert result.safe is True
 
 
-@patch("compiler.security.client")
-def test_llm_security_review_unsafe(mock_client):
+@patch("compiler.security.chat")
+def test_llm_security_review_unsafe(mock_chat):
     """Test LLM review with unsafe content."""
-    mock_response = MagicMock()
-    mock_response.content = [MagicMock(text='{"safe": false, "reason": "Malicious code detected"}')]
-    mock_client.messages.create.return_value = mock_response
+    mock_chat.return_value = LLMResponse(
+        text='{"safe": false, "reason": "Malicious code detected"}',
+        tool_calls=(),
+        finish_reason="stop",
+    )
 
     result = llm_security_review("Suspicious content", [])
     assert result.safe is False
@@ -81,7 +86,7 @@ def test_llm_security_review_unsafe(mock_client):
 def test_security_check_clean(mock_patterns, mock_llm):
     """Test full security check with clean content."""
     mock_patterns.return_value = []
-    mock_llm.return_value = MagicMock(safe=True, reason="")
+    mock_llm.return_value = LLMSecurityResult(safe=True, reason="")
 
     threats, passed = security_check("Clean content", skip_llm=True)
     assert passed is True

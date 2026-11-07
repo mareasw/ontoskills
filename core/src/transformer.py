@@ -1,22 +1,25 @@
 """
 LLM Tool-Use Extraction Module.
 
-Orchestrates the tool-use conversation with Claude to extract
+Orchestrates the tool-use conversation with the configured model to extract
 structured skill data from markdown files.
 """
 
 import json
-import os
 import logging
 from pathlib import Path
-
-import anthropic
-from anthropic import Anthropic
 
 from compiler.env import load_local_env
 from compiler.schemas import ContentExtraction, ExtractedSkill
 from compiler.exceptions import ExtractionError
-from compiler.config import ANTHROPIC_MODEL, MAX_ITERATIONS, EXTRACTION_TIMEOUT
+from compiler.config import LLM_MODEL, MAX_ITERATIONS, EXTRACTION_TIMEOUT
+from compiler.llm import (
+    LLMError,
+    assistant_tool_message,
+    chat,
+    tool_message,
+    tool_to_openai,
+)
 from compiler.prompts import SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -64,7 +67,7 @@ Consider this context when:
 DO NOT add an "extends" relationship - this will be injected automatically by the compiler.
 """
 
-# Tool definitions
+# Tool definitions (canonical shape; converted to OpenAI at call time)
 TOOLS = [
     {
         "name": "list_files",
@@ -96,23 +99,8 @@ TOOLS = [
     }
 ]
 
-# Initialize Anthropic client
-client = Anthropic(
-    api_key=os.getenv("ANTHROPIC_API_KEY"),
-    base_url=os.getenv("ANTHROPIC_BASE_URL")
-)
-
-
-def tool_result(tool_id: str, content: str) -> dict:
-    """Create a tool result message for the conversation."""
-    return {
-        "role": "user",
-        "content": [{
-            "type": "tool_result",
-            "tool_use_id": tool_id,
-            "content": content
-        }]
-    }
+# Tools as the OpenAI Chat Completions API expects them
+OPENAI_TOOLS = [tool_to_openai(tool) for tool in TOOLS]
 
 
 def execute_tool(name: str, input_data: dict, skill_dir: Path) -> str:
@@ -176,7 +164,7 @@ def tool_use_loop(
     content_extraction: "ContentExtraction | None" = None,
 ) -> ExtractedSkill:
     """
-    Orchestrates the tool-use conversation with Claude.
+    Orchestrates the tool-use conversation with the configured model.
 
     Args:
         skill_dir: Path to skill directory
@@ -304,64 +292,58 @@ Use the available tools to:
 
         content_parts[0] += "".join(content_summary_parts)
 
-    messages = [{
-        "role": "user",
-        "content": content_parts[0]
-    }]
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": content_parts[0]},
+    ]
 
     for iteration in range(MAX_ITERATIONS):
         logger.debug(f"Tool-use iteration {iteration + 1}/{MAX_ITERATIONS}")
 
         try:
-            response = client.messages.create(
-                model=ANTHROPIC_MODEL,
+            response = chat(
+                model=LLM_MODEL,
                 max_tokens=8192,
-                tools=TOOLS,
+                tools=OPENAI_TOOLS,
                 messages=messages,
-                system=system_prompt,
-                timeout=EXTRACTION_TIMEOUT
+                timeout=EXTRACTION_TIMEOUT,
             )
-        except anthropic.APIError as e:
-            raise ExtractionError(f"API error during extraction: {e}")
+        except LLMError as e:
+            raise ExtractionError(f"API error during extraction: {e}") from e
 
-        # Process response blocks
-        tool_results = []
-        _extraction_data = None  # Use underscore prefix for internal use
+        if response.tool_calls:
+            # OpenAI requires the assistant turn before the tool results.
+            messages.append(
+                assistant_tool_message(response.text, response.tool_calls)
+            )
 
-        for block in response.content:
-            if block.type == "tool_use":
-                logger.debug(f"Tool call: {block.name}")
+            for call in response.tool_calls:
+                logger.debug(f"Tool call: {call.name}")
 
-                if block.name == COMPLETION_TOOL:
+                if call.name == COMPLETION_TOOL:
                     # Validate and return the extraction
                     try:
-                        skill = ExtractedSkill.model_validate(block.input)
+                        skill = ExtractedSkill.model_validate(call.arguments)
                         # Override with our computed values
                         skill.id = skill_id
                         skill.hash = skill_hash
                         skill.provenance = str(skill_dir)
-                        skill.generated_by = ANTHROPIC_MODEL
+                        skill.generated_by = LLM_MODEL
                         logger.info(f"Successfully extracted skill: {skill_id}")
                         return skill
                     except Exception as e:
-                        raise ExtractionError(f"Invalid extraction data: {e}")
-                else:
-                    # Execute tool and collect result
-                    result = execute_tool(block.name, block.input, skill_dir)
-                    tool_results.append(tool_result(block.id, result))
+                        raise ExtractionError(f"Invalid extraction data: {e}") from e
 
-            elif block.type == "text":
-                logger.debug(f"LLM text: {block.text[:100]}...")
+                result = execute_tool(call.name, call.arguments, skill_dir)
+                messages.append(tool_message(call.id, result))
 
-        # Check for end_turn without extraction
-        if response.stop_reason == "end_turn":
-            raise ExtractionError("LLM finished without calling extract_skill")
+            continue
 
-        # Add tool results to conversation
-        if tool_results:
-            messages.extend(tool_results)
+        if response.text:
+            logger.debug(f"LLM text: {response.text[:100]}...")
 
-    raise ExtractionError(f"Max iterations ({MAX_ITERATIONS}) exceeded")
+        # No tool call and no completion tool: the turn is wasted.
+        raise ExtractionError("LLM finished without calling extract_skill")
 
 
 # ============================================================================
