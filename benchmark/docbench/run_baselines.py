@@ -157,11 +157,39 @@ def make_prompt(context: str, question: str) -> str:
     return f"CONTEXT:\n{context}\n\nQUESTION: {question}"
 
 
-def call_model(backend: str, model: str, prompt: str) -> tuple[str, int, int]:
+def call_model(backend: str, model: str, prompt: str, base_url: str = "") -> tuple[str, int, int]:
     started = time.monotonic()
     if backend == "mock":
         # Plumbing test only: never use mock answers for a real evaluation.
         return '{"answer":"UNKNOWN","citation":"","claim_ids":[]}', 0, 0
+    if backend == "http":
+        # OpenAI-compatible HTTP endpoint without the openai SDK. Works with
+        # Ollama, vLLM, LM Studio, LocalAI and any compatible server.
+        try:
+            import requests
+        except ImportError as exc:
+            raise SystemExit("requests is not installed: pip install requests") from exc
+        url = (base_url or os.environ.get("OPENAI_BASE_URL") or "http://localhost:8000/v1").rstrip("/")
+        headers = {"Content-Type": "application/json"}
+        key = os.environ.get("OPENAI_API_KEY")
+        if key:
+            headers["Authorization"] = f"Bearer {key}"
+        payload = {
+            "model": model,
+            "temperature": 0,
+            "max_tokens": 1024,
+            "messages": [
+                {"role": "system", "content": SYSTEM},
+                {"role": "user", "content": prompt},
+            ],
+        }
+        resp = requests.post(f"{url}/chat/completions", headers=headers, json=payload, timeout=180)
+        if resp.status_code >= 400:
+            raise SystemExit(f"HTTP {resp.status_code} from {url}: {resp.text[:400]}")
+        data = resp.json()
+        text = data["choices"][0]["message"].get("content") or ""
+        usage = data.get("usage") or {}
+        return text, int(usage.get("prompt_tokens", 0)), int(usage.get("completion_tokens", 0))
     if backend == "anthropic":
         try:
             import anthropic
@@ -184,7 +212,7 @@ def call_model(backend: str, model: str, prompt: str) -> tuple[str, int, int]:
             import openai
         except ImportError as exc:
             raise SystemExit("openai is not installed: pip install openai") from exc
-        client = openai.OpenAI(base_url=os.environ.get("OPENAI_BASE_URL") or None)
+        client = openai.OpenAI(base_url=base_url or os.environ.get("OPENAI_BASE_URL") or None)
         resp = client.chat.completions.create(
             model=model,
             max_tokens=1024,
@@ -218,8 +246,10 @@ def parse_answer(text: str) -> tuple[str, str, list[str]]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true", help="Build prompts only; do not call a model")
-    ap.add_argument("--backend", choices=["anthropic", "openai", "mock"], default="anthropic")
+    ap.add_argument("--backend", choices=["anthropic", "openai", "http", "mock"], default="anthropic")
     ap.add_argument("--model", default=os.environ.get("DOCBENCH_MODEL", ""))
+    ap.add_argument("--base-url", default=os.environ.get("OPENAI_BASE_URL", ""),
+                    help="OpenAI-compatible base URL, e.g. http://localhost:11434/v1")
     ap.add_argument("--conditions", default="B0,B1,B2")
     ap.add_argument("--only-docs", default="", help="Comma-separated doc ids, e.g. D1,D4")
     args = ap.parse_args()
@@ -240,6 +270,7 @@ def main() -> int:
     manifest = {
         "stamp": stamp,
         "backend": args.backend,
+        "base_url": args.base_url or os.environ.get("OPENAI_BASE_URL", ""),
         "model": args.model or "(dry-run)",
         "conditions": conditions,
         "rag_top_k": RAG_TOP_K,
@@ -270,7 +301,7 @@ def main() -> int:
             if not args.model:
                 raise SystemExit("--model is required unless --dry-run")
             started = time.monotonic()
-            raw, in_tok, out_tok = call_model(args.backend, args.model, prompt)
+            raw, in_tok, out_tok = call_model(args.backend, args.model, prompt, args.base_url)
             answer, citation, claim_ids = parse_answer(raw)
             answers.append({
                 "condition": condition,
