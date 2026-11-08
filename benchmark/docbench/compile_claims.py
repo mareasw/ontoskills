@@ -42,7 +42,6 @@ import json
 import os
 import re
 import sys
-import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -644,50 +643,18 @@ def pairs_prompt(claims: list[dict], pairs: list[tuple[str, str]]) -> str:
 
 
 def call_model(prompt: str, args, system: str = SYSTEM) -> tuple[str, dict, str]:
-    import requests
+    from llm import chat
 
-    key = os.environ.get("OPENAI_API_KEY", "")
-    url = (args.base_url or os.environ.get("OPENAI_BASE_URL", "")).rstrip("/")
-    if not url:
-        raise SystemExit("no base URL: set OPENAI_BASE_URL or pass --base-url")
-    headers = {"Content-Type": "application/json"}
-    if key:
-        headers["Authorization"] = f"Bearer {key}"
-    payload = {
-        "model": args.model,
-        "temperature": 0,
-        "max_tokens": args.max_tokens,
-        "messages": [
+    return chat(
+        args.base_url or os.environ.get("OPENAI_BASE_URL", ""),
+        os.environ.get("OPENAI_API_KEY", ""),
+        args.model,
+        [
             {"role": "system", "content": system},
             {"role": "user", "content": prompt},
         ],
-    }
-    last = ""
-    # The gateway drops long runs with 503s, often several in a row. Six
-    # attempts with widening backoff is cheaper than losing a 20-minute run.
-    for attempt in range(6):
-        try:
-            resp = requests.post(f"{url}/chat/completions", headers=headers, json=payload, timeout=300)
-        except requests.RequestException as exc:
-            last = str(exc)
-            time.sleep(min(30, 3 * (attempt + 1)))
-            continue
-        if resp.status_code in {408, 409, 429, 500, 502, 503, 504}:
-            last = f"HTTP {resp.status_code}"
-            time.sleep(min(30, 3 * (attempt + 1)))
-            continue
-        if resp.status_code >= 400:
-            raise SystemExit(f"HTTP {resp.status_code}: {resp.text[:400]}")
-        data = resp.json()
-        choice = (data.get("choices") or [{}])[0]
-        content = (choice.get("message") or {}).get("content") or ""
-        usage = data.get("usage") or {}
-        finish = str(choice.get("finish_reason") or "")
-        return content, {
-            "input_tokens": usage.get("prompt_tokens", 0),
-            "output_tokens": usage.get("completion_tokens", 0),
-        }, finish
-    raise SystemExit(f"model call failed after retries: {last}")
+        args.max_tokens,
+    )
 
 
 def statement_key(statement: str) -> str:

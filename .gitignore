@@ -45,3 +45,9 @@ benchmark/docbench/gold/*.compiled.jsonl*
 # Claude Code runtime artifacts
 .claude/scheduled_tasks.lock
 *.log
+
+# Output di verifica e compilazioni parziali (rigenerabili)
+benchmark/docbench/gold/verify.work*/
+benchmark/docbench/gold/*.compiled.*.jsonl
+benchmark/docbench/gold/*.compiled.*.manifest.json
+benchmark/docbench/gold/*.adjudications.jsonl
