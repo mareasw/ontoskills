@@ -304,3 +304,57 @@ The compiled claim set will be larger than the hand-built one (the extractor
 sees every span), so B2 switches from `all_claims` to `bm25_claims` with top-12;
 that change is part of what the run measures and must be reported separately
 from extraction quality.
+
+### 9.1 Amendment A1 (2026-11-08) — a repair stage, after the gate failed on evidence support
+
+Run 3 (the clean compile of D1–D4 in `gold/claims.compiled.jsonl`) passed every
+structural criterion and failed one: the full census put evidence support at
+**88.8%** (459/517), below the 90% bar. The stop rule above then applies: do not
+tune the prompt against the gold set, change the pipeline.
+
+The failure is measured, not guessed: 58 claims where a material element of the
+statement is not in the claim's own quote — the actor from a heading (28), a
+qualifier from an adjacent line (21), an omitted exception (4), a number added,
+a quote that belongs to another rule, a strengthened modality. A deterministic
+post-hoc checker was tried first and rejected on measurement (28% precision on
+the actor test; ~30% lexical coverage; ~10% exception cues).
+
+The pipeline therefore gains a third stage, `verify_claims.py`:
+
+1. **audit** — a model sees `(statement, quotes, section path)` and nothing else,
+   and returns `ok | weak | no | fabricated` on the same scale as the census.
+2. **repair** — a second call sees the claim, its current spans and the spans
+   within ±3 positions, and may only `reevidence` (cite a neighbouring span),
+   `rewrite` (restate within the current evidence) or `drop`. It cannot invent a
+   span or a sentence; a rewrite shorter than the extractor's own 15-character
+   floor is refused.
+3. **re-audit** — repaired claims are audited again; whatever still fails after
+   the last round is dropped. An unsupported claim is not shipped.
+
+`compile_claims.py --verify` runs the whole pipeline in one command.
+
+**What this does not change.** The gate thresholds above, the census method, and
+the rule that the measure is an independent census of the final artifact. The
+audit inside the stage is *not* the measure: after the residual is dropped its
+final audit is ~100% by construction, and it is a model grading its own repair.
+The number that decides the gate is a fresh census of the emitted artifact.
+
+**Instrument calibration** (recorded in `gold/audit.calibration.md`, run before
+the stage was applied to the artifact): against the census, with the stop rule
+fixed in advance at >= 45/58 known non-ok caught and <= 5 false positives on 60
+known-ok, the frozen instrument catches **62/65** known defects (95.4%) and
+flags 6 of 120 known-ok claims, of which **1** survives adjudication as a true
+false positive. It is conservative in the right direction: almost everything it
+flags is a real defect, so it never rewrites a claim that was already supported.
+
+**Census of the repaired artifact.** Rows whose statement and evidence are
+byte-identical to the censused artifact keep their existing verdict: the census
+is a function of exactly those fields, the reviewer is the same, and re-judging
+identical text measures nothing. Every rewritten, re-evidenced or newly merged
+row is judged fresh, and the gate number is the ok share of the whole artifact
+under that join. This is stated here before the number exists.
+
+**Why the census, not the audit, is the measure.** Temperature is 0 but the
+gateway is not deterministic: three of 118 verdicts flipped between two
+identical calibration runs. A stage that both repairs and re-judges would
+report its own convergence. An independent pass over the emitted text cannot.
