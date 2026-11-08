@@ -14,11 +14,15 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import sys
 import re
 import statistics
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT))
+
+from claims_model import quotes  # noqa: E402
 GOLD = ROOT / "gold"
 RUNS = ROOT / "runs" / "baselines"
 PRIVATE = ROOT / "private"
@@ -84,7 +88,7 @@ def main() -> int:
         citation_present = bool(citation.strip())
         citation_supported = bool(citation_norm) and citation_norm in norm(sources[a["doc_id"]])
 
-        gold_cites = [claims[cid]["quote"] for cid in q.get("gold_claim_ids", []) if cid in claims]
+        gold_cites = [quote for cid in q.get("gold_claim_ids", []) if cid in claims for quote in quotes(claims[cid])]
         if set(a.get("claim_ids", [])) & set(q.get("gold_claim_ids", [])):
             citation_matches_gold = True
         elif citation_norm and gold_cites:
