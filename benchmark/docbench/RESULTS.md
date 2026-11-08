@@ -91,6 +91,53 @@ counted as a failure. 39 questions remain.
 4. **Zero unsupported claims in all three conditions**, but B0 reaches that only
    with a quote-following prompt; B2 gets it from the context itself.
 
+## Independent re-score (2026-11-08)
+
+The manual pass above was made by the same agent that built the harness, which
+is a conflict of interest. The 120 answers were therefore re-scored by an
+independent reviewer with the condition label and the claim ids stripped
+(`build_blind_sheet.py`, `key.json` withheld), then unblinded and compared
+(`compare_blind.py`, `blind_metrics.py`).
+
+Because a reviewer can tell an abstention from a wrong answer, the citation
+metric is reported on **answerable questions only** (32 per condition); an empty
+citation on a correct abstention is not a failure.
+
+| | B0 | B1 | B2 |
+|---|---:|---:|---:|
+| Answer correct (39) | 38/39 — 97.4% | 28/39 — 71.8% | **39/39 — 100%** |
+| Citation verbatim and on point (32 answerable) | 26/32 — 81.2% | 21/32 — 65.6% | **30/32 — 93.8%** |
+| Citation partial | 6 | 2 | 2 |
+| Unsupported claims | 0 | **1** | 0 |
+| Correct abstention (7 unanswerable) | 6/7 | 6/7 | **7/7** |
+
+**Agreement with the original pass:** 117/117 answers, zero flips. The answer
+scores are not an artefact of who did the scoring. Of the 24 citation
+disagreements, 18 are the convention above (an empty citation on a correct
+abstention) and 6 are real — every one of them a two-part answer supported by a
+quote that covers only one part (four in B0, one in B1, one in B2).
+
+**Deltas under the clean convention:** B2 − B1 = **+28.1 pp** on citation
+quality, identical to the original number; B2 − B0 = **+12.5 pp**. The decision
+rule (+15 pp vs B1) survives an independent, stricter reviewer.
+
+**Two things the re-score changed:**
+
+1. **B1 makes an unsupported claim, and it is the worst kind.** On `D4-Q06`
+   (conflicting deadlines) it answers *"The provided context does not show an
+   inconsistency."* That is a negative about the whole document asserted from
+   five retrieved paragraphs. Paragraph RAG does not merely miss a conflict; it
+   certifies its absence. The original pass scored it as 0 unsupported claims.
+2. **B0's citation gap is larger than reported** (81.2%, not 93.8%): six of its
+   answers are multi-part, and one quote cannot cover them. B2's answers are
+   more atomic, so a single quote usually does. This is a real, structural
+   advantage of compiling claims, not a scoring artefact — but it is
+   smaller than the original pass implied, and it is the honest number to quote.
+
+**Still not blind in the strict sense.** The reviewer was an LLM agent with no
+access to the labels, but B2 answers are visibly shorter and more atomic, which
+can hint at the condition. A human reviewer remains the only fully blind option.
+
 ### Decision rule from `PREFLIGHT.md`
 
 | Criterion | Threshold | Measured | Verdict |
@@ -107,14 +154,22 @@ Technical gate: **pass on this run**.
 - **n = 39 scored questions, one run, one model.** No confidence interval is
   reported because 40 questions cannot support one.
 - **Manual scoring was done by the agent that built the harness, not blind.**
-  The verdicts and the excluded question are in `runs/.../scores.csv`; an
-  independent reviewer should re-score before this number is quoted publicly.
+  The verdicts and the excluded question are in `runs/.../scores.csv`. An
+  independent re-score (2026-11-08, above) reproduced every answer verdict and
+  the B2 − B1 citation delta; it corrected one unsupported claim in B1 and found
+  that the original pass overstated B0's citation accuracy. It was still an LLM
+  reviewer, not a human, so treat it as a strong cross-check, not a certified
+  score.
 - **The corpus is public and small.** The result says "claims help on
   structure-heavy normative documents"; it does not generalise to contracts,
   invoices or internal wikis without a second corpus.
+- **The claim layer was hand-built.** B2's context came from `gold/claims.jsonl`,
+  annotated by hand, not produced by a compiler. The benchmark validates the
+  *representation* (claim + evidence + locator), not the extraction. Machine
+  extraction is the next gate and has not been measured.
 - **A single `citation` field cannot express conflicting evidence** (`D4-Q06`).
-  The schema needs `evidence: [...]` or the answer must cite claim ids instead
-  of one quote.
+  The 2026-11-07 run used the old contract. `schemas/claim.v2.schema.json` now
+  models evidence as a list with roles, but no run has measured it yet.
 - **Market gate is untouched.** No interviews and no design partner: willingness
   to pay is still unproven, and these numbers do not prove it.
 
@@ -126,5 +181,17 @@ python benchmark/docbench/run_baselines.py \
 python benchmark/docbench/score.py
 ```
 
+The blind re-score:
+
+```bash
+RUN=benchmark/docbench/runs/baselines/20261107T140843Z
+python benchmark/docbench/build_blind_sheet.py --run "$RUN" \
+  --gold benchmark/docbench/gold/questions.jsonl --out "$RUN/blind"
+# one independent reviewer per document scores $RUN/blind/cases_D*.jsonl
+python benchmark/docbench/compare_blind.py --run "$RUN"
+python benchmark/docbench/blind_metrics.py --run "$RUN"
+```
+
 The corpus and the full gold set are gitignored; see `README.md` and
-`sources.md` to rebuild them.
+`sources.md` to rebuild them. The blind verdict sheets live with the run and are
+gitignored with it; `key.json` never leaves that directory.

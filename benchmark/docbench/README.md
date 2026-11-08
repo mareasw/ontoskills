@@ -1,6 +1,8 @@
 # DocBench (pre-flight)
 
-**Status: first full run done (2026-11-07).** See [`RESULTS.md`](RESULTS.md) for the numbers, the manual review and the limitations. The corpus and the full gold set stay local; the protocol and the examples are public.
+**Status: first full run done (2026-11-07), independently re-scored (2026-11-08).** See [`RESULTS.md`](RESULTS.md) for the numbers, the manual review, the blind re-score and the limitations. The corpus and the full gold set stay local; the protocol and the examples are public.
+
+The claim shape is defined by [`schemas/claim.v2.schema.json`](../../schemas/claim.v2.schema.json) and [`docs/adr/0001-document-first-kernel.md`](../../docs/adr/0001-document-first-kernel.md): a claim carries an `evidence` list, not a single quote, so a rule with an exception or a two-sided conflict can cite every span it needs.
 
 The goal is to test, on a small hand-built corpus, whether a compiled claim layer with per-claim evidence beats full-document reading and RAG on citation accuracy and answer accuracy with citation.
 
@@ -14,17 +16,21 @@ benchmark/docbench/
 ├── sources.md              # the three documents, URLs, hashes, licences
 ├── private/                # local copies of source documents (gitignored)
 ├── gold/
-│   ├── schema.json         # JSON schema for claims and questions
+│   ├── schema.json         # v1 schema (single quote + locator), kept for the 2026-11-07 run
 │   ├── claims.example.jsonl
 │   └── questions.example.jsonl
+├── tests/                  # stdlib unittest for the claim model
 └── runs/                   # local run outputs (gitignored)
 ```
 
 ## Scripts
 
 ```bash
-# Validate every claim: verbatim quote, PDF page, JSON schema
+# Validate every claim: verbatim quote (every evidence span), PDF page, JSON schema
 python benchmark/docbench/check_claims.py
+
+# Convert a v1 claim file to the v2 evidence-list shape (lossless)
+python benchmark/docbench/migrate_claims_v2.py gold/claims.jsonl -o gold/claims.v2.jsonl
 
 # Fix PDF page numbers in place (only when the quote is correct)
 python benchmark/docbench/check_claims.py --fix-pages
@@ -47,6 +53,15 @@ python benchmark/docbench/run_baselines.py --backend openai --model <model>
 
 # Score the latest run
 python benchmark/docbench/score.py
+
+# Blind re-score: strip the condition label, then compare after unblinding
+python benchmark/docbench/build_blind_sheet.py --run "$RUN" \
+  --gold benchmark/docbench/gold/questions.jsonl --out "$RUN/blind"
+python benchmark/docbench/compare_blind.py --run "$RUN"
+python benchmark/docbench/blind_metrics.py --run "$RUN"
+
+# Claim model tests (stdlib unittest, no extra dependencies)
+python -m unittest discover -s benchmark/docbench/tests -v
 ```
 
 `--backend http` works with any OpenAI-compatible server: Ollama
@@ -71,7 +86,7 @@ same JSON output contract. Only the context differs.
 
 ## Rules
 
-1. **No quote, no claim.** A claim without a verbatim quote and a resolving locator is invalid.
+1. **No quote, no claim.** A claim without at least one verbatim evidence span and a resolving locator is invalid. Evidence is a list: a rule with an exception, or a two-sided conflict, cites every span it needs.
 2. **Do not commit source documents.** Download them into `private/` and commit only URLs, SHA-256 hashes, and short quotes used as annotation examples.
 3. **One claim per atomic assertion.** Split conjunctions; keep conditions separate.
 4. **Same model, same prompt, same output format** across the three baselines.
@@ -94,7 +109,7 @@ same JSON output contract. Only the context differs.
 
 1. Download it into `private/` (do not commit it).
 2. Record URL, licence, SHA-256 and a one-line rationale in `sources.md`.
-3. Annotate 10 claims in `gold/claims.jsonl`, following `schema.json`.
+3. Annotate 10 claims in `gold/claims.jsonl`, following `schemas/claim.v2.schema.json`.
 4. Write 10 questions in `gold/questions.jsonl`: 5 direct, 3 multi-hop/conditional, 2 unanswerable.
 5. Run the three baselines and write results into `runs/<date>/`.
 
@@ -111,7 +126,9 @@ same JSON output contract. Only the context differs.
 - [x] OpenAI-compatible HTTP backend tested against a local stub
 - [x] B0/B1/B2 run with a real model (`deepseek-v4.1-flash`, 120 calls)
 - [x] Scored: automatic triage + manual review of all 120 answers
-- [ ] Independently re-scored by a reviewer who did not build the harness
+- [x] Independently re-scored by a reviewer who did not see the condition labels: 117/117 answers agree; B2 − B1 citation delta reproduced at +28.1 pp
+- [x] Claim schema v2 (`evidence: [...]`) defined, migrated and tested
+- [ ] Machine-extracted claims replace the hand-built gold set (the real extraction gate)
 - [ ] Go/no-go decision recorded (technical gate passed; market gate open)
 
 The full annotations (`gold/claims.jsonl`, `gold/questions.jsonl`) and the
