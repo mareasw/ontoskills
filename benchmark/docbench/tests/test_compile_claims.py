@@ -73,6 +73,82 @@ class SegmentTest(unittest.TestCase):
             self.assertIn(cc.norm(span["paragraph"]), source)
 
 
+class HeadingTest(unittest.TestCase):
+    def test_all_caps_label_with_qualifier_is_a_table_label(self) -> None:
+        for label in ("HIGH (Orange)", "CRITICAL (Red)", "LOW (Blue)", "MEDIUM (Yellow)"):
+            self.assertTrue(cc.is_table_label(label), label)
+            self.assertTrue(cc.looks_like_heading(label), label)
+
+    def test_plain_all_caps_heading_is_not_a_table_label(self) -> None:
+        # D4 is full of these; treating them as labels swallowed whole sections.
+        for line in ("PURPOSE", "CRITERIA", "EXHIBIT A", "TABLE OF CONTENTS"):
+            self.assertFalse(cc.is_table_label(line), line)
+            self.assertTrue(cc.looks_like_heading(line), line)
+
+    def test_sentence_ending_in_a_parenthetical_is_body(self) -> None:
+        line = "Notify regulators within required timeframe (typically 72 hours)"
+        self.assertFalse(cc.is_table_label(line))
+        self.assertFalse(cc.looks_like_heading(line))
+
+    def test_address_fragment_is_body(self) -> None:
+        self.assertFalse(cc.looks_like_heading("P.O. Box 1998"))
+
+
+TABLE_DOC = """\
+Incident Playbook
+
+Severity Classification
+
+CRITICAL (Red)
+
+System compromise in progress
+
+Response time : 1 hour
+
+HIGH (Orange)
+
+Active campaign detected
+
+Response time : 4 hours
+
+Incident Response Workflow
+
+Detect the incident and classify its severity before anything else happens.
+"""
+
+
+class SeverityTableTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.spans = cc.segment(TABLE_DOC, "D3", min_chars=60)
+
+    def test_band_and_its_response_time_share_one_span(self) -> None:
+        hour = [s for s in self.spans if "Response time : 1 hour" in s["paragraph"]]
+        self.assertEqual(len(hour), 1)
+        # The band must be in the same span, or the value inherits its
+        # neighbour's severity label.
+        self.assertTrue(hour[0]["paragraph"].startswith("CRITICAL (Red)"))
+        self.assertNotIn("HIGH", hour[0]["paragraph"])
+
+    def test_each_band_keeps_its_own_rows(self) -> None:
+        four = [s for s in self.spans if "Response time : 4 hours" in s["paragraph"]]
+        self.assertEqual(len(four), 1)
+        self.assertTrue(four[0]["paragraph"].startswith("HIGH (Orange)"))
+        self.assertIn("Active campaign detected", four[0]["paragraph"])
+
+    def test_a_real_heading_closes_the_block(self) -> None:
+        # The heading itself is section metadata, not span text: the body that
+        # follows it must be clean of table rows.
+        body = [s for s in self.spans if s["paragraph"].startswith("Detect the incident")]
+        self.assertEqual(len(body), 1)
+        self.assertNotIn("Response time", body[0]["paragraph"])
+        self.assertEqual(body[0]["locator"]["section_path"], ["Incident Response Workflow"])
+
+    def test_table_text_is_still_verbatim(self) -> None:
+        flat = cc.norm(TABLE_DOC)
+        for span in self.spans:
+            self.assertIn(cc.norm(span["paragraph"]), flat)
+
+
 class ParseTest(unittest.TestCase):
     def test_plain_array(self) -> None:
         self.assertEqual(cc.parse_claims('[{"statement": "x"}]'), [{"statement": "x"}])
@@ -259,6 +335,62 @@ class ConflictTest(unittest.TestCase):
         self.assertEqual(cc.parse_pair_indices("[0,4,2,2,\"x\"]", 3), [2])
         self.assertEqual(cc.parse_pair_indices("none", 3), [])
         self.assertEqual(cc.parse_pair_indices("```json\n[1]\n```", 3), [1])
+
+
+class DedupeTest(unittest.TestCase):
+    def _claim(self, cid: str, doc: str, statement: str, quote: str = "q") -> dict:
+        return {
+            "claim_id": cid,
+            "doc_id": doc,
+            "statement": statement,
+            "modality": "obligation",
+            "evidence": [{"quote": quote, "locator": {"page": 1}, "role": "supports"}],
+        }
+
+    def test_paraphrase_of_the_same_rule_is_merged(self) -> None:
+        claims = [
+            self._claim("D4-0001", "D4", "The Firm shall maintain automobile liability of no less than $1,000,000.", "a"),
+            self._claim("D4-0002", "D4", "The Firm must maintain automobile liability of no less than $1,000,000.", "b"),
+        ]
+        kept, merged = cc.dedupe_claims(claims)
+        self.assertEqual(merged, 1)
+        self.assertEqual(len(kept), 1)
+        # A merge must not delete evidence: both quotes are still there.
+        self.assertEqual({e["quote"] for e in kept[0]["evidence"]}, {"a", "b"})
+        self.assertEqual(kept[0]["claim_id"], "D4-0001")
+
+    def test_different_rules_are_kept(self) -> None:
+        claims = [
+            self._claim("D4-0001", "D4", "Proposals are due on February 12, 2026 at 2 p.m."),
+            self._claim("D4-0002", "D4", "The County shall publish the notice on its website."),
+        ]
+        kept, merged = cc.dedupe_claims(claims)
+        self.assertEqual(merged, 0)
+        self.assertEqual(len(kept), 2)
+
+    def test_the_same_rule_in_two_documents_is_not_merged(self) -> None:
+        claims = [
+            self._claim("D4-0001", "D4", "The Firm shall maintain automobile liability of no less than $1,000,000."),
+            self._claim("D2-0001", "D2", "The Firm shall maintain automobile liability of no less than $1,000,000."),
+        ]
+        kept, merged = cc.dedupe_claims(claims)
+        self.assertEqual(merged, 0)
+        self.assertEqual(len(kept), 2)
+
+    def test_missing_fields_are_filled_from_the_absorbed_claim(self) -> None:
+        first = self._claim("D4-0001", "D4", "The Firm shall maintain automobile liability of no less than $1,000,000.")
+        second = self._claim("D4-0002", "D4", "The Firm must maintain automobile liability of no less than $1,000,000.")
+        second["deadline"] = "during the term of the contract"
+        kept, _ = cc.dedupe_claims([first, second])
+        self.assertEqual(kept[0]["deadline"], "during the term of the contract")
+
+    def test_output_is_sorted_and_stable(self) -> None:
+        claims = [
+            self._claim("D2-0002", "D2", "A rule about something entirely different here."),
+            self._claim("D1-0003", "D1", "Another rule about something else entirely."),
+        ]
+        kept, _ = cc.dedupe_claims(claims)
+        self.assertEqual([c["claim_id"] for c in kept], ["D1-0003", "D2-0002"])
 
 
 class EstimateTest(unittest.TestCase):
