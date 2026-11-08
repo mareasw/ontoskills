@@ -16,6 +16,8 @@ benchmark/docbench/
 ├── sources.md              # the three documents, URLs, hashes, licences
 ├── private/                # local copies of source documents (gitignored)
 ├── compile_claims.py       # span-first compiler: segment -> extract -> validate -> emit
+├── verify_claims.py        # audit each claim against its own evidence, repair, drop what cannot be repaired
+├── llm.py                  # one OpenAI-compatible call, with the retry policy both stages share
 ├── gold/
 │   ├── schema.json         # v1 schema (single quote + locator), kept for the 2026-11-07 run
 │   ├── claims.example.jsonl
@@ -37,6 +39,14 @@ python benchmark/docbench/migrate_claims_v2.py gold/claims.jsonl -o gold/claims.
 python benchmark/docbench/compile_claims.py --estimate
 python benchmark/docbench/compile_claims.py --out gold/claims.compiled.jsonl
 python benchmark/docbench/check_claims.py gold/claims.compiled.jsonl
+
+# Compile and verify in one command: audit every claim against its own evidence,
+# repair or drop what fails, write <out>.verified.jsonl
+python benchmark/docbench/compile_claims.py --out gold/claims.compiled.jsonl --verify
+
+# Verify an existing artifact (resumable; the cache lives in <out>.verify/)
+python benchmark/docbench/verify_claims.py \
+  --claims gold/claims.compiled.jsonl --resume
 
 # Fix PDF page numbers in place (only when the quote is correct)
 python benchmark/docbench/check_claims.py --fix-pages
