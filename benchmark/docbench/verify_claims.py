@@ -18,8 +18,12 @@ This stage closes the gap as a pipeline step, not as a per-document patch:
      ``rewrite`` (restate within the current evidence), ``reevidence`` (cite a
      neighbouring span that does support it) or ``drop`` (no support anywhere
      in the neighbourhood). It may not invent a span or a sentence.
-  3. **re-audit** — repaired claims are audited again. Whatever still fails
-     after the last round is dropped: an unsupported claim is not shipped.
+  3. **re-audit** — repaired claims are audited again. A claim that still fails
+     with ``weak`` (true, but part of its meaning sits outside its own quote)
+     ships and is listed in the report: deleting it was measured to cost more
+     recall than it bought support (PREFLIGHT.md §9.2). A claim still failing
+     with ``no`` or ``fabricated`` (the quote does not state the claim) is
+     dropped: an unsupported claim is not shipped.
 
 Only the claim and a bounded neighbourhood of its own spans are ever shown, so
 the stage measures internal consistency, never agreement with the gold set.
@@ -53,6 +57,9 @@ from env import load_dotenv  # noqa: E402
 
 VERDICTS = ("ok", "weak", "no", "fabricated")
 ACTIONS = ("rewrite", "reevidence", "drop")
+# Verdicts that mean "the quote does not state this claim". Only these are
+# dropped at the end of the pipeline; `weak` rows are kept, see PREFLIGHT §9.2.
+HARD_FAIL = ("no", "fabricated")
 
 # Spans considered as alternative evidence, on each side of a cited span. Three
 # covers a lead-in followed by its list: ``The Commission may terminate ...:``
@@ -607,6 +614,17 @@ def prune_conflicts(claims: list[dict]) -> int:
 # Orchestration
 
 
+def verdict_of(claim: dict, audit: dict[str, dict]) -> str:
+    """The audit verdict recorded for a claim, never ``ok`` by default.
+
+    Silence from the auditor is not a pass, so a claim with no record -- or with
+    a verdict outside VERDICTS -- counts as ``weak``. Anything else is taken
+    verbatim; only ``no`` and ``fabricated`` are hard failures.
+    """
+    verdict = str(audit.get(claim["claim_id"], {}).get("verdict", "")).strip().lower()
+    return verdict if verdict in VERDICTS else "weak"
+
+
 def run_pipeline(
     claims: list[dict],
     spans: SpanIndex,
@@ -640,7 +658,7 @@ def run_pipeline(
     report = {"initial": summarize(claims, audit), "rounds": []}
 
     for index in range(1, max(1, rounds) + 1):
-        failing = [claim for claim in claims if audit.get(claim["claim_id"], {}).get("verdict") != "ok"]
+        failing = [claim for claim in claims if verdict_of(claim, audit) != "ok"]
         if not failing:
             break
         repairs = repair_claims(
@@ -667,7 +685,7 @@ def run_pipeline(
                 usage=usage,
             )
         )
-        unresolved = [c for c in touched if audit.get(c["claim_id"], {}).get("verdict") != "ok"]
+        unresolved = [c for c in touched if verdict_of(c, audit) != "ok"]
         round_report.update(
             {
                 "round": index,
@@ -687,13 +705,22 @@ def run_pipeline(
 
     # Merge near-duplicates that rewriting may have created, then clean links.
     claims, merged = dedupe_claims(claims)
-    residual = [claim for claim in claims if audit.get(claim["claim_id"], {}).get("verdict") != "ok"]
-    if residual and not keep_residual:
-        residual_ids = {claim["claim_id"] for claim in residual}
-        claims = [claim for claim in claims if claim["claim_id"] not in residual_ids]
+    residual = [claim for claim in claims if verdict_of(claim, audit) != "ok"]
+    # `weak` means the claim is true but a material element sits outside its own
+    # quote: a citation-quality defect the gate's 90% bar tolerates. `no` and
+    # `fabricated` mean the quote does not state the claim: those never ship.
+    # Deleting weak rows was measured to cost more recall than it bought support
+    # (PREFLIGHT.md §9.2), so only hard failures are dropped by default.
+    hard = [claim for claim in residual if verdict_of(claim, audit) in HARD_FAIL]
+    kept_weak = [claim for claim in residual if claim not in hard]
+    if not keep_residual:
+        hard_ids = {claim["claim_id"] for claim in hard}
+        claims = [claim for claim in claims if claim["claim_id"] not in hard_ids]
     report["merged_duplicates"] = merged
-    report["residual_dropped"] = 0 if keep_residual else len(residual)
+    report["residual_dropped"] = 0 if keep_residual else len(hard)
     report["residual_ids"] = [claim["claim_id"] for claim in residual]
+    report["kept_weak"] = 0 if keep_residual else len(kept_weak)
+    report["kept_weak_ids"] = [] if keep_residual else [claim["claim_id"] for claim in kept_weak]
     report["conflict_links_removed"] = prune_conflicts(claims)
     report["final"] = summarize(claims, audit)
     report["usage"] = usage
@@ -708,8 +735,7 @@ def run_pipeline(
 def summarize(claims: list[dict], audit: dict[str, dict]) -> dict:
     counts = {verdict: 0 for verdict in VERDICTS}
     for claim in claims:
-        verdict = audit.get(claim["claim_id"], {}).get("verdict", "weak")
-        counts[verdict] = counts.get(verdict, 0) + 1
+        counts[verdict_of(claim, audit)] += 1
     total = len(claims)
     counts["claims"] = total
     counts["ok_share"] = round(counts.get("ok", 0) / total, 4) if total else 0.0
@@ -784,7 +810,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--audit-only", action="store_true", help="stop after the first audit")
     parser.add_argument("--keep-residual", action="store_true",
-                        help="keep claims that still fail after the last round")
+                        help="also keep claims that still fail hard after the last round "
+                             "(for measuring what dropping costs; not for shipping)")
     parser.add_argument("--calibrate", default="", metavar="DIR",
                         help="directory with verdicts_D*.jsonl from the census")
     parser.add_argument("--adjudications", default="", metavar="FILE",
