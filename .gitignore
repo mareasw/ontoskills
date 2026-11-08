@@ -15,7 +15,9 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
-docs
+docs/*
+# ADRs are part of the design record and must be versioned
+!docs/adr/
 
 # ONNX test fixtures (large files)
 mcp/tests/fixtures/
