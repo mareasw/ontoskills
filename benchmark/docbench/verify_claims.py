@@ -478,6 +478,16 @@ def clean_statement(text: str) -> str:
     return text.strip().strip('"').strip()
 
 
+# The compiler rejects an extracted statement shorter than this (build_claim);
+# a repair must not smuggle in a stub the extractor was not allowed to write.
+MIN_STATEMENT = 15
+
+
+def usable_statement(statement: str, old: str) -> bool:
+    """True when a rewritten statement is a real, different sentence."""
+    return len(statement) >= MIN_STATEMENT and statement != old
+
+
 def make_evidence(span: dict, role: str = "supports") -> dict:
     return {"quote": span.get("paragraph", ""), "locator": dict(span.get("locator") or {}), "role": role}
 
@@ -490,9 +500,10 @@ def apply_repairs(
     """Apply repair records to the claim list.
 
     A record is only honoured when it is usable: a rewrite needs a non-empty
-    statement different from the old one, a re-evidence needs at least one span
-    that is actually in the claim's neighbourhood, and an unknown action leaves
-    the claim untouched. Rejected records are counted, never silently accepted.
+    statement, at least ``MIN_STATEMENT`` characters and different from the old
+    one; a re-evidence needs at least one span that is actually in the claim's
+    neighbourhood; an unknown action leaves the claim untouched. Rejected
+    records are counted, never silently accepted.
     """
     report = {
         "rewritten": 0,
@@ -540,7 +551,7 @@ def apply_repairs(
                 for span in chosen
             ]
             statement = clean_statement(record.get("statement", ""))
-            if statement and statement != claim["statement"]:
+            if usable_statement(statement, claim["statement"]):
                 updated["statement"] = statement
                 report["rewritten"] += 1
             report["reevidenced"] += 1
@@ -549,7 +560,7 @@ def apply_repairs(
 
         # rewrite
         statement = clean_statement(record.get("statement", ""))
-        if not statement or statement == claim["statement"]:
+        if not usable_statement(statement, claim["statement"]):
             report["rejected"] += 1
             out.append(claim)
             continue
