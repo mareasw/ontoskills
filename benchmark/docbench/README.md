@@ -15,6 +15,7 @@ benchmark/docbench/
 ├── README.md
 ├── sources.md              # the three documents, URLs, hashes, licences
 ├── private/                # local copies of source documents (gitignored)
+├── compile_claims.py       # span-first compiler: segment -> extract -> validate -> emit
 ├── gold/
 │   ├── schema.json         # v1 schema (single quote + locator), kept for the 2026-11-07 run
 │   ├── claims.example.jsonl
@@ -31,6 +32,11 @@ python benchmark/docbench/check_claims.py
 
 # Convert a v1 claim file to the v2 evidence-list shape (lossless)
 python benchmark/docbench/migrate_claims_v2.py gold/claims.jsonl -o gold/claims.v2.jsonl
+
+# Compile a document into claims (span-first; --estimate costs nothing)
+python benchmark/docbench/compile_claims.py --estimate
+python benchmark/docbench/compile_claims.py --out gold/claims.compiled.jsonl
+python benchmark/docbench/check_claims.py gold/claims.compiled.jsonl
 
 # Fix PDF page numbers in place (only when the quote is correct)
 python benchmark/docbench/check_claims.py --fix-pages

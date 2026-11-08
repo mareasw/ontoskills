@@ -254,3 +254,53 @@ A private document would strengthen the test, but it is optional for the pre-fli
 | 5 | Score, write the result, decide go/no-go |
 
 If the five days produce no clear signal, the next step is not more code. It is a narrower document class or a different problem.
+
+---
+
+## 9. Gate 2 — machine extraction (added 2026-11-08)
+
+The 2026-11-07 run used hand-built claims. It validated the *representation*
+(claim + evidence + locator), not the compiler. `compile_claims.py` closes that
+gap; this section fixes the test before it is run, so the result cannot be
+redefined afterwards.
+
+**Pipeline (span-first).** `source → segmenter → extractor → validator →
+emitter`. The segmenter assigns every span an id and a locator *before* the
+model runs. The extractor may only reference span ids; the quote is copied from
+the span. Verbatim evidence is therefore a structural property, not a hope.
+
+**Method.**
+
+1. Compile D1–D4: 18 model calls (14 extraction + 4 conflict), ~56K input and
+   ~19K output tokens, ~$0.02 at the current flash-model price. One pass, no
+   tuning against the gold set.
+2. `check_claims.py` on the result: every span verbatim, every PDF page
+   recomputed, every claim valid against `schemas/claim.v2.schema.json`.
+3. **Evidence support** — the part structure cannot guarantee. An independent
+   reviewer gets `(statement, quote)` pairs and no source, and answers "does
+   this quote state this claim, as written?" Sample: 15 claims per document.
+4. **Recall proxy** — for each of the 41 gold claims, is a compiled claim that
+   states the same rule present? A proxy, not a measure: the gold set is small
+   and was written by hand for a different purpose.
+5. Re-run B2 with the compiled claims, then re-score.
+
+**Go criteria (all must hold).**
+
+| Check | Threshold |
+|---|---|
+| Structural validity (`check_claims.py`) | 100% — anything less is a bug, not a result |
+| Evidence support, sampled | >= 90% of sampled claims |
+| Claims asserting facts absent from the source | 0 |
+| Gold-set recall proxy | >= 70% |
+| B2 − B1 citation accuracy with compiled claims | >= 15 pp |
+| B2 answer accuracy with compiled claims | within 5 pp of the hand-built B2 (100%) |
+
+**Stop rule.** If structural validity or evidence support fails, do not tune the
+prompt against the gold set — that would measure the tuning, not the compiler.
+Change the pipeline (segmenter or validator) and re-run from a clean compile.
+
+**Known limits of this gate.** One model, one pass, four documents, one domain.
+The compiled claim set will be larger than the hand-built one (the extractor
+sees every span), so B2 switches from `all_claims` to `bm25_claims` with top-12;
+that change is part of what the run measures and must be reported separately
+from extraction quality.
