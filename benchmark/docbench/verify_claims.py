@@ -310,6 +310,16 @@ def _batches(items: list, size: int) -> list[list]:
     return [items[start : start + size] for start in range(0, len(items), size)]
 
 
+def _record_usage(usage: dict | None, data: dict | None) -> None:
+    """Accumulate one call's token counts into a shared dict (no-op if None)."""
+    if usage is None:
+        return
+    data = data or {}
+    usage["calls"] = usage.get("calls", 0) + 1
+    usage["input_tokens"] = usage.get("input_tokens", 0) + int(data.get("input_tokens") or 0)
+    usage["output_tokens"] = usage.get("output_tokens", 0) + int(data.get("output_tokens") or 0)
+
+
 def audit_claims(
     claims: list[dict],
     spans: SpanIndex,
@@ -319,6 +329,7 @@ def audit_claims(
     resume: bool = False,
     batch_size: int = 10,
     max_tokens: int = 8000,
+    usage: dict | None = None,
 ) -> dict[str, dict]:
     """Return ``{claim_id: {verdict, note}}`` for every claim.
 
@@ -342,13 +353,14 @@ def audit_claims(
     def ask(batch: list[dict]) -> None:
         pairs = [(claim, spans.resolve(claim)) for claim in batch]
         try:
-            reply, _usage, finish = call(audit_prompt(pairs), AUDIT_SYSTEM, max_tokens)
+            reply, data, finish = call(audit_prompt(pairs), AUDIT_SYSTEM, max_tokens)
         except SystemExit as exc:
             # One dead batch must not lose the 400 claims already audited. The
             # cache keeps them; --resume re-asks only this batch.
             aborted.extend(claim["claim_id"] for claim in batch)
             print(f"  audit: batch of {len(batch)} failed ({exc})", file=sys.stderr)
             return
+        _record_usage(usage, data)
         parsed = parse_claims(reply)
         by_id = {str(row.get("claim_id")): row for row in parsed if row.get("claim_id")}
         rows: list[dict] = []
@@ -398,6 +410,7 @@ def repair_claims(
     resume: bool = False,
     batch_size: int = 6,
     max_tokens: int = 8000,
+    usage: dict | None = None,
 ) -> dict[str, dict]:
     """Return ``{claim_id: action record}`` for the claims that need repair."""
     done: dict[str, dict] = {}
@@ -415,11 +428,12 @@ def repair_claims(
             for claim in batch
         ]
         try:
-            reply, _usage, finish = call(repair_prompt(triples), REPAIR_SYSTEM, max_tokens)
+            reply, data, finish = call(repair_prompt(triples), REPAIR_SYSTEM, max_tokens)
         except SystemExit as exc:
             aborted.extend(claim["claim_id"] for claim in batch)
             print(f"  repair: batch of {len(batch)} failed ({exc})", file=sys.stderr)
             return
+        _record_usage(usage, data)
         parsed = parse_claims(reply)
         by_id = {str(row.get("claim_id")): row for row in parsed if row.get("claim_id")}
         rows: list[dict] = []
@@ -607,8 +621,10 @@ def run_pipeline(
     keep_residual: bool = False,
     initial_audit: dict[str, dict] | None = None,
     verbose: bool = True,
+    usage: dict | None = None,
 ) -> tuple[list[dict], dict]:
     """audit -> repair -> re-audit, repeated `rounds` times. Pure policy."""
+    usage = usage if usage is not None else {}
     audit = initial_audit
     if audit is None:
         audit = audit_claims(
@@ -619,6 +635,7 @@ def run_pipeline(
             resume=resume,
             batch_size=audit_batch,
             max_tokens=max_tokens,
+            usage=usage,
         )
     report = {"initial": summarize(claims, audit), "rounds": []}
 
@@ -634,6 +651,7 @@ def run_pipeline(
             resume=resume,
             batch_size=repair_batch,
             max_tokens=max_tokens,
+            usage=usage,
         )
         claims, round_report = apply_repairs(claims, repairs, spans)
         touched = [claim for claim in claims if claim["claim_id"] in repairs]
@@ -646,6 +664,7 @@ def run_pipeline(
                 resume=resume,
                 batch_size=audit_batch,
                 max_tokens=max_tokens,
+                usage=usage,
             )
         )
         unresolved = [c for c in touched if audit.get(c["claim_id"], {}).get("verdict") != "ok"]
@@ -677,6 +696,12 @@ def run_pipeline(
     report["residual_ids"] = [claim["claim_id"] for claim in residual]
     report["conflict_links_removed"] = prune_conflicts(claims)
     report["final"] = summarize(claims, audit)
+    report["usage"] = usage
+    report["cost_usd"] = round(
+        usage.get("input_tokens", 0) / 1_000_000 * 0.15
+        + usage.get("output_tokens", 0) / 1_000_000 * 0.60,
+        4,
+    )
     return claims, report
 
 
@@ -812,6 +837,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"adjudications applied: {len(overrides)}")
         sample = calibration_sample(claims, known, args.calibrate_ok)
         print(f"calibration sample: {len(sample)} claims ({sum(1 for c in sample if known[c['claim_id']] != 'ok')} known non-ok)")
+        usage: dict = {}
         audit = audit_claims(
             sample,
             spans,
@@ -820,15 +846,20 @@ def main(argv: list[str] | None = None) -> int:
             resume=args.resume,
             batch_size=args.audit_batch,
             max_tokens=args.max_tokens,
+            usage=usage,
         )
         report = calibration_report(sample, audit, known)
+        report["usage"] = usage
         (work / "calibration.report.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
         print(json.dumps(report, indent=1))
+        print(f"tokens: {usage.get('input_tokens', 0):,} in / {usage.get('output_tokens', 0):,} out "
+              f"({usage.get('calls', 0)} calls)")
         ok = report["caught"] >= args.min_recall * report["known_bad"] and len(report["false_positives"]) <= args.max_fp
         print(f"stop rule: {'PASS' if ok else 'FAIL'} "
               f"(need >= {args.min_recall:.3f} recall, <= {args.max_fp} false positives)")
         return 0 if ok else 2
 
+    usage: dict = {}
     audit = audit_claims(
         claims,
         spans,
@@ -837,6 +868,7 @@ def main(argv: list[str] | None = None) -> int:
         resume=args.resume,
         batch_size=args.audit_batch,
         max_tokens=args.max_tokens,
+        usage=usage,
     )
     initial = summarize(claims, audit)
     print(f"audit: {json.dumps(initial)}")
@@ -856,6 +888,7 @@ def main(argv: list[str] | None = None) -> int:
         resume=args.resume,
         keep_residual=args.keep_residual,
         initial_audit=audit,
+        usage=usage,
     )
     report["claims_in"] = len(load_claims(claims_path))
 
@@ -863,6 +896,8 @@ def main(argv: list[str] | None = None) -> int:
     (work / "report.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
     print(f"\nwrote {len(claims)} claims -> {out_path}")
     print(json.dumps(report["final"], indent=1))
+    print(f"tokens: {usage.get('input_tokens', 0):,} in / {usage.get('output_tokens', 0):,} out "
+          f"({usage.get('calls', 0)} calls, ~${report['cost_usd']:.4f} at flash price)")
     return 0
 
 
