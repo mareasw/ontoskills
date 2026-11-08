@@ -1,6 +1,12 @@
 # DocBench (pre-flight)
 
-**Status: first full run done (2026-11-07), independently re-scored (2026-11-08).** See [`RESULTS.md`](RESULTS.md) for the numbers, the manual review, the blind re-score and the limitations. The corpus and the full gold set stay local; the protocol and the examples are public.
+**Status: representation validated (2026-11-07) and machine extraction validated
+(Gate 2, 2026-11-08).** The compiler's claims pass an independent census at
+**99.0% evidence support** (499/504), 0 fabrications, 97.6% gold recall, and B2
+beats B1 on citation by +20.0 pp automatic / +21.9 pp blind. The **market gate
+is still open**. See [`RESULTS.md`](RESULTS.md) for the numbers, the manual
+review, the blind re-score and the limitations. The corpus and the full gold set
+stay local; the protocol and the examples are public.
 
 The claim shape is defined by [`schemas/claim.v2.schema.json`](../../schemas/claim.v2.schema.json) and [`docs/adr/0001-document-first-kernel.md`](../../docs/adr/0001-document-first-kernel.md): a claim carries an `evidence` list, not a single quote, so a rule with an exception or a two-sided conflict can cite every span it needs.
 
@@ -8,15 +14,31 @@ The goal is to test, on a small hand-built corpus, whether a compiled claim laye
 
 Read the full protocol first: [`PREFLIGHT.md`](PREFLIGHT.md).
 
+## Where it stands
+
+| Gate | Threshold | Measured |
+|---|---|---|
+| Structural validity of compiled claims | 100% | 504/504 claims, 586/586 spans, 0 failures |
+| Evidence support (independent census) | ≥ 90% | **99.0%** (499/504), 0 fabricated |
+| Gold-set recall proxy | ≥ 70% | 97.6% (40/41) |
+| B2 − B1 citation | ≥ +15 pp | **+20.0 pp** automatic / **+21.9 pp** blind |
+| B2 answer vs hand-built B2 | within 5 pp | blind 97.4% (−2.6 pp) |
+| Market (interview / design partner) | evidence of demand | **not started** |
+
+Gate 2's thresholds and method were fixed in `PREFLIGHT.md` §9 before the run;
+the four amendments that got it there (§9.1–§9.4) each answer a measured defect
+and are recorded with the number they moved. The census is
+[`gold/audit.run4.md`](gold/audit.run4.md).
+
 ## Layout
 
 ```
 benchmark/docbench/
 ├── README.md
-├── sources.md              # the three documents, URLs, hashes, licences
+├── sources.md              # the four documents, URLs, hashes, licences
 ├── private/                # local copies of source documents (gitignored)
 ├── compile_claims.py       # span-first compiler: segment -> extract -> validate -> emit
-├── verify_claims.py        # audit each claim against its own evidence, repair, drop what cannot be repaired
+├── verify_claims.py        # audit each claim against its own evidence, repair it, drop only what is unsupported
 ├── llm.py                  # one OpenAI-compatible call, with the retry policy both stages share
 ├── gold/
 │   ├── schema.json         # v1 schema (single quote + locator), kept for the 2026-11-07 run
