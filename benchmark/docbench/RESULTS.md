@@ -149,6 +149,140 @@ can hint at the condition. A human reviewer remains the only fully blind option.
 
 Technical gate: **pass on this run**.
 
+## Gate 2 — machine extraction (2026-11-08)
+
+The 2026-11-07 run used hand-built claims: it validated the representation, not
+the compiler. Gate 2 was fixed in `PREFLIGHT.md` §9 before the run and is
+scored here.
+
+**Artifact.** `gold/claims.compiled.jsonl`, `deepseek-v4.1-flash`, one pass, no
+tuning against the gold set: 420 spans, 33 chunks, 517 claims, 15 rejected,
+24 near-duplicates merged, 11 truncation retries, 5 conflict pairs, 1 conflict
+batch failure, 105,095 input / 209,723 output tokens.
+
+### What the compiler got right
+
+- **Structural validity: 517/517 claims, 554/554 evidence spans, 0 failures.**
+  Every quote is verbatim in the source, every PDF page recomputed, every claim
+  valid against `schemas/claim.v2.schema.json` (all v2).
+- **Fabrications: 0.** No claim asserts a fact absent from its source.
+- **Recall proxy: 40/41 = 97.6%** (D1 10/10, D2 10/10, D3 9/10, D4 11/11). The
+  single miss is `Step 3: Notification & Escalation (30 minutes)`: the span
+  exists and was sent to the model, no claim came back. Extraction variance, not
+  segmentation.
+- **Conflicts: 5 pairs, all real.** `D4-0048` (22 Jan 2026) vs `D4-0077`
+  (12 Feb 2026) is the substantive contradiction; `D4-0010`/`D4-0014` vs
+  `D4-0050` is the `#20246-001` / `#2026-001` typo; `D1-0057` vs `D1-0073` is
+  access vs redaction; `D2-0089` vs `D2-0090` is the reporting path.
+- **A segmentation defect was found and fixed before this run.** The first clean
+  compile produced `D3-0002 = "1 hour, classified HIGH (Orange)"`: a flattened
+  HTML table ships every cell as a block, so all rows were headings and the band
+  label was popped before the row that used it. The segmenter now keeps a band
+  label with its rows (commit `06ba3b1`). Blast radius measured before the paid
+  run: 4 lines change class, 0 headings lost, 420 spans before and after, 41/41
+  gold quotes still covered. The result reads CRITICAL 1 hour, HIGH 4 hours,
+  MEDIUM 1 business day, LOW 1 week.
+
+### What it got wrong: evidence support does not pass
+
+| Verdict | Census (517) | Sample (60) |
+|---|---:|---:|
+| ok — quote states the claim | 459 (88.8%) | 57 (95.0%) |
+| weak — true, but a material element is outside the quote | 55 (10.6%) | 3 (5.0%) |
+| no — quote does not state it, or modality changed | 3 (0.6%) | 0 |
+| fabricated | 0 | 0 |
+
+The pre-registered sample passes the 90% bar; the full census (run afterwards,
+because a lexical screen flagged too many claims) does not. Sampling by stride
+under-drew the largest defect cluster: D3 repeats the same fault 14 times, so a
+one-in-five stride can miss a run of consecutive cases.
+
+The defects are systematic: 28 claims carry an actor or subject supplied from a
+heading or a list lead-in, 21 carry a qualifier from a heading or the adjacent
+line, 4 drop an exception present in the source (the statement is broader than
+the rule), 2 add a specific number or action, 2 cite an unrelated quote, 1
+strengthens `should` to `must`. Full table: `gold/audit.run3.md`.
+
+Root cause is structural, not stochastic: the quote is the whole *span*, and
+spans are large (median 432 characters, 54% over 400, one quote shared by 10
+claims). When the subject lives in the heading, the extractor writes a complete
+sentence and cites a span that does not contain the subject. `check_claims.py`
+stays green because "verbatim in the source" and "states this claim" are
+different properties.
+
+### Gate 2 criteria
+
+| Check | Threshold | Measured | Verdict |
+|---|---|---|---|
+| Structural validity | 100% | 517/517, 0 failures | pass |
+| Evidence support, pre-registered sample | ≥ 90% | 57/60 = 95.0% | pass |
+| Evidence support, full census | ≥ 90% | 459/517 = **88.8%** | **fail** |
+| Claims asserting facts absent from source | 0 | 0 | pass |
+| Gold-set recall proxy | ≥ 70% | 40/41 = 97.6% | pass |
+| B2 − B1 citation, compiled claims | ≥ +15 pp | 75.0 − 60.0 = **+15.0 pp** | pass (exactly) |
+| B2 answer vs hand-built B2 (100%) | within 5 pp | blind **97.4% (−2.6 pp)**; automatic 83.9% (−6.2 pp) | pass on blind, fail on the automatic proxy |
+
+**Gate 2 does not pass.** Five of the seven rows pass outright; the sixth passes
+exactly at its threshold; evidence support fails on the full set. Per the stop
+rule, the response is a pipeline change, not prompt tuning — the ranked fixes
+are in `gold/audit.run3.md`.
+
+### B2 with compiled claims — read the retrieval switch separately
+
+`PREFLIGHT.md` §9 requires reporting the retrieval change separately from
+extraction quality. With 517 claims, **every document exceeds the 12-claim
+context cap (D1 148, D2 95, D3 83, D4 191), so all 40 questions ran in
+`bm25_claims` mode**. The hand-built set had ≤ 12 claims per document and ran in
+`all_claims` mode. The B2 number below therefore measures *retrieval +
+extraction*, not extraction alone.
+
+| Run | Answer recall (auto) | Citation supported (auto) |
+|---|---:|---:|
+| Hand-built B2 (`20261107T140843Z`) | 90.1% | 80.0% |
+| Compiled B2 (`20261108T141134Z`) | 83.9% | 75.0% |
+| B1, fresh, same day (`20261108T141837Z`) | 57.0% | 60.0% |
+
+- **B2 − B1 citation = +15.0 pp**, exactly at the threshold. The fresh B1
+  reproduces the 2026-11-07 B1 to the decimal (60.0%), which is expected: B1
+  never reads the claim file, so a claims change cannot move it.
+- **B2 answer: −6.2 pp against the hand-built B2 on the automatic metric**
+  (83.9 vs 90.1), which misses the 5 pp window by 1.2 pp. The automatic
+  `answer_recall` is word overlap and penalises longer correct answers
+  (`D1-Q03` goes 1.0 → 0.4 while the answer gets more complete). The blind
+  re-score is the fair measure: **38/39 = 97.4%**, i.e. −2.6 pp, inside the
+  window. Both are reported; the gate text calls the automatic metric triage.
+
+### The two unsupported answers are not fabrications
+
+- `D3-Q06` — the answer needs two claims (CRITICAL = 1 hour, and the 15-minute
+  step). Its `claim_ids` are correct and complete (`D3-0002`, `D3-0006`,
+  `D3-0061`, `D3-0062`), but the single `citation` field carries only
+  `Response time : 1 hour`. The answer is supported; the field cannot express
+  it. This is measured evidence for the `{answer, claim_ids}` contract that
+  `docs/adr/0001-document-first-kernel.md` left unshipped.
+- `D4-Q06` — the question asks for the deadline and any inconsistency. The
+  retrieved context holds `D4-0010`/`D4-0014` with `CONFLICTS WITH: D4-0050`,
+  but not `D4-0050` itself, and not `D4-0048`/`D4-0077` (the 22 Jan / 12 Feb
+  pair). The model answered the deadline and explicitly said the conflict's
+  substance was not in the context. That is a retrieval defect with honest
+  behaviour, not an invented answer. Fix: expand retrieved claims with their
+  `conflicts_with` closure.
+
+### Cost
+
+| Item | Input | Output | Cost |
+|---|---:|---:|---:|
+| Compile, 3 attempts (2 aborted/resumed + final) | 268,791 | 523,723 | $0.355 |
+| B2 with compiled claims, 40 answers | ~76,900 | ~9,440 | $0.017 |
+| B1 fresh, 40 answers | 49,532 | 6,971 | $0.012 |
+
+About **$0.38** for the whole gate, against the ~$0.02 estimated in
+`PREFLIGHT.md` §9. The estimate was wrong by an order of magnitude: output
+tokens dominate because reasoning tokens are generated on every call
+(209,723 output for 105,095 input on the final compile), and the prefix needed
+three attempts. The per-run cost is still small, but the estimate in the
+preflight was not honest and is corrected here.
+
 ## Limitations
 
 - **n = 39 scored questions, one run, one model.** No confidence interval is
@@ -163,13 +297,18 @@ Technical gate: **pass on this run**.
 - **The corpus is public and small.** The result says "claims help on
   structure-heavy normative documents"; it does not generalise to contracts,
   invoices or internal wikis without a second corpus.
-- **The claim layer was hand-built.** B2's context came from `gold/claims.jsonl`,
-  annotated by hand, not produced by a compiler. The benchmark validates the
-  *representation* (claim + evidence + locator), not the extraction. Machine
-  extraction is the next gate and has not been measured.
-- **A single `citation` field cannot express conflicting evidence** (`D4-Q06`).
-  The 2026-11-07 run used the old contract. `schemas/claim.v2.schema.json` now
-  models evidence as a list with roles, but no run has measured it yet.
+- **The claim layer is machine-compiled as of 2026-11-08, and it does not yet
+  pass its own support bar.** B2's context now comes from
+  `gold/claims.compiled.jsonl` (517 claims). Structural validity, recall and
+  fabrication are clean, but the full evidence-support census is 88.8%, below
+  the 90% gate. See the Gate 2 section above.
+- **A single `citation` field cannot express a multi-claim answer**
+  (`D3-Q06`). The compiler emits v2 evidence lists, but the B2 prompt still
+  asks for one citation string, so a correct two-part answer looks unsupported.
+  `schemas/claim.v2.schema.json` models the evidence; the answer-side
+  `{answer, claim_ids}` contract in `docs/adr/0001-document-first-kernel.md` is
+  designed but not shipped, because it has not been measured against this
+  baseline.
 - **Market gate is untouched.** No interviews and no design partner: willingness
   to pay is still unproven, and these numbers do not prove it.
 
@@ -195,3 +334,20 @@ python benchmark/docbench/blind_metrics.py --run "$RUN"
 The corpus and the full gold set are gitignored; see `README.md` and
 `sources.md` to rebuild them. The blind verdict sheets live with the run and are
 gitignored with it; `key.json` never leaves that directory.
+
+Gate 2, end to end:
+
+```bash
+python benchmark/docbench/compile_claims.py \
+  --out benchmark/docbench/gold/claims.compiled.jsonl --model deepseek-v4.1-flash
+python benchmark/docbench/check_claims.py \
+  benchmark/docbench/gold/claims.compiled.jsonl
+python benchmark/docbench/run_baselines.py --backend http \
+  --model deepseek-v4.1-flash --conditions B2 \
+  --claims benchmark/docbench/gold/claims.compiled.jsonl
+python benchmark/docbench/score.py --run "$RUN"
+# blind: build_blind_sheet.py, 4 independent reviewers, then
+python benchmark/docbench/blind_metrics.py --run "$RUN"
+```
+
+The evidence-support audit (sample and full census) is `gold/audit.run3.md`.
