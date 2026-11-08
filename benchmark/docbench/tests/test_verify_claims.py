@@ -153,12 +153,27 @@ class ApplyRepairsTest(unittest.TestCase):
 
     def test_rewrite_is_rejected_when_empty_or_identical(self) -> None:
         c = claim("D1-0002", "The Commission may terminate.", [SPANS[1]])
-        for statement in ("", "   ", c["statement"]):
+        for statement in ("", "   ", c["statement"], "Yes."):
             out, report = vc.apply_repairs(
                 [c], {"D1-0002": {"action": "rewrite", "statement": statement}}, self.index
             )
             self.assertEqual(out[0]["statement"], c["statement"])
             self.assertEqual(report["rejected"], 1)
+
+    def test_reevidence_keeps_the_old_statement_when_the_rewrite_is_a_stub(self) -> None:
+        c = claim("D1-0002", "The Commission may terminate when (a) or (b) applies.", [SPANS[1]])
+        repairs = {
+            "D1-0002": {
+                "action": "reevidence",
+                "statement": "N/A",
+                "evidence_span_ids": ["S0003"],
+            }
+        }
+        out, report = vc.apply_repairs([c], repairs, self.index)
+        self.assertEqual(out[0]["statement"], c["statement"])
+        self.assertEqual([item["quote"] for item in out[0]["evidence"]], [SPANS[2]["paragraph"]])
+        self.assertEqual(report["reevidenced"], 1)
+        self.assertEqual(report["rewritten"], 0)
 
     def test_reevidence_uses_verbatim_span_text(self) -> None:
         c = claim("D1-0002", "The Commission may terminate when (a), (b) or (c) applies.", [SPANS[1]])
