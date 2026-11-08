@@ -15,10 +15,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT))
+
+from claims_model import evidence_items, primary_locator  # noqa: E402
 
 PREFIXES = """\
 @prefix oc: <https://ontoskills.sh/ontology#> .
@@ -106,6 +110,7 @@ def main() -> int:
         ctx = f"ex:ctx_{doc}"
         doc_iri = f"ex:doc_{doc}"
         first = items[0]["context"]
+        doc_locator = primary_locator(items[0])
         out.append(f"{doc_iri} a oc:Document ;")
         out.append(f"    oc:hasTitle {lit(DOC_TITLES.get(doc, doc))} ;")
         out.append(f"    oc:hasVersion {lit(first.get('version', ''))} ;")
@@ -113,14 +118,13 @@ def main() -> int:
         out.append(f"    oc:inContext {ctx} .")
         out.append("")
         out.append(f"{ctx} a oc:Context ;")
-        out.append(f"    oc:hasSourceUrl {lit(items[0]['locator'].get('url', ''))} ;")
+        out.append(f"    oc:hasSourceUrl {lit(doc_locator.get('url', ''))} ;")
         if first.get("jurisdiction"):
             out.append(f"    oc:hasJurisdiction {lit(first['jurisdiction'])} ;")
         out.append(f"    oc:hasVersion {lit(first.get('version', ''))} .")
         out.append("")
         for c in items:
             cid = iri(c["claim_id"])
-            ev = f"ex:ev_{cid}"
             out.append(f"ex:claim_{cid} a oc:Claim ;")
             out.append(f"    oc:inContext {ctx} ;")
             out.append(f"    oc:hasStatement {lit(c['statement'])} ;")
@@ -131,24 +135,25 @@ def main() -> int:
                 out.append(f"    oc:hasDeadline {lit(c['deadline'])} ;")
             for cond in c.get("conditions", []) or []:
                 out.append(f"    oc:hasCondition {lit(cond)} ;")
-            out.append(f"    oc:hasLocator {lit(' > '.join(c['locator'].get('section_path', [])))} ;")
-            if c["locator"].get("url"):
-                out.append(f"    oc:hasSourceUrl {lit(c['locator']['url'])} ;")
-            if c["locator"].get("page"):
-                out.append(f"    oc:hasPage {c['locator']['page']} ;")
             out.append(f"    oc:hasConfidence {lit(str(c.get('confidence', 0.95)))} ;")
-            out.append(f"    oc:hasEvidence {ev} ;")
+            evidence = evidence_items(c)
+            links = " ,\n        ".join(f"ex:ev_{cid}_{i}" for i in range(len(evidence)))
+            out.append(f"    oc:hasEvidence {links} ;")
             out.append(f"    prov:wasDerivedFrom {doc_iri} .")
             out.append("")
-            out.append(f"{ev} a oc:Evidence ;")
-            out.append(f"    oc:hasQuote {lit(c['quote'])} ;")
-            out.append(f"    oc:hasLocator {lit(' > '.join(c['locator'].get('section_path', [])))} ;")
-            if c["locator"].get("url"):
-                out.append(f"    oc:hasSourceUrl {lit(c['locator']['url'])} ;")
-            if c["locator"].get("page"):
-                out.append(f"    oc:hasPage {c['locator']['page']} ;")
-            out.append(f"    prov:wasDerivedFrom {doc_iri} .")
-            out.append("")
+            for index, item in enumerate(evidence):
+                locator = item.get("locator") or {}
+                out.append(f"ex:ev_{cid}_{index} a oc:Evidence ;")
+                out.append(f"    oc:hasQuote {lit(item['quote'])} ;")
+                out.append(f"    oc:evidenceRole {lit(item.get('role', 'supports'))} ;")
+                if locator.get("section_path"):
+                    out.append(f"    oc:hasLocator {lit(' > '.join(locator['section_path']))} ;")
+                if locator.get("url"):
+                    out.append(f"    oc:hasSourceUrl {lit(locator['url'])} ;")
+                if locator.get("page"):
+                    out.append(f"    oc:hasPage {locator['page']} ;")
+                out.append(f"    prov:wasDerivedFrom {doc_iri} .")
+                out.append("")
             for other in c.get("conflicts_with", []) or []:
                 out.append(f"ex:claim_{cid} oc:conflictsWith ex:claim_{iri(other)} .")
         out.append("")
