@@ -78,7 +78,8 @@ for cond in present:
     s = stats[cond]
     print(f"  {cond}: {s['unanswerable_correct']}/{s['unanswerable']}")
 
-p = lambda cond, field: 100 * cond[field] / cond["answerable"]
+def p(cond: dict, field: str) -> float:
+    return 100 * cond[field] / cond["answerable"]
 if "B2" in present:
     print("\ndeltas on citation quality (answerable questions only)")
     for other in ("B1", "B0"):
