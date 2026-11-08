@@ -49,6 +49,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 from claims_model import to_v2  # noqa: E402
+from env import load_dotenv  # noqa: E402
 
 PRIVATE = ROOT / "private"
 GOLD = ROOT / "gold"
@@ -140,9 +141,8 @@ Return ONLY a JSON array. Every element is an object with exactly these keys:
   actor      the party the rule binds or benefits (string, may be "")
   deadline   a date or duration if the source states one (string, may be "")
   conditions array of conditions/exceptions that scope the claim (may be [])
-  subject    short noun phrase the claim is about (may be "")
-  predicate  the relation, e.g. "must submit", "may not use" (may be "")
-  object     the thing the relation points at (may be "")
+
+Keep the JSON compact: one object per line, no extra keys, no explanation.
 
 Rules, in order of importance:
 
@@ -365,9 +365,100 @@ def make_prompt(spans: list[dict], doc_id: str) -> str:
     return "\n".join(lines)
 
 
-def parse_claims(text: str) -> list[dict]:
-    """Extract the first JSON array from a model reply, tolerating fences."""
+def repair_json_array(text: str) -> list[dict]:
+    """Recover the JSON objects from a malformed or truncated reply.
+
+    Two failure modes are common with reasoning models behind a gateway:
+
+    * the separating comma between two objects is dropped (``}{``);
+    * the reply is cut in the middle of an object, while the objects before
+      it are complete.
+
+    Both are recoverable without inventing anything: the objects that survive
+    are still model output, and every one of them is validated afterwards
+    against real span ids.
+    """
     text = text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
+        text = re.sub(r"\n?```$", "", text).strip()
+    start = text.find("[")
+    if start == -1:
+        return []
+    body = text[start:]
+    end = body.rfind("]")
+    if end != -1:
+        body = body[: end + 1]
+
+    def close_objects(piece: str) -> str:
+        return re.sub(r"\}\s*(?=\{)", "},", piece)
+
+    for candidate in (body, close_objects(body), re.sub(r",\s*\]", "]", close_objects(body))):
+        try:
+            data = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, list):
+            return [item for item in data if isinstance(item, dict)]
+
+    # Salvage: keep the complete top-level objects of a truncated reply.
+    depth = 0
+    last_complete = -1
+    in_string = False
+    escaped = False
+    for index, char in enumerate(body):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char in "[{":
+            depth += 1
+        elif char in "]}":
+            depth -= 1
+            if char == "}" and depth == 1:
+                last_complete = index
+    if last_complete > 0:
+        try:
+            data = json.loads(close_objects(body[: last_complete + 1]) + "]")
+        except json.JSONDecodeError:
+            return []
+        if isinstance(data, list):
+            return [item for item in data if isinstance(item, dict)]
+    return []
+
+
+def parse_claims(text: str) -> list[dict]:
+    """Extract the JSON array from a model reply, tolerating fences and damage."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
+        text = re.sub(r"\n?```$", "", text).strip()
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        start, end = text.find("["), text.rfind("]")
+        if start == -1 or end == -1:
+            return repair_json_array(text)
+        try:
+            data = json.loads(text[start : end + 1])
+        except json.JSONDecodeError:
+            return repair_json_array(text)
+    if isinstance(data, dict):
+        data = [data]
+    if not isinstance(data, list):
+        return []
+    return [item for item in data if isinstance(item, dict)]
+
+
+def parse_pair_indices(reply: str, count: int) -> list[int]:
+    """Parse a JSON array of pair numbers (1-based), validated against count."""
+    text = reply.strip()
     if text.startswith("```"):
         text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
         text = re.sub(r"\n?```$", "", text).strip()
@@ -381,11 +472,17 @@ def parse_claims(text: str) -> list[dict]:
             data = json.loads(text[start : end + 1])
         except json.JSONDecodeError:
             return []
-    if isinstance(data, dict):
-        data = [data]
     if not isinstance(data, list):
         return []
-    return [item for item in data if isinstance(item, dict)]
+    out: list[int] = []
+    for item in data:
+        try:
+            index = int(item)
+        except (TypeError, ValueError):
+            continue
+        if 1 <= index <= count and index not in out:
+            out.append(index)
+    return out
 
 
 def parse_conflicts(reply: str, valid_ids: set[str]) -> list[tuple[str, str]]:
@@ -431,17 +528,56 @@ def link_conflicts(claims: list[dict], reply: str) -> int:
     return len(pairs)
 
 
-def conflict_prompt(claims: list[dict]) -> str:
-    lines = ["CLAIMS:"]
-    for claim in claims:
-        extra = f" (deadline: {claim['deadline']})" if claim.get("deadline") else ""
-        lines.append(f"[{claim['claim_id']}] {claim['statement']}{extra}")
+STOP = set(
+    "the a an and or of to in on for by with from as at is are was were be been being that this these those "
+    "it its their his her shall must may can will would should not no any all such other which who whom whose".split()
+)
+
+
+def tokens(text: str) -> set[str]:
+    return {t for t in re.findall(r"[a-z0-9]+", text.lower()) if t not in STOP and len(t) > 2}
+
+
+def conflict_candidates(claims: list[dict], k: int = 3, floor: float = 0.12) -> list[tuple[str, str]]:
+    """Cheap local candidate generation: a contradiction is usually between two
+    claims that talk about the same thing. The model then only confirms or
+    rejects a numbered pair list, instead of comparing every claim to every
+    other one (which made it exhaust its reasoning budget and return nothing).
+    """
+    sets = {c["claim_id"]: tokens(c["statement"] + " " + str(c.get("deadline") or "")) for c in claims}
+    scored: dict[tuple[str, str], float] = {}
+    ids = list(sets)
+    for i, left in enumerate(ids):
+        for right in ids[i + 1 :]:
+            a, b = sets[left], sets[right]
+            if not a or not b:
+                continue
+            score = len(a & b) / len(a | b)
+            if score >= floor:
+                scored[(left, right)] = score
+    per_claim: dict[str, int] = {}
+    picked: list[tuple[str, str, float]] = []
+    for (left, right), score in sorted(scored.items(), key=lambda kv: -kv[1]):
+        if per_claim.get(left, 0) >= k or per_claim.get(right, 0) >= k:
+            continue
+        per_claim[left] = per_claim.get(left, 0) + 1
+        per_claim[right] = per_claim.get(right, 0) + 1
+        picked.append((left, right, score))
+    return [(left, right) for left, right, _ in picked]
+
+
+def pairs_prompt(claims: list[dict], pairs: list[tuple[str, str]]) -> str:
+    by_id = {c["claim_id"]: c for c in claims}
+    lines = ["PAIRS:"]
+    for index, (left, right) in enumerate(pairs, start=1):
+        lines.append(f"{index}. [{left}] {by_id[left]['statement']}")
+        lines.append(f"   [{right}] {by_id[right]['statement']}")
     lines.append("")
-    lines.append("Return the JSON array of conflicting id pairs now.")
+    lines.append("Return the JSON array of pair numbers that contradict each other, e.g. [3,7]. JSON only.")
     return "\n".join(lines)
 
 
-def call_model(prompt: str, args, system: str = SYSTEM) -> tuple[str, dict]:
+def call_model(prompt: str, args, system: str = SYSTEM) -> tuple[str, dict, str]:
     import requests
 
     key = os.environ.get("OPENAI_API_KEY", "")
@@ -478,10 +614,11 @@ def call_model(prompt: str, args, system: str = SYSTEM) -> tuple[str, dict]:
         choice = (data.get("choices") or [{}])[0]
         content = (choice.get("message") or {}).get("content") or ""
         usage = data.get("usage") or {}
+        finish = str(choice.get("finish_reason") or "")
         return content, {
             "input_tokens": usage.get("prompt_tokens", 0),
             "output_tokens": usage.get("completion_tokens", 0),
-        }
+        }, finish
     raise SystemExit(f"model call failed after retries: {last}")
 
 
@@ -561,6 +698,7 @@ def estimate(spans: list[dict], chunks: list[list[dict]], args, conflicts: bool 
 
 
 def main() -> int:
+    load_dotenv()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--docs", default="D1,D2,D3,D4")
     ap.add_argument("--out", default=str(GOLD / "claims.compiled.jsonl"))
@@ -568,13 +706,18 @@ def main() -> int:
     ap.add_argument("--backend", choices=["http", "dry-run"], default="http")
     ap.add_argument("--model", default=os.environ.get("DOCBENCH_MODEL") or os.environ.get("OPENAI_MODEL", ""))
     ap.add_argument("--base-url", default=os.environ.get("OPENAI_BASE_URL", ""))
-    ap.add_argument("--chunk-size", type=int, default=40, help="Spans per request")
+    ap.add_argument("--chunk-size", type=int, default=15, help="Spans per request")
     ap.add_argument("--overlap", type=int, default=2, help="Spans repeated between requests")
     ap.add_argument("--min-chars", type=int, default=60)
-    ap.add_argument("--max-tokens", type=int, default=4096)
+    ap.add_argument("--max-tokens", type=int, default=10000)
+    ap.add_argument("--resume", action="store_true",
+                    help="Continue a previous run, skipping completed chunks")
+    ap.add_argument("--retry-failed", action="store_true",
+                    help="With --resume: redo the chunks touched by recorded failures")
     ap.add_argument("--conflicts", dest="conflicts", action="store_true", default=True,
                     help="Second pass that links contradicting claims (default: on)")
     ap.add_argument("--no-conflicts", dest="conflicts", action="store_false")
+    ap.add_argument("--pair-batch", type=int, default=20, help="Candidate pairs per conflict request")
     ap.add_argument("--dry-run", action="store_true", help="Segment and estimate only")
     ap.add_argument("--estimate", action="store_true", help="Estimate tokens and stop (implies --dry-run)")
     args = ap.parse_args()
@@ -629,51 +772,166 @@ def main() -> int:
         doc_id: {s["span_id"]: s for s in spans} for doc_id, spans in per_doc_spans.items()
     }
 
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    state_path = Path(str(out) + ".state.json")
+    failures_path = Path(str(out) + ".failures.jsonl")
+
     claims: list[dict] = []
-    seen_statements: set[str] = set()
+    counters: dict[str, int] = {}
+    done_chunks: dict[str, int] = {}
+    if args.resume and out.exists() and state_path.exists():
+        claims = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines() if line.strip()]
+        for claim in claims:
+            doc = claim["doc_id"]
+            counters[doc] = max(counters.get(doc, 0), int(claim["claim_id"].split("-")[-1]))
+        done_chunks = json.loads(state_path.read_text(encoding="utf-8")).get("done", {})
+        print(f"resuming: {len(claims)} claims, {len(done_chunks)} chunk(s) already done")
+    else:
+        counters = {}
+
+    seen_statements: set[str] = {statement_key(c["statement"]) for c in claims}
     totals = {"input_tokens": 0, "output_tokens": 0}
     rejected = 0
-    for index, block in enumerate(chunks, start=1):
-        doc_id = block[0]["doc_id"]
-        prompt = make_prompt(block, doc_id)
-        reply, usage = call_model(prompt, args)
-        totals["input_tokens"] += usage["input_tokens"]
-        totals["output_tokens"] += usage["output_tokens"]
-        parsed = parse_claims(reply)
+    truncated = 0
+    if not (args.resume and done_chunks):
+        failures_path.write_text("", encoding="utf-8")
+
+    if args.retry_failed and failures_path.exists():
+        failed_spans: set[str] = set()
+        for line in failures_path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                failed_spans.update(json.loads(line).get("span_ids") or [])
+        reset = 0
+        for block in chunks:
+            key = f"{block[0]['doc_id']}:{block[0]['span_id']}-{block[-1]['span_id']}"
+            if key in done_chunks and any(span["span_id"] in failed_spans for span in block):
+                del done_chunks[key]
+                reset += 1
+        print(f"retry: {reset} chunk(s) reset, touching {len(failed_spans)} recorded span(s)")
+
+    def save() -> None:
+        out.write_text("".join(json.dumps(c, ensure_ascii=False) + "\n" for c in claims), encoding="utf-8")
+        state_path.write_text(json.dumps({"done": done_chunks}, indent=1), encoding="utf-8")
+
+    def record_failure(doc_id: str, block: list[dict], reply: str, reason: str) -> None:
+        with failures_path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps({
+                "doc_id": doc_id,
+                "span_ids": [s["span_id"] for s in block],
+                "reason": reason,
+                "reply": reply[:4000],
+            }, ensure_ascii=False) + "\n")
+
+    def absorb_objects(doc_id: str, parsed: list[dict]) -> int:
+        """Turn parsed reply objects into claims. Returns how many were kept."""
+        nonlocal rejected
         kept = 0
         for raw in parsed:
-            claim = build_claim(raw, per_doc_by_id[doc_id], doc_id, len(claims) + 1)
+            counters[doc_id] = counters.get(doc_id, 0) + 1
+            claim = build_claim(raw, per_doc_by_id[doc_id], doc_id, counters[doc_id])
             if claim is None:
+                counters[doc_id] -= 1
                 rejected += 1
                 continue
             key = statement_key(claim["statement"])
             if key in seen_statements:
+                counters[doc_id] -= 1
                 rejected += 1
                 continue
             seen_statements.add(key)
             claims.append(claim)
             kept += 1
+        return kept
+
+    def absorb(doc_id: str, block: list[dict]) -> tuple[int, int]:
+        """Extract from one block, salvaging what is complete and retrying the rest."""
+        nonlocal truncated
+        prompt = make_prompt(block, doc_id)
+        reply, usage, finish = call_model(prompt, args)
+        totals["input_tokens"] += usage["input_tokens"]
+        totals["output_tokens"] += usage["output_tokens"]
+
+        cut_off = finish == "length" or (bool(reply.strip()) and not reply.strip().endswith("]"))
+        parsed = parse_claims(reply)
+        kept = absorb_objects(doc_id, parsed)
+        if not parsed and reply.strip() not in ("[]", ""):
+            record_failure(doc_id, block, reply, "unparseable")
+
+        # A reply cut in the middle is not "this block has no rules". Keep the
+        # objects that arrived complete, and ask again only for the spans they
+        # do not cover.
+        if cut_off:
+            truncated += 1
+            record_failure(doc_id, block, reply, f"truncated (finish={finish or 'unknown'})")
+            covered = {
+                str(span_id).strip().strip("[]")
+                for raw in parsed
+                for span_id in (raw.get("span_ids") or raw.get("spans") or [])
+            }
+            remaining = [span for span in block if span["span_id"] not in covered]
+            if remaining and len(block) > 1:
+                middle = len(remaining) // 2
+                first, _ = absorb(doc_id, remaining[:middle])
+                second, _ = absorb(doc_id, remaining[middle:])
+                return kept + first + second, len(parsed)
+        return kept, len(parsed)
+
+    for index, block in enumerate(chunks, start=1):
+        doc_id = block[0]["doc_id"]
+        chunk_key = f"{doc_id}:{block[0]['span_id']}-{block[-1]['span_id']}"
+        if chunk_key in done_chunks:
+            continue
+        before = (totals["input_tokens"], totals["output_tokens"])
+        kept, parsed = absorb(doc_id, block)
+        done_chunks[chunk_key] = kept
+        save()
         print(
-            f"[{index}/{len(chunks)}] {doc_id} spans={len(block)} parsed={len(parsed)} "
-            f"kept={kept} tokens={usage['input_tokens']}+{usage['output_tokens']}"
+            f"[{index}/{len(chunks)}] {doc_id} spans={len(block)} parsed={parsed} "
+            f"kept={kept} tokens={totals['input_tokens'] - before[0]}+"
+            f"{totals['output_tokens'] - before[1]}"
         )
 
     conflict_pairs = 0
+    conflict_failures = 0
     if args.conflicts:
+        by_doc_claims: dict[str, list[dict]] = {}
+        for claim in claims:
+            by_doc_claims.setdefault(claim["doc_id"], []).append(claim)
         for doc_id in doc_ids:
-            doc_claims = [c for c in claims if c["doc_id"] == doc_id]
+            doc_claims = by_doc_claims.get(doc_id, [])
             if len(doc_claims) < 2:
                 continue
-            reply, usage = call_model(conflict_prompt(doc_claims), args, CONFLICT_SYSTEM)
-            totals["input_tokens"] += usage["input_tokens"]
-            totals["output_tokens"] += usage["output_tokens"]
-            linked = link_conflicts(doc_claims, reply)
+            pairs = conflict_candidates(doc_claims)
+            linked = 0
+            failed = 0
+            for start in range(0, len(pairs), args.pair_batch):
+                batch = pairs[start : start + args.pair_batch]
+                try:
+                    reply, usage, finish = call_model(pairs_prompt(doc_claims, batch), args, CONFLICT_SYSTEM)
+                except SystemExit as exc:
+                    # The gateway drops long runs with 503s. Losing one batch of
+                    # 20 candidate pairs must not lose the other 100 claims.
+                    failed += 1
+                    record_failure(doc_id, [], str(exc), "conflict batch failed")
+                    print(f"  conflicts {doc_id}: batch {start // args.pair_batch + 1} failed ({exc})")
+                    continue
+                totals["input_tokens"] += usage["input_tokens"]
+                totals["output_tokens"] += usage["output_tokens"]
+                chosen = parse_pair_indices(reply, len(batch))
+                if finish == "length" and not chosen:
+                    print(f"  conflicts {doc_id}: batch of {len(batch)} pairs hit the token limit, skipped")
+                    continue
+                selected = [batch[i - 1] for i in chosen]
+                linked += link_conflicts(doc_claims, json.dumps([[a, b] for a, b in selected]))
             conflict_pairs += linked
-            print(f"conflicts {doc_id}: {linked} pair(s) of {len(doc_claims)} claims")
+            conflict_failures += failed
+            print(
+                f"conflicts {doc_id}: {linked} pair(s) confirmed from {len(pairs)} candidate(s), "
+                f"{len(doc_claims)} claims" + (f", {failed} batch(es) failed" if failed else "")
+            )
 
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text("".join(json.dumps(c, ensure_ascii=False) + "\n" for c in claims), encoding="utf-8")
+    save()
 
     manifest = {
         "model": args.model,
@@ -686,7 +944,9 @@ def main() -> int:
         "spans": len(all_spans),
         "claims": len(claims),
         "rejected": rejected,
+        "truncated_retries": truncated,
         "conflict_pairs": conflict_pairs,
+        "conflict_batch_failures": conflict_failures,
         "input_tokens": totals["input_tokens"],
         "output_tokens": totals["output_tokens"],
         "spans_sha256": hashlib.sha256(spans_out.read_bytes()).hexdigest(),
