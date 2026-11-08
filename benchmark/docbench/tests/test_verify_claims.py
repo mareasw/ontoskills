@@ -262,6 +262,26 @@ class AuditPassTest(unittest.TestCase):
         self.assertEqual(audit["D1-0001"]["verdict"], "ok")
         self.assertEqual(audit["D1-0002"]["verdict"], "no")
 
+    def test_dead_batch_aborts_resumably_and_keeps_the_cache(self) -> None:
+        claims = [claim(f"D1-000{i}", f"statement {i}", [SPANS[1]]) for i in range(1, 5)]
+
+        def call(prompt, system, max_tokens):
+            if "D1-0003" in prompt:
+                raise SystemExit("model call failed after retries: HTTP 503")
+            rows = [
+                {"claim_id": cid, "verdict": "ok", "note": "-"}
+                for cid in ("D1-0001", "D1-0002") if cid in prompt
+            ]
+            return json.dumps(rows), {"input_tokens": 1, "output_tokens": 1}, "stop"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "audit.jsonl"
+            with self.assertRaises(SystemExit) as caught:
+                vc.audit_claims(claims, self.index, call, cache_path=cache, batch_size=2)
+            self.assertIn("--resume", str(caught.exception))
+            cached = {row["claim_id"] for row in vc.load_jsonl(cache)}
+            self.assertEqual(cached, {"D1-0001", "D1-0002"})
+
 
 class RepairPassTest(unittest.TestCase):
     def test_repair_batches_by_claim_count(self) -> None:
@@ -276,6 +296,20 @@ class RepairPassTest(unittest.TestCase):
         self.assertEqual(len(repairs), 5)
         self.assertEqual(len(call.prompts), 3)
         self.assertEqual(repairs["D1-0003"]["statement"], "fixed 3")
+
+    def test_omitted_repair_is_asked_again_not_invented(self) -> None:
+        index = vc.SpanIndex(SPANS)
+        claims = [claim("D1-0001", "a", [SPANS[1]]), claim("D1-0002", "b", [SPANS[1]])]
+
+        def call(prompt, system, max_tokens):
+            rows = [{"claim_id": "D1-0001", "action": "drop"}] if "D1-0002" not in prompt else []
+            return json.dumps(rows), {"input_tokens": 1, "output_tokens": 1}, "stop"
+
+        repairs = vc.repair_claims(claims, index, call, batch_size=2)
+        self.assertEqual(repairs["D1-0001"]["action"], "drop")
+        # The claim the model never answered has no action, so nothing is applied.
+        self.assertEqual(repairs["D1-0002"]["action"], "")
+        self.assertIn("omitted", repairs["D1-0002"]["note"])
 
 
 class PipelineTest(unittest.TestCase):

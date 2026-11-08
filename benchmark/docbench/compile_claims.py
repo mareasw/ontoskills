@@ -812,6 +812,12 @@ def main() -> int:
                     help="Second pass that links contradicting claims (default: on)")
     ap.add_argument("--no-conflicts", dest="conflicts", action="store_false")
     ap.add_argument("--pair-batch", type=int, default=20, help="Candidate pairs per conflict request")
+    ap.add_argument("--verify", action="store_true",
+                    help="After compiling, audit every claim against its own evidence, repair "
+                         "what fails, and drop what cannot be repaired (see verify_claims.py)")
+    ap.add_argument("--verify-rounds", type=int, default=2)
+    ap.add_argument("--verify-audit-batch", type=int, default=10)
+    ap.add_argument("--verify-repair-batch", type=int, default=6)
     ap.add_argument("--dry-run", action="store_true", help="Segment and estimate only")
     ap.add_argument("--estimate", action="store_true", help="Estimate tokens and stop (implies --dry-run)")
     args = ap.parse_args()
@@ -1060,6 +1066,52 @@ def main() -> int:
 
     save()
 
+    verify_summary: dict | None = None
+    if args.verify:
+        from llm import chat
+        from verify_claims import SpanIndex, run_pipeline, write_jsonl
+
+        def verify_call(prompt: str, system: str, max_tokens: int):
+            return chat(
+                args.base_url or os.environ.get("OPENAI_BASE_URL", ""),
+                os.environ.get("OPENAI_API_KEY", ""),
+                args.model,
+                [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt},
+                ],
+                max_tokens,
+            )
+
+        span_index = SpanIndex(
+            [json.loads(line) for line in spans_out.read_text(encoding="utf-8").splitlines() if line.strip()]
+        )
+        work = Path(str(out) + ".verify")
+        verified, verify_report = run_pipeline(
+            claims,
+            span_index,
+            verify_call,
+            work=work,
+            rounds=args.verify_rounds,
+            audit_batch=args.verify_audit_batch,
+            repair_batch=args.verify_repair_batch,
+            max_tokens=args.max_tokens,
+            resume=args.resume,
+        )
+        verified_path = Path(str(out)[: -len(".jsonl")] + ".verified.jsonl") if str(out).endswith(".jsonl") else Path(str(out) + ".verified.jsonl")
+        write_jsonl(verified_path, verified)
+        (work / "report.json").write_text(json.dumps(verify_report, indent=1), encoding="utf-8")
+        print(f"\nverified: {len(verified)} claims -> {verified_path}")
+        print(json.dumps(verify_report["final"], indent=1))
+        verify_summary = {
+            "file": str(verified_path),
+            "initial": verify_report["initial"],
+            "rounds": verify_report["rounds"],
+            "residual_dropped": verify_report["residual_dropped"],
+            "merged_duplicates": verify_report["merged_duplicates"],
+            "final": verify_report["final"],
+        }
+
     manifest = {
         "model": args.model,
         "base_url": args.base_url,
@@ -1080,6 +1132,7 @@ def main() -> int:
         "spans_sha256": hashlib.sha256(spans_out.read_bytes()).hexdigest(),
         "claims_sha256": hashlib.sha256(out.read_bytes()).hexdigest(),
         "claims_by_doc": {d: sum(1 for c in claims if c["doc_id"] == d) for d in doc_ids},
+        "verify": verify_summary,
     }
     Path(str(out) + ".manifest.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
     print(f"\nwrote {len(claims)} claims -> {out}")
