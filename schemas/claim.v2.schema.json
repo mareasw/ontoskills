@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ontoskills.sh/schemas/claim-v2.json",
+  "title": "OntoSkills Claim (v2, evidence list)",
+  "description": "One atomic assertion with the verbatim spans that support, qualify or contradict it. See docs/adr/0001-document-first-kernel.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "claim_id",
+    "doc_id",
+    "statement",
+    "modality",
+    "evidence"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "claim_id": {
+      "type": "string",
+      "pattern": "^D[0-9]+-[0-9]{4}$"
+    },
+    "doc_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "statement": {
+      "type": "string",
+      "minLength": 1
+    },
+    "subject": { "type": "string" },
+    "predicate": { "type": "string" },
+    "object": { "type": "string" },
+    "polarity": {
+      "enum": ["affirmed", "negated"]
+    },
+    "modality": {
+      "enum": [
+        "obligation",
+        "permission",
+        "prohibition",
+        "recommendation",
+        "definition",
+        "procedure_step",
+        "condition"
+      ]
+    },
+    "actor": { "type": "string" },
+    "deadline": { "type": "string" },
+    "conditions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["quote", "locator"],
+        "properties": {
+          "quote": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "enum": ["supports", "qualifies", "contradicts"],
+            "default": "supports"
+          },
+          "locator": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind"],
+            "properties": {
+              "kind": {
+                "enum": ["pdf", "html", "docx", "pptx", "text", "markdown"]
+              },
+              "page": { "type": "integer", "minimum": 1 },
+              "bbox": {
+                "type": "array",
+                "items": { "type": "number" },
+                "minItems": 4,
+                "maxItems": 4
+              },
+              "section_path": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "char_start": { "type": "integer", "minimum": 0 },
+              "char_end": { "type": "integer", "minimum": 0 },
+              "url": { "type": "string" },
+              "anchor": { "type": "string" },
+              "slide": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      }
+    },
+    "conflicts_with": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^D[0-9]+-[0-9]{4}$" }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": { "type": "string" },
+        "version": { "type": "string" },
+        "jurisdiction": { "type": "string" },
+        "doc_type": { "type": "string" },
+        "valid_from": { "type": "string" },
+        "valid_to": { "type": "string" }
+      }
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "notes": { "type": "string" }
+  }
+}
