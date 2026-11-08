@@ -193,6 +193,26 @@ HEADING_NUMBERED = re.compile(
     r"^\s*(?:ARTICLE\s+|Article\s+)?(?:\d+(?:\.\d+)*\.?|[IVXLC]+\.|[A-Z]\.)\s+\S"
 )
 HEADING_SHORT = re.compile(r"^[A-Z][A-Za-z0-9 ,'&()\-/]{2,70}$")
+# A table block opened by an ALL-CAPS label is closed and reopened past this
+# length, so one label can never swallow a whole document.
+TABLE_BLOCK_CHARS = 700
+
+
+# An ALL-CAPS label with a trailing qualifier, e.g. "CRITICAL (Red)". This is
+# the shape a flattened HTML table gives to a column/band header, and it is
+# what distinguishes it from an ordinary section title such as "PURPOSE".
+TABLE_LABEL = re.compile(r"^[A-Z][A-Z0-9 &/\-.,']{1,40}\s*\([^)]{1,40}\)$")
+
+
+def is_table_label(line: str) -> bool:
+    """True for an ALL-CAPS label with a qualifier that heads a table block.
+
+    Severity bands arrive from HTML as ``CRITICAL (Red)`` followed by their
+    rows. The label is the only thing that says what the rows mean, so it has
+    to travel with them instead of becoming a heading that the next row
+    immediately replaces.
+    """
+    return bool(TABLE_LABEL.match(line.strip()))
 
 
 def looks_like_heading(line: str) -> bool:
@@ -204,6 +224,8 @@ def looks_like_heading(line: str) -> bool:
     words = stripped.split()
     if len(words) > 7:
         return False
+    if is_table_label(stripped):
+        return True
     # A parenthetical line is usually a table row ("... (typically 72 hours)"),
     # not a title; keep it in the body so it can carry a claim.
     if stripped.endswith(")") and not HEADING_NUMBERED.match(stripped):
@@ -248,6 +270,8 @@ def segment(text: str, doc_id: str, min_chars: int = 60) -> list[dict]:
     section_stack: list[tuple[int, str]] = []
     pending: list[str] = []
     short_buffer: list[str] = []
+    # Lines of the table block opened by an ALL-CAPS label, or None.
+    table_block: list[str] | None = None
 
     def emit(piece: str) -> None:
         # A span must carry words: table rules, arrows and page numbers are not
@@ -294,21 +318,46 @@ def segment(text: str, doc_id: str, min_chars: int = 60) -> list[dict]:
             if len(piece) >= min_chars:
                 emit(piece)
 
+    def flush_table(reopen: bool = False) -> None:
+        """Emit the open table block: the label plus the rows it governs.
+
+        The rows of a flattened HTML table are meaningless on their own —
+        "Response time : 1 hour" says nothing about which band it belongs to.
+        The label is the row's meaning, so it stays in the same span.
+        """
+        nonlocal table_block
+        if not table_block:
+            table_block = None
+            return
+        block = norm(" ".join(table_block))
+        label = table_block[0]
+        table_block = [label] if reopen else None
+        emit(block)
+
     # splitlines() also splits on form feed, which is how pages are encoded
     # here, so split on newlines only and handle \f explicitly.
     for raw_line in text.split("\n"):
         if "\f" in raw_line:
             flush()
             flush_short()
+            flush_table()
             page += raw_line.count("\f")
             continue
         stripped = raw_line.strip()
         if not stripped:
+            # A blank line separates rows in flattened HTML, not blocks: do not
+            # close the table here.
             flush()
             continue
-        if looks_like_heading(stripped):
+        # Inside an open table block every short line is a row — including the
+        # ones that look like headings, because a flattened HTML table ships its
+        # cells as separate <div>s. The block is closed by its next label or by
+        # a "key : value" terminator row, never by the shape of a cell.
+        in_block = table_block is not None and not is_table_label(stripped)
+        if looks_like_heading(stripped) and not in_block:
             flush()
             flush_short()
+            flush_table()
             # Keep a shallow stack: a numbered heading pops to its own depth.
             match = re.match(r"^\s*(?:ARTICLE\s+|Article\s+)?((?:\d+|[IVXLC]+|[A-Z]))(?:\.\d+)*\.?\s", stripped)
             depth = 1
@@ -318,10 +367,27 @@ def segment(text: str, doc_id: str, min_chars: int = 60) -> list[dict]:
             while section_stack and section_stack[-1][0] >= depth:
                 section_stack.pop()
             section_stack.append((depth, stripped[:90]))
+            if is_table_label(stripped):
+                table_block = [stripped]
+            continue
+        if table_block is not None:
+            table_block.append(stripped)
+            # A "key : value" row is the terminator of a table record: the
+            # severity band ends with its "Response time : ..." line, and the
+            # next thing in the document is either the next band or a real
+            # section heading.
+            if re.search(r"\s:\s", stripped):
+                flush_table()
+                continue
+            if len(norm(" ".join(table_block))) > TABLE_BLOCK_CHARS:
+                # Never let a label swallow a whole document: close the block
+                # and reopen it with the label repeated.
+                flush_table(reopen=True)
             continue
         pending.append(stripped)
     flush()
     flush_short()
+    flush_table()
 
     # Char offsets index the whitespace-normalised source (the same string the
     # verbatim check uses). They are a convenience, not the identity of a span;
@@ -597,16 +663,18 @@ def call_model(prompt: str, args, system: str = SYSTEM) -> tuple[str, dict, str]
         ],
     }
     last = ""
-    for attempt in range(4):
+    # The gateway drops long runs with 503s, often several in a row. Six
+    # attempts with widening backoff is cheaper than losing a 20-minute run.
+    for attempt in range(6):
         try:
             resp = requests.post(f"{url}/chat/completions", headers=headers, json=payload, timeout=300)
         except requests.RequestException as exc:
             last = str(exc)
-            time.sleep(2 * (attempt + 1))
+            time.sleep(min(30, 3 * (attempt + 1)))
             continue
         if resp.status_code in {408, 409, 429, 500, 502, 503, 504}:
             last = f"HTTP {resp.status_code}"
-            time.sleep(2 * (attempt + 1))
+            time.sleep(min(30, 3 * (attempt + 1)))
             continue
         if resp.status_code >= 400:
             raise SystemExit(f"HTTP {resp.status_code}: {resp.text[:400]}")
@@ -624,6 +692,65 @@ def call_model(prompt: str, args, system: str = SYSTEM) -> tuple[str, dict, str]
 
 def statement_key(statement: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", statement.lower()).strip()
+
+
+def dedupe_claims(claims: list[dict], threshold: float = 0.85) -> tuple[list[dict], int]:
+    """Merge claims that state the same rule twice.
+
+    Consecutive chunks overlap by two spans, so the same rule is often
+    extracted twice and paraphrased slightly ("must"/"shall"). Exact
+    statement matching does not catch that, and a duplicated rule crowds a
+    retrieval budget that should cover different rules.
+
+    Only near-identical statements inside one document are merged, and the
+    survivor keeps the union of the evidence: a merge never deletes support.
+    """
+    by_doc: dict[str, list[dict]] = {}
+    for claim in claims:
+        by_doc.setdefault(claim["doc_id"], []).append(claim)
+
+    kept: list[dict] = []
+    merged_count = 0
+    for doc_claims in by_doc.values():
+        token_sets = [tokens(c["statement"]) for c in doc_claims]
+        absorbed: set[int] = set()
+        for i, claim in enumerate(doc_claims):
+            if i in absorbed:
+                continue
+            for j in range(i + 1, len(doc_claims)):
+                if j in absorbed:
+                    continue
+                left, right = token_sets[i], token_sets[j]
+                if not left or not right:
+                    continue
+                if len(left & right) / len(left | right) < threshold:
+                    continue
+                other = doc_claims[j]
+                quotes = {e["quote"] for e in claim.get("evidence", [])}
+                for evidence in other.get("evidence", []):
+                    if evidence["quote"] not in quotes:
+                        claim.setdefault("evidence", []).append(evidence)
+                        quotes.add(evidence["quote"])
+                for field in ("actor", "deadline", "subject", "predicate", "object"):
+                    if not claim.get(field) and other.get(field):
+                        claim[field] = other[field]
+                conditions = claim.setdefault("conditions", [])
+                for condition in other.get("conditions", []) or []:
+                    if condition not in conditions:
+                        conditions.append(condition)
+                if not conditions:
+                    claim.pop("conditions", None)
+                conflicts = claim.setdefault("conflicts_with", [])
+                for conflict in other.get("conflicts_with", []) or []:
+                    if conflict not in conflicts:
+                        conflicts.append(conflict)
+                if not conflicts:
+                    claim.pop("conflicts_with", None)
+                absorbed.add(j)
+                merged_count += 1
+        kept.extend(c for index, c in enumerate(doc_claims) if index not in absorbed)
+    kept.sort(key=lambda c: (c["doc_id"], int(c["claim_id"].split("-")[-1])))
+    return kept, merged_count
 
 
 def build_claim(raw: dict, span_by_id: dict[str, dict], doc_id: str, number: int) -> dict | None:
@@ -787,13 +914,39 @@ def main() -> int:
             counters[doc] = max(counters.get(doc, 0), int(claim["claim_id"].split("-")[-1]))
         done_chunks = json.loads(state_path.read_text(encoding="utf-8")).get("done", {})
         print(f"resuming: {len(claims)} claims, {len(done_chunks)} chunk(s) already done")
+        # Keep the accounting honest across invocations: tokens already spent
+        # belong in the manifest of the finished artifact.
+        prior_manifest = Path(str(out) + ".manifest.json")
+        if prior_manifest.exists():
+            prior = json.loads(prior_manifest.read_text(encoding="utf-8"))
+            prior_totals = {
+                "input_tokens": prior.get("input_tokens", 0),
+                "output_tokens": prior.get("output_tokens", 0),
+            }
+            prior_rejected = prior.get("rejected", 0)
+            prior_counts = {
+                "truncated_retries": prior.get("truncated_retries", 0),
+                "duplicates_merged": prior.get("duplicates_merged", 0),
+                "conflict_pairs": prior.get("conflict_pairs", 0),
+                "conflict_batch_failures": prior.get("conflict_batch_failures", 0),
+            }
+        else:
+            prior_totals = {"input_tokens": 0, "output_tokens": 0}
+            prior_rejected = 0
+            prior_counts = {}
     else:
         counters = {}
+        prior_totals = {"input_tokens": 0, "output_tokens": 0}
+        prior_rejected = 0
+        prior_counts = {}
 
     seen_statements: set[str] = {statement_key(c["statement"]) for c in claims}
-    totals = {"input_tokens": 0, "output_tokens": 0}
-    rejected = 0
-    truncated = 0
+    totals = dict(prior_totals)
+    rejected = prior_rejected
+    # These describe the whole artifact, not one invocation, so a resumed run
+    # adds to what the previous invocation already recorded.
+    truncated = prior_counts.get("truncated_retries", 0)
+    duplicates_merged = prior_counts.get("duplicates_merged", 0)
     if not (args.resume and done_chunks):
         failures_path.write_text("", encoding="utf-8")
 
@@ -892,8 +1045,15 @@ def main() -> int:
             f"{totals['output_tokens'] - before[1]}"
         )
 
-    conflict_pairs = 0
-    conflict_failures = 0
+    claims, newly_merged = dedupe_claims(claims)
+    duplicates_merged += newly_merged
+    if newly_merged:
+        seen_statements = {statement_key(c["statement"]) for c in claims}
+        print(f"dedupe: merged {newly_merged} near-duplicate claim(s) -> {len(claims)} claims")
+    save()
+
+    conflict_pairs = prior_counts.get("conflict_pairs", 0)
+    conflict_failures = prior_counts.get("conflict_batch_failures", 0)
     if args.conflicts:
         by_doc_claims: dict[str, list[dict]] = {}
         for claim in claims:
@@ -944,6 +1104,7 @@ def main() -> int:
         "spans": len(all_spans),
         "claims": len(claims),
         "rejected": rejected,
+        "duplicates_merged": duplicates_merged,
         "truncated_retries": truncated,
         "conflict_pairs": conflict_pairs,
         "conflict_batch_failures": conflict_failures,
