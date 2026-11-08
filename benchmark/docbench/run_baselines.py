@@ -42,6 +42,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 from claims_model import evidence_items, shape  # noqa: E402
+from env import load_dotenv  # noqa: E402
 GOLD = ROOT / "gold"
 PRIVATE = ROOT / "private"
 RUNS = ROOT / "runs" / "baselines"
@@ -65,24 +66,6 @@ MAX_CLAIMS_IN_CONTEXT = 12
 RAG_TOP_K = 5
 DEFAULT_MAX_TOKENS = 2048
 RETRIES = 3
-
-
-def load_dotenv(path: Path | None = None) -> None:
-    """Load the repo-root .env without overriding existing variables."""
-    env_path = path or ROOT.parent.parent / ".env"
-    if not env_path.exists():
-        return
-    for raw in env_path.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        if line.startswith("export "):
-            line = line[len("export "):].strip()
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key:
-            os.environ.setdefault(key, value)
 
 
 def norm(text: str) -> str:
