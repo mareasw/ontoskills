@@ -1,8 +1,16 @@
-# DocBench results — first full run
+# DocBench results
 
-**Date:** 2026-11-07
-**Run:** `runs/baselines/20261107T140843Z` (local, gitignored)
-**Status:** technical gate passed on one model and one run; market gate still open.
+**Dates:** 2026-11-07 (hand-built claims) · 2026-11-08 (machine-compiled claims).
+**Status:** both technical gates pass — the representation (2026-11-07) and
+machine extraction (Gate 2, final numbers under *Gate 2 — final*). The **market
+gate is still open**: no interviews, no design partner, no public-evidence memo
+yet.
+
+The file is chronological: the 2026-11-07 run, then Gate 2 — first attempt
+(kept as the measured failure the amendments answer), then **Gate 2 — final**.
+Read the final section for the current verdict.
+
+## First run (2026-11-07): hand-built claims
 
 ## Setup
 
