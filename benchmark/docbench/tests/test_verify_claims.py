@@ -384,6 +384,51 @@ class PipelineTest(unittest.TestCase):
         self.assertEqual(report["rounds"][0]["rewritten"], 1)
         self.assertEqual(report["rounds"][0]["dropped"], 1)
         self.assertEqual(report["residual_dropped"], 0)
+        self.assertEqual(report["kept_weak"], 0)
+
+    def test_pipeline_keeps_weak_residual_and_drops_only_hard_failures(self) -> None:
+        """PREFLIGHT §9.2: `weak` costs citation quality, not truth, so it ships."""
+        index = vc.SpanIndex(SPANS)
+        claims = [
+            claim("D1-0001", "good", [SPANS[0]]),
+            claim("D1-0002", "The Commission must terminate.", [SPANS[1]]),
+            claim("D1-0003", "Hopeless claim with no evidence at all.", [SPANS[6]]),
+        ]
+        verdicts = {"D1-0001": "ok", "D1-0002": "weak", "D1-0003": "no"}
+
+        def call(prompt: str, system: str, max_tokens: int):
+            rows = [{"claim_id": cid, "verdict": v} for cid, v in verdicts.items() if cid in prompt]
+            if "evidence auditor" not in system:
+                rows = [
+                    {"claim_id": "D1-0002", "action": "rewrite",
+                     "statement": "The Commission may terminate the appointment of the expert."},
+                    {"claim_id": "D1-0003", "action": "rewrite",
+                     "statement": "Filler text about nothing in particular and more."},
+                ]
+                rows = [row for row in rows if row["claim_id"] in prompt]
+            return json.dumps(rows), {"input_tokens": 1, "output_tokens": 1}, "stop"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out, report = vc.run_pipeline(
+                claims, index, call, work=Path(tmp), rounds=2,
+                audit_batch=5, repair_batch=5, verbose=False,
+            )
+        self.assertEqual([c["claim_id"] for c in out], ["D1-0001", "D1-0002"])
+        self.assertEqual(report["residual_ids"], ["D1-0002", "D1-0003"])
+        self.assertEqual(report["residual_dropped"], 1)
+        self.assertEqual(report["kept_weak"], 1)
+        self.assertEqual(report["kept_weak_ids"], ["D1-0002"])
+        self.assertEqual(report["final"]["claims"], 2)
+        self.assertEqual(report["final"]["ok"], 1)
+        self.assertEqual(report["final"]["weak"], 1)
+        self.assertEqual(report["final"]["no"], 0)
+
+    def test_verdict_of_never_reads_silence_as_a_pass(self) -> None:
+        claim_ = claim("D1-0001", "good", [SPANS[0]])
+        self.assertEqual(vc.verdict_of(claim_, {}), "weak")
+        self.assertEqual(vc.verdict_of(claim_, {"D1-0001": {"verdict": "maybe"}}), "weak")
+        self.assertEqual(vc.verdict_of(claim_, {"D1-0001": {"verdict": "no"}}), "no")
+        self.assertEqual(vc.verdict_of(claim_, {"D1-0001": {"verdict": "ok"}}), "ok")
 
 
 class CalibrationTest(unittest.TestCase):

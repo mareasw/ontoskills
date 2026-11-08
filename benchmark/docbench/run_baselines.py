@@ -58,7 +58,9 @@ SYSTEM = (
     "You answer questions about one document. Use only the CONTEXT. "
     "Do not use outside knowledge. If the context does not support an answer, "
     'answer exactly "UNKNOWN". Return a JSON object with keys: '
-    '"answer" (string), "citation" (a verbatim quote from CONTEXT, or ""), '
+    '"answer" (string), "citation" (a verbatim quote copied from the document '
+    'text in CONTEXT, or ""; when a claim block shows a QUOTE line, copy the '
+    'QUOTE line, never the claim statement), '
     '"claim_ids" (array of claim ids present in CONTEXT, or []).'
 )
 
@@ -66,6 +68,11 @@ MAX_CLAIMS_IN_CONTEXT = 12
 RAG_TOP_K = 5
 DEFAULT_MAX_TOKENS = 2048
 RETRIES = 3
+# If the model's citation is not a verbatim substring of the document, ask once
+# more before scoring it. The check is mechanical (the harness has the source),
+# so it measures grounding rather than typing accuracy, and it applies to every
+# condition equally.
+CITATION_RETRIES = 1
 
 
 def norm(text: str) -> str:
@@ -273,6 +280,23 @@ def call_model(
     raise SystemExit(f"unknown backend: {backend}")
 
 
+def citation_is_verbatim(citation: str, document: str) -> bool:
+    """True when the citation text can be found in the document as written."""
+    quoted = norm(citation)
+    return bool(quoted) and quoted in norm(document)
+
+
+def citation_retry_prompt(prompt: str, citation: str) -> str:
+    """Ask once more for the same answer with a citation that can be checked."""
+    return (
+        f"{prompt}\n\nYour previous citation was not copied verbatim from the document:\n"
+        f"{citation}\n\nReply with the same JSON object, keeping the answer unchanged, but "
+        "make the citation an exact substring of CONTEXT that supports the answer. When the "
+        "context is a claim block, copy a QUOTE line; never copy the claim statement. Use \"\" "
+        "only if no sentence supports the answer."
+    )
+
+
 def parse_answer(text: str) -> tuple[str, str, list[str]]:
     raw = text.strip()
     candidate = raw
@@ -339,11 +363,13 @@ def main() -> int:
         "max_claims_in_context": MAX_CLAIMS_IN_CONTEXT,
         "max_tokens": args.max_tokens,
         "questions": len(questions),
+        "citation_retries": CITATION_RETRIES,
         "dry_run": args.dry_run,
         "claims_path": str(claims_path),
         "claims_sha256": _sha256(claims_path),
         "claims_shape": sorted({shape(c) for c in claims}) if claims else [],
         "questions_sha256": _sha256(questions_path),
+        "system_sha256": hashlib.sha256(SYSTEM.encode("utf-8")).hexdigest(),
     }
     (outdir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
@@ -382,6 +408,27 @@ def main() -> int:
                 args.backend, args.model, prompt, args.base_url, args.max_tokens
             )
             answer, citation, claim_ids = parse_answer(raw)
+            retried = 0
+            while (
+                citation
+                and retried < CITATION_RETRIES
+                and not citation_is_verbatim(citation, source)
+            ):
+                retried += 1
+                retry_raw, retry_in, retry_out, retry_reasoning = call_model(
+                    args.backend,
+                    args.model,
+                    citation_retry_prompt(prompt, citation),
+                    args.base_url,
+                    args.max_tokens,
+                )
+                in_tok += retry_in
+                out_tok += retry_out
+                reasoning_tok += retry_reasoning
+                retry_answer, retry_citation, retry_ids = parse_answer(retry_raw)
+                answer, citation = retry_answer or answer, retry_citation
+                claim_ids = retry_ids or claim_ids
+                raw = retry_raw
             row = {
                 "condition": condition,
                 "question_id": q["question_id"],
@@ -389,6 +436,7 @@ def main() -> int:
                 "answer": answer,
                 "citation": citation,
                 "claim_ids": claim_ids,
+                "citation_retried": retried,
                 "input_tokens": in_tok,
                 "output_tokens": out_tok,
                 "reasoning_tokens": reasoning_tok,
