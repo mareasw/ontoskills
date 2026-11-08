@@ -381,6 +381,11 @@ def audit_claims(
     pending = [c for c in claims if c["claim_id"] not in done]
     for batch in _batches(pending, batch_size):
         ask(batch)
+    if aborted:
+        raise SystemExit(
+            f"audit incomplete: {len(aborted)} claim(s) never judged, e.g. {aborted[:5]}. "
+            "Progress is cached; re-run with --resume."
+        )
     return done
 
 
@@ -391,11 +396,12 @@ def repair_claims(
     *,
     cache_path: Path | None = None,
     resume: bool = False,
-    batch_size: int = 8,
+    batch_size: int = 6,
     max_tokens: int = 8000,
 ) -> dict[str, dict]:
     """Return ``{claim_id: action record}`` for the claims that need repair."""
     done: dict[str, dict] = {}
+    aborted: list[str] = []
     if resume and cache_path and cache_path.exists():
         for row in load_jsonl(cache_path):
             if row.get("claim_id"):
@@ -408,7 +414,12 @@ def repair_claims(
             (claim, spans.resolve(claim), spans.neighbourhood(spans.resolve(claim)))
             for claim in batch
         ]
-        reply, _usage, finish = call(repair_prompt(triples), REPAIR_SYSTEM, max_tokens)
+        try:
+            reply, _usage, finish = call(repair_prompt(triples), REPAIR_SYSTEM, max_tokens)
+        except SystemExit as exc:
+            aborted.extend(claim["claim_id"] for claim in batch)
+            print(f"  repair: batch of {len(batch)} failed ({exc})", file=sys.stderr)
+            return
         parsed = parse_claims(reply)
         by_id = {str(row.get("claim_id")): row for row in parsed if row.get("claim_id")}
         rows: list[dict] = []
@@ -449,6 +460,11 @@ def repair_claims(
     pending = [c for c in claims if c["claim_id"] not in done]
     for batch in _batches(pending, batch_size):
         ask(batch)
+    if aborted:
+        raise SystemExit(
+            f"repair incomplete: {len(aborted)} claim(s) never judged, e.g. {aborted[:5]}. "
+            "Progress is cached; re-run with --resume."
+        )
     return done
 
 
@@ -573,8 +589,8 @@ def run_pipeline(
     *,
     work: Path,
     rounds: int = 2,
-    audit_batch: int = 20,
-    repair_batch: int = 8,
+    audit_batch: int = 10,
+    repair_batch: int = 6,
     max_tokens: int = 8000,
     resume: bool = False,
     keep_residual: bool = False,
@@ -725,8 +741,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--work", default="", help="cache/report directory (default: alongside --out)")
     parser.add_argument("--model", default=os.environ.get("DOCBENCH_MODEL") or os.environ.get("OPENAI_MODEL", ""))
     parser.add_argument("--base-url", default=os.environ.get("OPENAI_BASE_URL", ""))
-    parser.add_argument("--audit-batch", type=int, default=20)
-    parser.add_argument("--repair-batch", type=int, default=8)
+    parser.add_argument("--audit-batch", type=int, default=10)
+    parser.add_argument("--repair-batch", type=int, default=6)
     parser.add_argument("--max-tokens", type=int, default=8000)
     parser.add_argument("--rounds", type=int, default=2)
     parser.add_argument("--resume", action="store_true")
