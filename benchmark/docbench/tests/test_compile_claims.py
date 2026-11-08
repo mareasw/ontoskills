@@ -92,6 +92,26 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(cc.parse_claims("I cannot help with that."), [])
         self.assertEqual(cc.parse_claims("[not json"), [])
 
+    def test_missing_comma_between_objects_is_repaired(self) -> None:
+        reply = '[{"statement": "a"}\n{"statement": "b"}]'
+        self.assertEqual([c["statement"] for c in cc.parse_claims(reply)], ["a", "b"])
+
+    def test_trailing_comma_is_repaired(self) -> None:
+        self.assertEqual([c["statement"] for c in cc.parse_claims('[{"statement": "a"},]')], ["a"])
+
+    def test_truncated_reply_keeps_complete_objects(self) -> None:
+        # The gateway sometimes returns finish=stop with the content cut in the
+        # middle of the last object. The complete ones are still usable.
+        reply = '[{"span_ids": ["S0001"], "statement": "a"}, {"span_ids": ["S0002"], "stat'
+        self.assertEqual([c["statement"] for c in cc.parse_claims(reply)], ["a"])
+
+    def test_truncated_without_any_complete_object_is_empty(self) -> None:
+        self.assertEqual(cc.parse_claims('[{"span_ids": ["S00'), [])
+
+    def test_repair_does_not_invent_objects(self) -> None:
+        # Nothing complete, nothing returned: salvage must not guess.
+        self.assertEqual(cc.repair_json_array("no array here"), [])
+
 
 class BuildClaimTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -208,10 +228,37 @@ class ConflictTest(unittest.TestCase):
         self.assertEqual(cc.parse_conflicts("[]", {"D4-0001"}), [])
         self.assertEqual(cc.parse_conflicts("no conflicts", {"D4-0001"}), [])
 
-    def test_conflict_prompt_lists_every_claim_once(self) -> None:
-        prompt = cc.conflict_prompt(self._claims())
-        for claim in self._claims():
-            self.assertEqual(prompt.count(f"[{claim['claim_id']}]"), 1)
+    def test_candidates_prefer_claims_about_the_same_thing(self) -> None:
+        claims = self._claims() + [
+            {"claim_id": "D4-0004", "statement": "The county shall publish the notice on its website."},
+            {"claim_id": "D4-0005", "statement": "The county shall advertise the notice in a newspaper."},
+        ]
+        pairs = cc.conflict_candidates(claims)
+        # The two deadline claims overlap the most, so they must be offered.
+        self.assertIn(("D4-0001", "D4-0002"), pairs)
+        # A claim about something unrelated must not be paired with everything.
+        self.assertLessEqual(len(pairs), 5)
+
+    def test_candidates_respect_k_and_floor(self) -> None:
+        claims = self._claims()
+        self.assertEqual(cc.conflict_candidates(claims, k=1), [("D4-0001", "D4-0002")])
+        # A floor above every score yields no pairs at all.
+        self.assertEqual(cc.conflict_candidates(claims, floor=0.99), [])
+
+    def test_pairs_prompt_is_numbered_from_one(self) -> None:
+        claims = self._claims()
+        pairs = [("D4-0001", "D4-0002"), ("D4-0002", "D4-0003")]
+        prompt = cc.pairs_prompt(claims, pairs)
+        self.assertIn("1. [D4-0001]", prompt)
+        self.assertIn("2. [D4-0002]", prompt)
+        self.assertIn("pair numbers", prompt)
+
+    def test_pair_indices_are_validated(self) -> None:
+        self.assertEqual(cc.parse_pair_indices("[2,1]", 3), [2, 1])
+        # Out of range, non-numeric and duplicate entries are dropped.
+        self.assertEqual(cc.parse_pair_indices("[0,4,2,2,\"x\"]", 3), [2])
+        self.assertEqual(cc.parse_pair_indices("none", 3), [])
+        self.assertEqual(cc.parse_pair_indices("```json\n[1]\n```", 3), [1])
 
 
 class EstimateTest(unittest.TestCase):
