@@ -27,8 +27,10 @@ optional repo-root `.env`, and never prints a key.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
+import sys
 import os
 import re
 import time
@@ -37,6 +39,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT))
+
+from claims_model import evidence_items, shape  # noqa: E402
 GOLD = ROOT / "gold"
 PRIVATE = ROOT / "private"
 RUNS = ROOT / "runs" / "baselines"
@@ -130,6 +135,10 @@ def paragraphs(text: str) -> list[str]:
     return [p for p in parts if len(p) >= 80]
 
 
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def load_jsonl(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
@@ -165,10 +174,15 @@ def build_context(condition: str, doc_id: str, question: str, claims: list[dict]
             lines.append(f"DEADLINE: {c['deadline']}")
         if c.get("conditions"):
             lines.append("CONDITIONS: " + "; ".join(c["conditions"]))
-        lines.append(f"QUOTE: {c['quote']}")
-        loc = " > ".join(c["locator"].get("section_path", []))
-        if loc:
-            lines.append(f"LOCATOR: {loc}")
+        for item in evidence_items(c):
+            role = item.get("role", "supports")
+            prefix = "QUOTE" if role == "supports" else f"QUOTE ({role})"
+            lines.append(f"{prefix}: {item['quote']}")
+            loc = " > ".join((item.get("locator") or {}).get("section_path", []))
+            if loc:
+                lines.append(f"LOCATOR: {loc}")
+        if c.get("conflicts_with"):
+            lines.append("CONFLICTS WITH: " + ", ".join(c["conflicts_with"]))
         lines.append("")
     return "\n".join(lines).strip(), {"kind": "claims", "mode": mode, "claims": len(picked)}
 
@@ -304,12 +318,17 @@ def main() -> int:
     ap.add_argument("--only-docs", default="", help="Comma-separated doc ids, e.g. D1,D4")
     ap.add_argument("--max-tokens", type=int, default=DEFAULT_MAX_TOKENS)
     ap.add_argument("--resume", default="", help="Resume a run directory, skipping answered pairs")
+    ap.add_argument("--claims", default=str(GOLD / "claims.jsonl"),
+                    help="Claim file, v1 or v2 (default: the hand-built gold set)")
+    ap.add_argument("--questions", default=str(GOLD / "questions.jsonl"), help="Question file")
     args = ap.parse_args()
 
     load_dotenv()
 
-    questions = load_jsonl(GOLD / "questions.jsonl")
-    claims = load_jsonl(GOLD / "claims.jsonl")
+    questions_path = Path(args.questions)
+    claims_path = Path(args.claims)
+    questions = load_jsonl(questions_path)
+    claims = load_jsonl(claims_path)
 
     if args.only_docs:
         keep = {x.strip() for x in args.only_docs.split(",") if x.strip()}
@@ -338,6 +357,10 @@ def main() -> int:
         "max_tokens": args.max_tokens,
         "questions": len(questions),
         "dry_run": args.dry_run,
+        "claims_path": str(claims_path),
+        "claims_sha256": _sha256(claims_path),
+        "claims_shape": sorted({shape(c) for c in claims}) if claims else [],
+        "questions_sha256": _sha256(questions_path),
     }
     (outdir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 

@@ -59,6 +59,9 @@ jobs:
       - name: Compile scripts
         run: python -m py_compile benchmark/docbench/*.py
 
+      - name: Claim model tests
+        run: python -m unittest discover -s benchmark/docbench/tests -v
+
       - name: Validate example claims against the schema
         run: python benchmark/docbench/check_claims.py --schema-only benchmark/docbench/gold/claims.example.jsonl
 
