@@ -1109,6 +1109,8 @@ def main() -> int:
             "rounds": verify_report["rounds"],
             "residual_dropped": verify_report["residual_dropped"],
             "merged_duplicates": verify_report["merged_duplicates"],
+            "usage": verify_report.get("usage"),
+            "cost_usd": verify_report.get("cost_usd"),
             "final": verify_report["final"],
         }
 

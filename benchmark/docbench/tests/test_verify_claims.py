@@ -227,6 +227,15 @@ class AuditPassTest(unittest.TestCase):
         self.index = vc.SpanIndex(SPANS)
         self.claims = [claim("D1-0001", "a", [SPANS[0]]), claim("D1-0002", "b", [SPANS[1]])]
 
+    def test_usage_is_accumulated_across_calls(self) -> None:
+        call = FakeCall([
+            {"claim_id": "D1-0001", "verdict": "ok", "note": "-"},
+            {"claim_id": "D1-0002", "verdict": "ok", "note": "-"},
+        ])
+        usage: dict = {}
+        vc.audit_claims(self.claims, self.index, call, batch_size=1, usage=usage)
+        self.assertEqual(usage, {"calls": 2, "input_tokens": 2, "output_tokens": 2})
+
     def test_verdicts_are_recorded_and_cached(self) -> None:
         call = FakeCall([
             {"claim_id": "D1-0001", "verdict": "ok", "note": "-"},
