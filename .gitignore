@@ -51,3 +51,4 @@ benchmark/docbench/gold/verify.work*/
 benchmark/docbench/gold/*.compiled.*.jsonl
 benchmark/docbench/gold/*.compiled.*.manifest.json
 benchmark/docbench/gold/*.adjudications.jsonl
+benchmark/docbench/gold/claims.verified.jsonl
