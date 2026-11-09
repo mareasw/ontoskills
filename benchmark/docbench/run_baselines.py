@@ -52,6 +52,8 @@ SOURCES = {
     "D2": PRIVATE / "D2.txt",
     "D3": PRIVATE / "D3.txt",
     "D4": PRIVATE / "D4.txt",
+    "D5": PRIVATE / "D5.txt",
+    "D6": PRIVATE / "D6.txt",
 }
 
 SYSTEM = (

@@ -460,3 +460,122 @@ added, removed or rewritten, and the gate's support bar is measured on the claim
 file, which the retry never touches. It is recorded here because it moves a
 reported gate row, and because a reader must be able to see that the final B2
 citation number includes one repair round that a raw model answer would need.
+
+---
+
+## 10. Second corpus — generalisation probe (added 2026-11-08)
+
+Gate 2 is a result on four normative-prose documents. Every document is a
+regulation, a policy, a playbook or a tender. Nothing in it tests a **contract**
+or a document whose operative content **is a table**. This section is written
+before any model call on the new documents and fixes the documents, the
+extraction, the method, the thresholds and the reporting.
+
+The question is narrow and answerable: *does the compiler that reached 99.0%
+support on D1-D4 still produce supported, non-fabricated claims when the
+document type changes?* It is not a test of invoices, internal wikis or
+customer data, and it does not re-open Gate 2.
+
+### 10.1 Documents
+
+| ID | Document | Pages / words | Licence | Why it is here |
+|---|---|---:|---|---|
+| **D5** | ALSPAC International Data Transfer Agreement (IDTA v1, 24 March 2024) — the ICO IDTA A1.0 completed with the University of Bristol as Exporter | 35 / 10,629 | (c) University of Bristol; publicly available sample, kept local, not redistributed | a **contract**: parties, defined terms, controller/processor duties, liability, termination, sub-processing — and four tables that are part of the operative text |
+| **D6** | NARA General Records Schedule 1.1, Financial Management and Reporting Records (Transmittal 31, April 2020) | 9 / 2,403 | US Government work, public domain | the operative content **is a table**: one row per record item, with its disposition instruction, trigger and disposition authority |
+
+Selection rules, applied before either document was read for claims: publicly
+available; text-extractable without OCR; no personal or customer data; at least
+one document type absent from D1-D4; at least one document whose rules live in
+a table; combined size small enough that a **full census** of every emitted
+claim stays possible (target <= 15k words).
+
+Rejected for size or access, recorded so the choice is auditable: MSC Core
+Terms v2.2A (29,418 words), Short Form Contract v1.5 (35,175 words), Model
+Services Contract Schedules, Barnet/Civica call-off contract (20,422 words),
+UK council retention schedules (17,731-18,880 words), CISA incident-response
+playbooks (403 to automated fetch), ICO IDTA original (Cloudflare challenge).
+
+### 10.2 Extraction
+
+- `pdftotext` 24.02.0, **default reading order (no `-layout`)**, for both
+  documents. The choice is part of the method, not a per-claim decision: the
+  GRS table is laid out column-major, and `-layout` interleaves its cells so
+  that no disposition instruction ("Destroy 6 years after final payment or
+  cancellation") remains a contiguous string. Default reading order keeps each
+  cell block whole, which is what a verbatim-evidence contract needs. D5's
+  Part 1 tables have the same property: `-layout` puts the Exporter and
+  Importer columns on one line and shreds the values, default order does not.
+- Byte hashes of the extracted `.txt` **and** of the downloaded PDFs are
+  recorded in `sources.md`; the PDFs and texts stay in `private/`.
+- **No cleaning.** Running page headers and footers, table column headers and
+  page numbers stay in the text exactly as the extractor emits them. Skipping
+  them is part of what is measured: the compiler's rule 6 says to skip page
+  furniture, and this probe tests whether it does.
+
+### 10.3 Method — identical to Gate 2
+
+Span-first segmentation with the §9 compiler at `main` (`7fd946c`), the same
+schema v2, the same extraction prompt, the same model (`deepseek-v4.1-flash`),
+the same chunking, the same `verify_claims.py` audit -> repair -> re-audit
+stage, and an **independent census of every emitted claim** (no sample), with
+the same verdict scale (`ok | weak | no | fabricated`) and the same join rule
+for rows that are byte-identical to an already-censused row (§9.1).
+
+Gold set: 10 hand-written claims and 8 hand-written questions per document,
+kept local and gitignored like D1-D4, written from the source before the
+compile and not adjusted afterwards. Each document's questions include at
+least 2 unanswerable ones.
+
+**No prompt, threshold or pipeline change is made in advance for these
+documents.** In particular, PDF table rows are not reconstructed by hand and
+the segmenter is not taught about them first: if it cannot recover a row, that
+is the measurement. A fix, if needed, is pre-registered as §10.x *after* the
+failure is measured and is then measured on its own re-run.
+
+### 10.4 Thresholds — unchanged, and now per document
+
+| Check | Threshold |
+|---|---|
+| Structural validity | 100% |
+| Evidence support, full census | >= 90% |
+| Claims asserting facts absent from source | 0 |
+| Gold-set recall proxy | >= 70% |
+
+The gate is **per document**: D5 and D6 each have to clear the bar. A pooled
+number that passes because one document carries the other is reported but does
+not pass the probe. This is stricter than §9, where the four documents were
+pooled, and it is fixed here before the numbers exist. Every figure is reported
+with its denominator: D6 is small, so one claim moves its support percentage
+by more than two points.
+
+The answer-side rows (B2 - B1 citation, B2 vs hand-built B2) are **not** part
+of this probe's gate. They were measured on D1-D4 with 40 questions; 16 new
+questions cannot support a 15 pp delta, and stating that after seeing a number
+would be exactly the move this protocol forbids. If a B1/B2 run is made on
+D5/D6 it is reported descriptively, with n, and labelled as such.
+
+### 10.5 What this probe can and cannot show
+
+- It can show that the compiler's support, recall and fabrication behaviour
+  survives a change of document type (contract; table-as-content).
+- It cannot show generalisation to invoices, emails, internal wikis or
+  customer documents, and it does not test a negotiated contract: D5 is a
+  completed standard instrument, not a deal with redlines.
+- D6 is a 9-page schedule. Its per-document percentage is coarse by
+  construction; the claim-level verdicts, not the percentage alone, are the
+  evidence.
+- D5's Part 1 tables and D6's page-crossing rows are the two places where the
+  extractor and the segmenter are known to be weakest. They are inside the
+  measurement on purpose, and a failure there is a finding about the pipeline,
+  not an excuse.
+
+### 10.6 Stop rule
+
+If either document misses a threshold, the probe **fails** and is reported as a
+failure with the failing rows named. No threshold is lowered, no sample is
+re-drawn, no prompt is tuned against the gold set, and the passing document is
+not used to average the failing one away. The failure is attributed to a stage
+(segmentation, extraction or repair) from the spans and statements themselves;
+the fix is written as a new pre-registered amendment before it is measured, and
+if it is measured it is measured on a fresh compile of the failing document,
+with the failed run kept in the report.
