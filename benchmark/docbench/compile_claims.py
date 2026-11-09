@@ -220,6 +220,13 @@ HEADING_SHORT = re.compile(r"^[A-Z][A-Za-z0-9 ,'&()\-/]{2,70}$")
 # length, so one label can never swallow a whole document.
 TABLE_BLOCK_CHARS = 700
 
+# An item-numbered table gives each row a short flat key ("001", "010", "012").
+RECORD_KEY_MAX = 8
+RECORD_KEY_CHARS = re.compile(r"^[A-Za-z0-9][A-Za-z0-9/\-]*$")
+# Record spans stay within one page and one record, and below this length so a
+# single record cannot fill a prompt chunk.
+RECORD_SPAN_CHARS = 900
+
 
 # An ALL-CAPS label with a trailing qualifier, e.g. "CRITICAL (Red)". This is
 # the shape a flattened HTML table gives to a column/band header, and it is
@@ -281,8 +288,10 @@ def split_sentences(text: str, limit: int = 700) -> list[str]:
     return out
 
 
-def segment(text: str, doc_id: str, min_chars: int = 60) -> list[dict]:
-    """Turn a document into spans with ids and locators. No model involved.
+def _segment_blocks(
+    text: str, doc_id: str, min_chars: int = 60, locate: bool = True
+) -> list[dict]:
+    """Segment prose documents by block and heading (the original path).
 
     Short blocks are merged with their neighbours instead of dropped: tabular
     runbooks state their rules in lines like "Response time: 1 hour", and
@@ -415,6 +424,12 @@ def segment(text: str, doc_id: str, min_chars: int = 60) -> list[dict]:
     # Char offsets index the whitespace-normalised source (the same string the
     # verbatim check uses). They are a convenience, not the identity of a span;
     # page + section path + url are the stable part.
+    if locate:
+        _locate(spans, text)
+    return spans
+
+
+def _locate(spans: list[dict], text: str) -> None:
     flat = norm(text)
     cursor = 0
     for span in spans:
@@ -425,7 +440,206 @@ def segment(text: str, doc_id: str, min_chars: int = 60) -> list[dict]:
             span["locator"]["char_start"] = found
             span["locator"]["char_end"] = found + len(span["paragraph"])
             cursor = found + len(span["paragraph"])
+
+
+def _line_pages(raw: list[str]) -> list[int]:
+    """Page number (1-based) at the start of each raw line."""
+    pages: list[int] = []
+    page = 1
+    for line in raw:
+        pages.append(page)
+        if "\f" in line:
+            page += line.count("\f")
+    return pages
+
+
+def _next_text_index(raw: list[str], start: int) -> int | None:
+    for j in range(start + 1, len(raw)):
+        if "\f" in raw[j]:
+            continue
+        if raw[j].strip():
+            return j
+    return None
+
+
+def record_key_lines(text: str) -> list[int]:
+    """Raw-line indices that look like the item keys of an item-numbered table.
+
+    A table of records (a records schedule, a catalogue, a runbook) gives each
+    row a short flat key — ``001``, ``010``, ``012`` — on its own line. Section
+    numbering looks identical but is a hierarchy (``1``, ``1.1``, ``1.2.1``),
+    and printed page numbers are standalone numbers too. The rules that tell
+    them apart are in PREFLIGHT.md §10.7(b)(i); all are properties of the text,
+    not of any score.
+    """
+    raw = text.split("\n")
+    pages = _line_pages(raw)
+    candidates: list[tuple[int, str]] = []
+    for i, line in enumerate(raw):
+        stripped = line.strip()
+        if not stripped or "\f" in line:
+            continue
+        if len(stripped) > RECORD_KEY_MAX or not re.search(r"\d", stripped):
+            continue
+        if not RECORD_KEY_CHARS.match(stripped):
+            continue
+        after = _next_text_index(raw, i)
+        if after is None:
+            continue
+        # A printed page number is the last text on its page.
+        if pages[after] > pages[i]:
+            continue
+        candidates.append((i, stripped))
+    # A token repeated in the document is page furniture, not a key.
+    counts: dict[str, int] = {}
+    for _, key in candidates:
+        counts[key] = counts.get(key, 0) + 1
+    candidates = [(i, key) for i, key in candidates if counts[key] == 1]
+    keys = [key.rstrip(".") for _, key in candidates]
+    if len(keys) < 3:
+        return []
+    # An item column has one fixed width and is zero-padded ("001", "010").
+    # A numbered list is all one-digit ("1", "2", …), and a consecutive run of
+    # integers is list numbering however wide it is; neither is a record table.
+    if not all(key.isdigit() for key in keys):
+        return []
+    widths = {len(key) for key in keys}
+    if len(widths) != 1 or next(iter(widths)) < 2:
+        return []
+    values = sorted(int(key) for key in keys)
+    if values == list(range(values[0], values[0] + len(values))):
+        return []
+    # Reject a dotted hierarchy: "1" is a component-prefix of "1.1".
+    components = [tuple(key.split(".")) for key in keys]
+    for a in components:
+        for b in components:
+            if a != b and len(a) < len(b) and b[: len(a)] == a:
+                return []
+    return [i for i, _ in candidates]
+
+
+def _section_path(text: str, furniture: set[str]) -> list[str]:
+    """The heading stack at the end of ``text``, minus repeated page furniture."""
+    stack: list[tuple[int, str]] = []
+    for line in text.split("\n"):
+        if "\f" in line:
+            continue
+        stripped = line.strip()
+        if not stripped or not looks_like_heading(stripped):
+            continue
+        match = re.match(
+            r"^\s*(?:ARTICLE\s+|Article\s+)?((?:\d+|[IVXLC]+|[A-Z]))(?:\.\d+)*\.?\s",
+            stripped,
+        )
+        depth = 1
+        if match:
+            raw_token = stripped.split()[0].rstrip(".")
+            depth = raw_token.count(".") + 1
+        while stack and stack[-1][0] >= depth:
+            stack.pop()
+        stack.append((depth, stripped[:90]))
+    return [title for _, title in stack if title not in furniture][-3:]
+
+
+def _record_spans(text: str, doc_id: str, key_lines: list[int]) -> list[dict]:
+    """Segment an item-numbered table by record, not by line shape.
+
+    The PDF reads column-major, so a row arrives as the item key, then its
+    description, then the disposition cell, then the authority. Treating the
+    first line of the disposition cell ("Destroy 2 years") as a heading drops
+    the operative instruction from every span, and leaving the authority line on
+    the heading stack attaches row N's authority to row N+1's records. A record
+    runs from its key to the line before the next key; no line inside it is a
+    heading, and no span crosses a record boundary.
+    """
+    raw = text.split("\n")
+    pages = _line_pages(raw)
+    first = key_lines[0]
+    key_set = set(key_lines)
+
+    seen: dict[str, set[int]] = {}
+    for i, line in enumerate(raw):
+        stripped = line.strip()
+        if not stripped or "\f" in line:
+            continue
+        seen.setdefault(stripped, set()).add(pages[i])
+    furniture = {s for s, ps in seen.items() if len(ps) >= 2 and len(s) <= 80}
+
+    preamble = "\n".join(raw[:first])
+    base = _section_path(preamble, furniture)
+    spans = _segment_blocks(preamble, doc_id, locate=False)
+
+    records: list[dict] = []
+    current: dict | None = None
+    for i in range(first, len(raw)):
+        if i in key_set:
+            if current is not None:
+                records.append(current)
+            current = {"key": raw[i].strip(), "parts": []}
+            continue
+        if current is None:
+            continue
+        for offset, chunk in enumerate(raw[i].split("\f")):
+            stripped = chunk.strip()
+            if stripped:
+                current["parts"].append((pages[i] + offset, stripped))
+    if current is not None:
+        records.append(current)
+
+    for record in records:
+        groups: list[list] = []
+        for page, line in record["parts"]:
+            if not groups or groups[-1][0] != page:
+                groups.append([page, []])
+            groups[-1][1].append(line)
+        first_span = True
+        for page, lines in groups:
+            body = norm(" ".join(lines))
+            piece = norm(f"{record['key']} {body}") if first_span else body
+            first_span = False
+            # Windows stay inside one page, so a span's declared page always
+            # contains its text. A span never crosses a record boundary.
+            for window in split_sentences(piece, limit=RECORD_SPAN_CHARS):
+                _append_span(
+                    spans, doc_id, window, page, base + [record["key"]]
+                )
+
+    _locate(spans, text)
     return spans
+
+
+def _append_span(
+    spans: list[dict], doc_id: str, piece: str, page: int, section_path: list[str]
+) -> None:
+    if not re.search(r"[A-Za-z]{3,}", piece):
+        return
+    if BOILERPLATE.search(piece):
+        return
+    spans.append(
+        {
+            "span_id": f"S{len(spans) + 1:04d}",
+            "doc_id": doc_id,
+            "paragraph": piece,
+            "locator": {
+                "kind": DOCS[doc_id]["kind"],
+                "page": page,
+                "section_path": section_path[-3:],
+                "url": DOCS[doc_id]["url"],
+            },
+        }
+    )
+
+
+def segment(text: str, doc_id: str, min_chars: int = 60) -> list[dict]:
+    """Turn a document into spans with ids and locators. No model involved.
+
+    Documents whose operative content is an item-numbered table take the
+    record-scoped path; everything else keeps the block/heading path unchanged.
+    """
+    key_lines = record_key_lines(text)
+    if key_lines:
+        return _record_spans(text, doc_id, key_lines)
+    return _segment_blocks(text, doc_id, min_chars)
 
 
 def chunk(spans: list[dict], size: int, overlap: int = 1) -> list[list[dict]]:
@@ -842,6 +1056,8 @@ def main() -> int:
     ap.add_argument("--verify-rounds", type=int, default=2)
     ap.add_argument("--verify-audit-batch", type=int, default=10)
     ap.add_argument("--verify-repair-batch", type=int, default=6)
+    ap.add_argument("--verify-concurrency", type=int, default=1,
+                    help="independent verify batches in flight (throughput only; prompts unchanged)")
     ap.add_argument("--dry-run", action="store_true", help="Segment and estimate only")
     ap.add_argument("--estimate", action="store_true", help="Estimate tokens and stop (implies --dry-run)")
     args = ap.parse_args()
@@ -1121,6 +1337,7 @@ def main() -> int:
             repair_batch=args.verify_repair_batch,
             max_tokens=args.max_tokens,
             resume=args.resume,
+            concurrency=args.verify_concurrency,
         )
         verified_path = Path(str(out)[: -len(".jsonl")] + ".verified.jsonl") if str(out).endswith(".jsonl") else Path(str(out) + ".verified.jsonl")
         write_jsonl(verified_path, verified)
