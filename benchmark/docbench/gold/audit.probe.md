@@ -277,3 +277,15 @@ no total is claimed.
   a complete audit of D5/D6.
 - No B1/B2 answer run was made on D5/D6. §10.4 says those rows are not part of
   this gate; none is reported.
+
+## Erratum (2026-11-09, added with the fixed-run census)
+
+The summary and the table above label D5 **pass** on every row. That is wrong
+under the gate's literal wording: `D5-0348` is counted `no` in this very report
+(it defines "Harmful Impact", a truncated form of "Significant Harmful Impact"),
+so D5 has **1** claim asserting a fact absent from source, not 0, and the
+"claims asserting facts absent from source = 0" row fails for D5 as well as for
+D6. The probe's verdict is unchanged — it already failed on D6 recall — and no
+measured number in this report changes. The correction matters because the same
+defect, on the same document, is the reason the fixed run fails
+(`gold/audit.probe.fixed.md`).
