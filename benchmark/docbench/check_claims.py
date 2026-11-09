@@ -8,7 +8,8 @@ Accepts both claim shapes (see docs/adr/0001-document-first-kernel.md):
 
 Rules enforced for every evidence span:
   * the quote must exist verbatim in the source text (whitespace-normalised);
-  * for PDF sources, the declared page must match the page where the quote occurs;
+  * for PDF sources, the declared page must be a page where the quote occurs
+    (a quote repeated across pages may legitimately be located on any of them);
   * the claim must validate against the schema for its shape when jsonschema is
     installed (v1: gold/schema.json, v2: schemas/claim.v2.schema.json).
 
@@ -53,11 +54,26 @@ def norm(text: str) -> str:
     return text.strip()
 
 
-def page_containing(source: str, quote: str) -> int | None:
-    for i, page in enumerate(source.split("\f"), start=1):
-        if quote in norm(page):
-            return i
-    return None
+def page_containing(source: str, quote: str, declared: int | None = None) -> int | None:
+    """Return the page that carries ``quote``.
+
+    A short quote (glossary scaffolding, a repeated disposition clause) can
+    occur on several pages. When the declared page is one of them, keep it:
+    the locator is right, and the first occurrence is not more correct. The
+    first-occurrence rule alone reported correct locators as failures on the
+    second corpus (``gold/audit.probe.md``), so the declared page is honoured
+    whenever the quote really is there. A declared page that does not contain
+    the quote still falls back to the first occurrence, which is what
+    ``--fix-pages`` then writes.
+    """
+    pages = [
+        i for i, page in enumerate(source.split("\f"), start=1) if quote in norm(page)
+    ]
+    if not pages:
+        return None
+    if declared in pages:
+        return declared
+    return pages[0]
 
 
 def main() -> int:
@@ -140,8 +156,8 @@ def main() -> int:
 
             locator = item.get("locator") or {}
             if locator.get("kind") == "pdf":
-                computed = page_containing(source, quote)
                 declared = locator.get("page")
+                computed = page_containing(source, quote, declared)
                 if computed is not None and declared != computed:
                     print(f"PAGE    {cid}[{index}]: declared {declared}, computed {computed}")
                     if args.fix_pages:
