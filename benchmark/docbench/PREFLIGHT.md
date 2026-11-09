@@ -863,7 +863,7 @@ chunking, verify stage. The failed run is untouched: `gold/probe.*`,
 `gold/probe.verdicts.jsonl` and `gold/audit.probe.md` remain the measurement of
 the unfixed pipeline.
 
-##### 10.7(e)(i) Key/value table segmentation — pre-registered, not yet written
+##### 10.7(e)(i) Key/value table segmentation — pre-registered, implemented, measurement pending
 
 This is written after the score is known, which is unavoidable for a defect the
 score exposed. It is a pre-registration for a **new** run: the fix below is not
@@ -907,3 +907,20 @@ support >= 90%, 0 facts absent, recall 10/10 and 0 misattributed authorities;
 D5 must reach 0 facts absent and must recall the three Table 1/Table 2 gold
 claims (`D5-0002`, `D5-0003`, `D5-0004`) while keeping recall >= 70%. Failure on
 either document rejects the fix as a regression or as not-a-fix.
+
+**Implementation status (2026-11-09).** The branch `probe/key-value-tables`
+implements the rules above; no threshold, prompt, schema or model changed. The
+segmenter computes a region mask from the text alone (a `Table N:` caption, a
+dense run of `Label:` cells, or a repeated header pair) and takes the
+key/value branch only inside that mask. Verified on a dry run (no model call):
+D1-D4 are **byte-identical** to the committed baseline (420 spans), D6 is
+**byte-identical** to the fixed run (35 spans), and D5 segments to 325 spans.
+The eight glossary fragments named in §10.7(e) now resolve to joined labels
+(`Adequate Country`, `Appropriate Safeguards`, `Commercial Clauses`, `Extra
+Protection Clauses`, `Special Category Data`, `UK Data Protection Laws`,
+`Without Undue Delay`, `Controller`), and the Table 1/Table 2 rows carry
+`Full legal name: ...`, `UK country's law that governs the IDTA: England and
+Wales` and `... Exporter is a Controller` in one span. 136 short tests pass
+(`unittest discover`). The billable fresh compile, verify and census are **not**
+run yet: they wait for explicit approval, and the acceptance verdict is made
+only from that run.

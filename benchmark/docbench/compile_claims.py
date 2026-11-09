@@ -42,6 +42,7 @@ import json
 import os
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -269,6 +270,75 @@ def looks_like_heading(line: str) -> bool:
     return bool(HEADING_SHORT.match(stripped)) and len(words) <= 8
 
 
+# A heading is a noun phrase, not a clause: "Exporter is a Controller" is a
+# table's value cell. Treating it as a heading hides the value from every span
+# and hands it to the next block as a section name. Question headings ("What
+# happens if there is ...") are real headings and stay.
+ASSERTION_LINE = re.compile(
+    r"^[A-Z][A-Za-z0-9 ,'&()\-/]{0,70}\s(?:is|are|was|were)\s+"
+    r"(?:a|an|the|not|no|bound|subject)\b"
+)
+INTERROGATIVE_HEADING = re.compile(
+    r"^(?:What|How|When|Where|Which|Who|Why|Can|Could|Is|Are|Does|Do|Will|Would|Should|May|Must)\b"
+)
+# A heading that breaks after one of these words is continued by the next line
+# ("Exporter (who sends the" / "Restricted Transfer)"), not ended by it.
+HEADING_CONTINUATION_WORDS = frozenset(
+    "a an and any as at by for from if in into of on or over the to under with".split()
+)
+
+
+def is_clause_heading(line: str) -> bool:
+    """True when a heading-shaped line is actually a full assertion."""
+    stripped = line.strip()
+    if INTERROGATIVE_HEADING.match(stripped):
+        return False
+    return bool(ASSERTION_LINE.match(stripped))
+
+
+def continues_heading(line: str, previous: str) -> bool:
+    """True when ``line`` is the wrapped remainder of the heading ``previous``."""
+    stripped = line.strip()
+    if not stripped:
+        return False
+    if stripped[0].islower() or stripped[0] in ")]}":
+        return True
+    if previous.strip().count("(") > previous.strip().count(")"):
+        return True
+    words = previous.strip().split()
+    return bool(words) and words[-1].lower().strip(".,;:") in HEADING_CONTINUATION_WORDS
+
+
+def starts_a_value(previous: str, line: str) -> bool:
+    """True when ``line`` opens a table value, not a heading (PREFLIGHT §10.7(e)(i)).
+
+    Two text properties decide it. A key that ends with ``:`` owns the next
+    line, and a clause is not a heading. Both are properties of the line pair,
+    not of any document's vocabulary. A numbered heading and a band label are
+    headings even when the line above ends with a colon.
+    """
+    if HEADING_NUMBERED.match(line.strip()) or is_table_label(line):
+        return False
+    if previous.rstrip().endswith(":"):
+        return True
+    return is_clause_heading(line)
+
+
+def is_pending_key(block: str) -> bool:
+    """True when a short block is a table key that owns the next block.
+
+    A key is a label, not content: "UK country's law that governs the IDTA:" and
+    "Full legal name:" name the cell that follows. Keeping the key for the next
+    block lets label and value be quoted together, which is the evidence a
+    key/value row needs (PREFLIGHT.md §10.7(e)(i)). Long paragraphs and
+    sentence-shaped blocks are never keys.
+    """
+    stripped = block.strip()
+    if not stripped.endswith(":") or len(stripped) > 120:
+        return False
+    return "." not in stripped and ";" not in stripped
+
+
 def split_sentences(text: str, limit: int = 700) -> list[str]:
     """Split a block into sentence windows of at most roughly ``limit`` chars."""
     parts = re.split(r"(?<=[.;:])\s+", text)
@@ -288,6 +358,145 @@ def split_sentences(text: str, limit: int = 700) -> list[str]:
     return out
 
 
+def _key_like_line(line: str) -> bool:
+    """True for a line that can be a table key: a heading or a "Label:" cell."""
+    stripped = line.strip()
+    if not stripped:
+        return False
+    if looks_like_heading(stripped):
+        return True
+    return is_pending_key(stripped)
+
+
+def _continues_line(line: str, previous: str) -> bool:
+    """True when a line is the wrapped remainder of the line above it."""
+    stripped = line.strip()
+    if not stripped:
+        return False
+    if stripped[0].islower() or stripped[0] in ")]}(":
+        return True
+    if previous.count("(") > previous.count(")"):
+        return True
+    words = previous.split()
+    return bool(words) and words[-1].lower().strip(".,;:") in HEADING_CONTINUATION_WORDS
+
+
+def _wrapped_label(lines: list[str]) -> bool:
+    """True for a multi-line cell that is one label: "Adequate" / "Country"."""
+    if len(lines) < 2 or not _key_like_line(lines[0]):
+        return False
+    for previous, line in zip(lines, lines[1:]):
+        if _key_like_line(line) or _continues_line(line, previous):
+            continue
+        return False
+    return True
+
+
+def _line_units(lines: list[str]) -> list[list[tuple[int, str]]]:
+    """Group raw lines into units separated by blank lines or page breaks."""
+    units: list[list[tuple[int, str]]] = []
+    current: list[tuple[int, str]] = []
+    for index, raw in enumerate(lines):
+        if "\f" in raw or not raw.strip():
+            if current:
+                units.append(current)
+                current = []
+            continue
+        current.append((index, raw.strip()))
+    if current:
+        units.append(current)
+    return units
+
+
+def kv_region_lines(lines: list[str]) -> list[bool]:
+    """Mark raw lines that belong to a key/value table (PREFLIGHT §10.7(e)(i)).
+
+    Three text properties open a region, and none of them names a document or a
+    term:
+
+    * a "Table N:" caption — an explicit table marker;
+    * a dense run of "Label:" cells — the shape of a key/value table;
+    * a header pair repeated on several pages — the shape of a long table.
+
+    Inside the region the segmenter keeps a label and its value together and
+    never promotes a value to a section. Outside it, segmentation is unchanged.
+    """
+    units = _line_units(lines)
+    if not units:
+        return [False] * len(lines)
+    texts = [norm(" ".join(text for _, text in unit)) for unit in units]
+    marked = [False] * len(units)
+
+    # 1. A captioned table runs to the next caption, a new Part/Section, or a
+    # real prose paragraph.
+    captions = [
+        index
+        for index, text in enumerate(texts)
+        if re.search(r"\bTable\s+\d+[A-Za-z]?\s*[:.]", text)
+    ]
+    for position, start in enumerate(captions):
+        stop = (
+            captions[position + 1] - 1
+            if position + 1 < len(captions)
+            else len(units) - 1
+        )
+        for index in range(start + 1, stop + 1):
+            text = texts[index]
+            if re.match(r"^(?:Part\s+\d+|Section\s+\d+)\b", text):
+                stop = index - 1
+                break
+            if len(text) > 400 and not text.endswith(":"):
+                stop = index - 1
+                break
+        for index in range(start, stop + 1):
+            marked[index] = True
+
+    # 2. A dense run of "Label:" cells.
+    colon = [is_pending_key(text) for text in texts]
+    window, need = 12, 3
+    for start in range(len(units)):
+        if sum(colon[start : start + window]) >= need:
+            for index in range(start, min(start + window, len(units))):
+                marked[index] = True
+
+    # 3. A header pair that repeats like a table header does on every page.
+    pairs = Counter(
+        (texts[index], texts[index + 1]) for index in range(len(texts) - 1)
+    )
+    repeated = [
+        index
+        for index in range(len(texts) - 1)
+        if pairs[(texts[index], texts[index + 1])] >= 3
+    ]
+    if repeated:
+        start = repeated[0]
+        stop = len(units) - 1
+        for index in range(repeated[-1] + 2, len(units)):
+            text = texts[index]
+            if re.match(r"^(?:Part\s+\d+|Section\s+\d+)\b", text):
+                stop = index - 1
+                break
+            if len(text) > 400 and not text.endswith(":"):
+                stop = index - 1
+                break
+        for index in range(start, stop + 1):
+            marked[index] = True
+
+    flags = [False] * len(lines)
+    start_unit: int | None = None
+    for index in range(len(units) + 1):
+        here = index < len(units) and marked[index]
+        if here and start_unit is None:
+            start_unit = index
+        elif not here and start_unit is not None:
+            first_line = units[start_unit][0][0]
+            last_line = units[index - 1][-1][0]
+            for line_index in range(first_line, last_line + 1):
+                flags[line_index] = True
+            start_unit = None
+    return flags
+
+
 def _segment_blocks(
     text: str, doc_id: str, min_chars: int = 60, locate: bool = True
 ) -> list[dict]:
@@ -296,7 +505,15 @@ def _segment_blocks(
     Short blocks are merged with their neighbours instead of dropped: tabular
     runbooks state their rules in lines like "Response time: 1 hour", and
     discarding those would remove the very content the benchmark is about.
+
+    A key/value table takes a separate branch (PREFLIGHT.md §10.7(e)(i)). Inside
+    one, a label that wraps over two lines is a single heading, a label and the
+    value cell that follows it are one row, and a cell value never becomes the
+    section of unrelated text. Outside one the original rules run unchanged, so
+    documents without such a region are segmented exactly as before.
     """
+    raw_lines = text.split("\n")
+    in_kv = kv_region_lines(raw_lines)
     spans: list[dict] = []
     page = 1
     section_stack: list[tuple[int, str]] = []
@@ -304,6 +521,15 @@ def _segment_blocks(
     short_buffer: list[str] = []
     # Lines of the table block opened by an ALL-CAPS label, or None.
     table_block: list[str] | None = None
+    # Heading group for the key/value branch: a label may wrap over two lines
+    # ("Adequate" / "Country"), and that is one section label.
+    heading_group: list[str] = []
+    block_mode = ""  # "" at a block start, then "heading" or "body"
+    previous_line = ""
+    # A short key block that owns the next block ("Full legal name:"), kept so
+    # label and value are one span (PREFLIGHT.md §10.7(e)(i)).
+    pending_key = ""
+    kv_active = False
 
     def emit(piece: str) -> None:
         # A span must carry words: table rules, arrows and page numbers are not
@@ -331,15 +557,28 @@ def _segment_blocks(
         if short_buffer:
             merged = norm(" ".join(short_buffer))
             short_buffer = []
-            if len(merged) >= 20:
+            if kv_active:
+                # A table cell is a value even when it is short: "England and
+                # Wales" must survive, a printed page number must not.
+                if re.search(r"[A-Za-z]{3,}", merged):
+                    emit(merged)
+            elif len(merged) >= 20:
                 emit(merged)
 
     def flush() -> None:
-        nonlocal pending, short_buffer
+        nonlocal pending, short_buffer, pending_key
         if not pending:
             return
         block = norm(" ".join(pending))
         pending = []
+        if kv_active and is_pending_key(block):
+            pending_key = norm(f"{pending_key} {block}")
+            return
+        if kv_active and pending_key:
+            # A key and its value are one row: quote the pair, not the value
+            # alone, so the span says what the value is evidence for.
+            block = norm(f"{pending_key} {block}")
+            pending_key = ""
         if len(block) < min_chars:
             short_buffer.append(block)
             if len(" ".join(short_buffer)) >= min_chars:
@@ -349,6 +588,30 @@ def _segment_blocks(
         for piece in split_sentences(block):
             if len(piece) >= min_chars:
                 emit(piece)
+
+    def push_heading_group() -> None:
+        """Close a key/value heading group: it is one section label."""
+        nonlocal heading_group, pending_key
+        if not heading_group:
+            return
+        # Short content buffered above belongs to the previous section.
+        flush_short()
+        joined = norm(" ".join(heading_group))[:90]
+        first = heading_group[0].strip()
+        # Keep a shallow stack: a numbered heading pops to its own depth.
+        match = re.match(
+            r"^\s*(?:ARTICLE\s+|Article\s+)?((?:\d+|[IVXLC]+|[A-Z]))(?:\.\d+)*\.?\s",
+            first,
+        )
+        depth = 1
+        if match:
+            raw = first.split()[0].rstrip(".")
+            depth = raw.count(".") + 1
+        while section_stack and section_stack[-1][0] >= depth:
+            section_stack.pop()
+        section_stack.append((depth, joined))
+        heading_group = []
+        pending_key = ""
 
     def flush_table(reopen: bool = False) -> None:
         """Emit the open table block: the label plus the rows it governs.
@@ -368,55 +631,135 @@ def _segment_blocks(
 
     # splitlines() also splits on form feed, which is how pages are encoded
     # here, so split on newlines only and handle \f explicitly.
-    for raw_line in text.split("\n"):
-        if "\f" in raw_line:
+    for line_index, raw_line in enumerate(raw_lines):
+        entering = in_kv[line_index] and not kv_active
+        leaving = kv_active and not in_kv[line_index]
+        if entering:
+            # Close the prose block before switching rules.
             flush()
             flush_short()
             flush_table()
+            heading_group = []
+            block_mode = ""
+            previous_line = ""
+            pending_key = ""
+            kv_active = True
+        elif leaving:
+            if heading_group:
+                push_heading_group()
+            flush()
+            flush_short()
+            flush_table()
+            heading_group = []
+            block_mode = ""
+            previous_line = ""
+            pending_key = ""
+            kv_active = False
+
+        if "\f" in raw_line:
+            flush()
+            flush_short()
+            if kv_active:
+                push_heading_group()
+            flush_table()
             page += raw_line.count("\f")
+            block_mode = ""
+            previous_line = ""
+            # A key owns a value on its own page: the span's declared page has
+            # to contain the whole quote, so never merge across a page break.
+            if kv_active:
+                pending_key = ""
             continue
         stripped = raw_line.strip()
         if not stripped:
             # A blank line separates rows in flattened HTML, not blocks: do not
             # close the table here.
             flush()
+            block_mode = ""
             continue
         # Inside an open table block every short line is a row — including the
         # ones that look like headings, because a flattened HTML table ships its
         # cells as separate <div>s. The block is closed by its next label or by
         # a "key : value" terminator row, never by the shape of a cell.
         in_block = table_block is not None and not is_table_label(stripped)
-        if looks_like_heading(stripped) and not in_block:
-            flush()
-            flush_short()
-            flush_table()
-            # Keep a shallow stack: a numbered heading pops to its own depth.
-            match = re.match(r"^\s*(?:ARTICLE\s+|Article\s+)?((?:\d+|[IVXLC]+|[A-Z]))(?:\.\d+)*\.?\s", stripped)
-            depth = 1
-            if match:
-                raw = stripped.split()[0].rstrip(".")
-                depth = raw.count(".") + 1
-            while section_stack and section_stack[-1][0] >= depth:
-                section_stack.pop()
-            section_stack.append((depth, stripped[:90]))
-            if is_table_label(stripped):
-                table_block = [stripped]
-            continue
-        if table_block is not None:
+        if in_block:
             table_block.append(stripped)
-            # A "key : value" row is the terminator of a table record: the
-            # severity band ends with its "Response time : ..." line, and the
-            # next thing in the document is either the next band or a real
-            # section heading.
             if re.search(r"\s:\s", stripped):
                 flush_table()
-                continue
-            if len(norm(" ".join(table_block))) > TABLE_BLOCK_CHARS:
+            elif len(norm(" ".join(table_block))) > TABLE_BLOCK_CHARS:
                 # Never let a label swallow a whole document: close the block
                 # and reopen it with the label repeated.
                 flush_table(reopen=True)
+            previous_line = stripped
             continue
-        pending.append(stripped)
+
+        if not kv_active:
+            # Original block path, unchanged outside key/value regions.
+            if looks_like_heading(stripped):
+                flush()
+                flush_short()
+                flush_table()
+                # Keep a shallow stack: a numbered heading pops to its own depth.
+                match = re.match(
+                    r"^\s*(?:ARTICLE\s+|Article\s+)?((?:\d+|[IVXLC]+|[A-Z]))(?:\.\d+)*\.?\s",
+                    stripped,
+                )
+                depth = 1
+                if match:
+                    raw = stripped.split()[0].rstrip(".")
+                    depth = raw.count(".") + 1
+                while section_stack and section_stack[-1][0] >= depth:
+                    section_stack.pop()
+                section_stack.append((depth, stripped[:90]))
+                if is_table_label(stripped):
+                    table_block = [stripped]
+                continue
+            pending.append(stripped)
+            continue
+
+        # Key/value table region.
+        if is_table_label(stripped):
+            # An ALL-CAPS band header still owns its rows.
+            flush()
+            flush_short()
+            push_heading_group()
+            flush_table()
+            heading_group.append(stripped)
+            push_heading_group()
+            table_block = [stripped]
+            block_mode = ""
+            previous_line = stripped
+            continue
+        heading_like = looks_like_heading(stripped) and not starts_a_value(
+            previous_line, stripped
+        )
+        if block_mode == "":
+            if heading_like:
+                if heading_group:
+                    # A second heading block before any body: it is a value or
+                    # the next column of the label above, not a replacement.
+                    push_heading_group()
+                    block_mode = "body"
+                    pending.append(stripped)
+                else:
+                    heading_group.append(stripped)
+                    block_mode = "heading"
+            else:
+                push_heading_group()
+                block_mode = "body"
+                pending.append(stripped)
+        elif block_mode == "heading":
+            if heading_like or continues_heading(stripped, heading_group[-1]):
+                heading_group.append(stripped)
+            else:
+                push_heading_group()
+                block_mode = "body"
+                pending.append(stripped)
+        else:
+            pending.append(stripped)
+        previous_line = stripped
+    if kv_active and heading_group:
+        push_heading_group()
     flush()
     flush_short()
     flush_table()

@@ -149,6 +149,158 @@ class SeverityTableTest(unittest.TestCase):
             self.assertIn(cc.norm(span["paragraph"]), flat)
 
 
+GLOSSARY_DOC = """\
+Table 1: Definitions
+
+Adequate
+Country
+
+A third country, or a territory, which the Secretary of State has specified by regulations.
+
+Special Category
+Data
+
+Data described in the UK GDPR, together with criminal conviction or criminal offence data.
+"""
+
+KEY_VALUE_DOC = """\
+Table 2: Transfer Details
+
+UK country's law that governs the IDTA:
+
+England and Wales
+
+The status of the Exporter
+
+In relation to the Processing of the Transferred Data:
+Exporter is a Controller
+"""
+
+STATUS_DOC = """\
+Table 4: Status
+
+Status
+
+Controller
+
+The Importer may process the data only as instructed by the Exporter and must keep a written record of every transfer it makes.
+"""
+
+
+class KeyValueTableTest(unittest.TestCase):
+    """The key/value table branch (PREFLIGHT.md §10.7(e)(i)).
+
+    Three properties, each stated on synthetic text so no document's
+    vocabulary is encoded: a label that wraps is one label, a label and its
+    value are one quotable row, and a value never heads unrelated text.
+    """
+
+    def test_wrapped_label_becomes_one_section(self) -> None:
+        spans = cc.segment(GLOSSARY_DOC, "D4", min_chars=60)
+        paths = [s["locator"]["section_path"] for s in spans]
+        self.assertIn(["Adequate Country"], paths)
+        self.assertIn(["Special Category Data"], paths)
+        # The value is still its own span, so it stays quotable.
+        values = [s for s in spans if s["paragraph"].startswith("A third country")]
+        self.assertEqual(len(values), 1)
+        self.assertEqual(values[0]["locator"]["section_path"], ["Adequate Country"])
+
+    def test_key_and_value_are_quotable_together(self) -> None:
+        spans = cc.segment(KEY_VALUE_DOC, "D4", min_chars=60)
+        rows = [
+            s
+            for s in spans
+            if "UK country's law that governs the IDTA: England and Wales"
+            in s["paragraph"]
+        ]
+        self.assertEqual(len(rows), 1)
+
+    def test_assertion_is_a_value_not_a_section(self) -> None:
+        spans = cc.segment(KEY_VALUE_DOC, "D4", min_chars=60)
+        rows = [s for s in spans if "Exporter is a Controller" in s["paragraph"]]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(
+            rows[0]["locator"]["section_path"], ["The status of the Exporter"]
+        )
+
+    def test_a_value_does_not_head_the_next_block(self) -> None:
+        spans = cc.segment(STATUS_DOC, "D4", min_chars=60)
+        body = [s for s in spans if s["paragraph"].startswith("The Importer may process")]
+        self.assertEqual(len(body), 1)
+        self.assertEqual(body[0]["locator"]["section_path"], ["Status"])
+
+    def test_table_text_is_still_verbatim(self) -> None:
+        for doc in (GLOSSARY_DOC, KEY_VALUE_DOC, STATUS_DOC):
+            flat = cc.norm(doc)
+            for span in cc.segment(doc, "D4", min_chars=60):
+                self.assertIn(cc.norm(span["paragraph"]), flat)
+
+
+class KeyValueRegionTest(unittest.TestCase):
+    """The region detector uses text properties, never a document's words."""
+
+    def test_caption_opens_a_region(self) -> None:
+        flags = cc.kv_region_lines(
+            ["Table 1: Definitions", "", "Alpha", "", "One thing.", ""]
+        )
+        self.assertTrue(flags[0])
+        self.assertTrue(flags[2])
+        self.assertTrue(flags[4])
+
+    def test_caption_region_stops_at_a_part_heading(self) -> None:
+        lines = [
+            "Table 3: Data",
+            "",
+            "Alpha",
+            "",
+            "One thing.",
+            "",
+            "Part 2: Other Rules",
+            "",
+            "This part contains general obligations for every party.",
+        ]
+        flags = cc.kv_region_lines(lines)
+        self.assertTrue(flags[0])
+        self.assertFalse(any(flags[6:]))
+
+    def test_dense_colon_cells_open_a_region(self) -> None:
+        lines = [
+            "Alpha:",
+            "",
+            "One.",
+            "",
+            "Beta:",
+            "",
+            "Two.",
+            "",
+            "Gamma:",
+            "",
+            "Three.",
+            "",
+            "Delta:",
+            "",
+            "Four.",
+        ]
+        flags = cc.kv_region_lines(lines)
+        self.assertTrue(flags[0])
+        self.assertTrue(flags[8])
+        self.assertTrue(flags[12])
+
+    def test_repeated_header_pair_opens_a_region(self) -> None:
+        lines = []
+        for term in ("Alpha", "Beta", "Gamma"):
+            lines += ["Word or Phrase", "", "Legal definition", "", term, "", "Value.", ""]
+        flags = cc.kv_region_lines(lines)
+        self.assertTrue(flags[0])  # the repeated header itself
+        self.assertTrue(flags[4])  # Alpha
+        self.assertTrue(flags[12])  # Beta
+        self.assertTrue(flags[20])  # Gamma
+
+    def test_plain_prose_has_no_region(self) -> None:
+        self.assertFalse(any(cc.kv_region_lines(DOC.split("\n"))))
+        self.assertFalse(any(cc.kv_region_lines(TABLE_DOC.split("\n"))))
+
+
 class ParseTest(unittest.TestCase):
     def test_plain_array(self) -> None:
         self.assertEqual(cc.parse_claims('[{"statement": "x"}]'), [{"statement": "x"}])
