@@ -46,6 +46,8 @@ import argparse
 import json
 import os
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -317,6 +319,31 @@ def _batches(items: list, size: int) -> list[list]:
     return [items[start : start + size] for start in range(0, len(items), size)]
 
 
+def _run_batches(batches: list[list], ask, concurrency: int = 1) -> None:
+    """Run independent batches, sequentially or side by side.
+
+    Concurrency here is throughput only. ``batches`` is built from the same
+    pending list in the same order either way, so every model call sees exactly
+    the prompt it would see in a sequential run: the batch content, the prompt,
+    the model, the schema and the parsing are untouched.
+    """
+    workers = min(max(1, concurrency), len(batches)) if batches else 1
+    if workers <= 1:
+        for batch in batches:
+            ask(batch)
+        return
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(ask, batch) for batch in batches]
+        for future in futures:
+            exc = future.exception()
+            if isinstance(exc, SystemExit):
+                # ``ask`` already recorded the dead batch; the pass stops at
+                # its end exactly as it would have sequentially.
+                continue
+            if exc is not None:
+                raise exc
+
+
 def _record_usage(usage: dict | None, data: dict | None) -> None:
     """Accumulate one call's token counts into a shared dict (no-op if None)."""
     if usage is None:
@@ -337,6 +364,7 @@ def audit_claims(
     batch_size: int = 10,
     max_tokens: int = 8000,
     usage: dict | None = None,
+    concurrency: int = 1,
 ) -> dict[str, dict]:
     """Return ``{claim_id: {verdict, note}}`` for every claim.
 
@@ -347,6 +375,10 @@ def audit_claims(
     is both cheaper and more honest than treating silence as ``weak``. Silence
     used to produce a false positive on every claim a batch skipped, so the
     omission is retried, halving the batch each time.
+
+    ``concurrency`` only schedules independent batches side by side; see
+    ``_run_batches``. The cache and the token accounting are written under a
+    lock, so the file stays one valid JSON object per line.
     """
     done: dict[str, dict] = {}
     aborted: list[str] = []
@@ -356,18 +388,37 @@ def audit_claims(
                 done[row["claim_id"]] = {"verdict": row["verdict"], "note": row.get("note", "")}
     if cache_path and not resume:
         cache_path.unlink(missing_ok=True)
+    lock = threading.Lock()
+
+    def persist(rows: list[dict]) -> None:
+        if cache_path and rows:
+            with lock:
+                append_jsonl(cache_path, rows)
 
     def ask(batch: list[dict]) -> None:
         pairs = [(claim, spans.resolve(claim)) for claim in batch]
         try:
             reply, data, finish = call(audit_prompt(pairs), AUDIT_SYSTEM, max_tokens)
         except SystemExit as exc:
-            # One dead batch must not lose the 400 claims already audited. The
-            # cache keeps them; --resume re-asks only this batch.
+            # A batch that keeps failing may be failing only as a batch: the
+            # provider answered HTTP 400 for one D5 triple and HTTP 503 for the
+            # same triple on another attempt, while each claim alone passed.
+            # So the error code cannot decide -- halve the batch and ask again,
+            # down to single claims. `chat` already retried the call itself.
+            if len(batch) > 1:
+                middle = len(batch) // 2 or 1
+                print(f"  audit: batch of {len(batch)} failed ({exc}); splitting", file=sys.stderr)
+                ask(batch[:middle])
+                ask(batch[middle:])
+                return
+            # A single claim that cannot be judged does not lose the 400 claims
+            # already audited: the cache keeps them and --resume re-asks this
+            # one.
             aborted.extend(claim["claim_id"] for claim in batch)
-            print(f"  audit: batch of {len(batch)} failed ({exc})", file=sys.stderr)
+            print(f"  audit: claim {batch[0]['claim_id']} failed ({exc})", file=sys.stderr)
             return
-        _record_usage(usage, data)
+        with lock:
+            _record_usage(usage, data)
         parsed = parse_claims(reply)
         by_id = {str(row.get("claim_id")): row for row in parsed if row.get("claim_id")}
         rows: list[dict] = []
@@ -381,8 +432,7 @@ def audit_claims(
             record = {"verdict": verdict, "note": str((row or {}).get("note", ""))[:160]}
             done[claim["claim_id"]] = record
             rows.append({"claim_id": claim["claim_id"], **record})
-        if cache_path and rows:
-            append_jsonl(cache_path, rows)
+        persist(rows)
         if missing and len(batch) > 1:
             middle = len(missing) // 2 or 1
             ask(missing[:middle])
@@ -392,14 +442,12 @@ def audit_claims(
             claim = missing[0]
             record = {"verdict": "weak", "note": "audit reply omitted this claim"}
             done[claim["claim_id"]] = record
-            if cache_path:
-                append_jsonl(cache_path, [{"claim_id": claim["claim_id"], **record}])
+            persist([{"claim_id": claim["claim_id"], **record}])
         if finish == "length":
             print(f"  audit: batch of {len(batch)} hit the token limit", file=sys.stderr)
 
     pending = [c for c in claims if c["claim_id"] not in done]
-    for batch in _batches(pending, batch_size):
-        ask(batch)
+    _run_batches(_batches(pending, batch_size), ask, concurrency)
     if aborted:
         raise SystemExit(
             f"audit incomplete: {len(aborted)} claim(s) never judged, e.g. {aborted[:5]}. "
@@ -418,8 +466,13 @@ def repair_claims(
     batch_size: int = 6,
     max_tokens: int = 8000,
     usage: dict | None = None,
+    concurrency: int = 1,
 ) -> dict[str, dict]:
-    """Return ``{claim_id: action record}`` for the claims that need repair."""
+    """Return ``{claim_id: action record}`` for the claims that need repair.
+
+    ``concurrency`` only schedules independent batches side by side; see
+    ``_run_batches``. Cache writes and token accounting are locked.
+    """
     done: dict[str, dict] = {}
     aborted: list[str] = []
     if resume and cache_path and cache_path.exists():
@@ -428,6 +481,12 @@ def repair_claims(
                 done[row["claim_id"]] = row
     if cache_path and not resume:
         cache_path.unlink(missing_ok=True)
+    lock = threading.Lock()
+
+    def persist(rows: list[dict]) -> None:
+        if cache_path and rows:
+            with lock:
+                append_jsonl(cache_path, rows)
 
     def ask(batch: list[dict]) -> None:
         triples = [
@@ -437,10 +496,22 @@ def repair_claims(
         try:
             reply, data, finish = call(repair_prompt(triples), REPAIR_SYSTEM, max_tokens)
         except SystemExit as exc:
+            # A batch that keeps failing may be failing only as a batch: the
+            # D5 triple that derailed the fixed run is HTTP 400 upstream_rejected
+            # on one attempt and HTTP 503 on another, while each of its claims
+            # passes alone. Halve the batch and ask again, down to single
+            # claims; `chat` already retried the call itself.
+            if len(batch) > 1:
+                middle = len(batch) // 2 or 1
+                print(f"  repair: batch of {len(batch)} failed ({exc}); splitting", file=sys.stderr)
+                ask(batch[:middle])
+                ask(batch[middle:])
+                return
             aborted.extend(claim["claim_id"] for claim in batch)
-            print(f"  repair: batch of {len(batch)} failed ({exc})", file=sys.stderr)
+            print(f"  repair: claim {batch[0]['claim_id']} failed ({exc})", file=sys.stderr)
             return
-        _record_usage(usage, data)
+        with lock:
+            _record_usage(usage, data)
         parsed = parse_claims(reply)
         by_id = {str(row.get("claim_id")): row for row in parsed if row.get("claim_id")}
         rows: list[dict] = []
@@ -460,8 +531,7 @@ def repair_claims(
             }
             done[claim["claim_id"]] = record
             rows.append(record)
-        if cache_path and rows:
-            append_jsonl(cache_path, rows)
+        persist(rows)
         if missing and len(batch) > 1:
             middle = len(missing) // 2 or 1
             ask(missing[:middle])
@@ -479,8 +549,7 @@ def repair_claims(
             print(f"  repair: batch of {len(batch)} hit the token limit", file=sys.stderr)
 
     pending = [c for c in claims if c["claim_id"] not in done]
-    for batch in _batches(pending, batch_size):
-        ask(batch)
+    _run_batches(_batches(pending, batch_size), ask, concurrency)
     if aborted:
         raise SystemExit(
             f"repair incomplete: {len(aborted)} claim(s) never judged, e.g. {aborted[:5]}. "
@@ -640,6 +709,7 @@ def run_pipeline(
     initial_audit: dict[str, dict] | None = None,
     verbose: bool = True,
     usage: dict | None = None,
+    concurrency: int = 1,
 ) -> tuple[list[dict], dict]:
     """audit -> repair -> re-audit, repeated `rounds` times. Pure policy."""
     usage = usage if usage is not None else {}
@@ -654,6 +724,7 @@ def run_pipeline(
             batch_size=audit_batch,
             max_tokens=max_tokens,
             usage=usage,
+            concurrency=concurrency,
         )
     report = {"initial": summarize(claims, audit), "rounds": []}
 
@@ -670,6 +741,7 @@ def run_pipeline(
             batch_size=repair_batch,
             max_tokens=max_tokens,
             usage=usage,
+            concurrency=concurrency,
         )
         claims, round_report = apply_repairs(claims, repairs, spans)
         touched = [claim for claim in claims if claim["claim_id"] in repairs]
@@ -683,6 +755,7 @@ def run_pipeline(
                 batch_size=audit_batch,
                 max_tokens=max_tokens,
                 usage=usage,
+                concurrency=concurrency,
             )
         )
         unresolved = [c for c in touched if verdict_of(c, audit) != "ok"]
@@ -805,6 +878,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--base-url", default=os.environ.get("OPENAI_BASE_URL", ""))
     parser.add_argument("--audit-batch", type=int, default=10)
     parser.add_argument("--repair-batch", type=int, default=6)
+    parser.add_argument("--concurrency", type=int, default=1,
+                        help="independent batches in flight (throughput only; prompts unchanged)")
     parser.add_argument("--max-tokens", type=int, default=8000)
     parser.add_argument("--rounds", type=int, default=2)
     parser.add_argument("--resume", action="store_true")
@@ -896,6 +971,7 @@ def main(argv: list[str] | None = None) -> int:
         batch_size=args.audit_batch,
         max_tokens=args.max_tokens,
         usage=usage,
+        concurrency=args.concurrency,
     )
     initial = summarize(claims, audit)
     print(f"audit: {json.dumps(initial)}")
@@ -916,6 +992,7 @@ def main(argv: list[str] | None = None) -> int:
         keep_residual=args.keep_residual,
         initial_audit=audit,
         usage=usage,
+        concurrency=args.concurrency,
     )
     report["claims_in"] = len(load_claims(claims_path))
 

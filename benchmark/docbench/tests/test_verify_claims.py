@@ -15,6 +15,8 @@ from __future__ import annotations
 import json
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 
@@ -286,15 +288,40 @@ class AuditPassTest(unittest.TestCase):
         self.assertEqual(audit["D1-0001"]["verdict"], "ok")
         self.assertEqual(audit["D1-0002"]["verdict"], "no")
 
-    def test_dead_batch_aborts_resumably_and_keeps_the_cache(self) -> None:
+    def test_client_rejection_splits_the_batch_instead_of_aborting(self) -> None:
+        def call(prompt, system, max_tokens):
+            if "D1-0001" in prompt and "D1-0002" in prompt:
+                raise SystemExit("HTTP 400: upstream rejected the request")
+            cid = "D1-0001" if "D1-0001" in prompt else "D1-0002"
+            return json.dumps([{"claim_id": cid, "verdict": "ok", "note": "-"}]), {
+                "input_tokens": 1, "output_tokens": 1,
+            }, "stop"
+
+        audit = vc.audit_claims(self.claims, self.index, call, batch_size=2)
+        self.assertEqual(audit["D1-0001"]["verdict"], "ok")
+        self.assertEqual(audit["D1-0002"]["verdict"], "ok")
+
+    def test_persistent_failure_aborts_after_splitting(self) -> None:
+        seen: list[str] = []
+
+        def call(prompt, system, max_tokens):
+            seen.append(prompt)
+            raise SystemExit("model call failed after retries: HTTP 503")
+
+        with self.assertRaises(SystemExit) as caught:
+            vc.audit_claims(self.claims, self.index, call, batch_size=2)
+        self.assertIn("--resume", str(caught.exception))
+        self.assertEqual(len(seen), 3)  # the pair, then each claim alone
+
+    def test_dead_batch_still_judges_the_surviving_half(self) -> None:
         claims = [claim(f"D1-000{i}", f"statement {i}", [SPANS[1]]) for i in range(1, 5)]
 
         def call(prompt, system, max_tokens):
             if "D1-0003" in prompt:
                 raise SystemExit("model call failed after retries: HTTP 503")
             rows = [
-                {"claim_id": cid, "verdict": "ok", "note": "-"}
-                for cid in ("D1-0001", "D1-0002") if cid in prompt
+                {"claim_id": f"D1-000{i}", "verdict": "ok", "note": "-"}
+                for i in range(1, 5) if f"D1-000{i}" in prompt
             ]
             return json.dumps(rows), {"input_tokens": 1, "output_tokens": 1}, "stop"
 
@@ -304,7 +331,8 @@ class AuditPassTest(unittest.TestCase):
                 vc.audit_claims(claims, self.index, call, cache_path=cache, batch_size=2)
             self.assertIn("--resume", str(caught.exception))
             cached = {row["claim_id"] for row in vc.load_jsonl(cache)}
-            self.assertEqual(cached, {"D1-0001", "D1-0002"})
+            # The pair splits; only the claim that fails alone stays unresolved.
+            self.assertEqual(cached, {"D1-0001", "D1-0002", "D1-0004"})
 
 
 class RepairPassTest(unittest.TestCase):
@@ -321,6 +349,22 @@ class RepairPassTest(unittest.TestCase):
         self.assertEqual(len(call.prompts), 3)
         self.assertEqual(repairs["D1-0003"]["statement"], "fixed 3")
 
+    def test_rejected_batch_splits_and_repairs_every_claim(self) -> None:
+        index = vc.SpanIndex(SPANS)
+        claims = [claim("D1-0001", "a", [SPANS[1]]), claim("D1-0002", "b", [SPANS[1]])]
+
+        def call(prompt, system, max_tokens):
+            if "D1-0001" in prompt and "D1-0002" in prompt:
+                raise SystemExit("model call failed after retries: HTTP 503")
+            cid = "D1-0001" if "D1-0001" in prompt else "D1-0002"
+            return json.dumps([{"claim_id": cid, "action": "drop"}]), {
+                "input_tokens": 1, "output_tokens": 1,
+            }, "stop"
+
+        repairs = vc.repair_claims(claims, index, call, batch_size=2)
+        self.assertEqual(repairs["D1-0001"]["action"], "drop")
+        self.assertEqual(repairs["D1-0002"]["action"], "drop")
+
     def test_omitted_repair_is_asked_again_not_invented(self) -> None:
         index = vc.SpanIndex(SPANS)
         claims = [claim("D1-0001", "a", [SPANS[1]]), claim("D1-0002", "b", [SPANS[1]])]
@@ -334,6 +378,78 @@ class RepairPassTest(unittest.TestCase):
         # The claim the model never answered has no action, so nothing is applied.
         self.assertEqual(repairs["D1-0002"]["action"], "")
         self.assertIn("omitted", repairs["D1-0002"]["note"])
+
+
+class ConcurrencyTest(unittest.TestCase):
+    """Batches are independent; running them side by side must not change them."""
+
+    def setUp(self) -> None:
+        self.index = vc.SpanIndex(SPANS)
+        self.claims = [claim(f"D1-000{i}", f"statement {i}", [SPANS[1]]) for i in range(1, 7)]
+
+    def _call(self, active: dict | None = None):
+        guard = threading.Lock()
+
+        def call(prompt, system, max_tokens):
+            if active is not None:
+                with guard:
+                    active["now"] += 1
+                    active["peak"] = max(active["peak"], active["now"])
+            time.sleep(0.02)
+            if active is not None:
+                with guard:
+                    active["now"] -= 1
+            rows = [
+                {"claim_id": f"D1-000{i}", "verdict": "ok", "note": "-"}
+                for i in range(1, 7)
+                if f"D1-000{i}" in prompt
+            ]
+            return json.dumps(rows), {"input_tokens": 1, "output_tokens": 1}, "stop"
+
+        return call
+
+    def test_concurrent_audit_gives_the_same_verdicts(self) -> None:
+        audit = vc.audit_claims(self.claims, self.index, self._call(), batch_size=1, concurrency=3)
+        self.assertEqual(set(audit), {c["claim_id"] for c in self.claims})
+        self.assertTrue(all(row["verdict"] == "ok" for row in audit.values()))
+
+    def test_batches_really_run_in_flight(self) -> None:
+        active = {"now": 0, "peak": 0}
+        vc.audit_claims(self.claims, self.index, self._call(active), batch_size=1, concurrency=3)
+        self.assertGreater(active["peak"], 1)
+
+    def test_concurrent_cache_stays_one_json_object_per_line(self) -> None:
+        usage: dict = {}
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "audit.jsonl"
+            vc.audit_claims(
+                self.claims, self.index, self._call(),
+                cache_path=cache, batch_size=1, concurrency=4, usage=usage,
+            )
+            lines = cache.read_text().splitlines()
+            self.assertEqual(len(lines), len(self.claims))
+            for line in lines:
+                self.assertIn("claim_id", json.loads(line))
+        self.assertEqual(usage["calls"], len(self.claims))
+
+    def test_dead_batch_under_concurrency_keeps_the_others_cached(self) -> None:
+        def call(prompt, system, max_tokens):
+            if "D1-0003" in prompt:
+                raise SystemExit("model call failed after retries: HTTP 503")
+            rows = [
+                {"claim_id": f"D1-000{i}", "verdict": "ok", "note": "-"}
+                for i in range(1, 7)
+                if f"D1-000{i}" in prompt
+            ]
+            return json.dumps(rows), {"input_tokens": 1, "output_tokens": 1}, "stop"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "audit.jsonl"
+            with self.assertRaises(SystemExit) as caught:
+                vc.audit_claims(self.claims, self.index, call, cache_path=cache, batch_size=1, concurrency=3)
+            self.assertIn("--resume", str(caught.exception))
+            cached = {row["claim_id"] for row in vc.load_jsonl(cache)}
+            self.assertEqual(cached, {f"D1-000{i}" for i in (1, 2, 4, 5, 6)})
 
 
 class PipelineTest(unittest.TestCase):
