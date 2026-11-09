@@ -579,3 +579,94 @@ not used to average the failing one away. The failure is attributed to a stage
 the fix is written as a new pre-registered amendment before it is measured, and
 if it is measured it is measured on a fresh compile of the failing document,
 with the failed run kept in the report.
+
+### 10.7 Probe result and amendments (added 2026-11-09, after the probe was measured)
+
+The probe ran on the artifact described in `gold/audit.probe.md` and **fails**.
+The numbers are in that report and in `RESULTS.md`; they are not restated here
+as a second source of truth.
+
+| Document | Structural | Support (census) | Fabrications | Recall | Verdict |
+|---|---|---|---|---|---|
+| D5 — contract | pass | 323/325 = 99.4% | 0 | 7/10 = 70.0% | **pass** |
+| D6 — table | pass | 47/51 = 92.2% | 0 (4 under the literal row) | 2/10 = 20.0% | **fail** |
+
+D6 fails the recall row. Under the literal "claims asserting facts absent from
+source" row it also has four failures (`D6-0027`, `D6-0029`, `D6-0030`,
+`D6-0032`), because each asserts a disposition-authority association that
+belongs to a different item. Neither a threshold nor the per-document rule is
+changed.
+
+#### 10.7(a) Page checker — an instrument fix, applied and re-measured
+
+`check_claims.py` reported 7 page failures on 512 evidence spans. All seven are
+quotes that recur on several pages (glossary scaffolding, a repeated disposition
+clause); the checker resolved the quote to its *first* occurrence, although the
+declared page contained it. That contradicts the checker's own contract, and the
+seven declared pages are the spans' actual pages.
+
+Fix, applied and re-measured on the same artifact with no model call:
+`page_containing()` keeps the declared page when the quote occurs there and
+falls back to the first occurrence only when it does not. Covered by
+`benchmark/docbench/tests/test_check_claims.py`. Structural validity is
+**376/376 claims, 512/512 spans, 0 failures**; D1-D4 stay at 0. No statement,
+quote, threshold or artifact changed.
+
+#### 10.7(b) Table-record segmentation — pre-registered, not yet measured
+
+**Measured defect.** D6's operative content is a four-cell table row (item
+number, description, disposition instruction, disposition authority). In the
+default-order text each cell arrives as its own line block. `looks_like_heading`
+classifies the first line of the disposition cell (`Destroy 2 years`,
+`Destroy when 3`, `Destroy 6 years`) as a section heading, so the line becomes
+`section_path` and never enters a span. The remaining `Temporary.` is under
+`min_chars` and is discarded by `flush_short()` (`< 20` characters). Measured on
+`gold/probe.compiled.jsonl.spans.jsonl`: `Destroy 2 years`, `Destroy 6 years`,
+`Destroy when 3` and `Destroy when no` occur in **no span**, and the item keys
+(`012`, `020`, …) occur in no span. The model can only quote what it is given,
+so it emits the continuation ("…longer retention is authorized") and never the
+operative "Temporary. Destroy X after Y"; the repair stage cannot recover a
+sentence that has no span.
+
+The same rule produces the four DAA misattributions: the authority line of row
+N stays on the heading stack while row N+1's description arrives, because the
+item number between them is a short fragment that `flush_short()` drops.
+`S0030` (item 020's description) carries `section_path:
+["DAA-GRS2016-00010001"]`, item 012's authority; `S0032` (item 030's
+description) carries item 020's authority.
+
+**Fix (generic, not D6-specific).**
+
+1. **Record detection.** A line is a *record key* when it is a standalone short
+   token (<= 8 characters, containing a digit) that (a) does not recur on more
+   than one page — page numbers do — and (b) is followed by at least one body
+   line. When at least three record keys are found in a document, the document
+   has an item-numbered table and is segmented by record.
+2. **Record scope.** A record runs from its key line to the line before the next
+   record key (or the end of the table). No line inside a record is consumed as
+   a heading; the key travels with the record's first span, so every span of a
+   record can be resolved to its row.
+3. **No fragmentation loss.** `flush_short()` may not drop a fragment inside an
+   open record: the fragment is appended to the record's text, and the record is
+   emitted as spans only when it exceeds the sentence-window limit. A span never
+   crosses a record boundary.
+4. **Locator.** A record span's `section_path` is the containing document
+   section plus the record key, never the previous row's authority line.
+
+No prompt, schema, model or threshold changes. The model still may only quote
+span text.
+
+**Measurement.** A fresh compile of **both** D5 and D6 with the fixed segmenter
+(the change is global, so D5 is the regression check even though it already
+passed), then verify and a full independent census of every emitted claim, with
+the same verdict scale. D6 is the gate; D5 must keep structural 100%, support
+>= 90%, 0 fabrications and recall >= 70%, or the fix is rejected as a
+regression. For D6, in addition to the §10.4 thresholds, the eight gold claims
+the first probe missed (`D6-0002`, `0003`, `0004`, `0005`, `0006`, `0008`,
+`0009`, `0010`) must be recalled, and `D6-0027`/`0029`/`0030`/`0032` must not
+reappear with a wrong authority.
+
+**What does not change.** The failed run is kept: `gold/probe.compiled.jsonl`,
+`gold/probe.compiled.verified.jsonl`, `gold/probe.verdicts.jsonl` and
+`gold/audit.probe.md` stay as the measurement of the unfixed pipeline. The fix
+is reported as a new run with its own census, not by rewriting this one.

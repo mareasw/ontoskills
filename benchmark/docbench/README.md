@@ -3,10 +3,13 @@
 **Status: representation validated (2026-11-07) and machine extraction validated
 (Gate 2, 2026-11-08).** The compiler's claims pass an independent census at
 **99.0% evidence support** (499/504), 0 fabrications, 97.6% gold recall, and B2
-beats B1 on citation by +20.0 pp automatic / +21.9 pp blind. The **market gate
-is still open**. See [`RESULTS.md`](RESULTS.md) for the numbers, the manual
-review, the blind re-score and the limitations. The corpus and the full gold set
-stay local; the protocol and the examples are public.
+beats B1 on citation by +20.0 pp automatic / +21.9 pp blind. The
+**second-corpus probe (2026-11-09) fails**: the contract (D5) passes every row,
+but the table-as-content document (D6) recalls 2/10 gold obligations because
+table disposition cells are segmented as headings. The **market gate is still
+open**. See [`RESULTS.md`](RESULTS.md) for the numbers, the manual review, the
+blind re-score and the limitations. The corpus and the full gold set stay local;
+the protocol and the examples are public.
 
 The claim shape is defined by [`schemas/claim.v2.schema.json`](../../schemas/claim.v2.schema.json) and [`docs/adr/0001-document-first-kernel.md`](../../docs/adr/0001-document-first-kernel.md): a claim carries an `evidence` list, not a single quote, so a rule with an exception or a two-sided conflict can cite every span it needs.
 
@@ -25,6 +28,17 @@ Read the full protocol first: [`PREFLIGHT.md`](PREFLIGHT.md).
 | B2 answer vs hand-built B2 | within 5 pp | blind 97.4% (−2.6 pp) |
 | Market (interview / design partner) | evidence of demand | **not started** |
 
+Second-corpus probe (`PREFLIGHT.md` §10, per document, 2026-11-09):
+
+| Document | Type | Structural | Support | Recall | Verdict |
+|---|---|---|---|---|---|
+| D5 | contract | 100% | 323/325 = 99.4% | 7/10 = 70.0% | **pass** |
+| D6 | table-as-content | 100% | 47/51 = 92.2% | 2/10 = 20.0% | **fail** |
+
+The probe fails on D6 recall. The support misses and the segmentation mechanism
+are named in [`gold/audit.probe.md`](gold/audit.probe.md); the fix is
+pre-registered as `PREFLIGHT.md` §10.7(b) and the failed run is kept.
+
 Gate 2's thresholds and method were fixed in `PREFLIGHT.md` §9 before the run;
 the four amendments that got it there (§9.1–§9.4) each answer a measured defect
 and are recorded with the number they moved. The census is
@@ -35,7 +49,7 @@ and are recorded with the number they moved. The census is
 ```
 benchmark/docbench/
 ├── README.md
-├── sources.md              # the four documents, URLs, hashes, licences
+├── sources.md              # the six documents, URLs, hashes, licences
 ├── private/                # local copies of source documents (gitignored)
 ├── compile_claims.py       # span-first compiler: segment -> extract -> validate -> emit
 ├── verify_claims.py        # audit each claim against its own evidence, repair it, drop only what is unsupported
@@ -166,6 +180,10 @@ same JSON output contract. Only the context differs.
 - [x] Scored: automatic triage + manual review of all 120 answers
 - [x] Independently re-scored by a reviewer who did not see the condition labels: 117/117 answers agree; B2 − B1 citation delta reproduced at +28.1 pp
 - [x] Claim schema v2 (`evidence: [...]`) defined, migrated and tested
+- [x] Second corpus annotated: D5 contract + D6 table (20 claims, 16 questions)
+- [x] Machine extraction compiled, verified and fully censused on six documents
+- [x] Second-corpus probe measured: **D5 pass, D6 fail (recall 2/10)**
+- [ ] Table-record segmentation (`PREFLIGHT.md` §10.7(b)) — pre-registered, not yet measured
 - [ ] Machine-extracted claims replace the hand-built gold set (the real extraction gate)
 - [ ] Go/no-go decision recorded (technical gate passed; market gate open)
 

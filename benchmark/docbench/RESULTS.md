@@ -1,14 +1,17 @@
 # DocBench results
 
-**Dates:** 2026-11-07 (hand-built claims) · 2026-11-08 (machine-compiled claims).
+**Dates:** 2026-11-07 (hand-built claims) · 2026-11-08 (machine-compiled claims) ·
+2026-11-09 (second-corpus probe).
 **Status:** both technical gates pass — the representation (2026-11-07) and
-machine extraction (Gate 2, final numbers under *Gate 2 — final*). The **market
-gate is still open**: no interviews, no design partner, no public-evidence memo
-yet.
+machine extraction (Gate 2, 2026-11-08). The second-corpus probe (2026-11-09)
+**fails on D6 recall**: the contract passes every row, the table document
+passes support but misses 8 of 10 gold obligations because table-disposition
+cells are segmented as headings. The **market gate is still open**: no
+interviews, no design partner, no public-evidence memo yet.
 
 The file is chronological: the 2026-11-07 run, then Gate 2 — first attempt
-(kept as the measured failure the amendments answer), then **Gate 2 — final**.
-Read the final section for the current verdict.
+(kept as the measured failure the amendments answer), then **Gate 2 — final**,
+then the **second-corpus probe** and its one instrument amendment.
 
 ## First run (2026-11-07): hand-built claims
 
@@ -396,6 +399,78 @@ change is `conflicts_with` closure in retrieval rather than more extraction.
 About **$0.73** for the whole gate against the ~$0.02 preflight estimate. The
 error is output tokens at reasoning price, not input; the preflight estimate is
 corrected in the superseded section above and in `gold/audit.run4.md`.
+
+## Second corpus probe (2026-11-09) — contract + table
+
+The probe is fixed in `PREFLIGHT.md` §10, before any model call on D5/D6. It
+asks one narrow question: does the compiler that reached 99.0% support on
+D1-D4 still produce supported, non-fabricated claims when the document type
+changes? The gate is **per document**: structural 100%, support >= 90%,
+fabrications 0, gold recall >= 70%, for each document. A pooled number cannot
+pass a failing document.
+
+**Artifact.** `gold/probe.compiled.verified.jsonl`: 376 claims (D5 325,
+D6 51), 512 evidence spans, `check_claims.py` 0 failures, 9 near-duplicates
+merged, 6 residual `weak` kept, 0 residual `no`/`fabricated` dropped. The full
+census is
+`gold/audit.probe.md`; every row was judged, not sampled.
+
+| Document | Type | Structural | Support (census) | Fabrications | Recall | Verdict |
+|---|---|---|---|---:|---:|---|
+| **D5** | contract (ALSPAC IDTA v1) | 100% | 323/325 = **99.4%** | 0 | 7/10 = **70.0%** | **pass** |
+| **D6** | table-as-content (NARA GRS 1.1) | 100% | 47/51 = **92.2%** | 0 (4 literal) | 2/10 = **20.0%** | **fail** |
+| Pooled | | 100% | 370/376 = **98.4%** | 0 | — | reported only |
+
+**Verdict: the probe fails.** D6 misses the recall bar by 50 pp. D5 passes at
+exactly 70.0%, so the contract result is not used to average D6 away. There are
+0 `fabricated` claims on the census scale; under the gate's literal "facts
+absent from source" row D6 has four, because it attaches a row's disposition
+authority to the neighbouring row's records. Both readings are reported; the
+verdict does not depend on which is used.
+
+**The support misses are kept visible.** `D5-0010` (`weak`) turns Table 2's
+"primary place for legal claims" field into a rule; `D5-0348` (`no`) defines
+"Harmful Impact", a truncated form of "Significant Harmful Impact"; `D6-0027`,
+`D6-0029`, `D6-0030`, `D6-0032` (`no`) each cite the disposition authority of
+the neighbouring item. The DAA pairings were checked against the official NARA
+PDF, not against the text the compiler consumed.
+
+### Why D6 failed — segmentation, not extraction or repair
+
+A D6 row has four cells: item number, description, disposition instruction,
+disposition authority. Default-order `pdftotext` delivers each cell as its own
+line block. The segmenter's "short Title-Case line is a heading" rule consumes
+`Destroy 2 years`, `Destroy when 3`, `Destroy 6 years` and `Destroy when no` as
+`section_path`, so those lines never enter a span; the residual `Temporary.` is
+under `min_chars` and is dropped by `flush_short()` (`< 20` characters). The
+span file confirms it: none of the four disposition prefixes, and none of the
+item keys (`012`, `020`, …), occurs in any span. The model therefore emits the
+continuation ("…longer retention is authorized") and the trigger, never
+"Temporary. Destroy X after Y". Repair cannot re-evidence a sentence that has no
+span. The same mechanism puts row N's authority line on the heading stack while
+row N+1's description arrives, which is exactly the four `D6-0027/29/30/32`
+misattributions.
+
+This is a real generalisation finding: the compiler is span-first and honest,
+but its segmenter has no notion of a table record. A fix is pre-registered as
+`PREFLIGHT.md` §10.7(b) and will be measured on a fresh compile of both D5 and
+D6; the failed run stays as the measurement of the unfixed pipeline.
+
+### Instrument amendment (§10.7(a))
+
+`check_claims.py` first reported 7 page failures on 512 spans. All seven are
+quotes that recur on several pages (glossary scaffolding, a repeated disposition
+clause) and the declared page does contain the quote; the checker's
+first-occurrence rule contradicted its own contract. The checker now keeps the
+declared page when the quote occurs there, with a test. Re-measured on the same
+artifact, no model call: **0 failures**. No statement, quote, threshold or
+artifact changed; D1-D4 remain at 0 failures.
+
+### What the probe did not test
+
+No B1/B2 answer run was made on D5/D6, so no answer or citation row is reported:
+§10.4 fixes that as outside this gate, and 16 questions cannot support the 15 pp
+delta used in Gate 2.
 
 ## Limitations
 
