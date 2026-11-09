@@ -102,6 +102,30 @@ DOCS = {
             "valid_from": "2026-01-01",
         },
     },
+    # Generalisation probe (PREFLIGHT.md §10): a contract and a table-as-content
+    # schedule. Same schema, same prompt, no per-document handling.
+    "D5": {
+        "file": "D5.txt",
+        "kind": "pdf",
+        "url": "https://www.bristol.ac.uk/media-library/sites/alspac/documents/researchers/data-access/ALSPAC_IDTA_template_SAMPLE.pdf",
+        "context": {
+            "source": "ALSPAC International Data Transfer Agreement (ICO IDTA A1.0)",
+            "version": "v1, 24 March 2024",
+            "jurisdiction": "UK",
+            "doc_type": "contract",
+        },
+    },
+    "D6": {
+        "file": "D6.txt",
+        "kind": "pdf",
+        "url": "https://www.archives.gov/files/records-mgmt/grs/grs01-1.pdf",
+        "context": {
+            "source": "NARA General Records Schedule 1.1 — Financial Management and Reporting Records",
+            "version": "Transmittal 31, April 2020",
+            "jurisdiction": "US-federal",
+            "doc_type": "records_schedule",
+        },
+    },
 }
 
 # HTML extractions keep the site chrome: cookies, JavaScript notices, navigation
