@@ -1,17 +1,21 @@
 # DocBench results
 
 **Dates:** 2026-11-07 (hand-built claims) · 2026-11-08 (machine-compiled claims) ·
-2026-11-09 (second-corpus probe).
+2026-11-09 (second-corpus probe, failed run and fixed run).
 **Status:** both technical gates pass — the representation (2026-11-07) and
 machine extraction (Gate 2, 2026-11-08). The second-corpus probe (2026-11-09)
-**fails on D6 recall**: the contract passes every row, the table document
-passes support but misses 8 of 10 gold obligations because table-disposition
-cells are segmented as headings. The **market gate is still open**: no
+**fails, twice**. The first run fails on D6 recall: the table document recalls
+2/10 gold obligations because disposition cells are segmented as headings. The
+fixed run repairs that (D6 recall 10/10, support 96.1%) and **fails again on
+D5**, which now has 8 claims asserting a definition for a term the document does
+not define, because glossary headwords wrap onto two lines and only the last
+line survives as the section heading. The **market gate is still open**: no
 interviews, no design partner, no public-evidence memo yet.
 
 The file is chronological: the 2026-11-07 run, then Gate 2 — first attempt
 (kept as the measured failure the amendments answer), then **Gate 2 — final**,
-then the **second-corpus probe** and its one instrument amendment.
+then the **second-corpus probe** (failed run), then the **fixed run** it
+pre-registered, still failing on a different document and a different row.
 
 ## First run (2026-11-07): hand-built claims
 
@@ -428,6 +432,13 @@ absent from source" row D6 has four, because it attaches a row's disposition
 authority to the neighbouring row's records. Both readings are reported; the
 verdict does not depend on which is used.
 
+**Erratum (2026-11-09).** An earlier version of this section said D5 "passes
+every row". That is wrong under the gate's literal wording: `D5-0348` is `no` in
+the census, so D5 has **1** claim asserting a fact absent from source, not 0,
+and the "facts absent from source = 0" row fails for D5 as well as D6. The
+probe verdict is unchanged (it already failed on D6 recall) and no measured
+number changes; the same erratum is appended to `gold/audit.probe.md`.
+
 **The support misses are kept visible.** `D5-0010` (`weak`) turns Table 2's
 "primary place for legal claims" field into a rule; `D5-0348` (`no`) defines
 "Harmful Impact", a truncated form of "Significant Harmful Impact"; `D6-0027`,
@@ -472,6 +483,61 @@ No B1/B2 answer run was made on D5/D6, so no answer or citation row is reported:
 §10.4 fixes that as outside this gate, and 16 questions cannot support the 15 pp
 delta used in Gate 2.
 
+## Second corpus probe, fixed run (2026-11-09) — D6 fixed, D5 fails
+
+The failed run above stands as the measurement of the unfixed pipeline. A second
+run applied the record-segmentation rule pre-registered as `PREFLIGHT.md`
+§10.7(b) and was measured under the same §10 gate, thresholds and census scale.
+The two scheduling amendments made while resuming (concurrency, split-on-failure,
+§10.7(c)/(d)) change throughput and retry only, not the prompt or the claim.
+
+**Artifact.** `gold/probe.fixed.compiled.verified.jsonl`: 429 claims compiled
+(D5 378, D6 51), 405 after verify (D5 354, D6 51), 552 evidence spans,
+`check_claims.py` 0 failures, 15 near-duplicates merged, 19 residual `weak`
+kept, 0 residual `no`/`fabricated` dropped. The full census is
+`gold/audit.probe.fixed.md`; 405 rows were judged, no sample.
+
+| Document | Type | Structural | Support (census) | Facts absent | Recall | Verdict |
+|---|---|---|---:|---:|---:|---|
+| **D5** | contract (ALSPAC IDTA v1) | 100% | 329/354 = **92.9%** | **8** | 7/10 = **70.0%** | **fail** |
+| **D6** | table-as-content (NARA GRS 1.1) | 100% | 49/51 = **96.1%** | 0 | 10/10 = **100%** | **pass** |
+| Pooled | | 100% | 378/405 = **93.3%** | 8 | — | reported only |
+
+**Verdict: the probe fails again.** D6 is fixed on every row, including the one
+it failed before: recall 2/10 -> 10/10, every disposition instruction inside its
+own quote, and **0** misattributed disposition authorities against the source's
+full item -> DAA map (year included, because items 010 and 090 share the same
+eight digits). Support 92.2% -> 96.1%; the two remaining `weak` rows lose the
+record type, not the disposition.
+
+D5 fails on the row that is zero by definition: **8 claims assert a definition
+for a term the document does not define** — `Safeguards`, `Delay`, `Data`,
+`Clauses` (twice), `Country`, `Controller`, `Protection Laws`. All eight are
+glossary entries whose headword is printed on two lines ("Appropriate /
+Safeguards", "Without Undue / Delay", "Special Category / Data", …); the
+segmenter keeps only the last line as `section_path`, so the model is told the
+term is `Delay` and defines `Delay`. Two are actively wrong, not just
+mislabelled: `Data` is narrowed to special category data and `Controller`
+receives the *Third Party Controller* definition while the glossary defines
+`Controller` as "As defined in the UK GDPR". The same mechanism explains the
+three D5 recall misses: Tables 1-4 are key/value tables, and the
+`Exporter is a Controller` value cell becomes the `section_path` of the following
+span (`S0022`/`S0023`), so the controller-status claims were dropped as `weak`.
+
+This is not a new criterion applied after the score was seen: the unfixed run
+already contained one instance (`D5-0348`, "Harmful Impact") and its census
+already counted it `no`. It is the same class of defect as §10.7(b), on a table
+without item numbers; the fix is pre-registered as §10.7(e)(i) for a **fresh**
+run of both documents, and was not applied to the artifact measured here.
+
+**What the fixed run shows.** (1) The record segmentation works on the document
+it was written for, and it does not touch D5 — D5 spans are byte-identical and
+D5 recall is unchanged at 7/10. (2) The remaining D5 failure is a pre-existing
+key/value-table defect, not a regression. (3) A support number above the bar
+(92.9%) coexists with a hard failure on the facts-absent row; the per-document
+gate is what catches that, which is why a pooled 93.3% is not used to pass the
+probe.
+
 ## Limitations
 
 - **n = 39 scored questions, one run, one model.** No confidence interval is
@@ -485,7 +551,16 @@ delta used in Gate 2.
   score.
 - **The corpus is public and small.** The result says "claims help on
   structure-heavy normative documents"; it does not generalise to contracts,
-  invoices or internal wikis without a second corpus.
+  invoices or internal wikis without a second corpus. The second corpus is still
+  two documents (one contract, one records schedule) and one model.
+- **The fixed-run census is manual, 405 rows, by the agent that built the
+  pipeline.** The claim-level verdicts and the span evidence are the record a
+  second reviewer can check; the notes are kept locally because they name the
+  source corpus. D6 is 51 claims, so one row is worth 1.96 pp of support.
+- **D5's recall sits exactly on the bar (7/10)** in both runs, and its 8 `no`
+  rows are instrument-caused and mechanically repairable. They are still claims
+  the artifact asserts and the source does not; they are counted, not excused,
+  and the fix has not been applied to a measured artifact yet.
 - **The claim layer passes its own support bar as of 2026-11-08, on this
   corpus.** B2's context comes from `gold/claims.verified.jsonl` (504 claims),
   and the independent census is 99.0%. The 11 rows the repair stage kept as

@@ -597,6 +597,14 @@ source" row it also has four failures (`D6-0027`, `D6-0029`, `D6-0030`,
 belongs to a different item. Neither a threshold nor the per-document rule is
 changed.
 
+**Correction (2026-11-09, added with the fixed-run census).** The D5 row above
+reads "0" on facts absent; that is wrong under the same literal rule. `D5-0348`
+defines "Harmful Impact", a truncated form of "Significant Harmful Impact", and
+is counted `no` in `gold/audit.probe.md` itself — so D5 has **1**, not 0. The
+probe verdict is unchanged (it already failed on D6 recall) and no measured
+number changes; the erratum is also at the end of `gold/audit.probe.md`. The same
+defect, at scale, is why the fixed run fails (§10.7(e)).
+
 #### 10.7(a) Page checker — an instrument fix, applied and re-measured
 
 `check_claims.py` reported 7 page failures on 512 evidence spans. All seven are
@@ -656,6 +664,64 @@ description) carries item 020's authority.
 No prompt, schema, model or threshold changes. The model still may only quote
 span text.
 
+#### 10.7(b)(i) Record-key discriminator — refined before measuring
+
+The detection rule in §10.7(b)(1) was evaluated on the two probe inputs before
+any fix run, with no model call. Read off the text alone, it is wrong in three
+ways, so the discriminator is refined here, still before the fix is measured:
+
+- **D5 is a false positive.** The rule matches 102 standalone number lines in
+  D5, because the contract numbers its clauses `1`, `1.1`, `1.2.1`, … . Applying
+  it would re-segment the contract by clause, which is not the intent and is a
+  needless regression risk for the document that already passed.
+- **A printed page number is not excluded by recurrence.** D5's page numbers
+  (`1`–`6`, …) each occur once, so the "does not recur on more than one page"
+  clause does not remove them. What does distinguish them is position: a page
+  number is the last content on its page.
+- **Page furniture can look like a key.** D6 contains the token `41T` twice;
+  a token repeated in the document is furniture, not an item number.
+
+The discriminator is therefore fixed as:
+
+1. A candidate is a standalone line of at most 8 characters, containing a digit,
+   with no whitespace and no trailing punctuation beyond a dot, followed by at
+   least one body line.
+2. **Page numbers:** a candidate that is the last text on its page is a printed
+   page number, not a key.
+3. **Distinctness:** a token that occurs more than once in the document is page
+   furniture, not a key.
+4. **Flatness:** a candidate set is rejected when any key is a component-prefix
+   of another (after dropping a trailing dot), e.g. `1` → `1.1` → `1.2.1`.
+   Item-numbered tables are flat (`001`, `010`, `011`, …); dotted section
+   numbering is a hierarchy. This rejects D5 after rule 2 has removed its page
+   numbers.
+5. At least three keys must survive all of the above.
+
+These are properties of the input text, established before the fixed run, not a
+choice made after seeing a score. No threshold changes.
+
+#### 10.7(b)(ii) Key shape — a guard found by dry-running the detector on D1-D4
+
+Running the detector on the four Gate 2 documents, with no model call, showed
+one more false positive: D2's numbered bibliography has standalone `1`…`6`,
+each followed by a reference entry, so it satisfies every rule above. Applying
+record segmentation there would re-segment a prose policy by list number.
+
+An item column is zero-padded to a fixed width (`001`, `010`, …); a numbered
+list is a consecutive run of small integers (`1`, `2`, `3`, …). The guard is
+therefore:
+
+6. **Key shape:** every key is numeric, all keys have one width, that width is
+   at least 2, and the keys are not a consecutive integer run.
+
+D5 is rejected by rules 2 and 4; D2 by rule 6; D6 keeps all 14 keys. The guard
+was added while the fixed D5/D6 compile was in flight; because it leaves the
+D5 and D6 key sets unchanged, the span file of that run is byte-identical to
+the output of this final code (verified by re-segmenting both documents and
+comparing every span id, paragraph and locator), so it cannot affect the
+measured numbers. It is recorded because "the change is global" is only true if
+the other documents are actually checked.
+
 **Measurement.** A fresh compile of **both** D5 and D6 with the fixed segmenter
 (the change is global, so D5 is the regression check even though it already
 passed), then verify and a full independent census of every emitted claim, with
@@ -670,3 +736,174 @@ reappear with a wrong authority.
 `gold/probe.compiled.verified.jsonl`, `gold/probe.verdicts.jsonl` and
 `gold/audit.probe.md` stay as the measurement of the unfixed pipeline. The fix
 is reported as a new run with its own census, not by rewriting this one.
+
+#### 10.7(c) Verify concurrency — a throughput amendment, not a pipeline change
+
+The fixed run's verify stage reached the end of repair round 1 with four batches
+dead on provider HTTP 503 (`repair incomplete: 12 claim(s) never judged`), so the
+process stopped exactly as `verify_claims.py` is written to: progress cached,
+`--resume` required. That is the moment this amendment was recorded, before the
+resumed calls were made.
+
+The audit and repair passes issued their independent batches strictly one after
+another. `audit_prompt` and `repair_prompt` are functions of the batch alone (the
+claims in it and their own spans), `llm.chat` opens one HTTP request per call,
+and the cache is an append-only JSONL. Nothing in a batch depends on another
+batch, so the batches can be scheduled side by side.
+
+**The change.** `--verify-concurrency N` (default `1`, i.e. today's behaviour) in
+`compile_claims.py` and `verify_claims.py`, implemented in `_run_batches`. Cache
+appends and token accounting take a lock; the cache stays one JSON object per
+line, and the tests in `ConcurrencyTest` pin both the concurrency and the file
+integrity. Batches are built from the same pending list in the same order.
+
+**Why it cannot move the measurement.** Identical model, prompt text, span
+neighbourhood, schema, batch size, parsing, verdict scale and repair policy. A
+model call sees exactly the prompt it would have seen sequentially; only *when*
+it is issued changes. Order was already irrelevant to the result: the audit and
+repair outputs are keyed by `claim_id` and applied per claim.
+
+**Provenance.** The 429-row audit of the fixed run and the first 150 rows of
+repair round 1 were produced sequentially. The 12 claims left dead by 503s, and
+round 2 and its re-audit, are produced with concurrency 6. The run manifest and
+the report must record `verify_concurrency`; the census treats both scheduling
+regimes as one pipeline, because the per-claim prompts are the same. The default
+of the tool remains sequential, so this amendment cannot silently change a
+future run.
+
+#### 10.7(d) A batch the provider rejects is split, not fatal
+
+Resuming the fixed run exposed a second, different failure. Six D5 claims were
+left dead by repair round 1: the batch of three returns **HTTP 400
+`upstream_rejected`**, while each of the three claims passes alone (measured on
+2026-11-09, one call per claim, same prompt builder, same model; all six
+succeeded). The failure is a property of the payload the provider was sent, not
+of the claims.
+
+Until now `ask()` treated any `SystemExit` from the model call the same way: it
+recorded the batch as aborted and the pass ended with
+`repair incomplete … re-run with --resume`. That is correct for a transient
+failure, and wrong for a payload the provider will never accept as-is: resuming
+re-sends the same batch forever.
+
+The rule is now the one the code already applied to *omitted* claims: when a
+batch of more than one claim fails, halve it and ask again, down to single
+claims; only a single claim that still fails is aborted. The error code was
+first used as the discriminator (`4xx` splits, `5xx` aborts), but the same D5
+triple was observed returning **HTTP 400 `upstream_rejected` on one attempt and
+HTTP 503 on another**, so the code classifies the *payload*, not the batch: the
+split is unconditional and `chat` still retries each call on its own before the
+split is reached. This widening was recorded while the resumed run was in
+flight, after the first resume had aborted twice on the same triple; it cannot
+touch a cached row, and it only changes calls that would otherwise end the pass.
+A total outage is bounded: it now costs the split tree (1 + 2 + 3 …) of single
+attempts before `repair incomplete` is raised, instead of one call.
+
+**What this cannot change.** Batches the provider accepts are untouched: the
+split only runs after a call has failed on its own retries and raised, so every
+claim whose batch succeeded was repaired by exactly the prompt §10.7(b)
+pre-registered. Claims rescued by a split are
+repaired by a smaller prompt (fewer sibling claims), which is recorded here
+rather than hidden. The alternative — leaving six claims unrepairable — would
+have made the pass impossible to finish at all.
+
+#### 10.7(e) The fixed run, measured — the probe fails again, on the key/value tables
+
+The run pre-registered in §10.7(b)(ii) finished on 2026-11-09 and its census is
+`gold/audit.probe.fixed.md`. The gate is unchanged; the artifact is new.
+
+| Document | Structural | Support (census) | Facts absent from source | Recall | Verdict |
+|---|---|---|---|---|---|
+| D5 — contract | pass | 329/354 = 92.9% | **8** | 7/10 = 70.0% | **fail** |
+| D6 — table | pass | 49/51 = 96.1% | 0 | 10/10 = 100% | **pass** |
+
+**D6 is fixed.** Recall goes 2/10 -> 10/10, every disposition now sits inside
+its own quote, and no claim attaches an item's disposition authority to another
+item's records (0 mismatches against the source's item -> DAA map, full strings,
+years included). Support 92.2% -> 96.1%; structural 100%. The two `weak` rows
+(`D6-0017`, `D6-0018`) lose the record type, not the disposition.
+
+**D5 fails on a different row and a different defect.** Eight claims assert a
+definition for a term the document does not define: `Safeguards`, `Delay`,
+`Data`, `Clauses` (twice), `Country`, `Controller`, `Protection Laws`. Every one
+is a glossary entry printed on **two lines** ("Appropriate / Safeguards",
+"Without Undue / Delay", "Special Category / Data", …): `looks_like_heading`
+accepts each line, both sit at the same depth, and the stack keeps only the
+last. The model is given `section_path: ["Delay"]` and defines `Delay`. Two of
+the eight are actively wrong rather than merely mislabelled: `Data` is narrowed
+to special category data, and `Controller` receives the *Third Party
+Controller* definition while the glossary defines it "As defined in the UK
+GDPR". This is not a new criterion: the unfixed run already had one instance
+(`D5-0348`, "Harmful Impact") and its census already counted it `no`; the
+correction to that report's summary is an erratum at its end.
+
+The same defect explains the three D5 recall misses: Tables 1-4 are key/value
+tables too. The controller-status label is `S0022` (`section_path:
+["The status of"]`) and the value cell `Exporter is a Controller` is the
+`section_path` of the next span (`S0023`). The claims `D5-0002`/`0003`/`0007`
+were produced, audited `weak` for exactly that reason, and dropped; the fix does
+not change D5's spans, so recall stays 7/10.
+
+**Scale application, frozen before the next run.** For a definition claim the
+evidence is the schema's pair (quote, locator). The locator's `section_path`
+names the term; when it names a term the document does not define, the claim is
+`no`, not `weak`. `weak` is for a statement that is true but lacks an element
+its own evidence also lacks (a bare definition body, an unresolved "the term",
+a truncated quote). This is how §9.1 already judged `D5-0348`; it is written
+down here so the next census cannot drift.
+
+**Carry-forward.** 64 rows were byte-identical to §9.1 rows and inherited their
+verdict (all `ok`). One of them, `D5-0392`, is the glossary scaffolding
+`(this is how this word or phrase must be interpreted in the IDTA)`; it is
+byte-identical to the fresh `D5-0421`, which the census finds `weak`, so both
+are `weak`. The re-judgement is disclosed because it lowers the score.
+
+**Nothing else changed.** Same thresholds, scale, model, prompt, schema,
+chunking, verify stage. The failed run is untouched: `gold/probe.*`,
+`gold/probe.verdicts.jsonl` and `gold/audit.probe.md` remain the measurement of
+the unfixed pipeline.
+
+##### 10.7(e)(i) Key/value table segmentation — pre-registered, not yet written
+
+This is written after the score is known, which is unavoidable for a defect the
+score exposed. It is a pre-registration for a **new** run: the fix below is not
+written, not applied to the artifact above, and the thresholds do not move.
+
+**Measured defect.** In the default-order text a key/value table arrives
+column-major: the label cell, then the value cell. When a label wraps onto two
+lines, each line is a heading and the second replaces the first on the stack
+(`S0279`-`S0327`, the Legal Glossary, pages 31-35). When the value is a checkbox
+or a short cell (`Exporter is a Controller`), the value itself becomes a heading
+for the following block instead of joining the label (`S0022`/`S0023`,
+`S0024`/`S0027`). Consequences already measured: 8 `no` claims, 13 `weak`
+claims, 3 recall misses.
+
+**Fix (general, not D5-specific).**
+
+1. **Joined label.** Inside a table region, consecutive heading-candidate lines
+   with no body text between them are one label: join them with a single space,
+   and use the joined text as the `section_path` entry. This restores
+   "Appropriate Safeguards", "Adequate Country", "Special Category Data",
+   "Without Undue Delay", "Mandatory Clauses", "UK Data Protection Laws",
+   "Importer Information", "Relevant Data Subject", "Significant Harmful
+   Impact", "Restricted Transfer", "Linked Agreement", "Importer Data Subject
+   Contact", "Extra Protection Clauses".
+2. **Label and value in one span.** A key/value row is a unit: the label and the
+   value cell that follows it must be quotable together, so the model can put
+   both sides of the definition (or the checkbox status) into its quote. A row
+   never starts a new `section_path` on its own value.
+3. **No table label as a section.** A joined label that belongs to a table row
+   may appear in `section_path`, but the table's *own* cell text may not become
+   a heading for unrelated following text.
+
+No prompt, schema, model or threshold change. The detection rule must be
+properties of the text (a run of heading-like lines with no body between them,
+inside a region whose rows repeat the label/value shape), not a list of the D5
+glossary headwords.
+
+**Measurement.** A fresh compile of **both** D5 and D6, verify, and a full
+independent census, same scale and thresholds. D6 must keep structural 100%,
+support >= 90%, 0 facts absent, recall 10/10 and 0 misattributed authorities;
+D5 must reach 0 facts absent and must recall the three Table 1/Table 2 gold
+claims (`D5-0002`, `D5-0003`, `D5-0004`) while keeping recall >= 70%. Failure on
+either document rejects the fix as a regression or as not-a-fix.
