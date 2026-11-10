@@ -1167,3 +1167,75 @@ billable call has been made: the dry run, the `--rule-report`, the
 The re-measurement costs the same as §10.7(e)(ii) — compile ~$0.16, verify
 ~$0.28, census $0.00, i.e. roughly **$0.40-0.45 and 3-4 hours** — and is not
 started until that spend is approved.
+
+##### 10.7(f)(i) Amendment — the first run exposed a non-verbatim quote; the gap is closed before any score
+
+The run registered in §10.7(f) started on 2026-11-10 and was **stopped before
+any score existed**. This amendment records what it exposed, what was changed,
+and the new dry-run measurement. Thresholds, scale, model, prompt, schema and
+the naming of the acceptance are untouched.
+
+**What the first compile produced.** 358 spans, 384 claims (D5 342, D6 42), 0
+rule claims — the model cited all seven row spans, so the deterministic rule had
+nothing left to add. That is the outcome §10.7(f) wanted for `D5-0002`: the
+exporter name and the Beacon House address are now claims (`D5-0003`,
+`D5-0004`), extracted rather than injected. But `check_claims.py` returned **1
+failure**:
+
+> `D5-0005[0]`: quote not found in D5 —
+> `Full name: Lynn Molloy Job title: ALSPAC Chief Operating Officer`
+
+**Cause.** Dropping an empty cell leaves a **gap** in the source. In the
+signatory block the sequence is `Full name: Lynn Molloy`, then an empty
+`Full name:`, then `Job title: ALSPAC Chief Operating Officer`; the first label
+is correctly dropped, but the short-cell buffer then joined the text on either
+side of it into one span. The join is semantically right and textually wrong:
+the quote elides a label, so it is not in the document. The rule was not wrong;
+the emission was.
+
+**Fix (general).** The short-cell buffer is now closed at every dropped block —
+when a label replaces a pending key, when a label chain is dropped, and when a
+block opens with its own label and discards a stale key. A span can therefore
+never span a dropped label. No prompt, schema, model or threshold change; a
+block that is dropped is still not a span, and a label followed by a value is
+still quoted together (they are adjacent in the source, so that join stays
+verbatim).
+
+**Measured (dry run, no model call).** D1-D4 and D6 are byte-identical to
+§10.7(f) (154/50/115/101/35 spans). D5 goes 325 -> **324** spans: the signatory
+block now yields `Full name: Lynn Molloy` and `Job title: ALSPAC Chief Operating
+Officer` as two spans, and the bogus `15.2.1.5 … and` path is still 0. The
+verbatim property was checked over **every span of all six documents** against
+the whitespace-normalised source: all pass. 166 unit tests pass, including two
+that fail without the fix.
+
+The two signatory cells reach the segmenter through the short-cell buffer, so
+they are spans but not marked rows; the rule still emits the same seven
+statements. That boundary is recorded rather than patched: no acceptance claim
+depends on those two cells, and widening the emitter would change the span list
+again for no measured gain.
+
+**The seven statements, amended span ids** (statements unchanged; ids after
+`S0015` shift by one because the signatory block is now two spans):
+
+| # | Span | Page | Statement |
+|---|---|---:|---|
+| 1 | S0007 | 1 | Full legal name: University of Bristol (through the Avon Longitudinal Study of Parents and Children (ALSPAC)). |
+| 2 | S0008 | 1 | Main address (if a company registered address): University of Bristol, Beacon House, Queens Road, Bristol, BS8 1QU, UK. |
+| 3 | S0018 | 2 | In relation to the Processing of the Transferred Data: Exporter is a Controller. |
+| 4 | S0025 | 3 | The Importer may Process the Transferred Data for the following time period: The period for which the Linked Agreement is in force. |
+| 5 | S0036 | 4 | The personal data to be sent to the Importer under this IDTA consists of: The categories of Transferred Data will update automatically if the information is updated in the Linked Agreement referred to. |
+| 6 | S0037 | 4 | The Transferred Data includes data relating to: Relevant Data Subjects. |
+| 7 | S0041 | 5 | The Importer may Process the Transferred Data for the purposes set out in: the Authorised Research (schedule 4) in the ALSPAC Data Access Agreement Any other purposes which are compatible with the purposes set out above. The purposes will update automatically if the information is updated in the Linked Agreement referred to. |
+
+**Status of the aborted attempt.** The verify stage was stopped after 50 of 384
+audit rows. No verdicts were computed, no census was written, and no support,
+recall or verdict exists for that artifact. Its files are preserved as
+`gold/probe.rows.attempt1.*` (gitignored, like every compiled artifact) so the
+defect stays reproducible; it is not a measurement of the registered pipeline
+and it is not cited as one. Cost: compile $0.1724, verify ~$0.004 — **≈ $0.18
+spent, no result**.
+
+**Restart.** The registered run restarts from scratch on the fixed pipeline
+(fresh compile, verify, full census), with the acceptance of §10.7(f)
+unchanged. Its cost is quoted and approved before it starts.
