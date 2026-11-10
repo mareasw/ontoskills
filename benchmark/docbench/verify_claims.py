@@ -592,8 +592,10 @@ def apply_repairs(
     A record is only honoured when it is usable: a rewrite needs a non-empty
     statement, at least ``MIN_STATEMENT`` characters and different from the old
     one; a re-evidence needs at least one span that is actually in the claim's
-    neighbourhood; an unknown action leaves the claim untouched. Rejected
-    records are counted, never silently accepted.
+    neighbourhood, and at least one that shares a section path with the evidence
+    it replaces (a citation that abandons the claim's own section is a different
+    claim); an unknown action leaves the claim untouched. Rejected records are
+    counted, never silently accepted.
     """
     report = {
         "rewritten": 0,
@@ -601,6 +603,7 @@ def apply_repairs(
         "dropped": 0,
         "unchanged": 0,
         "rejected": 0,
+        "section_rejected_ids": [],
         "dropped_ids": [],
     }
     out: list[dict] = []
@@ -628,6 +631,24 @@ def apply_repairs(
                     chosen.append(span)
             if not chosen:
                 report["rejected"] += 1
+                out.append(claim)
+                continue
+            current = {
+                tuple((item.get("locator") or {}).get("section_path") or [])
+                for item in evidence_items(claim)
+            } - {()}
+            replacement = {
+                tuple((span.get("locator") or {}).get("section_path") or [])
+                for span in chosen
+            } - {()}
+            if current and replacement and current.isdisjoint(replacement):
+                # The section path is evidence too (PREFLIGHT §10.4): a repair
+                # that abandons the section which supplies the claim's term
+                # produces a different claim, so it is rejected rather than
+                # silently rewriting what the document said. The claim is then
+                # settled: another round would only offer the same escape.
+                report["rejected"] += 1
+                report["section_rejected_ids"].append(claim["claim_id"])
                 out.append(claim)
                 continue
             chosen.sort(key=lambda s: spans.position.get((s["doc_id"], s["span_id"]), 0))
@@ -727,9 +748,14 @@ def run_pipeline(
             concurrency=concurrency,
         )
     report = {"initial": summarize(claims, audit), "rounds": []}
+    settled: set[str] = set()
 
     for index in range(1, max(1, rounds) + 1):
-        failing = [claim for claim in claims if verdict_of(claim, audit) != "ok"]
+        failing = [
+            claim
+            for claim in claims
+            if verdict_of(claim, audit) != "ok" and claim["claim_id"] not in settled
+        ]
         if not failing:
             break
         repairs = repair_claims(
@@ -744,6 +770,7 @@ def run_pipeline(
             concurrency=concurrency,
         )
         claims, round_report = apply_repairs(claims, repairs, spans)
+        settled.update(round_report.get("section_rejected_ids") or [])
         touched = [claim for claim in claims if claim["claim_id"] in repairs]
         audit.update(
             audit_claims(
