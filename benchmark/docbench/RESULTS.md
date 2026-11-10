@@ -538,6 +538,80 @@ key/value-table defect, not a regression. (3) A support number above the bar
 gate is what catches that, which is why a pooled 93.3% is not used to pass the
 probe.
 
+## Second corpus probe, key/value fix (2026-11-10) — rejected by its own criteria
+
+A third run applied the key/value segmentation pre-registered as
+`PREFLIGHT.md` §10.7(e)(i), on the same documents, model, prompt, schema and
+thresholds. The two earlier runs and their censuses are untouched.
+
+**Artifact.** `gold/probe.kv.compiled.verified.jsonl`: 411 claims compiled
+(D5 348, D6 63), **397 after verify** (D5 335, D6 62), 532 evidence spans,
+`check_claims.py` 0 failures, 33 near-duplicates merged on compile and 7 on
+verify, 12 residual `weak` kept, 0 residual `no`/`fabricated`. The full census is
+`gold/audit.probe.kv.md`; 397 rows were judged, no sample.
+
+| Document | Type | Structural | Support (census) | Facts absent | Recall | Verdict |
+|---|---|---|---:|---:|---:|---|
+| **D5** | contract (ALSPAC IDTA v1) | 100% | 329/335 = **98.2%** | **0** | 8/10 = **80.0%** | **fail** |
+| **D6** | table-as-content (NARA GRS 1.1) | 100% | 61/62 = **98.4%** | 0 | 10/10 = **100%** | **pass** |
+| Pooled | | 100% | 390/397 = **98.2%** | 0 | — | reported only |
+
+**Verdict: the fix is rejected.** §10.7(e)(i) required D5 to reach 0 facts
+absent and to recall `D5-0002`, `D5-0003` and `D5-0004` while keeping recall
+>= 70%. Two of the four hold — 0 facts absent and `D5-0004` (recalled by
+`D5-0007` *Exporter is a Controller* + `D5-0009` *Importer is a Controller*) —
+and recall stays above the bar at 80%. `D5-0002` and `D5-0003` are not recalled,
+so the fix fails its own pre-registered condition: overall recall does not
+substitute for a named claim.
+
+What it repaired is real. The eight D5 glossary definitions of a term the
+document does not define (`Country`, `Safeguards`, `Clauses` twice, `Data`,
+`Controller`, `Protection Laws`, `Delay`) do not reappear in any form; the
+joined headwords are correct and the definition-body-only `weak` rows of the
+fixed run now name their term. D5 "facts absent from source" goes 8 -> **0** and
+support 92.9% -> 98.2%. D6 keeps its pass with 0 misattributed DAAs.
+
+The two misses have different causes, and neither is what the region rule
+addresses:
+
+- **`D5-0002` is an extraction miss.** The segmenter produces the exporter row
+  (`S0007` `Full legal name: University of Bristol (through ALSPAC)`, `S0008` the
+  Beacon House address), both in the first chunk with the Table 1 rows the model
+  did use; of 411 raw claims, none quotes `Full legal name`, `Beacon House` or
+  `BS8`. `S0008` also opens with a stale `Full legal name:` prefix from the
+  Importer's empty cell.
+- **`D5-0003` is quoted, then audited away.** The primary-place row is a
+  colonless four-line label: the label is joined into `section_path`, the value
+  `England and Wales` stays in `S0018`. The raw compile did state the rule
+  (`D5-0006`); the verify stage judged it `weak` because the label was not in
+  the quote, and re-evidencing it on the governing-law cell replaced the
+  primary-place rule with the governing-law rule.
+
+D6's pass is not evidence for the fix: its spans are **byte-identical** to the
+fixed run (35 spans, same sha), so its input did not change. The support move
+96.1% -> 98.4% is model nondeterminism on the same 35 spans (63 raw claims vs
+51), not the segmentation.
+
+One residual regression is recorded: the bogus `section_path`
+`["Laws", "15.2.1.5 contact point for more information; and"]` attaches to 27
+spans / 49 claims here, against 6 spans / 19 claims in the fixed run (pages
+16-20). Page and quote are right, no census verdict moves, but a wrong locator
+on 49 claims is not a clean fix.
+
+**What this run shows.** (1) The two-line glossary headword defect is fixed at
+the root: 8 unsupported definitions -> 0, and D5 support reaches 98.2%, the best
+this corpus has produced. (2) Support above the bar still coexists with a hard
+failure, twice in a row: the gate that catches it is the per-document named
+recall, not the pooled support. (3) The key/value branch is not sufficient on
+D5: a correctly segmented row is not a claim (extraction), and a correctly
+located value is not accepted by the quote-only repair policy (verify).
+
+**What it does not show.** It does not show that the key/value rule works as a
+fix; it shows that it works in part and is not sufficient. It does not re-open
+the earlier runs; `gold/probe.*`, `gold/probe.fixed.*` and their censuses remain
+the measurement of those pipelines. It does not test B1/B2 answer quality on
+D5/D6 (§10.4: outside this gate).
+
 ## Limitations
 
 - **n = 39 scored questions, one run, one model.** No confidence interval is
@@ -557,10 +631,16 @@ probe.
   pipeline.** The claim-level verdicts and the span evidence are the record a
   second reviewer can check; the notes are kept locally because they name the
   source corpus. D6 is 51 claims, so one row is worth 1.96 pp of support.
-- **D5's recall sits exactly on the bar (7/10)** in both runs, and its 8 `no`
-  rows are instrument-caused and mechanically repairable. They are still claims
-  the artifact asserts and the source does not; they are counted, not excused,
-  and the fix has not been applied to a measured artifact yet.
+- **The key/value run is a third manual census, 397 rows, same reviewer.** It
+  is the strictest of the three (0 facts absent, 98.2% support) and still fails:
+  D5 is 335 claims, one row is worth 0.30 pp, and the failing rows are named
+  gold claims, not a support average.
+- **D5's recall sits exactly on the bar (7/10)** in the first two runs, and its
+  8 `no` rows are instrument-caused and mechanically repairable. They are still
+  claims the artifact asserts and the source does not; they are counted, not
+  excused. The key/value fix removed them (0 `no`, 0 `fabricated`) but did not
+  recover `D5-0002`/`D5-0003`, so the two D5 requirements had to be met
+  together and were not.
 - **The claim layer passes its own support bar as of 2026-11-08, on this
   corpus.** B2's context comes from `gold/claims.verified.jsonl` (504 claims),
   and the independent census is 99.0%. The 11 rows the repair stage kept as
