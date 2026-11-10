@@ -217,6 +217,9 @@ HEADING_NUMBERED = re.compile(
     r"^\s*(?:ARTICLE\s+|Article\s+)?(?:\d+(?:\.\d+)*\.?|[IVXLC]+\.|[A-Z]\.)\s+\S"
 )
 HEADING_SHORT = re.compile(r"^[A-Z][A-Za-z0-9 ,'&()\-/]{2,70}$")
+# A numbered line that ends in a conjunction is the tail of a clause, not a
+# heading: the sentence continues in the next numbered item (PREFLIGHT §10.7(f)).
+CLAUSE_FRAGMENT_END = re.compile(r"\b(?:and|or|but|nor)\s*$", re.IGNORECASE)
 # A table block opened by an ALL-CAPS label is closed and reopened past this
 # length, so one label can never swallow a whole document.
 TABLE_BLOCK_CHARS = 700
@@ -246,11 +249,29 @@ def is_table_label(line: str) -> bool:
     return bool(TABLE_LABEL.match(line.strip()))
 
 
+def is_clause_fragment(line: str) -> bool:
+    """True when a numbered heading-shaped line is the tail of a clause.
+
+    ``15.2.1.5 contact point for more information; and`` is a list item whose
+    sentence continues in the next numbered item. It looks exactly like the
+    numbered title ``15.2.1 Importer obligations``: a number, then lower-case
+    words, no terminal stop. The conjunction at the end is what separates them,
+    and it is a property of the line, not of any document's vocabulary
+    (PREFLIGHT.md §10.7(f)).
+    """
+    stripped = line.strip()
+    return bool(CLAUSE_FRAGMENT_END.search(stripped)) and bool(
+        HEADING_NUMBERED.match(stripped)
+    )
+
+
 def looks_like_heading(line: str) -> bool:
     stripped = line.strip()
     if not stripped or len(stripped) > 90:
         return False
     if stripped.endswith((".", ";", ":", ",")):
+        return False
+    if is_clause_fragment(stripped):
         return False
     words = stripped.split()
     if len(words) > 7:
@@ -279,7 +300,7 @@ ASSERTION_LINE = re.compile(
     r"(?:a|an|the|not|no|bound|subject)\b"
 )
 INTERROGATIVE_HEADING = re.compile(
-    r"^(?:What|How|When|Where|Which|Who|Why|Can|Could|Is|Are|Does|Do|Will|Would|Should|May|Must)\b"
+    r"^(?:What|Whether|How|When|Where|Which|Who|Why|Can|Could|Is|Are|Does|Do|Will|Would|Should|May|Must)\b"
 )
 # A heading that breaks after one of these words is continued by the next line
 # ("Exporter (who sends the" / "Restricted Transfer)"), not ended by it.
@@ -337,6 +358,78 @@ def is_pending_key(block: str) -> bool:
     if not stripped.endswith(":") or len(stripped) > 120:
         return False
     return "." not in stripped and ";" not in stripped
+
+
+# A label colon is followed by its value: a colon inside a time ("10:00") or a
+# ratio is not a cell boundary (PREFLIGHT.md §10.7(f)).
+ROW_COLON = re.compile(r":(?=\s|$)")
+# A value that is only a section number points at another clause; it states
+# nothing a row claim can assert.
+BARE_SECTION_NUMBER = re.compile(r"^\d+(?:\.\d+)*\.?$")
+
+
+def split_key_value(block: str) -> tuple[str, str, int] | None:
+    """Split a block at its last label colon: ``(label, value, offset)``.
+
+    ``offset`` is where the label starts, which is how a caller tells a cell
+    that opens with its own label (offset 0) from one whose label is glued to
+    the text before it. A label is a capitalised noun phrase without a sentence
+    stop; a value is whatever follows the colon (PREFLIGHT.md §10.7(f)).
+    """
+    best: tuple[str, str, int] | None = None
+    for match in ROW_COLON.finditer(block):
+        end = match.start()
+        start = 0
+        for marker in (". ", "; ", "! ", "? "):
+            found = block.rfind(marker, 0, end)
+            if found != -1:
+                start = max(start, found + 2)
+        previous = block.rfind(": ", 0, end)
+        if previous != -1:
+            start = max(start, previous + 2)
+        label = block[start:end].strip()
+        if not label or len(label) > 120:
+            continue
+        if not label[0].isupper() and not label[0].isdigit():
+            continue
+        if "." in label or ";" in label:
+            continue
+        best = (label, block[end + 1 :].strip(), start)
+    return best
+
+
+def clean_row(block: str) -> tuple[str, str] | None:
+    """The ``(label, value)`` of a cell that is one label and one value.
+
+    A block with two labels is a chain of cells the extractor fused — an empty
+    cell followed by a filled one, or several cells of a row. Its label is
+    ambiguous, and guessing one is how a claim ends up asserting the wrong
+    thing, so only a clean single cell is promoted (PREFLIGHT.md §10.7(f)).
+
+    The remaining guards are properties of the text, not of a document: a label
+    that ends on a conjunction is the tail of a clause, a label that names a
+    table is a caption reference, and a value that is only a section number
+    points at another clause instead of stating anything.
+    """
+    if block.count(":") != 1:
+        return None
+    split = split_key_value(block)
+    if split is None or split[2] != 0:
+        return None
+    label, value, _ = split
+    if not value:
+        return None
+    if CLAUSE_FRAGMENT_END.search(label):
+        return None
+    if re.search(r"\bTable\s+\d+", label):
+        return None
+    if INTERROGATIVE_HEADING.match(value):
+        # A question after a label is the next row's label, not this row's
+        # value ("In relation to ...: Whether UK GDPR applies to the Importer").
+        return None
+    if BARE_SECTION_NUMBER.match(value):
+        return None
+    return label, value
 
 
 def split_sentences(text: str, limit: int = 700) -> list[str]:
@@ -531,26 +624,30 @@ def _segment_blocks(
     pending_key = ""
     kv_active = False
 
-    def emit(piece: str) -> None:
+    def emit(piece: str, row: tuple[str, str] | None = None) -> None:
         # A span must carry words: table rules, arrows and page numbers are not
         # claims, and a span with no letters only wastes prompt space.
         if not re.search(r"[A-Za-z]{3,}", piece):
             return
         if BOILERPLATE.search(piece):
             return
-        spans.append(
-            {
-                "span_id": f"S{len(spans) + 1:04d}",
-                "doc_id": doc_id,
-                "paragraph": piece,
-                "locator": {
-                    "kind": DOCS[doc_id]["kind"],
-                    "page": page,
-                    "section_path": [title for _, title in section_stack][-3:],
-                    "url": DOCS[doc_id]["url"],
-                },
-            }
-        )
+        span = {
+            "span_id": f"S{len(spans) + 1:04d}",
+            "doc_id": doc_id,
+            "paragraph": piece,
+            "locator": {
+                "kind": DOCS[doc_id]["kind"],
+                "page": page,
+                "section_path": [title for _, title in section_stack][-3:],
+                "url": DOCS[doc_id]["url"],
+            },
+        }
+        if row is not None:
+            # The cell's label and value travel with the span: the evidence of a
+            # table row is label + value, and the emitter must not have to parse
+            # it back out of the text (PREFLIGHT.md §10.7(f)).
+            span["row"] = {"label": row[0], "value": row[1]}
+        spans.append(span)
 
     def flush_short() -> None:
         nonlocal short_buffer
@@ -571,23 +668,49 @@ def _segment_blocks(
             return
         block = norm(" ".join(pending))
         pending = []
+        row: tuple[str, str] | None = None
         if kv_active and is_pending_key(block):
-            pending_key = norm(f"{pending_key} {block}")
+            # A label that is followed by another label owns an empty cell: the
+            # first label is dropped, never glued to the second (PREFLIGHT
+            # §10.7(f)). "Full legal name:" with no value is a fact about the
+            # form, not the start of the next row.
+            pending_key = block
             return
+        if kv_active:
+            split = split_key_value(block)
+            if (
+                split is not None
+                and not split[1]
+                and block.count(":") >= 2
+                and "." not in block
+                and ";" not in block
+            ):
+                # A run of labels with no value at all is an empty cell: it
+                # asserts nothing, so it is not a span (PREFLIGHT §10.7(f)).
+                # Two or more label colons is what makes it a chain; a sentence
+                # that merely ends with a colon keeps its text.
+                pending_key = ""
+                return
         if kv_active and pending_key:
-            # A key and its value are one row: quote the pair, not the value
-            # alone, so the span says what the value is evidence for.
-            block = norm(f"{pending_key} {block}")
+            split = split_key_value(block)
+            if split is None or split[2] != 0:
+                # A key and its value are one row: quote the pair, not the value
+                # alone, so the span says what the value is evidence for.
+                block = norm(f"{pending_key} {block}")
+                row = clean_row(block)
             pending_key = ""
+        if kv_active and row is None:
+            row = clean_row(block)
         if len(block) < min_chars:
             short_buffer.append(block)
             if len(" ".join(short_buffer)) >= min_chars:
                 flush_short()
             return
         flush_short()
-        for piece in split_sentences(block):
+        pieces = split_sentences(block)
+        for piece in pieces:
             if len(piece) >= min_chars:
-                emit(piece)
+                emit(piece, row if len(pieces) == 1 else None)
 
     def push_heading_group() -> None:
         """Close a key/value heading group: it is one section label."""
@@ -1344,6 +1467,47 @@ def build_claim(raw: dict, span_by_id: dict[str, dict], doc_id: str, number: int
     return to_v2(claim)
 
 
+def row_claims(spans: list[dict]) -> list[dict]:
+    """One deterministic claim per key/value row span (PREFLIGHT §10.7(f)).
+
+    The statement is the cell itself: the printed label and the printed value,
+    with nothing paraphrased. A row that the model skipped therefore still
+    reaches the artifact, and a row the model did extract is left alone (the
+    caller drops rows its claims already cite).
+    """
+    out: list[dict] = []
+    for span in spans:
+        row = span.get("row")
+        if not row:
+            continue
+        label = norm(str(row.get("label", "")))
+        value = norm(str(row.get("value", "")))
+        if not label or not value:
+            continue
+        statement = f"{label}: {value}"
+        if not statement.endswith((".", ";", "?", "!")):
+            statement += "."
+        out.append({"span": span, "statement": norm(statement)})
+    return out
+
+
+def build_row_claim(record: dict, number: int) -> dict:
+    """Turn a rule-emitted row into a claim in the artifact's own shape."""
+    span = record["span"]
+    doc_id = span["doc_id"]
+    claim = {
+        "claim_id": f"{doc_id}-{number:04d}",
+        "doc_id": doc_id,
+        "statement": record["statement"],
+        "modality": "definition",
+        "evidence": [
+            {"quote": span["paragraph"], "locator": dict(span["locator"]), "role": "supports"}
+        ],
+        "context": dict(DOCS[doc_id]["context"]),
+    }
+    return to_v2(claim)
+
+
 def estimate(spans: list[dict], chunks: list[list[dict]], args, conflicts: bool = True) -> dict:
     prompt_chars = sum(len(make_prompt(c, c[0]["doc_id"])) for c in chunks if c)
     # ~3.6 chars/token for English, plus the system prompt on every call.
@@ -1403,8 +1567,14 @@ def main() -> int:
                     help="independent verify batches in flight (throughput only; prompts unchanged)")
     ap.add_argument("--dry-run", action="store_true", help="Segment and estimate only")
     ap.add_argument("--estimate", action="store_true", help="Estimate tokens and stop (implies --dry-run)")
+    ap.add_argument("--rule-report", action="store_true",
+                    help="Print every claim the key/value row rule would emit, then stop")
+    ap.add_argument("--no-rules", action="store_true",
+                    help="Do not emit the deterministic key/value row claims")
     args = ap.parse_args()
 
+    if args.rule_report:
+        args.dry_run = True
     if args.estimate:
         args.dry_run = True
     if not args.model and not args.dry_run:
@@ -1445,6 +1615,21 @@ def main() -> int:
     print(f"wrote spans: {spans_out}")
 
     if args.dry_run:
+        if args.rule_report:
+            total = 0
+            for doc_id in doc_ids:
+                records = row_claims(per_doc_spans[doc_id])
+                total += len(records)
+                print(f"\n--- {doc_id}: {len(records)} rule claim(s) from key/value rows ---")
+                for record in records:
+                    span = record["span"]
+                    print(
+                        f"{span['span_id']} p{span['locator'].get('page')} "
+                        f"{span['locator'].get('section_path')}"
+                    )
+                    print(f"    {record['statement']}")
+            print(f"\n{total} rule claim(s) over {len(doc_ids)} document(s)")
+            return 0
         if chunks:
             print(f"\n--- first prompt (chunk 1/{len(chunks)}) ---\n")
             print(make_prompt(chunks[0], chunks[0][0]["doc_id"])[:2500])
@@ -1601,6 +1786,37 @@ def main() -> int:
             f"{totals['output_tokens'] - before[1]}"
         )
 
+    # Deterministic row claims: the evidence of a table row is label + value, so
+    # a row the model did not use is emitted from the span itself, before dedupe
+    # and the conflict pass see the claim list (PREFLIGHT.md §10.7(f)).
+    rule_added = 0
+    if not args.no_rules:
+        covered: set[tuple] = set()
+        for claim in claims:
+            for item in claim.get("evidence") or []:
+                locator = item.get("locator") or {}
+                start, end = locator.get("char_start"), locator.get("char_end")
+                if start is not None and end is not None:
+                    covered.add((claim["doc_id"], start, end))
+        for doc_id in doc_ids:
+            for record in row_claims(per_doc_spans[doc_id]):
+                locator = record["span"]["locator"]
+                key = (doc_id, locator.get("char_start"), locator.get("char_end"))
+                if key in covered:
+                    continue
+                counters[doc_id] = counters.get(doc_id, 0) + 1
+                claim = build_row_claim(record, counters[doc_id])
+                signature = statement_key(claim["statement"])
+                if signature in seen_statements:
+                    counters[doc_id] -= 1
+                    continue
+                seen_statements.add(signature)
+                claims.append(claim)
+                covered.add(key)
+                rule_added += 1
+        if rule_added:
+            print(f"rows: {rule_added} deterministic claim(s) from key/value rows")
+
     claims, newly_merged = dedupe_claims(claims)
     duplicates_merged += newly_merged
     if newly_merged:
@@ -1711,6 +1927,7 @@ def main() -> int:
         "spans": len(all_spans),
         "claims": len(claims),
         "rejected": rejected,
+        "rule_claims": rule_added,
         "duplicates_merged": duplicates_merged,
         "truncated_retries": truncated,
         "conflict_pairs": conflict_pairs,
