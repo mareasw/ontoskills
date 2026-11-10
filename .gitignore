@@ -18,6 +18,8 @@ __pycache__/
 docs/*
 # ADRs are part of the design record and must be versioned
 !docs/adr/
+# Market and product investigations are decisions, not scratch notes
+!docs/market/
 
 # ONNX test fixtures (large files)
 mcp/tests/fixtures/
