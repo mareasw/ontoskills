@@ -673,7 +673,11 @@ def _segment_blocks(
             # A label that is followed by another label owns an empty cell: the
             # first label is dropped, never glued to the second (PREFLIGHT
             # §10.7(f)). "Full legal name:" with no value is a fact about the
-            # form, not the start of the next row.
+            # form, not the start of the next row. Dropping it opens a gap in
+            # the source, so text buffered before it is closed here: a span may
+            # never elide a dropped label or the quote stops being verbatim.
+            if pending_key:
+                flush_short()
             pending_key = block
             return
         if kv_active:
@@ -688,16 +692,24 @@ def _segment_blocks(
                 # A run of labels with no value at all is an empty cell: it
                 # asserts nothing, so it is not a span (PREFLIGHT §10.7(f)).
                 # Two or more label colons is what makes it a chain; a sentence
-                # that merely ends with a colon keeps its text.
+                # that merely ends with a colon keeps its text. The dropped
+                # block is a gap, so the buffer before it is closed first.
+                flush_short()
                 pending_key = ""
                 return
         if kv_active and pending_key:
             split = split_key_value(block)
             if split is None or split[2] != 0:
                 # A key and its value are one row: quote the pair, not the value
-                # alone, so the span says what the value is evidence for.
+                # alone, so the span says what the value is evidence for. Key
+                # and value are adjacent in the source, so the join is verbatim.
                 block = norm(f"{pending_key} {block}")
                 row = clean_row(block)
+            else:
+                # The block opens with its own label, so the pending key owned
+                # an empty cell: it is dropped, and the gap it leaves closes the
+                # buffer above it.
+                flush_short()
             pending_key = ""
         if kv_active and row is None:
             row = clean_row(block)
