@@ -472,6 +472,54 @@ class EmptyCellChainTest(unittest.TestCase):
         self.assertIn("The Parties agree to the following terms", text)
 
 
+KV_GAP_DOC = """\
+Table 1: Parties
+
+Date of signature:
+
+Full name: Lynn Molloy
+
+Full name:
+
+Job title: ALSPAC Chief
+Operating Officer
+
+Job title:
+
+Table 2: Transfer Details
+
+UK country's law that governs the IDTA:
+
+England and Wales
+"""
+
+
+class DroppedLabelGapTest(unittest.TestCase):
+    """A dropped empty cell is a gap: no span may span across it.
+
+    Merging the two cells that remain on either side of an empty label produced
+    a quote that is not in the source ("Full name: Lynn Molloy Job title: ..."),
+    which no longer satisfies the verbatim contract (PREFLIGHT.md §10.7(f)).
+    """
+
+    def setUp(self) -> None:
+        self.spans = cc.segment(KV_GAP_DOC, "D4", min_chars=60)
+
+    def test_every_span_is_verbatim_in_the_source(self) -> None:
+        flat = cc.norm(KV_GAP_DOC)
+        for span in self.spans:
+            self.assertIn(cc.norm(span["paragraph"]), flat, span["paragraph"])
+
+    def test_the_two_cells_around_the_gap_stay_separate(self) -> None:
+        text = [span["paragraph"] for span in self.spans]
+        self.assertIn("Full name: Lynn Molloy", text)
+        self.assertIn("Job title: ALSPAC Chief Operating Officer", text)
+        self.assertFalse(
+            any("Lynn Molloy Job title" in paragraph for paragraph in text),
+            text,
+        )
+
+
 class ParseTest(unittest.TestCase):
     def test_plain_array(self) -> None:
         self.assertEqual(cc.parse_claims('[{"statement": "x"}]'), [{"statement": "x"}])
