@@ -997,3 +997,173 @@ survives). The memo proposes two pre-registrations — a cheap text+verifier one
 and a separate region-scoped geometry one — and nothing is executed from it
 without approval.
 
+### 10.7(f) Key/value row claims and a section guard for repairs — pre-registered 2026-11-10
+
+§10.7(e)(ii) rejected the segmentation fix because `D5-0002` and `D5-0003` were
+not recovered, and the survey (`gold/survey.segmentation.md`) found that neither
+failure is an extraction defect: `D5-0002` is a **model skip** of a row that is
+already segmented, and `D5-0003` is a **verifier/census disagreement** about
+which cell a claim may cite. This section fixes exactly those two things, with
+rules that are properties of the text, and registers the run that will judge
+them. It is written before any model call on the new pipeline; the thresholds
+of §10.2 do not move.
+
+#### The rule
+
+A row of a key/value table asserts **label + value**. That is the evidence the
+artifact needs, and it is a property of the row, not of the model's willingness
+to extract it. Three rules follow, all computed from the text alone.
+
+1. **An empty cell owns nothing.** Inside a key/value region, a label block that
+   is followed by another label is an empty cell: the first label is dropped,
+   never glued onto the second. A block that is a chain of labels — two or more
+   label colons, no value after the last, no sentence stop — leaves no span,
+   because an empty form cell asserts nothing; a sentence that merely ends with
+   a colon keeps its text. A block that opens with its own label discards a
+   stale pending key — the label belongs to this row.
+2. **A clause tail is not a heading.** A *numbered* line that ends in `and`,
+   `or`, `but` or `nor` continues the sentence of the preceding item
+   (`15.2.1.5 contact point for more information; and`), so it does not open a
+   section. Unnumbered headings are unaffected; this is the only place a
+   terminal conjunction is read.
+3. **Only a clean cell becomes a claim.** A row claim is emitted from a span
+   whose text is exactly one label and one value: exactly one colon, the label
+   at offset 0, capitalised, without `.`/`;`, not ending on a conjunction, not
+   naming a `Table N`, its value not a bare section number and not a question
+   (`Whether …`, which is the next row's label). The statement is the cell
+   verbatim, `"<label>: <value>."`; nothing is paraphrased and no grammar is
+   invented. Modality is `definition`; evidence is the span's paragraph and
+   locator, as §10.4 requires.
+
+The emitted claims are deterministic: no model call produces or edits them.
+They are inserted before dedupe and the conflict pass, and a row whose span is
+already cited by a model claim (same `doc_id`, `char_start`, `char_end`) is
+skipped, so the rule never duplicates text the extractor already used. The
+marking lives in the span (`span["row"]`), which is not schema-bound, so the
+claim schema stays closed.
+
+#### The frozen statement list
+
+These are the seven claims the rule emits on D5's current segmentation. They are
+frozen here; a run that emits a different set is a different pipeline.
+
+| # | Span | Page | Statement |
+|---|---|---:|---|
+| 1 | S0007 | 1 | Full legal name: University of Bristol (through the Avon Longitudinal Study of Parents and Children (ALSPAC)). |
+| 2 | S0008 | 1 | Main address (if a company registered address): University of Bristol, Beacon House, Queens Road, Bristol, BS8 1QU, UK. |
+| 3 | S0017 | 2 | In relation to the Processing of the Transferred Data: Exporter is a Controller. |
+| 4 | S0024 | 3 | The Importer may Process the Transferred Data for the following time period: The period for which the Linked Agreement is in force. |
+| 5 | S0035 | 4 | The personal data to be sent to the Importer under this IDTA consists of: The categories of Transferred Data will update automatically if the information is updated in the Linked Agreement referred to. |
+| 6 | S0036 | 4 | The Transferred Data includes data relating to: Relevant Data Subjects. |
+| 7 | S0040 | 5 | The Importer may Process the Transferred Data for the purposes set out in: the Authorised Research (schedule 4) in the ALSPAC Data Access Agreement Any other purposes which are compatible with the purposes set out above. The purposes will update automatically if the information is updated in the Linked Agreement referred to. |
+
+All seven pass `check_claims.py` (verbatim quote, declared page contains it,
+schema v2) when written as an artifact. D6 emits **0** rule claims: its records
+bypass the key/value branch, which is the correct result for a document whose
+operative content is already item-scoped.
+
+#### Measured blast radius (dry run, no model call)
+
+| Document | Spans before | Spans after | Identical |
+|---|---:|---:|---|
+| D1 | 154 | 154 | yes, byte-identical |
+| D2 | 50 | 50 | yes, byte-identical |
+| D3 | 115 | 115 | yes, byte-identical |
+| D4 | 101 | 101 | yes, byte-identical |
+| D5 | 325 | **323** | no — changes below |
+| D6 | 35 | 35 | yes, byte-identical |
+
+D1-D4 carry no key/value region and no numbered clause tail, and D6 takes the
+record path, so their identity is structural as well as measured. The D5 change
+is exactly:
+
+| # | Before | After |
+|---|---|---|
+| 1 | `Full legal name: Main address (…): University of Bristol, …` | `Main address (…): University of Bristol, …` |
+| 2 | `Trading name (…): Main address (…): Official registration number (…):` | removed (a chain of empty cells) |
+| 3 | `Signed: Signed: Date of signature: Date of signature: Full name: Lynn Molloy` + `Full name: Job title: ALSPAC Chief Operating Officer` | `Full name: Lynn Molloy Job title: ALSPAC Chief Operating Officer` |
+| 4 | `Job title: Table 2: Transfer Details UK country's law …` | `Table 2: Transfer Details UK country's law …` |
+| 5 | `… 15.2.1.5 contact point for more information; and` as a heading for 27 spans | `… 15.2.1.5 contact point for more information;` ends the span, `and 15.2.1.6 …` starts the next; the bogus path is gone |
+| 6 | `26.1.1 has breached this IDTA; or` as a heading for 2 spans | folded back into `26.1 … if it: 26.1.1 has breached this IDTA; or` |
+
+Counted from the two span lists: 8 paragraphs disappear and 7 appear (two are
+the same text re-cut), 28 spans keep their text but change a `section_path`,
+and the bogus path
+`["Laws", "15.2.1.5 contact point for more information; and"]` goes from 27
+spans to 0. Nothing in D5 is dropped that carried a claim in the recorded runs;
+the two paragraphs that vanish outright are label chains with no value.
+
+#### The verifier guard
+
+Rule 1 of §10.7(e)(i) made the row one span, but the repair stage can still
+abandon it. A `reevidence` record is now rejected when **none** of its chosen
+spans shares a `section_path` with the claim's current evidence (empty paths are
+ignored, since they carry no section evidence to abandon), and the rejected
+claim is recorded in `report["section_rejected_ids"]` and then **settled**: it is
+excluded from later repair rounds, because round 2 would otherwise offer the
+same escape as a rewrite or a drop. Rewrites and drops are untouched.
+
+Measured by re-applying the **recorded** repair pass of the rejected run to its
+recorded claims — no model call, no artifact rewritten:
+
+| Repair file | Before | After |
+|---|---|---|
+| `repair.1.jsonl` | 59 rewritten, 52 re-evidenced, 7 dropped, 4 rejected | 58 rewritten, 51 re-evidenced, 7 dropped, **5 rejected** |
+| `repair.2.jsonl` | 33 rewritten, 2 re-evidenced, 0 dropped, 0 rejected | unchanged |
+
+Exactly one claim diverges: `D5-0006` (*The primary place for legal claims to be
+made by the Parties is England and Wales*) keeps its own quote and section
+instead of being re-evidenced on the governing-law cell. The other three claims
+whose evidence the old code left unchanged (`D5-0120`, `D5-0138`, `D5-0147`)
+were already rejected for having no usable span, and are untouched.
+
+#### Acceptance — fixed here, before the run
+
+A fresh compile of **both** D5 and D6, its verify, and an independent census at
+full census (no sample). Same model, prompts, schema, thresholds and scale as
+§10.7(e)(ii). The gate stays per-document and unchanged: structural 100%,
+support >= 90%, facts absent from source 0, recall >= 70%. In addition:
+
+- D5 must recall `D5-0002`, `D5-0003` and `D5-0004`. `D5-0002` may be recalled by
+  the two row claims taken together (the gate already reads a set of claims as
+  one rule); `D5-0003` by the retained primary-place claim plus the governing-law
+  claim; `D5-0004` by the exporter and importer status claims.
+- The bogus `15.2.1.5` path must not appear in any claim's locator.
+- D6 must keep structural 100%, support >= 90%, 0 facts absent, recall 10/10 and
+  0 misattributed authority strings.
+- Support is reported **split**: model claims and rule claims separately, plus
+  the pooled figure the gate uses. Rule claims are verbatim cells, so their
+  expected support is 100% by construction; publishing the split is what keeps
+  that fact from flattering the number.
+
+Failure on either document — or a named claim still absent — rejects the fix as
+before. A pass accepts the pipeline, not the previous runs: `gold/probe.*`,
+`gold/probe.fixed.*`, `gold/probe.kv.*` and their verdicts stay as the
+measurements of the pipelines that produced them.
+
+#### Considered and not done
+
+- **`Table N: caption becomes a heading` (R2).** Implemented and measured: it
+  cleaned S0017 but also reordered Table 1/3/4 paths (`Security of Processing`
+  landed under `["Security of Storage"]`). The benefit is not needed for
+  acceptance and the blast radius is not defensible, so it is removed.
+- **Claims for headed rows** (label in `section_path`, value alone in the span,
+  e.g. S0018 `England and Wales`). A headed row cannot be told apart from
+  `The Parties` / `Parties' details` without guessing which line is a label;
+  `D5-0003`'s primary-place half is recovered by the verifier guard instead.
+- **Adding `Whether` to `starts_a_value`.** Measured regression: it split
+  `Can the Importer make further transfers of the Transferred Data?` into
+  `…Transferred` + `Data?` in the Table 2 question rows. `Whether` is used only
+  in the clean-cell guard, where a question after a label is the next label.
+- **Geometry / a canonical extraction product.** Needs `check_claims.py` to
+  change and is the subject of the second pre-registration the survey proposes;
+  out of scope here.
+
+#### Status and cost
+
+The code is on the branch that carries this section; 162 unit tests pass. No
+billable call has been made: the dry run, the `--rule-report`, the
+`check_claims.py` check and the re-application of recorded repairs all cost $0.
+The re-measurement costs the same as §10.7(e)(ii) — compile ~$0.16, verify
+~$0.28, census $0.00, i.e. roughly **$0.40-0.45 and 3-4 hours** — and is not
+started until that spend is approved.
