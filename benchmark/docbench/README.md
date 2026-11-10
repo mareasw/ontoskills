@@ -226,6 +226,9 @@ same JSON output contract. Only the context differs.
 - [x] Fixed run measured: **still fail** — D6 fixed (recall 10/10), D5 fails on 8 facts absent (two-line glossary headwords)
 - [x] Key/value table segmentation (`PREFLIGHT.md` §10.7(e)(i)) written and measured: D5 98.2% support, 0 facts absent, but `D5-0002`/`D5-0003` still missed — **rejected** (§10.7(e)(ii))
 - [x] Row claims + repair section guard (`PREFLIGHT.md` §10.7(f)) measured on a fresh D5+D6 run: D5 98.5% support, 0 facts absent, 9/10 recall — **rejected**, `D5-0003` emitted at compile then dropped by the verify repair policy, which the guard (scoped to `reevidence`) does not cover (§10.7(f)(ii)); first attempt stopped before any score and preserved
+- [ ] Drop/rewrite guard (`PREFLIGHT.md` §10.7(g)) — pre-registered, zero-cost replay pending, paid run only after approval
+- [ ] Evidence-first pipeline + public demo (`../../docs/adr/0002-evidence-first-extraction.md`): ≤ $0.05 and ≤ 60 s per 60-page document, first-pass support ≥ 90%
+- [ ] Five design-partner conversations (`../../docs/market/beachhead-2026-11.md`)
 - [ ] Machine-extracted claims replace the hand-built gold set (the real extraction gate)
 - [ ] Go/no-go decision recorded (technical gate passed; market gate open)
 
