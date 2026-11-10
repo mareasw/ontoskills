@@ -1285,3 +1285,98 @@ this number.
 aborted attempt of §10.7(f)(i) (≈ $0.1764, no score), §10.7(f) cost ≈ **$0.72**.
 The verify overran its ~$0.28 quote on two repair rounds with 11 token-limit
 splits and 4 HTTP 503 splits.
+
+### 10.7(g) The drop guard — pre-registered 2026-11-10, before the run
+
+§10.7(f)(ii) rejected the row-claim run on `D5-0003`. The claim was emitted at
+compile (`D5-0007`) and the verify stage removed it: `rewrite` in round 1,
+`drop` in round 2. The section guard of §10.7(f) covers `reevidence` only, so it
+never fired. This amendment changes the action policy that lost the claim. It
+does not touch a threshold, the model, the prompt, the schema, the span set or
+the acceptance of §10.7(f). It is written before any model call on the amended
+pipeline.
+
+#### The rule
+
+A claim may not be deleted, or have its evidence replaced, when the source text
+that supports it lies inside the claim's own section. Three deterministic rules
+in `verify_claims.py`:
+
+1. **Drop test.** A `drop` of a `weak` claim whose evidence is verbatim in its
+   own section is rejected, and the claim is kept with its verdict: the audit
+   called it weak because a label or qualifier lives in the locator, not because
+   the quote is false. A `drop` for `no` is accepted only when the evidence lies
+   outside the claim's section; a `fabricated` claim may always be dropped,
+   because a claim with no basis has no in-section evidence to preserve.
+2. **Rewrite test.** A `rewrite` whose new evidence lies outside the claim's
+   section is rejected. A rewrite that stays in the section is allowed, unless
+   it drops a sequence of two or more content tokens that the `section_path`
+   attests and the original statement contained (the primary-place case: the
+   path carries "primary place for legal claims", the rewrite keeps only "law
+   that governs the IDTA"). In that case the original statement is kept and the
+   claim is marked `weak`.
+3. **Visibility.** Every rejection is recorded in `report.json` under
+   `guard_rejected_drops` and `guard_rejected_rewrites`, with claim ids and
+   reasons. A guard that fires silently is not a guard.
+
+Each rule has a unit test, including the `D5-0007` fixture and a negative case
+where a `drop` is legitimate (verdict `no`, evidence outside the claim's
+section).
+
+The rule generalises the glossary precedent of §10.7(e)(i) — a headword in
+`section_path` is the term of the row — and the census call on `D5-0334` in the
+kv run. It is a property of the artifact, not of the model's willingness to
+quote the label.
+
+#### Why this is not moving the goalposts
+
+- The acceptance of §10.7(f) is unchanged: structural 100%, support ≥ 90% per
+  document, 0 facts absent, recall ≥ 70%, and `D5-0002`, `D5-0003`, `D5-0004`
+  recalled.
+- The change is to the repair policy, which §10.7(f)(ii) recorded as the cause.
+  The thresholds were written before that cause was known.
+- The effect on support is small and pre-registered: keeping `D5-0007` as
+  `weak` costs at most one `ok` row, so D5 support moves from 98.5% to at worst
+  98.2%. A drop below 90% still fails.
+
+#### Precondition — zero-cost replay
+
+Before any model call, the guard is run against the recorded verify trace of the
+rejected run (`gold/probe.rows.compiled.jsonl.verify/`). It must:
+
+1. keep `D5-0007` — the claim survives its round-2 `drop`;
+2. leave every other decision unchanged (there was exactly one `drop` in round
+   2, and the round-1 `rewrite` of `D5-0007` is the one the second rule covers);
+3. produce the final claim set plus the kept claim, with no other claim removed.
+
+If any of the three fails, the run does not start and the design is
+reconsidered. This makes the fix falsifiable without spending, and it is the
+same discipline as the dry run of §10.7(f)(i).
+
+#### The run
+
+A fresh compile, verify and full census of D5 and D6, same model
+(`deepseek-v4.1-flash`), prompt, schema and span set (359 spans). The
+`gold/probe.rows.*` artifacts of §10.7(f) stay untouched as the measurement of
+the rejected pipeline.
+
+| Criterion | Threshold |
+|---|---|
+| D5 structural | 100% |
+| D5 support (census) | ≥ 90% |
+| D5 facts absent | 0 |
+| D5 recall | ≥ 70%, with `D5-0002`, `D5-0003`, `D5-0004` all recalled |
+| `D5-0003` primary-place half | present, `ok` or `weak` (a kept `weak` is a recall pass) |
+| D6 | 100% support, 10/10 recall, 0 misattributed authorities |
+| `no` / `fabricated` | 0 |
+| `check_claims.py` | 0 failures |
+| Guard activity | at least one rejected `drop` (`D5-0007`), recorded in `report.json` |
+
+Support is reported split model/rule plus pooled, as in §10.7(f). Cost: compile
+≈ $0.18 + verify ≈ $0.36, quoted at **≤ $0.55**; the run starts only after
+explicit approval.
+
+If it passes, §10.7(h) records the result and the row-claim pipeline is accepted
+for the demo. If it fails, the failure is recorded and the architecture decision
+in `docs/adr/0002-evidence-first-extraction.md` proceeds without a fifth bench
+iteration.
