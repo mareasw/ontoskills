@@ -10,7 +10,11 @@ D6 (recall 10/10, support 96.1%) and **fails on D5**, where 8 claims define a
 term the document does not define because glossary headwords wrap onto two
 lines; the key/value fix removes all 8 and lifts D5 to 98.2% support with 0 facts
 absent, but still misses `D5-0002` and `D5-0003`, so it is **rejected by its own
-pre-registered criteria**. The **market gate is still open**. See
+pre-registered criteria**. The third pre-registration (`PREFLIGHT.md` §10.7(f))
+targets exactly those two failures — deterministic claims read from clean
+key/value cells, and a verifier guard that refuses a re-evidence which abandons
+the claim's own section — and is written, tested and dry-run measured, **not yet
+run**. The **market gate is still open**. See
 [`RESULTS.md`](RESULTS.md) for the numbers, the manual review, the blind re-score
 and the limitations. The corpus and the full gold set stay local; the protocol
 and the examples are public.
@@ -207,7 +211,8 @@ same JSON output contract. Only the context differs.
 - [x] Second-corpus probe measured: **fail** — D5 pass, D6 fail (recall 2/10)
 - [x] Table-record segmentation (`PREFLIGHT.md` §10.7(b)) written, measured on a fresh D5+D6 run and fully censused
 - [x] Fixed run measured: **still fail** — D6 fixed (recall 10/10), D5 fails on 8 facts absent (two-line glossary headwords)
-- [ ] Key/value table segmentation (`PREFLIGHT.md` §10.7(e)(i)) — pre-registered, not yet written
+- [x] Key/value table segmentation (`PREFLIGHT.md` §10.7(e)(i)) written and measured: D5 98.2% support, 0 facts absent, but `D5-0002`/`D5-0003` still missed — **rejected** (§10.7(e)(ii))
+- [ ] Row claims + repair section guard (`PREFLIGHT.md` §10.7(f)) — written, tested and dry-run measured; the billable re-measurement has not started
 - [ ] Machine-extracted claims replace the hand-built gold set (the real extraction gate)
 - [ ] Go/no-go decision recorded (technical gate passed; market gate open)
 
