@@ -987,3 +987,13 @@ gate, and no further repair is built on it without a new pre-registration. This
 section plus `gold/audit.probe.kv.md` are its measurement. Cost: compile
 ~$0.16, verify $0.2761 (102 calls), census $0.00.
 
+**Next step: survey before the next registration.** `gold/survey.segmentation.md`
+(2026-11-10, zero cost) records what the failure classes actually are and what
+external practice offers. Two findings matter here: the two named failures are a
+model skip and a verifier/census disagreement, not extraction defects; and the
+cheap extractor change (`pdftotext -layout`) was measured and is a regression
+(D6 0/14 authority strings intact, D5 440 spans, the page-16 heading bug
+survives). The memo proposes two pre-registrations — a cheap text+verifier one,
+and a separate region-scoped geometry one — and nothing is executed from it
+without approval.
+
