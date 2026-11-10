@@ -612,6 +612,93 @@ the earlier runs; `gold/probe.*`, `gold/probe.fixed.*` and their censuses remain
 the measurement of those pipelines. It does not test B1/B2 answer quality on
 D5/D6 (§10.4: outside this gate).
 
+## Second corpus probe, row claims + section guard (2026-11-10) — rejected on `D5-0003`
+
+A fourth run applied the row-claim rule and the repair section guard
+pre-registered as `PREFLIGHT.md` §10.7(f), with the gap fix of §10.7(f)(i), on
+the same documents, model, prompt, schema and thresholds. The three earlier runs
+and their censuses are untouched.
+
+**Artifact.** `gold/probe.rows.compiled.verified.jsonl`: 394 claims compiled
+(D5 343, D6 51), **389 after verify** (D5 338, D6 51), 516 evidence spans,
+`check_claims.py` 0 failures, 25 near-duplicates merged on compile and 4 on
+verify, 9 residual `weak` kept, 0 residual `no`/`fabricated`. The full census is
+`gold/audit.probe.rows.md`; 389 rows were judged, no sample.
+
+| Document | Type | Structural | Support (census) | Facts absent | Recall | Verdict |
+|---|---|---|---|---:|---:|---|
+| **D5** | contract (ALSPAC IDTA v1) | 100% | 333/338 = **98.5%** | **0** | 9/10 = **90.0%** | **fail** |
+| **D6** | table-as-content (NARA GRS 1.1) | 100% | 51/51 = **100%** | 0 | 10/10 = **100%** | **pass** |
+| Pooled | | 100% | 384/389 = **98.7%** | 0 | — | reported only |
+
+Support split as §10.7(f) requires, model claims and rule claims separately:
+
+| | Claims | `ok` | Support |
+|---|---:|---:|---:|
+| D5, model | 337 | 332 | 98.5% |
+| D5, rule | 1 | 1 | 100% |
+| D6, model | 51 | 51 | 100% |
+| **Pooled** | **389** | **384** | **98.7%** |
+
+The rule contributed exactly one claim (`D5-0367`, the `Relevant Data Subjects`
+row the model skipped); the model extracted the other six row cells itself.
+
+**Verdict: rejected.** §10.7(f) named `D5-0002`, `D5-0003` and `D5-0004` as hard
+requirements, with structural 100%, support >= 90%, 0 facts absent and recall
+>= 70%. Every numeric threshold passes, and so do `D5-0002` (recalled by the two
+exporter row claims, `D5-0004` + `D5-0005`) and `D5-0004` (`D5-0008` +
+`D5-0011`). `D5-0003` fails, and one named claim absent rejects the fix:
+overall recall does not substitute for it.
+
+What it repaired is real. `D5-0002` is now extracted by the model from the
+segmented rows instead of skipped, support reaches 98.5% with 0 `no` and 0
+`fabricated`, and the bogus `15.2.1.5 contact point` path of the kv run attaches
+to no claim. That is the row rule working as designed.
+
+**Why `D5-0003` fails.** The primary-place half is not a segmentation defect
+this time, and not a census disagreement: the compile **did** emit it
+(`D5-0007` *The primary place for legal claims to be made by the Parties is
+England and Wales*) and the verify stage removed it — `rewrite` in round 1
+("Span is only the value"), `drop` in round 2 ("Spans name England and Wales but
+never state it is the primary place for legal claims"). The section guard of
+§10.7(f) rejects a `reevidence` that abandons its own section; it does not cover
+`rewrite` or `drop`, which the pre-registration itself excluded. So the guard
+did not fire on the claim it was written to protect, because that claim was not
+re-evidenced. The governing-law half (`D5-0006`) survives and is supported.
+
+The drop policy, not the row rule, is the defect: the row is a colonless
+four-line label whose value cell is `England and Wales`, and a policy that
+requires the label inside the quote will drop it every time.
+
+**Residual defects**, recorded and not repaired in this run: `D5-0063` narrows
+the exception to Section 5.1.1 (source: 5.1.1-5.1.3); one wrong `section_path`
+on `D5-0366`; four near-duplicate pairs that survived dedupe; four bare
+definition fragments whose subject lives only in the section path; one wrong
+modality label (`D5-0065`, `permission` on a prohibition). No census verdict
+moves.
+
+The verifier audit and the census agree on 379/389 rows = 97.4%. The ten
+disagreements are the documented calibration classes: seven glossary-term rows
+the verifier called `weak` and the census calls `ok` (the term is in
+`section_path`, and §10.4 defines evidence as quote **and** locator), and three
+rows the verifier accepted and the census does not.
+
+D6's pass is a control, not evidence for the fix: its 35 spans are byte-identical
+to the fixed run, so its input did not change.
+
+**Cost.** Compile $0.1843, verify $0.3554, census $0.00 — **$0.5397** for this
+run, plus the aborted first attempt (≈ $0.1764, no score) for **≈ $0.72** spent
+on §10.7(f). The verify overran its ~$0.28 quote because two repair rounds split
+11 batches on the token limit and 4 on HTTP 503.
+
+**What this run shows.** (1) The row rule works: row cells the model used to skip
+are now claims, and support is the best D5 figure this corpus has produced.
+(2) A pipeline can pass every numeric threshold and still fail on one named
+claim, twice in a row for the same `D5-0003` — the second time through the repair
+policy rather than through segmentation. (3) The guard was scoped to the wrong
+action: `reevidence` was guarded, `drop` was not, and `drop` is what removed the
+claim.
+
 ## Limitations
 
 - **n = 39 scored questions, one run, one model.** No confidence interval is
