@@ -301,6 +301,177 @@ class KeyValueRegionTest(unittest.TestCase):
         self.assertFalse(any(cc.kv_region_lines(TABLE_DOC.split("\n"))))
 
 
+class ClauseFragmentTest(unittest.TestCase):
+    """PREFLIGHT.md §10.7(f): a numbered line ending on a conjunction is a
+    clause tail, not a heading, so the next item keeps its own section."""
+
+    def test_tail_of_a_clause_is_not_a_heading(self) -> None:
+        for line in (
+            "15.2.1.5 contact point for more information; and",
+            "26.1.1 has breached this IDTA; or",
+            "4.3 the Importer must stop, but",
+        ):
+            self.assertTrue(cc.is_clause_fragment(line), line)
+            self.assertFalse(cc.looks_like_heading(line), line)
+
+    def test_a_numbered_heading_still_heads(self) -> None:
+        for line in ("4.2 Importer obligations", "15.2.1 Importer obligations"):
+            self.assertFalse(cc.is_clause_fragment(line), line)
+            self.assertTrue(cc.looks_like_heading(line), line)
+
+    def test_the_terminal_conjunction_is_what_decides(self) -> None:
+        # Same number, same words: only the conjunction differs.
+        self.assertTrue(cc.is_clause_fragment("4.3 contact point for more information and"))
+        self.assertFalse(cc.is_clause_fragment("4.3 contact point for more information"))
+
+
+class SplitKeyValueTest(unittest.TestCase):
+    """A block is split at its last label colon (PREFLIGHT.md §10.7(f))."""
+
+    def test_label_and_value_are_split_at_the_colon(self) -> None:
+        self.assertEqual(
+            cc.split_key_value("Full legal name: University of Bristol"),
+            ("Full legal name", "University of Bristol", 0),
+        )
+
+    def test_the_last_label_colon_wins(self) -> None:
+        label, value, offset = cc.split_key_value("Job title: ALSPAC: Chief Operating Officer")
+        self.assertEqual((label, value), ("ALSPAC", "Chief Operating Officer"))
+        self.assertGreater(offset, 0)
+
+    def test_a_time_is_not_a_cell_boundary(self) -> None:
+        # "10:00" is a time, not a label followed by a value.
+        self.assertIsNone(cc.split_key_value("Response time 10:00"))
+
+    def test_a_label_must_be_capitalised(self) -> None:
+        self.assertIsNone(cc.split_key_value("the parties: Alpha"))
+
+
+class CleanRowTest(unittest.TestCase):
+    """Only a cell that is exactly one label and one value is a row."""
+
+    def test_a_clean_cell_is_a_label_and_a_value(self) -> None:
+        self.assertEqual(
+            cc.clean_row("Main address: Beacon House"), ("Main address", "Beacon House")
+        )
+
+    def test_two_labels_are_not_a_row(self) -> None:
+        self.assertIsNone(cc.clean_row("Trading name: Main address: Beacon House"))
+
+    def test_a_label_glued_to_earlier_text_is_not_a_row(self) -> None:
+        self.assertIsNone(cc.clean_row("Done. Main address: Beacon House"))
+
+    def test_an_empty_value_is_not_a_row(self) -> None:
+        self.assertIsNone(cc.clean_row("Main address:"))
+
+    def test_a_clause_tail_is_not_a_label(self) -> None:
+        self.assertIsNone(cc.clean_row("Contact point for more information and: Alpha"))
+
+    def test_a_caption_reference_is_not_a_label(self) -> None:
+        self.assertIsNone(cc.clean_row("In Table 2: Transfer Details"))
+
+    def test_a_question_is_the_next_label_not_a_value(self) -> None:
+        self.assertIsNone(
+            cc.clean_row("In relation to the Processing: Whether UK GDPR applies")
+        )
+
+    def test_a_section_number_is_not_a_value(self) -> None:
+        # "Governing law: 4.2" points at a clause; it does not state a rule.
+        self.assertIsNone(cc.clean_row("Governing law: 4.2"))
+
+
+KV_ROW_DOC = """\
+Table 1: Parties
+
+Trading name (if different):
+
+Full legal name:
+
+Main address: Beacon House
+"""
+
+
+class RowClaimTest(unittest.TestCase):
+    """The emitter marks a clean key/value cell and the rule reads it back."""
+
+    def setUp(self) -> None:
+        self.spans = cc.segment(KV_ROW_DOC, "D4", min_chars=10)
+
+    def test_an_empty_cell_label_is_replaced_not_glued(self) -> None:
+        rows = [span for span in self.spans if span.get("row")]
+        self.assertEqual(len(rows), 1, [span["paragraph"] for span in self.spans])
+        self.assertEqual(rows[0]["paragraph"], "Main address: Beacon House")
+        self.assertEqual(
+            rows[0]["row"], {"label": "Main address", "value": "Beacon House"}
+        )
+
+    def test_a_run_of_empty_cells_leaves_no_span(self) -> None:
+        text = " ".join(span["paragraph"] for span in self.spans)
+        self.assertNotIn("Trading name", text)
+        self.assertNotIn("Full legal name", text)
+
+    def test_each_row_span_yields_one_statement(self) -> None:
+        records = cc.row_claims(self.spans)
+        self.assertEqual(
+            [record["statement"] for record in records],
+            ["Main address: Beacon House."],
+        )
+
+    def test_the_statement_is_the_cell_verbatim(self) -> None:
+        record = cc.row_claims(self.spans)[0]
+        self.assertIn(
+            cc.norm(record["statement"].rstrip(".")),
+            cc.norm(record["span"]["paragraph"]),
+        )
+
+    def test_a_span_without_a_row_is_not_a_claim(self) -> None:
+        self.assertEqual(cc.row_claims([{"paragraph": "x", "locator": {}}]), [])
+
+    def test_an_empty_label_or_value_is_not_a_claim(self) -> None:
+        for row in ({"label": "", "value": "v"}, {"label": "L", "value": ""}):
+            span = {"paragraph": "x", "locator": {}, "row": row}
+            self.assertEqual(cc.row_claims([span]), [])
+
+    def test_a_row_claim_has_the_artifact_shape(self) -> None:
+        record = cc.row_claims(self.spans)[0]
+        claim = cc.build_row_claim(record, 7)
+        self.assertEqual(claim["claim_id"], "D4-0007")
+        self.assertEqual(claim["doc_id"], "D4")
+        self.assertEqual(claim["statement"], "Main address: Beacon House.")
+        self.assertEqual(claim["modality"], "definition")
+        self.assertEqual(claim["schema_version"], 2)
+        self.assertEqual(claim["evidence"][0]["quote"], record["span"]["paragraph"])
+        self.assertEqual(claim["evidence"][0]["locator"], record["span"]["locator"])
+        self.assertEqual(claim["evidence"][0]["role"], "supports")
+        self.assertEqual(claim["context"], cc.DOCS["D4"]["context"])
+
+
+KV_EMPTY_CHAIN_DOC = """\
+Table 1: Parties
+
+Trading name (if different): Main address (if a company registered address): Official registration number (if any) (company number or similar identifier):
+
+The Parties agree to the following terms as set out in Section 5.3 of this IDTA and in the Schedules attached to it and referred to above:
+"""
+
+
+class EmptyCellChainTest(unittest.TestCase):
+    """A chain of labels is an empty cell; a sentence that ends with a colon is
+    content (PREFLIGHT.md §10.7(f))."""
+
+    def setUp(self) -> None:
+        self.spans = cc.segment(KV_EMPTY_CHAIN_DOC, "D4", min_chars=10)
+
+    def test_a_chain_of_labels_leaves_no_span(self) -> None:
+        text = " ".join(span["paragraph"] for span in self.spans)
+        self.assertNotIn("Trading name", text)
+        self.assertNotIn("Official registration number", text)
+
+    def test_a_sentence_ending_with_a_colon_keeps_its_text(self) -> None:
+        text = " ".join(span["paragraph"] for span in self.spans)
+        self.assertIn("The Parties agree to the following terms", text)
+
+
 class ParseTest(unittest.TestCase):
     def test_plain_array(self) -> None:
         self.assertEqual(cc.parse_claims('[{"statement": "x"}]'), [{"statement": "x"}])

@@ -201,6 +201,37 @@ class ApplyRepairsTest(unittest.TestCase):
         _out, report = vc.apply_repairs([c], repairs, self.index)
         self.assertEqual(report["rejected"], 1)
 
+    def test_reevidence_that_abandons_the_section_is_rejected(self) -> None:
+        # S0001 is in Chapter I; the claim's own evidence is in Chapter II.
+        c = claim("D1-0002", "The Commission may terminate when (a) or (b) applies.", [SPANS[1]])
+        repairs = {"D1-0002": {"action": "reevidence", "evidence_span_ids": ["S0001"]}}
+        out, report = vc.apply_repairs([c], repairs, self.index)
+        self.assertEqual(report["rejected"], 1)
+        self.assertEqual(report["section_rejected_ids"], ["D1-0002"])
+        self.assertEqual(out[0]["evidence"], c["evidence"])
+
+    def test_reevidence_inside_the_same_section_is_accepted(self) -> None:
+        c = claim("D1-0002", "The Commission may terminate when (a) or (b) applies.", [SPANS[1]])
+        repairs = {"D1-0002": {"action": "reevidence", "evidence_span_ids": ["S0004"]}}
+        out, report = vc.apply_repairs([c], repairs, self.index)
+        self.assertEqual(report["reevidenced"], 1)
+        self.assertEqual(report["section_rejected_ids"], [])
+        self.assertEqual(out[0]["evidence"][0]["quote"], SPANS[3]["paragraph"])
+
+    def test_a_claim_with_no_section_is_not_guarded(self) -> None:
+        # Without a section path there is no section evidence to abandon, so the
+        # guard must not invent one and reject a repair on a guess.
+        c = claim("D1-0002", "The Commission may terminate.", [SPANS[1]])
+        c["evidence"][0]["locator"] = {
+            key: value
+            for key, value in c["evidence"][0]["locator"].items()
+            if key != "section_path"
+        }
+        repairs = {"D1-0002": {"action": "reevidence", "evidence_span_ids": ["S0003"]}}
+        out, report = vc.apply_repairs([c], repairs, self.index)
+        self.assertEqual(report["reevidenced"], 1)
+        self.assertEqual(report["section_rejected_ids"], [])
+
     def test_drop_removes_the_claim(self) -> None:
         c = claim("D1-0002", "The Commission must terminate.", [SPANS[1]])
         out, report = vc.apply_repairs([c], {"D1-0002": {"action": "drop"}}, self.index)
@@ -538,6 +569,47 @@ class PipelineTest(unittest.TestCase):
         self.assertEqual(report["final"]["ok"], 1)
         self.assertEqual(report["final"]["weak"], 1)
         self.assertEqual(report["final"]["no"], 0)
+
+    def test_a_section_rejected_claim_is_not_offered_again(self) -> None:
+        index = vc.SpanIndex(SPANS)
+        claims = [
+            claim("D1-0002", "The Commission may terminate when (a) or (b) applies.", [SPANS[1]])
+        ]
+        systems: list[str] = []
+        prompts: list[str] = []
+
+        def call(prompt: str, system: str, max_tokens: int):
+            prompts.append(prompt)
+            systems.append(system)
+            if "evidence auditor" in system:
+                rows = [{"claim_id": "D1-0002", "verdict": "weak"}]
+            else:
+                rows = [
+                    {
+                        "claim_id": "D1-0002",
+                        "action": "reevidence",
+                        "evidence_span_ids": ["S0001"],
+                    }
+                ]
+            return json.dumps(rows), {"input_tokens": 1, "output_tokens": 1}, "stop"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out, report = vc.run_pipeline(
+                claims, index, call, work=Path(tmp), rounds=2,
+                audit_batch=5, repair_batch=5, verbose=False,
+            )
+        # The claim keeps its evidence and is not sent back to the repairer: the
+        # same re-evidence offer must not buy a second escape in round 2.
+        self.assertEqual([c["claim_id"] for c in out], ["D1-0002"])
+        self.assertEqual(out[0]["evidence"], claims[0]["evidence"])
+        self.assertEqual(report["rounds"][0]["section_rejected_ids"], ["D1-0002"])
+        self.assertEqual(len(report["rounds"]), 1)
+        repair_prompts = [
+            prompt
+            for prompt, system in zip(prompts, systems)
+            if "evidence auditor" not in system and "D1-0002" in prompt
+        ]
+        self.assertEqual(len(repair_prompts), 1)
 
     def test_verdict_of_never_reads_silence_as_a_pass(self) -> None:
         claim_ = claim("D1-0001", "good", [SPANS[0]])
