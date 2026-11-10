@@ -863,7 +863,7 @@ chunking, verify stage. The failed run is untouched: `gold/probe.*`,
 `gold/probe.verdicts.jsonl` and `gold/audit.probe.md` remain the measurement of
 the unfixed pipeline.
 
-##### 10.7(e)(i) Key/value table segmentation — pre-registered, implemented, measurement pending
+##### 10.7(e)(i) Key/value table segmentation — pre-registered, implemented, measured, rejected
 
 This is written after the score is known, which is unavoidable for a defect the
 score exposed. It is a pre-registration for a **new** run: the fix below is not
@@ -921,6 +921,69 @@ Protection Clauses`, `Special Category Data`, `UK Data Protection Laws`,
 `Without Undue Delay`, `Controller`), and the Table 1/Table 2 rows carry
 `Full legal name: ...`, `UK country's law that governs the IDTA: England and
 Wales` and `... Exporter is a Controller` in one span. 136 short tests pass
-(`unittest discover`). The billable fresh compile, verify and census are **not**
-run yet: they wait for explicit approval, and the acceptance verdict is made
-only from that run.
+(`unittest discover`). The billable fresh compile, verify and census were **not**
+run at that date: they waited for explicit approval, and the acceptance verdict
+is made only from that run. The run and its verdict are in §10.7(e)(ii) below.
+
+##### 10.7(e)(ii) The run, measured — the fix is rejected by its own criteria
+
+The fresh compile of D5 and D6, its verify and the independent census finished
+on 2026-11-10. The artifact is
+`gold/probe.kv.compiled.verified.jsonl` (397 claims: D5 335, D6 62; 532 evidence
+spans; schema v2; `check_claims.py` 0 failures). The full census is
+`gold/audit.probe.kv.md`: **397 rows, no sample**. The pre-registration above,
+the thresholds and the scale are unchanged; the failed and fixed runs and their
+censuses are untouched.
+
+| Document | Structural | Support (census) | Facts absent from source | Recall | Verdict |
+|---|---|---|---|---|---|
+| D5 — contract | pass | 329/335 = **98.2%** | **0** | 8/10 = **80.0%** | **fail** (named claims) |
+| D6 — table-as-content | pass | 61/62 = **98.4%** | 0 | 10/10 = 100% | **pass** |
+
+Pooled support 390/397 = 98.2%, **0** `no`, **0** `fabricated`.
+
+**What it repaired.** The eight glossary definitions of a term the document does
+not define (`Country`, `Safeguards`, `Clauses` twice, `Data`, `Controller`,
+`Protection Laws`, `Delay`) do not reappear in any form; the joined headwords
+are correct (`D5-0330`-`D5-0378`), and the definition-body-only `weak` rows of
+the fixed run now name their term. D5 "facts absent from source" goes 8 -> **0** and
+support 92.9% -> 98.2%. `D5-0004` is now recalled (`D5-0007` *Exporter is a
+Controller* + `D5-0009` *Importer is a Controller*). D6 keeps its pass, 0
+misattributed DAAs; but D6's spans are **byte-identical** to the fixed run, so
+that pass is unchanged input, not evidence for the rule.
+
+**Why it fails.**
+
+- **`D5-0002` is not extracted.** The segmenter does produce the exporter row —
+  `S0007` `Full legal name: University of Bristol (through ALSPAC)`, `S0008`
+  the Beacon House address — and both spans are in the first chunk with the
+  Table 1 rows the model did use. Of the 411 raw claims, **none** quotes
+  `Full legal name`, `Beacon House` or `BS8`. The text is segmented; the
+  extractor skips it. `S0008` additionally opens with a stale `Full legal name:`
+  prefix belonging to the Importer's empty cell.
+- **`D5-0003` is quoted, then audited away.** The primary-place row is a
+  colonless four-line label; the label is joined into `section_path` and the
+  value `England and Wales` stays in its own span `S0018`. The raw compile did
+  state the rule (`D5-0006`), and the verify stage judged it `weak` because the
+  label was not inside the quote, re-evidencing it on the governing-law cell —
+  so the primary-place rule does not survive. This is the one place where the
+  census rule (evidence is quote **and** locator) and the verifier's quote-only
+  repair policy disagree; under the pre-registered rule 2 the two sides of the
+  row should be one span, and for this colonless label they are not.
+
+**Residual, outside the acceptance.** The bogus `section_path`
+`["Laws", "15.2.1.5 contact point for more information; and"]` now attaches to
+27 spans / 49 claims (fixed run: 6 spans / 19 claims) on pages 16-20; page and
+quote are correct and no verdict moves, but a wrong locator on 49 claims is a
+regression and is recorded rather than excused. `D5-0009`'s locator also names
+the wrong Table 2 row (`Linked Agreement`) while its quote carries the status.
+
+**Verdict: rejected.** The pre-registration required `D5-0002`, `D5-0003` and
+`D5-0004`; two of the three are absent, and the 80% overall recall does not
+replace a named requirement. The segmentation code is on `main` (merged as
+`e125d08` before the run, which is what the pre-registration required); what is
+rejected is the fix as a validated improvement — it is not carried into the
+gate, and no further repair is built on it without a new pre-registration. This
+section plus `gold/audit.probe.kv.md` are its measurement. Cost: compile
+~$0.16, verify $0.2761 (102 calls), census $0.00.
+
