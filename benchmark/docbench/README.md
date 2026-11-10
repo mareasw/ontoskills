@@ -4,17 +4,20 @@
 (Gate 2, 2026-11-08).** The compiler's claims pass an independent census at
 **99.0% evidence support** (499/504), 0 fabrications, 97.6% gold recall, and B2
 beats B1 on citation by +20.0 pp automatic / +21.9 pp blind. The
-**second-corpus probe (2026-11-09/10) fails, three times**: the first run misses
+**second-corpus probe (2026-11-09/10) fails, four times**: the first run misses
 D6 recall (2/10, disposition cells segmented as headings); the fixed run repairs
 D6 (recall 10/10, support 96.1%) and **fails on D5**, where 8 claims define a
 term the document does not define because glossary headwords wrap onto two
 lines; the key/value fix removes all 8 and lifts D5 to 98.2% support with 0 facts
 absent, but still misses `D5-0002` and `D5-0003`, so it is **rejected by its own
 pre-registered criteria**. The third pre-registration (`PREFLIGHT.md` §10.7(f))
-targets exactly those two failures — deterministic claims read from clean
-key/value cells, and a verifier guard that refuses a re-evidence which abandons
-the claim's own section — and is written, tested and dry-run measured, **not yet
-run**. The **market gate is still open**. See
+— deterministic claims read from clean key/value cells, plus a verifier guard
+that refuses a re-evidence which abandons the claim's own section — recovers
+`D5-0002` and lifts D5 to **98.5% support with 0 facts absent and 9/10 recall**,
+but `D5-0003` is emitted at compile and then **dropped by the verify repair
+policy**, which the guard (scoped to `reevidence`) does not cover; one named
+claim absent means the fix is **rejected** again (§10.7(f)(ii)). The **market
+gate is still open**. See
 [`RESULTS.md`](RESULTS.md) for the numbers, the manual review, the blind re-score
 and the limitations. The corpus and the full gold set stay local; the protocol
 and the examples are public.
@@ -46,8 +49,10 @@ Second-corpus probe (`PREFLIGHT.md` §10, per document, 2026-11-09/10):
 | D6 — fixed run | table-as-content | 100% | 49/51 = 96.1% | 0 | 10/10 = 100% | **pass** |
 | D5 — key/value fix | contract | 100% | 329/335 = 98.2% | 0 | 8/10 = 80.0% | **fail** |
 | D6 — key/value fix | table-as-content | 100% | 61/62 = 98.4% | 0 | 10/10 = 100% | **pass** |
+| D5 — row claims + guard | contract | 100% | 333/338 = 98.5% | 0 | 9/10 = 90.0% | **fail** |
+| D6 — row claims + guard | table-as-content | 100% | 51/51 = 100% | 0 | 10/10 = 100% | **pass** |
 
-The probe fails on all three runs, for different reasons. The first run fails D6
+The probe fails on all four runs, for different reasons. The first run fails D6
 recall; the fixed run fixes D6 and fails D5 on "facts absent from source" — 8
 glossary claims define a term the document does not define, because two-line
 headwords keep only their last line as the section heading; the key/value fix
@@ -57,13 +62,21 @@ extracted) or `D5-0003` (the primary place: quoted in the raw compile, then
 re-evidenced away by the quote-only repair), so the fix is **rejected by its own
 pre-registered criteria** rather than shipped. D6's evidence in that run is
 byte-identical to the fixed run, so its pass is unaffected input, not evidence
-for the key/value rule. The support misses and all three mechanisms are named in
+for the key/value rule. The row-claim run recovers `D5-0002` (the exporter name
+and address) and lifts D5 to 98.5% support, but `D5-0003` is emitted at compile
+(`D5-0007`) and then dropped by the verify repair policy — `rewrite`, then
+`drop`, neither of which the section guard covers — so `D5-0003` is absent
+again and the fix is **rejected** (§10.7(f)(ii)). D6's 35 spans are again
+byte-identical, so its pass is a control. The support misses and all four
+mechanisms are named in
 [`gold/audit.probe.md`](gold/audit.probe.md),
-[`gold/audit.probe.fixed.md`](gold/audit.probe.fixed.md) and
-[`gold/audit.probe.kv.md`](gold/audit.probe.kv.md); the fixes are pre-registered
-as `PREFLIGHT.md` §10.7(b) (applied), §10.7(e)(i) (applied, rejected on
-measurement, §10.7(e)(ii)); the code is on `main`, the fix is not accepted. All
-three runs are kept as measured.
+[`gold/audit.probe.fixed.md`](gold/audit.probe.fixed.md),
+[`gold/audit.probe.kv.md`](gold/audit.probe.kv.md) and
+[`gold/audit.probe.rows.md`](gold/audit.probe.rows.md); the fixes are
+pre-registered as `PREFLIGHT.md` §10.7(b) (applied), §10.7(e)(i) (applied,
+rejected on measurement, §10.7(e)(ii)) and §10.7(f) (applied, rejected on
+measurement, §10.7(f)(ii)); the code is on `main`, none of the fixes is
+accepted. All four runs are kept as measured.
 
 Gate 2's thresholds and method were fixed in `PREFLIGHT.md` §9 before the run;
 the four amendments that got it there (§9.1–§9.4) each answer a measured defect
@@ -212,7 +225,7 @@ same JSON output contract. Only the context differs.
 - [x] Table-record segmentation (`PREFLIGHT.md` §10.7(b)) written, measured on a fresh D5+D6 run and fully censused
 - [x] Fixed run measured: **still fail** — D6 fixed (recall 10/10), D5 fails on 8 facts absent (two-line glossary headwords)
 - [x] Key/value table segmentation (`PREFLIGHT.md` §10.7(e)(i)) written and measured: D5 98.2% support, 0 facts absent, but `D5-0002`/`D5-0003` still missed — **rejected** (§10.7(e)(ii))
-- [ ] Row claims + repair section guard (`PREFLIGHT.md` §10.7(f)) — written, tested and dry-run measured; the first billable attempt was stopped before any score (one non-verbatim quote), the gap is fixed in §10.7(f)(i), and the registered run restarts on the fixed pipeline
+- [x] Row claims + repair section guard (`PREFLIGHT.md` §10.7(f)) measured on a fresh D5+D6 run: D5 98.5% support, 0 facts absent, 9/10 recall — **rejected**, `D5-0003` emitted at compile then dropped by the verify repair policy, which the guard (scoped to `reevidence`) does not cover (§10.7(f)(ii)); first attempt stopped before any score and preserved
 - [ ] Machine-extracted claims replace the hand-built gold set (the real extraction gate)
 - [ ] Go/no-go decision recorded (technical gate passed; market gate open)
 
