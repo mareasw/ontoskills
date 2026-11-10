@@ -1239,3 +1239,49 @@ spent, no result**.
 **Restart.** The registered run restarts from scratch on the fixed pipeline
 (fresh compile, verify, full census), with the acceptance of §10.7(f)
 unchanged. Its cost is quoted and approved before it starts.
+
+##### 10.7(f)(ii) The run, measured — the fix is rejected by its own criteria
+
+The fresh compile of D5 and D6, its verify and the independent census finished
+on 2026-11-10. The artifact is `gold/probe.rows.compiled.verified.jsonl`
+(gitignored); the census is `gold/audit.probe.rows.md`. Thresholds, scale,
+model, prompt, schema and the acceptance of §10.7(f) are untouched.
+
+**Result.** D5: structural 100%, support 333/338 = **98.5%**, facts absent **0**,
+recall 9/10 = 90.0% — and `D5-0003` **not recalled**. D6: structural 100%,
+support 51/51 = 100%, facts absent 0, recall 10/10, 0 misattributed authorities
+— **pass**. Pooled 384/389 = 98.7%, 0 `no`, 0 `fabricated`. One named claim
+absent rejects the fix; the pooled figures do not substitute for it.
+
+**The fix did what it was opened for.** `D5-0002` is extracted by the model from
+the segmented rows (`D5-0004` full legal name + `D5-0005` Beacon House address),
+`D5-0004` is recalled (`D5-0008` + `D5-0011`), the bogus `15.2.1.5 contact
+point` path of the kv run attaches to no claim, and the single rule claim
+(`D5-0367`) is a row the model skipped — which is the mechanism the
+pre-registration wanted, reported split from the model's 337 claims.
+
+**Why `D5-0003` fails.** The primary-place claim is not missing at compile: it
+is `D5-0007` (*The primary place for legal claims to be made by the Parties is
+England and Wales*), and the verify stage removed it — `rewrite` in round 1
+("Span is only the value; no broader wording claimed"), `drop` in round 2
+("Spans name England and Wales but never state it is the primary place for
+legal claims"). The section guard rejects a `reevidence` that abandons its own
+section; §10.7(f) left `rewrite` and `drop` untouched, so the guard did not
+cover the action that removed the claim. The governing-law half (`D5-0006`)
+survives and is supported. The row itself is unchanged and still correct: a
+colonless four-line label whose value cell is `England and Wales`, which a
+policy requiring the label inside the quote will always drop.
+
+**Not repaired here.** The drop policy is not changed by this amendment: a
+correction would be a new pre-registration, measured on its own run, and the
+run that produced this result stays the measurement of the pipeline it tested.
+Residual defects are listed in `gold/audit.probe.rows.md` and move no census
+verdict. The verifier/census disagreements (7 glossary-term rows the verifier
+called `weak`, 3 rows the verifier accepted and the census does not) are the
+calibration classes already documented, not rubric changes made after seeing
+this number.
+
+**Cost.** Compile $0.1843 + verify $0.3554 = **$0.5397** for this run; with the
+aborted attempt of §10.7(f)(i) (≈ $0.1764, no score), §10.7(f) cost ≈ **$0.72**.
+The verify overran its ~$0.28 quote on two repair rounds with 11 token-limit
+splits and 4 HTTP 503 splits.
