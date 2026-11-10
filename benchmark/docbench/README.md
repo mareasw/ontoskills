@@ -212,7 +212,7 @@ same JSON output contract. Only the context differs.
 - [x] Table-record segmentation (`PREFLIGHT.md` §10.7(b)) written, measured on a fresh D5+D6 run and fully censused
 - [x] Fixed run measured: **still fail** — D6 fixed (recall 10/10), D5 fails on 8 facts absent (two-line glossary headwords)
 - [x] Key/value table segmentation (`PREFLIGHT.md` §10.7(e)(i)) written and measured: D5 98.2% support, 0 facts absent, but `D5-0002`/`D5-0003` still missed — **rejected** (§10.7(e)(ii))
-- [ ] Row claims + repair section guard (`PREFLIGHT.md` §10.7(f)) — written, tested and dry-run measured; the billable re-measurement has not started
+- [ ] Row claims + repair section guard (`PREFLIGHT.md` §10.7(f)) — written, tested and dry-run measured; the first billable attempt was stopped before any score (one non-verbatim quote), the gap is fixed in §10.7(f)(i), and the registered run restarts on the fixed pipeline
 - [ ] Machine-extracted claims replace the hand-built gold set (the real extraction gate)
 - [ ] Go/no-go decision recorded (technical gate passed; market gate open)
 
