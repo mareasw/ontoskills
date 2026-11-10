@@ -4,13 +4,16 @@
 (Gate 2, 2026-11-08).** The compiler's claims pass an independent census at
 **99.0% evidence support** (499/504), 0 fabrications, 97.6% gold recall, and B2
 beats B1 on citation by +20.0 pp automatic / +21.9 pp blind. The
-**second-corpus probe (2026-11-09) fails, twice**: the first run misses D6 recall
-(2/10, disposition cells segmented as headings); the fixed run repairs D6
-(recall 10/10, support 96.1%) and **fails on D5**, where 8 claims define a term
-the document does not define because glossary headwords wrap onto two lines.
-The **market gate is still open**. See [`RESULTS.md`](RESULTS.md) for the
-numbers, the manual review, the blind re-score and the limitations. The corpus
-and the full gold set stay local; the protocol and the examples are public.
+**second-corpus probe (2026-11-09/10) fails, three times**: the first run misses
+D6 recall (2/10, disposition cells segmented as headings); the fixed run repairs
+D6 (recall 10/10, support 96.1%) and **fails on D5**, where 8 claims define a
+term the document does not define because glossary headwords wrap onto two
+lines; the key/value fix removes all 8 and lifts D5 to 98.2% support with 0 facts
+absent, but still misses `D5-0002` and `D5-0003`, so it is **rejected by its own
+pre-registered criteria**. The **market gate is still open**. See
+[`RESULTS.md`](RESULTS.md) for the numbers, the manual review, the blind re-score
+and the limitations. The corpus and the full gold set stay local; the protocol
+and the examples are public.
 
 The claim shape is defined by [`schemas/claim.v2.schema.json`](../../schemas/claim.v2.schema.json) and [`docs/adr/0001-document-first-kernel.md`](../../docs/adr/0001-document-first-kernel.md): a claim carries an `evidence` list, not a single quote, so a rule with an exception or a two-sided conflict can cite every span it needs.
 
@@ -29,7 +32,7 @@ Read the full protocol first: [`PREFLIGHT.md`](PREFLIGHT.md).
 | B2 answer vs hand-built B2 | within 5 pp | blind 97.4% (−2.6 pp) |
 | Market (interview / design partner) | evidence of demand | **not started** |
 
-Second-corpus probe (`PREFLIGHT.md` §10, per document, 2026-11-09):
+Second-corpus probe (`PREFLIGHT.md` §10, per document, 2026-11-09/10):
 
 | Document | Type | Structural | Support | Facts absent | Recall | Verdict |
 |---|---|---|---:|---:|---:|---|
@@ -37,15 +40,26 @@ Second-corpus probe (`PREFLIGHT.md` §10, per document, 2026-11-09):
 | D6 — failed run | table-as-content | 100% | 47/51 = 92.2% | 4 | 2/10 = 20.0% | **fail** |
 | D5 — fixed run | contract | 100% | 329/354 = 92.9% | 8 | 7/10 = 70.0% | **fail** |
 | D6 — fixed run | table-as-content | 100% | 49/51 = 96.1% | 0 | 10/10 = 100% | **pass** |
+| D5 — key/value fix | contract | 100% | 329/335 = 98.2% | 0 | 8/10 = 80.0% | **fail** |
+| D6 — key/value fix | table-as-content | 100% | 61/62 = 98.4% | 0 | 10/10 = 100% | **pass** |
 
-The probe fails on both runs, for different reasons. The first run fails D6
-recall; the fixed run fixes D6 and fails D5 on "facts absent from source" —
-8 glossary claims define a term the document does not define, because two-line
-headwords keep only their last line as the section heading. The support misses
-and both mechanisms are named in [`gold/audit.probe.md`](gold/audit.probe.md)
-and [`gold/audit.probe.fixed.md`](gold/audit.probe.fixed.md); the fixes are
-pre-registered as `PREFLIGHT.md` §10.7(b) (applied) and §10.7(e)(i) (not yet
-written), and both runs are kept as measured.
+The probe fails on all three runs, for different reasons. The first run fails D6
+recall; the fixed run fixes D6 and fails D5 on "facts absent from source" — 8
+glossary claims define a term the document does not define, because two-line
+headwords keep only their last line as the section heading; the key/value fix
+removes those 8 and takes D5 to 98.2% support with 0 facts absent, but D5 still
+does not recall `D5-0002` (the exporter's name and address: segmented, never
+extracted) or `D5-0003` (the primary place: quoted in the raw compile, then
+re-evidenced away by the quote-only repair), so the fix is **rejected by its own
+pre-registered criteria** rather than shipped. D6's evidence in that run is
+byte-identical to the fixed run, so its pass is unaffected input, not evidence
+for the key/value rule. The support misses and all three mechanisms are named in
+[`gold/audit.probe.md`](gold/audit.probe.md),
+[`gold/audit.probe.fixed.md`](gold/audit.probe.fixed.md) and
+[`gold/audit.probe.kv.md`](gold/audit.probe.kv.md); the fixes are pre-registered
+as `PREFLIGHT.md` §10.7(b) (applied), §10.7(e)(i) (applied, rejected on
+measurement, §10.7(e)(ii)); the code is on `main`, the fix is not accepted. All
+three runs are kept as measured.
 
 Gate 2's thresholds and method were fixed in `PREFLIGHT.md` §9 before the run;
 the four amendments that got it there (§9.1–§9.4) each answer a measured defect
