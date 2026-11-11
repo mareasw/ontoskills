@@ -1,9 +1,11 @@
 # DocBench results
 
 **Dates:** 2026-11-07 (hand-built claims) · 2026-11-08 (machine-compiled claims) ·
-2026-11-09 (second-corpus probe, failed run and fixed run).
+2026-11-09 (second-corpus probe, failed run and fixed run) · 2026-11-11
+(ADR 0002 Phase 0 and Phase 1).
 **Status:** both technical gates pass — the representation (2026-11-07) and
-machine extraction (Gate 2, 2026-11-08). The second-corpus probe (2026-11-09)
+machine extraction (Gate 2, 2026-11-08). ADR 0002 Phases 0 and 1 both pass on
+2026-11-11 (the last two sections). The second-corpus probe (2026-11-09)
 **fails, twice**. The first run fails on D6 recall: the table document recalls
 2/10 gold obligations because disposition cells are segmented as headings. The
 fixed run repairs that (D6 recall 10/10, support 96.1%) and **fails again on
@@ -821,6 +823,52 @@ presence test and 8 as a class comparison, and caught none of the census's 8
 `no` (verbatim, locator, page, section, numbers) but not the judge of `weak`:
 the unquoted lead-in is the class the LLM audit exists for, so Phase 1 keeps the
 ADR's 10% sampled QA for support.
+
+## Phase 1 — evidence-first prompt (2026-11-11) — **accepted**
+
+`PREFLIGHT.md` §10.8 pre-registered four evidence-first prompt rules and the
+criteria before the run. The run is compile-only over D5 + D6, fresh output, no
+repair and no drop — a true first pass.
+
+| Document | Claims | `ok` | `weak` | First-pass support |
+|---|---:|---:|---:|---:|
+| D5 | 315 | 296 | 19 | **93.97%** |
+| D6 | 49 | 48 | 1 | **97.96%** |
+| **Pooled** | **364** | **344** | **20** | **94.51%** |
+
+| Criterion (§10.8) | Threshold | Measured |
+|---|---|---|
+| D5 support | ≥ 90% | 93.97% |
+| D6 support | ≥ 90% | 97.96% |
+| Facts absent from the source | 0 | 0 |
+| `no` / `fabricated` | 0 | 0 |
+| Recall | ≥ 70%, named claims recalled | 10/10 D5, 10/10 D6, all three named |
+| Cost | ≤ $0.30 | $0.145 |
+
+The run emitted 364 claims and 463 evidence spans, rejected 41 at the schema
+check and merged 15 near-duplicates; 96,164 input and 217,937 output tokens at
+$0.15/M and $0.60/M give **$0.145**, against $0.37 for the two-repair-round run
+of §10.7(g).
+
+What changed for the better: the primary-place fact of `D5-0003` is emitted at
+first pass with the correct section path, the exception in `D5-0053` keeps
+**5.1.1 to 5.1.3** (the §10.7(g) claim narrowed it to 5.1.1), and definitions
+name their headword (104 of 364 claims are definitions, 2 have a wrong subject).
+What did not change: 16 of the 20 `weak` rows are still the unquoted lead-in,
+because atomic splitting (rule 4) multiplies sub-item claims whose parent span
+is elsewhere. Rule 2 as prompt text did not close that class, and the weak rate
+rose from 2.0% in §10.7(g) to 5.5% here. The bar is met on both documents, so
+the phase passes; the class is a measured debt, and the fix is structural
+(attach the parent span at split time), not another prompt paragraph.
+
+The deterministic verifier scored 361/364 = 99.18%: it caught the three rows
+whose missing element is a content word (`D5-0163`, `D5-0164`, `D6-0047`) and
+missed all 17 whose missing element is the actor or the modal. Phase 0's
+conclusion holds, and the LLM census remains the judge of support.
+
+**Verdict: Phase 1 accepted.** Full census, the twenty rows and the recall
+tables are in `gold/audit.phase1.md`; the pre-registration and its outcome are
+`PREFLIGHT.md` §10.8.
 
 ## Limitations
 

@@ -23,8 +23,13 @@ drop/rewrite guard (§10.7(g)) passed its zero-cost replay on 2026-11-11:
 defined headword before the replay passed (§10.7(g)(i)–(ii)). Its paid run, the
 same day, is the first to **pass**: D5 97.7% support, 0 facts absent, 10/10
 recall with `D5-0003` kept by the guard, and D6 100% with 0 misattributed
-authorities (§10.7(h)). The row-claim pipeline is accepted for the demo. The
-**market gate is still open**. See
+authorities (§10.7(h)). The row-claim pipeline is accepted for the demo.
+ADR 0002 Phase 0 then validated the deterministic verifier against that census
+(97.73% agreement, 0 false rejections, §10.7(h)), and Phase 1 validated the
+evidence-first prompt on a compile-only first pass: D5 93.97%, D6 97.96%, 0
+facts absent, 10/10 recall and $0.145 — **accepted** (§10.8). Twenty claims
+remain `weak`, 16 of them the unquoted-lead-in class, carried into Phase 2 as
+measured debt. The **market gate is still open**. See
 [`RESULTS.md`](RESULTS.md) for the numbers, the manual review, the blind re-score
 and the limitations. The corpus and the full gold set stay local; the protocol
 and the examples are public.
@@ -245,6 +250,8 @@ same JSON output contract. Only the context differs.
 - [x] Drop/rewrite guard (`PREFLIGHT.md` §10.7(g)) — implemented with 51 verifier tests (175 in the suite); the first rewrite rule failed its zero-cost replay (14 rewrites rejected, two named claims) and was narrowed to a defined headword in §10.7(g)(ii); replay 2 keeps `D5-0007`, changes only 6 glossary-headword rewrites, 0 model calls; paid run **passes** (2026-11-11, $0.37): D5 97.7% support, 0 facts absent, 10/10 recall with `D5-0003` kept, D6 100% and 0 misattributed authorities — **accepted** (§10.7(h))
 - [x] Evidence-support census of the accepted run (`gold/audit.probe.rows.g.md`): 389/397 `ok`, 8 `weak`, 0 `no`, 0 `fabricated`
 - [x] Phase 0 of `docs/adr/0002-evidence-first-extraction.md`: deterministic verifier vs this census — **388/397 = 97.73%**, 0 `no`, D5 97.36% / D6 100%; modality demoted to a note; the 7 missed `weak` are the unquoted-lead-in class (`gold/audit.phase0.md`)
+- [x] Phase 1 of the ADR (`PREFLIGHT.md` §10.8): evidence-first prompt, compile-only first pass — **accepted**, D5 296/315 = 93.97%, D6 48/49 = 97.96%, 0 facts absent, 10/10 recall (all three named), $0.145; 20 `weak`, 16 of them the unquoted lead-in (`gold/audit.phase1.md`)
+- [ ] Phase 2 of the ADR: CLI `ingest` + web claim view + public multi-document corpus
 - [ ] Evidence-first pipeline + public demo (`../../docs/adr/0002-evidence-first-extraction.md`): ≤ $0.05 and ≤ 60 s per 60-page document, first-pass support ≥ 90%
 - [ ] Five design-partner conversations (`../../docs/market/beachhead-2026-11.md`)
 - [ ] Machine-extracted claims replace the hand-built gold set (the real extraction gate)
