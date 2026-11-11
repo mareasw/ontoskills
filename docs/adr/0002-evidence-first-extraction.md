@@ -8,6 +8,24 @@
 - **Evidence:** `benchmark/docbench/RESULTS.md` (four second-corpus runs),
   `benchmark/docbench/gold/audit.probe.rows.md` (389-row census)
 
+## What the product is
+
+The product is an **enterprise knowledge base**: every document the company owns
+or receives is compiled into claims with verbatim evidence, linked into a graph,
+and queried deterministically — SPARQL through the MCP runtime — with a citation
+for every answer.
+
+"Contract review", "policy Q&A", "audit evidence pack", "onboarding assistant"
+are **views** over that graph: a saved query plus a presentation layer. They are
+not separate products, and they must never grow their own ingestion pipeline.
+The architecture below exists to make the knowledge base cheap enough to ingest
+everything, not to build a better review tool than the incumbents.
+
+This distinction is the line the project must not cross: a review tool edits
+documents and competes on Word integration; a knowledge base produces claims and
+evidence and competes on being right. The first is a feature market with
+distribution already won; the second is the asset.
+
 ## Context
 
 Four runs of the second-corpus probe have produced the same shape of result:
@@ -107,26 +125,39 @@ fixed six-document eval set, then on the public demo corpus.
 | Fabricated | 0 | **0** | Non-negotiable |
 | Deterministic verifier vs. census agreement | not measured | **≥ 95%** on the 389-row artifact, replay only | The verifier replaces the audit; it must earn it |
 | Named claims of §10.7(f) | 2/3 | **3/3** | The gate that rejected the last run |
+| Cross-document demo questions | 0 | **3/3, each citing claims from ≥ 2 documents** | The demo must prove a corpus index, not a single-file reader |
 
 ## Demo
 
-One command, one document, one visible result:
+One command ingests a folder, because the unit of the product is the corpus, not
+the document:
 
 ```
-ontoskills extract contract.pdf --out claims.jsonl --ttl contract.ttl
+ontoskills ingest docs/ --out kb/      # every PDF/DOCX/TXT in the folder
+ontoskills ask "which contracts let us audit the sub-processor?"
 ```
 
 - local run with a single API key, no upload by default;
-- web view: every claim shows its quote, page and section, with a copy-citation
-  control;
-- three canned questions answered through the existing MCP/SPARQL runtime, each
-  answer citing the claims it used;
+- the output is one graph over the whole folder: claims from different documents
+  share subjects and land in the same query surface;
+- web view: every claim shows its quote, page, section and source document, with
+  a copy-citation control;
+- **three questions that only a cross-document index can answer**, each answered
+  through the existing MCP/SPARQL runtime and citing the claims it used:
+  1. *Which suppliers have a breach-notification window shorter than 72 hours?*
+     (answer assembled from several contracts, one row per contract);
+  2. *Where does this DPA conflict with our own retention policy?*
+     (a conflict between a received document and an internal one);
+  3. *What must we tell a sub-processor before they can use a new AI vendor?*
+     (an obligation chain that crosses a contract, an annex and a policy);
 - export JSONL, TTL, and a CSV evidence pack for an audit file.
 
 The demo corpus is **public and redistributable**: 12–15 documents from SEC
 EDGAR exhibits, gov.uk model contracts, EU standard contractual clauses and
-public tender documents, with the licence checked per document. No private
-corpus, no IDTA, no NARA text in the public demo.
+public tender documents, with the licence checked per document. It must contain
+at least three document types (contract, policy, annex or tender) so the
+cross-document questions are real, not staged. No private corpus, no IDTA, no
+NARA text in the public demo.
 
 ## Rollout
 
@@ -134,7 +165,7 @@ corpus, no IDTA, no NARA text in the public demo.
 |---|---|---|---|
 | 0 | Replay the deterministic verifier on the 389-claim artifact; no model calls | ≥ 95% agreement with the census; `D5-0007` survives the drop guard | $0 |
 | 1 | Evidence-first prompt + token attestation on D5 and D6 | First-pass support ≥ 90%, 3/3 named claims | ≤ $0.30 |
-| 2 | CLI subcommand + web claim view + public corpus | The demo runs end to end on a document we can redistribute | engineering only |
+| 2 | CLI `ingest` + web claim view + public multi-document corpus | The demo ingests a folder and all three cross-document questions answer with citations from ≥ 2 documents | engineering only |
 | 3 | Five design-partner documents (memo: `docs/market/beachhead-2026-11.md`) | A consultant uses the pack in a real engagement | pilot |
 
 Phase 0 is a precondition: if the deterministic verifier cannot reproduce the
@@ -159,10 +190,21 @@ Phase 1.
 
 ## Non-goals
 
-Redlining, negotiation, legal advice, autonomous actions on documents. The
+**Editing and negotiation.** No redlining, no clause generation, no tracked
+changes, no Word round-trip, no "accept this suggestion" button. The views are
+read-only over the graph: they select, order and cite claims; they never write
+back into a document. A review view that starts editing has become the
+incumbent's product and lost the only thing we have — that it cannot say
+something the source does not say.
+
+**Advice and autonomous action.** No legal advice, no decisions taken on a
+document, no sending, filing or accepting anything on the user's behalf. The
 product produces verifiable claims and evidence; the professional keeps the
 judgement. This boundary is also the liability boundary and must be stated in
 the pilot contract.
+
+**A separate pipeline per view.** Every view is a saved query. If a use case
+needs a new ingestion stage, it is a different product, not a feature.
 
 ## Open questions
 
