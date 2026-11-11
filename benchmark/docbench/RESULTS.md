@@ -699,6 +699,45 @@ policy rather than through segmentation. (3) The guard was scoped to the wrong
 action: `reevidence` was guarded, `drop` was not, and `drop` is what removed the
 claim.
 
+## Zero-cost guard replay (2026-11-11) — no model calls, no new census
+
+`PREFLIGHT.md` §10.7(g) pre-registered a guard on `drop` and `rewrite` and made a
+replay of the rejected trace a precondition for the paid run. The replay executes
+the pure verify policy against the recorded audit and repair cache, with
+`--replay` aborting on any attempted model call. It costs $0 and cannot produce a
+new census: the claims come from the same compile.
+
+**Replay 1 (rule 2 as first written): rejected.** `D5-0007` survived its round-2
+`drop`, but the rewrite rule rejected 14 rewrites, including `D5-0002` (the
+document title abbreviated to "IDTA") and `D5-0004` (a parenthetical column
+descriptor dropped while the headword stayed). The trigger — any section-path
+n-gram the rewrite loses — cannot tell a lost term from an abbreviation or a
+paraphrase. Precondition 2 failed, so no paid run started.
+
+**Replay 2 (rule 2 narrowed to a defined headword, §10.7(g)(ii)): pass.**
+
+| Check | Result |
+|---|---|
+| `D5-0007` kept | yes, as `weak` |
+| changes limited to lost defined headwords | 6 rewrites rejected |
+| final set vs the rejected run | 390 vs 389 claims: `D5-0007` added, nothing removed |
+| evidence | 0 quotes or locators changed |
+| statements | 5 differ, all guard-rejected glossary rows |
+| `check_claims.py` | 390 claims, 517 spans, 0 failures |
+
+The six rejections are `D5-0010`, `D5-0336`, `D5-0345`, `D5-0363`, `D5-0310` and
+`D5-0312`; four of those fragments were already in the census's residual-defect
+list. The guard keeps the row's own term instead of the subjectless fragment.
+
+The audit distribution of replay 2 is 380 `ok`, 10 `weak`, 0 `no`, 0
+`fabricated`. That is the verifier's own verdict, **not** a census support
+figure; the gate of §10.7(f) is unchanged and will be measured by the paid run,
+which has not started.
+
+The replay output is kept beside the measured trace in
+`gold/probe.rows.compiled.jsonl.replay-10.7g/` (`report.json`, the 390-claim
+artifact and its spans; gitignored like every other measured artifact).
+
 ## Limitations
 
 - **n = 39 scored questions, one run, one model.** No confidence interval is
@@ -786,3 +825,18 @@ python benchmark/docbench/blind_metrics.py --run "$RUN"
 ```
 
 The evidence-support audit (sample and full census) is `gold/audit.run3.md`.
+
+The zero-cost guard replay must not touch the measured artifacts, and the replay
+writes `report.json`, so it runs on a copy of the cache:
+
+```bash
+REPLAY=/tmp/opencode/replay-guard
+rm -rf "$REPLAY" && mkdir -p "$REPLAY"
+cp benchmark/docbench/gold/probe.rows.compiled.jsonl.verify/*.jsonl "$REPLAY"/
+python benchmark/docbench/verify_claims.py \
+  --claims benchmark/docbench/gold/probe.rows.compiled.jsonl \
+  --spans benchmark/docbench/gold/probe.rows.compiled.jsonl.spans.jsonl \
+  --out "$REPLAY/verified.jsonl" --work "$REPLAY" --resume --replay
+```
+
+`--replay` aborts on any attempted model call, so the command cannot spend.
