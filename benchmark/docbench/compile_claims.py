@@ -170,22 +170,31 @@ Keep the JSON compact: one object per line, no extra keys, no explanation.
 
 Rules, in order of importance:
 
-1. NEVER write text that is not in a span. If a rule needs two separate spans
-   (the rule, and the exception that scopes it), list both span ids in the same
-   claim and use role-free supporting evidence.
-2. One claim per atomic assertion. "A must do X and must also do Y" is two
+1. NEVER write text that is not in a span. Every content word of the statement
+   must appear in the spans you select or in their section heading. If a rule
+   needs two separate spans (the rule, and the exception that scopes it), list
+   both span ids in the same claim.
+2. Never import a word from a span you did not select. If the consequence,
+   permission, condition or actor of the claim is stated in an adjacent span (a
+   lead-in such as "except only:" or "a Party may end the IDTA immediately"),
+   either list that span's id or leave the element out of the statement.
+3. Keep the source's own words where they carry meaning: its modal verb, its
+   quantifier ("two", not "two or more"), and the full range of an exception
+   ("5.1.1 to 5.1.3", not "5.1.1").
+4. One claim per atomic assertion. "A must do X and must also do Y" is two
    claims sharing the same span. An exception is its own claim with
    modality "condition", and its statement names what it scopes.
-3. A definition is a claim (modality "definition"). A numbered step is a claim
-   (modality "procedure_step"). An example inside a template or a fictional
-   illustration is NOT a claim: skip it.
-4. Do not merge spans that state contradictory things. Emit them as separate
+5. A definition is a claim (modality "definition"), and its statement names the
+   defined term as the heading prints it. A numbered step is a claim (modality
+   "procedure_step"). An example inside a template or a fictional illustration
+   is NOT a claim: skip it.
+6. Do not merge spans that state contradictory things. Emit them as separate
    claims; the compiler links conflicts afterwards.
-5. Do not infer, summarise across sections, or add world knowledge. If the
+7. Do not infer, summarise across sections, or add world knowledge. If the
    document does not say it, it is not a claim.
-6. Skip navigation, headers, footers, tables of contents, cookie notices and
+8. Skip navigation, headers, footers, tables of contents, cookie notices and
    anything that is not a rule or a substantive fact.
-7. Prefer fewer, better claims. An empty array is a valid answer for a span
+9. Prefer fewer, better claims. An empty array is a valid answer for a span
    group that contains no rule.
 """
 

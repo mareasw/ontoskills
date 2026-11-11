@@ -1522,3 +1522,113 @@ new measurement, not a rewrite of theirs. Phase 0 of
 same day and is **met**: 388/397 = 97.73% agreement, 0 `no`, D5 97.36% / D6
 100% (`gold/audit.phase0.md`). The market gate remains open and is not affected
 by this result.
+
+## 10.8 Phase 1 — evidence-first prompt (pre-registration)
+
+The accepted pipeline pays for repair because the first pass is not evidence
+bound: in §10.7(g) the first audit rated 290 of 402 claims `ok` (72.1%), and two
+of the three repair rounds existed to pull statements back onto their quotes.
+ADR 0002 Phase 1 asks for **first-pass support ≥ 90%** at ≤ $0.30 on D5 + D6.
+
+This section pre-registers the change and its criteria. It is written before
+the run; the prompt below is the one that will be used, verbatim.
+
+### What changes
+
+Only the extraction system prompt. Spans (359), chunking (15, overlap 2),
+schema, model and corpus are unchanged. Four rules are added, each aimed at a
+failure the censuses named:
+
+| Rule | Failure it targets | Evidence |
+|---|---|---|
+| Every content word of the statement must be in the selected spans or their section heading | paraphrase drift (`D5-0203` "apply"/"applies") | `audit.probe.rows.g.md` |
+| Never import a word from a span you did not select: cite the lead-in or leave the element out | consequence/permission taken from an unquoted lead-in | `D5-0072`, `D5-0264`–`D5-0267`, `D5-0288` |
+| Keep the source's modal, quantifier and full exception range | narrowed exception, generalised quantity | `D5-0067`, `D5-0063` |
+| A definition names the term as the heading prints it | bare definition fragments | `D5-0307`, `D5-0341`, `D5-0345` |
+
+The four are inserted into the existing rules 1–7; the rest of the prompt is
+unchanged.
+
+### Measurement
+
+1. Compile only (`--verify` off) over D5 + D6, fresh output. No repair, no drop.
+2. Score every emitted claim with the deterministic verifier
+   (`verify_deterministic.py`), whose agreement with the census is 97.73% and
+   whose known bias is to call 7 of 8 census `weak` rows `ok`
+   (`gold/audit.phase0.md`).
+3. Full independent census of the emitted claims, as in every previous run.
+   The deterministic number selects nothing: the verdict is the census.
+
+### Criteria
+
+| Criterion | Threshold |
+|---|---|
+| D5 first-pass support (census) | ≥ 90% |
+| D6 first-pass support (census) | ≥ 90% |
+| Facts absent from source | 0 |
+| `no` / `fabricated` | 0 |
+| Recall | ≥ 70%, with `D5-0002`, `D5-0003`, `D5-0004` recalled |
+| Cost | ≤ $0.30 |
+
+A document that misses a threshold fails the phase on its own. If Phase 1
+fails, the failure is recorded and Phase 2 (product) proceeds without another
+prompt iteration; a new attempt needs its own pre-registration, as before.
+
+### The prompt as run
+
+```
+1. NEVER write text that is not in a span. Every content word of the statement
+   must appear in the spans you select or in their section heading. If a rule
+   needs two separate spans (the rule, and the exception that scopes it), list
+   both span ids in the same claim.
+2. Never import a word from a span you did not select. If the consequence,
+   permission, condition or actor of the claim is stated in an adjacent span (a
+   lead-in such as "except only:" or "a Party may end the IDTA immediately"),
+   either list that span's id or leave the element out of the statement.
+3. Keep the source's own words where they carry meaning: its modal verb, its
+   quantifier ("two", not "two or more"), and the full range of an exception
+   ("5.1.1 to 5.1.3", not "5.1.1").
+4. One claim per atomic assertion. "A must do X and must also do Y" is two
+   claims sharing the same span. An exception is its own claim with
+   modality "condition", and its statement names what it scopes.
+5. A definition is a claim (modality "definition"), and its statement names the
+   defined term as the heading prints it. A numbered step is a claim (modality
+   "procedure_step"). An example inside a template or a fictional illustration
+   is NOT a claim: skip it.
+6. Do not merge spans that state contradictory things. Emit them as separate
+   claims; the compiler links conflicts afterwards.
+7. Do not infer, summarise across sections, or add world knowledge. If the
+   document does not say it, it is not a claim.
+8. Skip navigation, headers, footers, tables of contents, cookie notices and
+   anything that is not a rule or a substantive fact.
+9. Prefer fewer, better claims. An empty array is a valid answer for a span
+   group that contains no rule.
+```
+
+### Result (2026-11-11)
+
+**Accepted.** The prompt above was used verbatim; the run was compile-only,
+fresh output, no repair and no drop. Census in `gold/audit.phase1.md`.
+
+| Criterion | Threshold | Measured | Result |
+|---|---|---|---|
+| D5 first-pass support | ≥ 90% | 296/315 = 93.97% | pass |
+| D6 first-pass support | ≥ 90% | 48/49 = 97.96% | pass |
+| Facts absent from source | 0 | 0 | pass |
+| `no` / `fabricated` | 0 | 0 | pass |
+| Recall | ≥ 70%, with `D5-0002`–`D5-0004` | 10/10 D5, 10/10 D6; all three named | pass |
+| Cost | ≤ $0.30 | $0.145 (96,164 in / 217,937 out) | pass |
+
+The 20 `weak` rows are 16 unquoted lead-ins, 2 invented subjects
+(`D5-0066`, `D5-0067`), 1 column-header object (`D5-0030`) and 1 retention
+phrase in a later span (`D6-0047`). Rule 2 did not close the lead-in class:
+splitting into atomic sub-items increased the exposure, and the weak rate rose
+from 2.0% (§10.7(g)) to 5.5% even as the named failures disappeared. The
+deterministic verifier scored 361/364 and missed every lead-in row, which
+reproduces Phase 0's bias; it stays the hard gate, not the support judge.
+
+The prompt change is kept — the bar is met on both documents, the named facts
+survive and the cost is $0.145 — but the lead-in class is carried forward to
+Phase 2 as measured debt. The structural fix is to attach the parent span when
+a clause is split, not a further prompt iteration: this section is closed and a
+new prompt attempt would need its own pre-registration.
