@@ -4,7 +4,8 @@
 (Gate 2, 2026-11-08).** The compiler's claims pass an independent census at
 **99.0% evidence support** (499/504), 0 fabrications, 97.6% gold recall, and B2
 beats B1 on citation by +20.0 pp automatic / +21.9 pp blind. The
-**second-corpus probe (2026-11-09/10) fails, four times**: the first run misses
+**second-corpus probe (2026-11-09/11) failed four times and passed on the
+fifth**: the first run misses
 D6 recall (2/10, disposition cells segmented as headings); the fixed run repairs
 D6 (recall 10/10, support 96.1%) and **fails on D5**, where 8 claims define a
 term the document does not define because glossary headwords wrap onto two
@@ -19,8 +20,11 @@ policy**, which the guard (scoped to `reevidence`) does not cover; one named
 claim absent means the fix is **rejected** again (§10.7(f)(ii)). The follow-up
 drop/rewrite guard (§10.7(g)) passed its zero-cost replay on 2026-11-11:
 `D5-0007` is kept as `weak`, and the rewrite rule had to be narrowed to a
-defined headword before the replay passed (§10.7(g)(i)–(ii)). The paid run has
-not started. The **market gate is still open**. See
+defined headword before the replay passed (§10.7(g)(i)–(ii)). Its paid run, the
+same day, is the first to **pass**: D5 97.7% support, 0 facts absent, 10/10
+recall with `D5-0003` kept by the guard, and D6 100% with 0 misattributed
+authorities (§10.7(h)). The row-claim pipeline is accepted for the demo. The
+**market gate is still open**. See
 [`RESULTS.md`](RESULTS.md) for the numbers, the manual review, the blind re-score
 and the limitations. The corpus and the full gold set stay local; the protocol
 and the examples are public.
@@ -42,7 +46,7 @@ Read the full protocol first: [`PREFLIGHT.md`](PREFLIGHT.md).
 | B2 answer vs hand-built B2 | within 5 pp | blind 97.4% (−2.6 pp) |
 | Market (interview / design partner) | evidence of demand | **not started** |
 
-Second-corpus probe (`PREFLIGHT.md` §10, per document, 2026-11-09/10):
+Second-corpus probe (`PREFLIGHT.md` §10, per document, 2026-11-09/11):
 
 | Document | Type | Structural | Support | Facts absent | Recall | Verdict |
 |---|---|---|---:|---:|---:|---|
@@ -54,8 +58,10 @@ Second-corpus probe (`PREFLIGHT.md` §10, per document, 2026-11-09/10):
 | D6 — key/value fix | table-as-content | 100% | 61/62 = 98.4% | 0 | 10/10 = 100% | **pass** |
 | D5 — row claims + guard | contract | 100% | 333/338 = 98.5% | 0 | 9/10 = 90.0% | **fail** |
 | D6 — row claims + guard | table-as-content | 100% | 51/51 = 100% | 0 | 10/10 = 100% | **pass** |
+| D5 — drop/rewrite guard | contract | 100% | 333/341 = **97.7%** | 0 | **10/10 = 100%** | **pass** |
+| D6 — drop/rewrite guard | table-as-content | 100% | 56/56 = **100%** | 0 | 10/10 = 100% | **pass** |
 
-The probe fails on all four runs, for different reasons. The first run fails D6
+The first four runs fail, for different reasons, and the fifth passes. The first run fails D6
 recall; the fixed run fixes D6 and fails D5 on "facts absent from source" — 8
 glossary claims define a term the document does not define, because two-line
 headwords keep only their last line as the section heading; the key/value fix
@@ -70,17 +76,22 @@ and address) and lifts D5 to 98.5% support, but `D5-0003` is emitted at compile
 (`D5-0007`) and then dropped by the verify repair policy — `rewrite`, then
 `drop`, neither of which the section guard covers — so `D5-0003` is absent
 again and the fix is **rejected** (§10.7(f)(ii)). D6's 35 spans are again
-byte-identical, so its pass is a control. The support misses and all four
-mechanisms are named in
+byte-identical, so its pass is a control. The support misses and the mechanisms
+behind the four failures are named in
 [`gold/audit.probe.md`](gold/audit.probe.md),
 [`gold/audit.probe.fixed.md`](gold/audit.probe.fixed.md),
 [`gold/audit.probe.kv.md`](gold/audit.probe.kv.md) and
-[`gold/audit.probe.rows.md`](gold/audit.probe.rows.md); the fixes are
+[`gold/audit.probe.rows.md`](gold/audit.probe.rows.md); the census of the
+passing run is [`gold/audit.probe.rows.g.md`](gold/audit.probe.rows.g.md). The
+fixes are
 pre-registered as `PREFLIGHT.md` §10.7(b) (applied), §10.7(e)(i) (applied,
 rejected on measurement, §10.7(e)(ii)) and §10.7(f) (applied, rejected on
 measurement, §10.7(f)(ii)); §10.7(g) is the guard for that failure — implemented,
-replay passed at zero cost, paid run pending. The code is on `main`, none of the
-fixes is accepted. All four runs are kept as measured.
+replay passed at zero cost, and its paid run **passes** (§10.7(h)): the verifier
+tries to drop `D5-0006` and the guard refuses, so `D5-0003` is recalled and D5
+reaches 97.7% support with 10/10 recall, while D6 stays at 100% and 0
+misattributed authorities. The code is on `main`; the row-claim pipeline is
+accepted for the demo. All five runs are kept as measured.
 
 Gate 2's thresholds and method were fixed in `PREFLIGHT.md` §9 before the run;
 the four amendments that got it there (§9.1–§9.4) each answer a measured defect
@@ -230,7 +241,9 @@ same JSON output contract. Only the context differs.
 - [x] Fixed run measured: **still fail** — D6 fixed (recall 10/10), D5 fails on 8 facts absent (two-line glossary headwords)
 - [x] Key/value table segmentation (`PREFLIGHT.md` §10.7(e)(i)) written and measured: D5 98.2% support, 0 facts absent, but `D5-0002`/`D5-0003` still missed — **rejected** (§10.7(e)(ii))
 - [x] Row claims + repair section guard (`PREFLIGHT.md` §10.7(f)) measured on a fresh D5+D6 run: D5 98.5% support, 0 facts absent, 9/10 recall — **rejected**, `D5-0003` emitted at compile then dropped by the verify repair policy, which the guard (scoped to `reevidence`) does not cover (§10.7(f)(ii)); first attempt stopped before any score and preserved
-- [x] Drop/rewrite guard (`PREFLIGHT.md` §10.7(g)) — implemented with 51 verifier tests (175 in the suite); the first rewrite rule failed its zero-cost replay (14 rewrites rejected, two named claims) and was narrowed to a defined headword in §10.7(g)(ii); replay 2 keeps `D5-0007`, changes only 6 glossary-headword rewrites, 0 model calls — paid run **≤ $0.55** awaiting approval
+- [x] Drop/rewrite guard (`PREFLIGHT.md` §10.7(g)) — implemented with 51 verifier tests (175 in the suite); the first rewrite rule failed its zero-cost replay (14 rewrites rejected, two named claims) and was narrowed to a defined headword in §10.7(g)(ii); replay 2 keeps `D5-0007`, changes only 6 glossary-headword rewrites, 0 model calls; paid run **passes** (2026-11-11, $0.37): D5 97.7% support, 0 facts absent, 10/10 recall with `D5-0003` kept, D6 100% and 0 misattributed authorities — **accepted** (§10.7(h))
+- [x] Evidence-support census of the accepted run (`gold/audit.probe.rows.g.md`): 389/397 `ok`, 8 `weak`, 0 `no`, 0 `fabricated`
+- [ ] Phase 0 of `docs/adr/0002-evidence-first-extraction.md`: deterministic verifier vs this census, agreement ≥ 95%
 - [ ] Evidence-first pipeline + public demo (`../../docs/adr/0002-evidence-first-extraction.md`): ≤ $0.05 and ≤ 60 s per 60-page document, first-pass support ≥ 90%
 - [ ] Five design-partner conversations (`../../docs/market/beachhead-2026-11.md`)
 - [ ] Machine-extracted claims replace the hand-built gold set (the real extraction gate)
