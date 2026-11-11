@@ -3,6 +3,12 @@
 The gateway drops long runs with 503s. Six attempts with a widening backoff is
 cheaper than losing a run that has already spent twenty minutes extracting.
 Credentials are read by the caller; this module never prints them.
+
+The timeout is per attempt and it is generous on purpose: the model returns the
+whole reply at once (no streaming), so a legal chunk that emits 6,000 tokens
+holds the connection for ~3 minutes. A 300-second ceiling turned those into
+retries that could never succeed; 600 seconds is a measured 1.7x margin over a
+real chunk (6,132 tokens in 175 s).
 """
 
 from __future__ import annotations
@@ -28,7 +34,7 @@ def chat(
     max_tokens: int,
     *,
     temperature: float = 0,
-    timeout: int = 300,
+    timeout: int = 600,
     attempts: int = ATTEMPTS,
 ) -> tuple[str, dict, str]:
     """POST one chat completion. Returns ``(content, usage, finish_reason)``."""

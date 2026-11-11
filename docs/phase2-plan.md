@@ -136,6 +136,7 @@ recorded in `manifest.json` after the run, never inferred afterwards.
 | Risk | Handling |
 |---|---|
 | Gateway 503s during a long run | cache every reply; `--resume`; `failed` calls are an error, not a silent partial artifact |
+| A chunk's reply outlives the client timeout | one reply is returned whole (no streaming); the per-attempt timeout is 600 s, measured against a 6,132-token chunk that took 175 s |
 | A document silently changes upstream | SHA-256 in the manifest; `fetch.sh` and `ingest` both refuse a mismatch |
 | HTML chrome becomes claims | extractor drops `nav/header/footer/aside/form` and feedback widgets; segmenter drops boilerplate phrases |
 | Page numbers are unstable | page ranges only for published PDFs; DOCX documents carry section paths and offsets, not pages |
