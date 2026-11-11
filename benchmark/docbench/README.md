@@ -107,6 +107,7 @@ benchmark/docbench/
 ├── private/                # local copies of source documents (gitignored)
 ├── compile_claims.py       # span-first compiler: segment -> extract -> validate -> emit
 ├── verify_claims.py        # audit each claim against its own evidence, repair it, drop only what is unsupported
+├── verify_deterministic.py # ADR 0002 Phase 0: six rules, no model, agreement vs a census
 ├── llm.py                  # one OpenAI-compatible call, with the retry policy both stages share
 ├── gold/
 │   ├── schema.json         # v1 schema (single quote + locator), kept for the 2026-11-07 run
@@ -243,7 +244,7 @@ same JSON output contract. Only the context differs.
 - [x] Row claims + repair section guard (`PREFLIGHT.md` §10.7(f)) measured on a fresh D5+D6 run: D5 98.5% support, 0 facts absent, 9/10 recall — **rejected**, `D5-0003` emitted at compile then dropped by the verify repair policy, which the guard (scoped to `reevidence`) does not cover (§10.7(f)(ii)); first attempt stopped before any score and preserved
 - [x] Drop/rewrite guard (`PREFLIGHT.md` §10.7(g)) — implemented with 51 verifier tests (175 in the suite); the first rewrite rule failed its zero-cost replay (14 rewrites rejected, two named claims) and was narrowed to a defined headword in §10.7(g)(ii); replay 2 keeps `D5-0007`, changes only 6 glossary-headword rewrites, 0 model calls; paid run **passes** (2026-11-11, $0.37): D5 97.7% support, 0 facts absent, 10/10 recall with `D5-0003` kept, D6 100% and 0 misattributed authorities — **accepted** (§10.7(h))
 - [x] Evidence-support census of the accepted run (`gold/audit.probe.rows.g.md`): 389/397 `ok`, 8 `weak`, 0 `no`, 0 `fabricated`
-- [ ] Phase 0 of `docs/adr/0002-evidence-first-extraction.md`: deterministic verifier vs this census, agreement ≥ 95%
+- [x] Phase 0 of `docs/adr/0002-evidence-first-extraction.md`: deterministic verifier vs this census — **388/397 = 97.73%**, 0 `no`, D5 97.36% / D6 100%; modality demoted to a note; the 7 missed `weak` are the unquoted-lead-in class (`gold/audit.phase0.md`)
 - [ ] Evidence-first pipeline + public demo (`../../docs/adr/0002-evidence-first-extraction.md`): ≤ $0.05 and ≤ 60 s per 60-page document, first-pass support ≥ 90%
 - [ ] Five design-partner conversations (`../../docs/market/beachhead-2026-11.md`)
 - [ ] Machine-extracted claims replace the hand-built gold set (the real extraction gate)

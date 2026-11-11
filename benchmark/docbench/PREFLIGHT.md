@@ -1517,8 +1517,8 @@ census, the verifier/census disagreement table and the residual defects are in
 
 **Verdict: accepted.** The row-claim pipeline is accepted for the demo. The
 earlier artifacts remain the measurements of their own pipelines; this run is a
-new measurement, not a rewrite of theirs. The next technical step is Phase 0 of
-`docs/adr/0002-evidence-first-extraction.md`: compare the deterministic
-verifier's verdicts against this census, which is the ≥ 95% agreement question
-the ADR left open. The market gate remains open and is not affected by this
-result.
+new measurement, not a rewrite of theirs. Phase 0 of
+`docs/adr/0002-evidence-first-extraction.md` was replayed against this census the
+same day and is **met**: 388/397 = 97.73% agreement, 0 `no`, D5 97.36% / D6
+100% (`gold/audit.phase0.md`). The market gate remains open and is not affected
+by this result.
