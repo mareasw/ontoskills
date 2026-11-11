@@ -18,6 +18,8 @@ __pycache__/
 docs/*
 # ADRs are part of the design record and must be versioned
 !docs/adr/
+# The Phase 2 engineering plan is the design record for the KB pipeline
+!docs/phase2-plan.md
 # Market and product investigations are decisions, not scratch notes
 !docs/market/
 
@@ -55,3 +57,8 @@ benchmark/docbench/gold/*.compiled.*.manifest.json
 benchmark/docbench/gold/*.adjudications.jsonl
 benchmark/docbench/gold/*.verdicts.jsonl
 benchmark/docbench/gold/claims.verified.jsonl
+
+# The demo corpus ships URLs, hashes and licences, not binaries.
+examples/demo-corpus/documents/
+examples/demo-corpus/kb/
+examples/demo-corpus/cache/
