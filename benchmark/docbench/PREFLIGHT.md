@@ -1305,9 +1305,10 @@ in `verify_claims.py`:
 1. **Drop test.** A `drop` of a `weak` claim whose evidence is verbatim in its
    own section is rejected, and the claim is kept with its verdict: the audit
    called it weak because a label or qualifier lives in the locator, not because
-   the quote is false. A `drop` for `no` is accepted only when the evidence lies
-   outside the claim's section; a `fabricated` claim may always be dropped,
-   because a claim with no basis has no in-section evidence to preserve.
+   the quote is false. A `no` or `fabricated` claim stays droppable: there the
+   audit says the quote does not state the claim, and keeping it to protect a
+   row would ship a false claim. The guard protects under-quoted claims, not
+   hard failures.
 2. **Rewrite test.** A `rewrite` whose new evidence lies outside the claim's
    section is rejected. A rewrite that stays in the section is allowed, unless
    it drops a sequence of two or more content tokens that the `section_path`
@@ -1315,6 +1316,13 @@ in `verify_claims.py`:
    path carries "primary place for legal claims", the rewrite keeps only "law
    that governs the IDTA"). In that case the original statement is kept and the
    claim is marked `weak`.
+
+   **Superseded by §10.7(g)(ii).** The literal n-gram form above failed its
+   zero-cost replay: it rejected 14 rewrites and two of the named claims,
+   because a section path also carries the document title, parenthetical column
+   descriptors and sub-heading numbers. The purpose is unchanged; the trigger
+   is narrowed to a defined headword in §10.7(g)(ii), before any model call.
+   The text above stays as the pre-registered first form.
 3. **Visibility.** Every rejection is recorded in `report.json` under
    `guard_rejected_drops` and `guard_rejected_rewrites`, with claim ids and
    reasons. A guard that fires silently is not a guard.
@@ -1352,6 +1360,92 @@ rejected run (`gold/probe.rows.compiled.jsonl.verify/`). It must:
 If any of the three fails, the run does not start and the design is
 reconsidered. This makes the fix falsifiable without spending, and it is the
 same discipline as the dry run of §10.7(f)(i).
+
+##### 10.7(g)(i) The zero-cost replay — rule 2 as written is rejected (2026-11-11)
+
+The guard is implemented in `verify_claims.py` with a `--replay` flag: on a
+complete `--resume` cache the pure policy re-runs and any attempted model call
+raises instead of spending. 51 tests cover the three rules, including the
+`D5-0007` fixture and the legitimate-drop negative case.
+
+Replay 1 ran rule 2 exactly as written above, on
+`gold/probe.rows.compiled.jsonl.verify/`, 0 calls, $0:
+
+| Check | Result |
+|---|---|
+| `D5-0007` survives the round-2 `drop` | **pass** — kept as `weak` |
+| every other decision unchanged | **fail** — 14 rewrites rejected |
+| final set plus the kept claim, nothing else removed | count passes (390 = 389 + 1), statements move |
+
+The extra rejections are not noise:
+
+- `D5-0002`: the rewrite "The IDTA, issued by the Information Commissioner,
+  provides Appropriate Safeguards…" is rejected because the section path is the
+  document title `International Data Transfer Agreement` and the rewrite uses
+  its initialism. A named claim.
+- `D5-0004`: the rewrite "The Exporter's full legal name is University of
+  Bristol…" is rejected because the path is `Exporter (who sends the Restricted
+  Transfer)`; the headword is kept, the parenthesis is a column descriptor. A
+  named claim.
+- `D5-0201`: a legitimate paraphrase (`easily accessible form` → `easy to
+  understand`) is rejected.
+- `D5-0037`: the rewrite substitutes *Information Security Controls* for
+  *Information Security policies*; arguably a real change, but the rule cannot
+  tell it from the paraphrases.
+
+Cause: an n-gram in a section path is not necessarily a row label. The path also
+carries the document title, parenthetical column descriptors and sub-heading
+numbers, and a rewrite may legitimately abbreviate, paraphrase or drop a
+descriptor. Precondition 2 failed, so the paid run did not start. The failure is
+kept here; the rule was not tuned after a score.
+
+The replay also exposed a cache defect: a resumed `repair.*.jsonl` was applied
+to every claim in the artifact, not only to the claims the current failing set
+asked about. In a replay that let a recorded reply re-fire on a claim the run had
+already settled (`D5-0363`). The pipeline now filters repairs to the asked ids.
+That is a correctness fix, not a policy change: in a fresh run every cached reply
+already belongs to an asked claim.
+
+##### 10.7(g)(ii) Amendment — the rewrite rule narrowed to the defined headword (pre-registered 2026-11-11, before the run)
+
+Rule 2 is replaced, not relaxed. The purpose is the same — a repair may not
+delete the term a row defines — and the trigger is narrower:
+
+A rewrite is rejected when the **leaf** of the section path (parentheticals
+removed, at least two content tokens) is the term the original statement
+defines — the statement begins with that leaf — the statement continues with a
+copula (`is`, `are`, `was`, `were`, `means`, `has`, `refers`, `includes`), and
+the rewrite no longer names the term. The original statement is kept as `weak`.
+The rest of the rewrite test is unchanged: new evidence may not leave the
+claim's section.
+
+This is the class the census actually loses: the `D5-0007` row label and the
+glossary rows where a rewrite turns "Personal Data has the meaning…" into "As
+defined in the UK GDPR.", a fragment with no subject. It cannot fire on a
+document title, an initialism, a parenthetical column label, or a paraphrase
+that keeps the term — the four shapes replay 1 measured.
+
+Replay 2, same trace, same command, 0 calls, $0:
+
+| Check | Result |
+|---|---|
+| `D5-0007` survives the round-2 `drop` | **pass** — kept as `weak` |
+| changes limited to lost defined headwords | **pass** — 6 rewrites rejected |
+| final set | 390 = 389 + `D5-0007`; 0 evidence changes; 5 statements differ |
+| `check_claims.py` | 390 claims, 517 spans, 0 failures |
+
+The six rejections: `D5-0010` (*Linked Agreement* → "Other agreements"),
+`D5-0336` (*Personal Data* → "As defined in the UK GDPR."), `D5-0345` (*Relevant
+Data Subject* → "A Data Subject of the Transferred Data."), `D5-0363` (*UK Data
+Protection Laws* → "Means all laws…"), `D5-0310` and `D5-0312` (*Access Request*
+→ "A legally binding request…"). Four of those fragments are already recorded as
+census defects; the guard keeps the row's own term instead.
+
+The amended precondition for the run: the replay must keep `D5-0007`, must change
+only claims whose rewrite deletes a defined headword, and must leave every quote
+and locator untouched. It does. Thresholds, model, prompt, schema and span set
+are unchanged; the quote stays **≤ $0.55** and the run still needs explicit
+approval.
 
 #### The run
 

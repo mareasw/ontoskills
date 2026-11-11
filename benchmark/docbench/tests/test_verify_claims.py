@@ -234,9 +234,161 @@ class ApplyRepairsTest(unittest.TestCase):
 
     def test_drop_removes_the_claim(self) -> None:
         c = claim("D1-0002", "The Commission must terminate.", [SPANS[1]])
-        out, report = vc.apply_repairs([c], {"D1-0002": {"action": "drop"}}, self.index)
+        out, report = vc.apply_repairs(
+            [c], {"D1-0002": {"action": "drop"}}, self.index, {"D1-0002": "fabricated"}
+        )
         self.assertEqual(out, [])
         self.assertEqual(report["dropped_ids"], ["D1-0002"])
+        self.assertEqual(report["guard_rejected_drops"], [])
+
+    def test_weak_drop_is_rejected_when_the_quote_is_in_its_own_section(self) -> None:
+        # PREFLIGHT §10.7(g) rule 1: `D5-0007` was true but under-quoted; the
+        # repair policy deleted it instead of keeping it as weak.
+        c = claim("D1-0002", "The Commission may terminate the appointment.", [SPANS[1]])
+        out, report = vc.apply_repairs(
+            [c], {"D1-0002": {"action": "drop"}}, self.index, {"D1-0002": "weak"}
+        )
+        self.assertEqual(out, [c])
+        self.assertEqual(report["dropped"], 0)
+        self.assertEqual([row["claim_id"] for row in report["guard_rejected_drops"]], ["D1-0002"])
+        self.assertIn("own section", report["guard_rejected_drops"][0]["reason"])
+
+    def test_no_drop_is_accepted_even_when_the_quote_is_in_its_own_section(self) -> None:
+        # A hard failure is a false claim, not an under-quoted one: keeping it
+        # to protect a row would ship something the source does not say.
+        c = claim("D1-0002", "The Commission may terminate the appointment.", [SPANS[1]])
+        out, report = vc.apply_repairs(
+            [c], {"D1-0002": {"action": "drop"}}, self.index, {"D1-0002": "no"}
+        )
+        self.assertEqual(out, [])
+        self.assertEqual(report["dropped_ids"], ["D1-0002"])
+        self.assertEqual(report["guard_rejected_drops"], [])
+
+    def test_weak_drop_is_accepted_when_the_evidence_is_outside_the_section(self) -> None:
+        # The claim says the rule lives in Chapter II, but cites a Chapter III
+        # span: nothing in the claim's own section supports it, so the drop is
+        # legitimate. (The pre-registered negative case.)
+        c = claim("D1-0002", "The Commission shall publish an annual report.", [SPANS[5]])
+        c["evidence"][0]["locator"]["section_path"] = ["Chapter II"]
+        out, report = vc.apply_repairs(
+            [c], {"D1-0002": {"action": "drop"}}, self.index, {"D1-0002": "weak"}
+        )
+        self.assertEqual(out, [])
+        self.assertEqual(report["dropped_ids"], ["D1-0002"])
+        self.assertEqual(report["guard_rejected_drops"], [])
+
+    def test_rewrite_inside_the_section_is_accepted(self) -> None:
+        c = claim("D1-0002", "The Commission may terminate the appointment.", [SPANS[1]])
+        repairs = {"D1-0002": {"action": "rewrite", "statement": "The Commission may end the appointment."}}
+        out, report = vc.apply_repairs([c], repairs, self.index, {"D1-0002": "weak"})
+        self.assertEqual(report["rewritten"], 1)
+        self.assertEqual(report["guard_rejected_rewrites"], [])
+        self.assertEqual(out[0]["statement"], "The Commission may end the appointment.")
+
+    def test_rewrite_that_drops_section_terms_is_rejected(self) -> None:
+        # PREFLIGHT §10.7(g) rule 2, the `D5-0007` fixture: the section path
+        # carries "primary place for legal claims"; the rewrite keeps only the
+        # governing law and silently loses the label.
+        s = span(
+            "S0008",
+            400,
+            "The law that governs this IDTA is the law of the place where the exporter is established.",
+            section=["Primary place for legal claims"],
+        )
+        index = vc.SpanIndex(SPANS + [s])
+        c = claim("D5-0007", "The primary place for legal claims is the law that governs the IDTA.", [s])
+        repairs = {
+            "D5-0007": {
+                "action": "rewrite",
+                "statement": "The law that governs the IDTA is the law of the exporter's place of establishment.",
+            }
+        }
+        out, report = vc.apply_repairs([c], repairs, index, {"D5-0007": "weak"})
+        self.assertEqual(out[0]["statement"], c["statement"])
+        self.assertEqual(report["rewritten"], 0)
+        self.assertEqual([row["claim_id"] for row in report["guard_rejected_rewrites"]], ["D5-0007"])
+        self.assertIn("primary place legal claims", report["guard_rejected_rewrites"][0]["reason"])
+
+    def test_rewrite_may_abbreviate_the_document_title(self) -> None:
+        # The replay rejected this rewrite in the first form of rule 2; the
+        # title is not a row label and "IDTA" is its initialism.
+        s = span(
+            "S0009",
+            500,
+            "The International Data Transfer Agreement provides Appropriate Safeguards for Restricted Transfers.",
+            section=["International Data Transfer Agreement"],
+        )
+        index = vc.SpanIndex(SPANS + [s])
+        c = claim(
+            "D5-0002",
+            "The International Data Transfer Agreement provides Appropriate Safeguards for Restricted Transfers.",
+            [s],
+        )
+        repairs = {
+            "D5-0002": {
+                "action": "rewrite",
+                "statement": "The IDTA, issued by the Information Commissioner, provides Appropriate Safeguards for Restricted Transfers.",
+            }
+        }
+        out, report = vc.apply_repairs([c], repairs, index, {"D5-0002": "weak"})
+        self.assertEqual(report["rewritten"], 1)
+        self.assertEqual(report["guard_rejected_rewrites"], [])
+        self.assertTrue(out[0]["statement"].startswith("The IDTA"))
+
+    def test_rewrite_may_drop_a_parenthetical_column_descriptor(self) -> None:
+        # `Exporter (who sends the Restricted Transfer)` is a column label; the
+        # headword is `Exporter`, which the rewrite keeps.
+        s = span(
+            "S0010",
+            600,
+            "The Exporter of the Restricted Transfer is the University of Bristol.",
+            section=["Exporter (who sends the Restricted Transfer)"],
+        )
+        index = vc.SpanIndex(SPANS + [s])
+        c = claim("D5-0004", "The Exporter of the Restricted Transfer is the University of Bristol.", [s])
+        repairs = {
+            "D5-0004": {
+                "action": "rewrite",
+                "statement": "The Exporter's full legal name is University of Bristol.",
+            }
+        }
+        out, report = vc.apply_repairs([c], repairs, index, {"D5-0004": "weak"})
+        self.assertEqual(report["rewritten"], 1)
+        self.assertEqual(report["guard_rejected_rewrites"], [])
+
+    def test_rewrite_keeps_the_defined_headword_but_may_paraphrase(self) -> None:
+        s = span(
+            "S0011",
+            700,
+            "An Access Request is a legally binding request to access any Transferred Data.",
+            section=["Access Request"],
+        )
+        index = vc.SpanIndex(SPANS + [s])
+        c = claim("D5-0310", "An Access Request is a legally binding request to access any Transferred Data.", [s])
+        repairs = {
+            "D5-0310": {
+                "action": "rewrite",
+                "statement": "An Access Request is a binding request for access to Transferred Data.",
+            }
+        }
+        out, report = vc.apply_repairs([c], repairs, index, {"D5-0310": "weak"})
+        self.assertEqual(report["rewritten"], 1)
+        self.assertEqual(out[0]["statement"], "An Access Request is a binding request for access to Transferred Data.")
+
+    def test_rewrite_with_new_evidence_outside_the_section_is_rejected(self) -> None:
+        c = claim("D1-0002", "The Commission may terminate the appointment.", [SPANS[1]])
+        repairs = {
+            "D1-0002": {
+                "action": "rewrite",
+                "statement": "The Commission may terminate the expert's appointment.",
+                "evidence_span_ids": ["S0001"],
+            }
+        }
+        out, report = vc.apply_repairs([c], repairs, self.index, {"D1-0002": "weak"})
+        self.assertEqual(out[0]["evidence"], c["evidence"])
+        self.assertEqual(
+            [row["claim_id"] for row in report["guard_rejected_rewrites"]], ["D1-0002"]
+        )
 
     def test_unknown_action_leaves_the_claim_untouched(self) -> None:
         c = claim("D1-0002", "The Commission must terminate.", [SPANS[1]])

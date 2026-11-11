@@ -16,8 +16,11 @@ that refuses a re-evidence which abandons the claim's own section — recovers
 `D5-0002` and lifts D5 to **98.5% support with 0 facts absent and 9/10 recall**,
 but `D5-0003` is emitted at compile and then **dropped by the verify repair
 policy**, which the guard (scoped to `reevidence`) does not cover; one named
-claim absent means the fix is **rejected** again (§10.7(f)(ii)). The **market
-gate is still open**. See
+claim absent means the fix is **rejected** again (§10.7(f)(ii)). The follow-up
+drop/rewrite guard (§10.7(g)) passed its zero-cost replay on 2026-11-11:
+`D5-0007` is kept as `weak`, and the rewrite rule had to be narrowed to a
+defined headword before the replay passed (§10.7(g)(i)–(ii)). The paid run has
+not started. The **market gate is still open**. See
 [`RESULTS.md`](RESULTS.md) for the numbers, the manual review, the blind re-score
 and the limitations. The corpus and the full gold set stay local; the protocol
 and the examples are public.
@@ -75,8 +78,9 @@ mechanisms are named in
 [`gold/audit.probe.rows.md`](gold/audit.probe.rows.md); the fixes are
 pre-registered as `PREFLIGHT.md` §10.7(b) (applied), §10.7(e)(i) (applied,
 rejected on measurement, §10.7(e)(ii)) and §10.7(f) (applied, rejected on
-measurement, §10.7(f)(ii)); the code is on `main`, none of the fixes is
-accepted. All four runs are kept as measured.
+measurement, §10.7(f)(ii)); §10.7(g) is the guard for that failure — implemented,
+replay passed at zero cost, paid run pending. The code is on `main`, none of the
+fixes is accepted. All four runs are kept as measured.
 
 Gate 2's thresholds and method were fixed in `PREFLIGHT.md` §9 before the run;
 the four amendments that got it there (§9.1–§9.4) each answer a measured defect
@@ -226,7 +230,7 @@ same JSON output contract. Only the context differs.
 - [x] Fixed run measured: **still fail** — D6 fixed (recall 10/10), D5 fails on 8 facts absent (two-line glossary headwords)
 - [x] Key/value table segmentation (`PREFLIGHT.md` §10.7(e)(i)) written and measured: D5 98.2% support, 0 facts absent, but `D5-0002`/`D5-0003` still missed — **rejected** (§10.7(e)(ii))
 - [x] Row claims + repair section guard (`PREFLIGHT.md` §10.7(f)) measured on a fresh D5+D6 run: D5 98.5% support, 0 facts absent, 9/10 recall — **rejected**, `D5-0003` emitted at compile then dropped by the verify repair policy, which the guard (scoped to `reevidence`) does not cover (§10.7(f)(ii)); first attempt stopped before any score and preserved
-- [ ] Drop/rewrite guard (`PREFLIGHT.md` §10.7(g)) — pre-registered, zero-cost replay pending, paid run only after approval
+- [x] Drop/rewrite guard (`PREFLIGHT.md` §10.7(g)) — implemented with 51 verifier tests (175 in the suite); the first rewrite rule failed its zero-cost replay (14 rewrites rejected, two named claims) and was narrowed to a defined headword in §10.7(g)(ii); replay 2 keeps `D5-0007`, changes only 6 glossary-headword rewrites, 0 model calls — paid run **≤ $0.55** awaiting approval
 - [ ] Evidence-first pipeline + public demo (`../../docs/adr/0002-evidence-first-extraction.md`): ≤ $0.05 and ≤ 60 s per 60-page document, first-pass support ≥ 90%
 - [ ] Five design-partner conversations (`../../docs/market/beachhead-2026-11.md`)
 - [ ] Machine-extracted claims replace the hand-built gold set (the real extraction gate)
