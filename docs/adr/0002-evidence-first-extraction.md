@@ -166,7 +166,7 @@ NARA text in the public demo.
 | Phase | Work | Exit criterion | Cost |
 |---|---|---|---|
 | 0 | Replay the deterministic verifier on the 397-claim accepted artifact; no model calls | **Met, 2026-11-11**: 388/397 = 97.73% agreement, 0 `no` (no false rejection), D5 97.36% / D6 100%; `D5-0006` survives the drop guard (`PREFLIGHT.md` §10.7(g)(ii), §10.7(h)). Tool: `benchmark/docbench/verify_deterministic.py`; measurement: `benchmark/docbench/gold/audit.phase0.md` | $0 |
-| 1 | Evidence-first prompt + token attestation on D5 and D6 | First-pass support ≥ 90%, 3/3 named claims | ≤ $0.30 |
+| 1 | Evidence-first prompt + token attestation on D5 and D6 | **Met, 2026-11-11**: compile-only first pass, D5 296/315 = 93.97%, D6 48/49 = 97.96%, 0 facts absent, 10/10 recall with all three named claims, $0.145 (`PREFLIGHT.md` §10.8, `gold/audit.phase1.md`) | $0.145 |
 | 2 | CLI `ingest` + web claim view + public multi-document corpus | The demo ingests a folder and all three cross-document questions answer with citations from ≥ 2 documents | engineering only |
 | 3 | Five design-partner documents (memo: `docs/market/beachhead-2026-11.md`) | A consultant uses the pack in a real engagement | pilot |
 
@@ -192,6 +192,31 @@ So the deterministic verifier can replace the audit as the **hard gate**
 (verbatim, locator, page, section, numbers), but not as the judge of `weak`: the
 unquoted lead-in is exactly the class the LLM audit exists for. Phase 1 keeps the
 ADR's sampled QA (10% stratified) for support, not the verifier alone.
+
+### Phase 1 result (2026-11-11)
+
+The bar is met on both documents, at $0.145 against a $0.30 ceiling. The run is
+a true first pass: compile only, no repair, no drop. D5 is 296/315 = **93.97%**,
+D6 is 48/49 = **97.96%**; 0 facts are absent from the source, no claim is `no` or
+`fabricated`, recall is 10/10 on both documents with the three named claims
+(exporter name and address, governing law and primary place, both parties
+Controllers), and the prompt is kept.
+
+The four new rules did what they were written for: the primary-place fact is
+emitted at first pass with the correct section path, the Mandatory Clauses
+exception keeps the full `5.1.1 to 5.1.3` range that §10.7(g) had narrowed, and
+the 104 definition claims name their headword. They did not close the unquoted
+lead-in: 16 of the 20 `weak` rows are a sub-item whose parent span supplies the
+actor, the modal or the condition, and the weak rate rose from 2.0% to 5.5%
+because atomic splitting multiplies that exposure. The deterministic verifier
+caught 3 of the 20 and missed all 16 lead-in rows, reproducing Phase 0's
+one-sided bias.
+
+That is the Phase 1 answer to the open question: the LLM audit stays, the
+verifier stays the hard gate, and the lead-in class is a **structural** debt —
+the fix is to attach the parent span when a clause is split, not another prompt
+paragraph. Phase 2 proceeds with the claim graph, the CLI, the web view and the
+public corpus; a further prompt attempt would need its own pre-registration.
 
 ## Risks
 
