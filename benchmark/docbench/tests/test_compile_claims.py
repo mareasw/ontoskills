@@ -782,5 +782,26 @@ class EstimateTest(unittest.TestCase):
         self.assertEqual(covered, {s["span_id"] for s in spans})
 
 
+class PromptTest(unittest.TestCase):
+    """The evidence-first rules of PREFLIGHT.md 10.8 are part of the contract."""
+
+    def test_system_prompt_carries_the_evidence_first_rules(self) -> None:
+        for rule in (
+            "Every content word of the statement",
+            "Never import a word from a span you did not select",
+            'quantifier ("two", not "two or more")',
+            "names the\n   defined term as the heading prints it",
+        ):
+            self.assertIn(rule, cc.SYSTEM)
+
+    def test_prompt_renders_every_span_with_its_heading(self) -> None:
+        spans = cc.segment(DOC, "D4", min_chars=60)
+        prompt = cc.make_prompt(spans, "D4")
+        for span in spans:
+            self.assertIn(f"[{span['span_id']}]", prompt)
+            self.assertIn(span["paragraph"].splitlines()[0][:40], prompt)
+        self.assertIn("Return the JSON array of claims now", prompt)
+
+
 if __name__ == "__main__":
     unittest.main()
