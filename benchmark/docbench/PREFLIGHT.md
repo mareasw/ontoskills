@@ -1474,3 +1474,51 @@ If it passes, §10.7(h) records the result and the row-claim pipeline is accepte
 for the demo. If it fails, the failure is recorded and the architecture decision
 in `docs/adr/0002-evidence-first-extraction.md` proceeds without a fifth bench
 iteration.
+
+##### 10.7(h) Result — the guard keeps `D5-0003`, the run passes (2026-11-11)
+
+The run was approved at ≤ $0.55 and executed on the pre-registered shape: same
+model, prompt, schema and 359 spans; a fresh compile, a fresh verify and a full
+census of D5 and D6. It cost **$0.37** (compile $0.094, verify $0.2755) and it
+**passes every criterion**.
+
+| Criterion | Threshold | Measured |
+|---|---|---|
+| D5 structural | 100% | 100% — `check_claims.py`, 397 claims / 534 spans, 0 failures |
+| D5 support (census) | ≥ 90% | **333/341 = 97.7%** |
+| D5 facts absent | 0 | **0** |
+| D5 recall | ≥ 70%, `D5-0002`/`0003`/`0004` recalled | **10/10**, all three recalled |
+| `D5-0003` primary-place half | present, `ok` or `weak` | `D5-0006`, **kept** by the guard |
+| D6 | 100% support, 10/10, 0 misattributed | 56/56, 10/10, 30/30 authorities correct |
+| `no` / `fabricated` | 0 | 0 / 0 |
+| Guard activity | at least one rejected `drop` | 4 rejected drops, 5 rejected rewrites |
+
+**What the guard did.** In round 1 the verifier audited the primary-place claim
+`D5-0006` (`weak`) and issued a `drop`. The guard refused it with "verdict weak,
+evidence verbatim in its own section". Round 2 did the same for `D5-0288`; round
+1 also refused drops of `D5-0039` and `D5-0339`, and five rewrites for deleting
+a defined headword (`D5-0009`, `D5-0343`, `D5-0344`, `D5-0346`, `D5-0347`). The
+claim is in the final artifact and is counted `ok` by the census under the
+locator rule: the value cell "England and Wales" plus the section path "Primary
+place for legal claims to be made by the Parties" is the whole row. This is the
+mechanism §10.7(g) pre-registered and replayed; the census did not decide it.
+
+**One named claim, two halves.** `D5-0003` is recalled by `D5-0006`
+(primary place) and `D5-0097` (governing law, default England and Wales).
+`D5-0002` is recalled by `D5-0004` (legal name) and `D5-0362` (main address,
+a deterministic row claim). `D5-0004` is recalled by `D5-0007` and `D5-0010`.
+
+**Census result.** 397 claims (D5 341, D6 56): **389 `ok` / 8 `weak`**, 0 `no`,
+0 `fabricated` — pooled 98.0%, D6 100%. The eight weak rows are `D5-0039`,
+`D5-0072`, `D5-0264`–`D5-0267`, `D5-0288` and the reused `D5-0109`; the four
+`D5-0264`–`D5-0267` are one mechanism (the 30.1 lead-in is not quoted). The full
+census, the verifier/census disagreement table and the residual defects are in
+`gold/audit.probe.rows.g.md`.
+
+**Verdict: accepted.** The row-claim pipeline is accepted for the demo. The
+earlier artifacts remain the measurements of their own pipelines; this run is a
+new measurement, not a rewrite of theirs. The next technical step is Phase 0 of
+`docs/adr/0002-evidence-first-extraction.md`: compare the deterministic
+verifier's verdicts against this census, which is the ≥ 95% agreement question
+the ADR left open. The market gate remains open and is not affected by this
+result.
