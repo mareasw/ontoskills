@@ -738,6 +738,55 @@ The replay output is kept beside the measured trace in
 `gold/probe.rows.compiled.jsonl.replay-10.7g/` (`report.json`, the 390-claim
 artifact and its spans; gitignored like every other measured artifact).
 
+## Second corpus probe, drop/rewrite guard (2026-11-11) — **accepted**
+
+`PREFLIGHT.md` §10.7(g) guarded the two actions that removed `D5-0003` in the
+previous run, and §10.7(g)(ii) narrowed the rewrite rule to a defined headword
+after the first replay rejected 14 legitimate paraphrases. The paid run was
+approved at ≤ $0.55 and cost **$0.37** (compile $0.094, verify $0.2755).
+
+| Document | Type | Structural | Support | Facts absent | Recall | Verdict |
+|---|---|---|---:|---:|---:|---|
+| D5 — guard run | contract | 100% | 333/341 = **97.7%** | **0** | **10/10** | **pass** |
+| D6 — guard run | table-as-content | 100% | 56/56 = 100% | 0 | 10/10 | **pass** |
+
+Pooled census: **389/397 = 98.0%**, 0 `no`, 0 `fabricated`.
+
+**The guard fired on the claim it was written for.** Round 1 audited the
+primary-place claim `D5-0006` as `weak` and issued a `drop`; the guard refused
+it ("verdict weak, evidence verbatim in its own section"). The claim is in the
+final artifact, so `D5-0003` is recalled by `D5-0006` (primary place) and
+`D5-0097` (governing law). `D5-0002` is recalled by `D5-0004` (legal name) and
+`D5-0362` (address, a deterministic row claim), and `D5-0004` by `D5-0007` and
+`D5-0010`. All three named claims pass, and D5 reaches 10/10 recall for the
+first time.
+
+| | Claims | `ok` | Support |
+|---|---:|---:|---:|
+| D5, model | 339 | 331 | 97.6% |
+| D5, rule | 2 | 2 | 100% |
+| D6, model | 56 | 56 | 100% |
+| **Pooled** | **397** | **389** | **98.0%** |
+
+The verifier's own residual is 378 `ok` / 19 `weak` / 0 `no` / 0 `fabricated`
+(95.21%); the independent census keeps 8 of those 19 weak and adds six the
+verifier passes. The 17 verifier-only weak rows are the known locator class
+(glossary headwords and D6 retention clauses whose record type is in the section
+path); the six census-only rows are `D5-0072`, `D5-0264`–`D5-0267` and the
+reused `D5-0109`, where an operative element comes from a neighbouring unquoted
+line. The full census is `gold/audit.probe.rows.g.md`.
+
+Guard activity, recorded in `report.json`: **4 refused drops** (`D5-0006`,
+`D5-0039`, `D5-0339`, `D5-0288`) and **5 refused rewrites** (`D5-0009`,
+`D5-0343`, `D5-0344`, `D5-0346`, `D5-0347`). One `reevidence` was rejected by
+the section guard (`D5-0340`). Final artifact: 397 claims (D5 341, D6 56), 534
+evidence spans, `check_claims.py` 0 failures.
+
+**Verdict: accepted by §10.7(g).** The row-claim pipeline is accepted for the
+demo. The earlier runs remain the measurements of their own pipelines. The
+open technical question is now Phase 0 of ADR 0002 (verifier vs census
+agreement), not another bench iteration; the market gate is unaffected.
+
 ## Limitations
 
 - **n = 39 scored questions, one run, one model.** No confidence interval is
