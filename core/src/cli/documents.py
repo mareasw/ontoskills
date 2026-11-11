@@ -1,0 +1,347 @@
+"""CLI commands for the document knowledge base: ``ingest``, ``ask``, ``view``.
+
+These are thin: the pipeline lives in ``compiler.documents``; the commands load
+credentials, print a cost estimate before spending anything, and write the
+corpus directory. ``ask`` and ``view`` are deterministic and never call a model.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+import click
+from rich.console import Console
+from rich.table import Table
+
+from compiler.documents.ask import Corpus, ask as answer, render_text
+from compiler.documents.compile import CompileOptions, compile_document
+from compiler.documents.extract import ExtractionError, extract, strip_pages
+from compiler.documents.model import load_corpus
+from compiler.documents.prompt import PROMPT_HASH
+from compiler.documents.segment import chunk, segment
+from compiler.documents.store import KnowledgeBase
+from compiler.documents.verify import summarise, verify_all
+from compiler.documents.web import render_view
+
+console = Console()
+
+CHARS_PER_TOKEN = 3.8
+# Output/input ratio measured on the accepted Phase 1 run (217,937 / 96,164).
+OUTPUT_RATIO = 2.27
+
+
+def load_env() -> None:
+    """Load ``.env`` from the working directory or a parent, without overriding."""
+    candidates = [Path.cwd() / ".env"]
+    candidates += [parent / ".env" for parent in Path.cwd().resolve().parents]
+    for path in candidates:
+        if not path.exists():
+            continue
+        for raw in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            if line.startswith("export "):
+                line = line[len("export "):].strip()
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key:
+                os.environ.setdefault(key, value)
+        return
+
+
+def _manifest_path(source: Path, explicit: Path | None) -> Path | None:
+    if explicit is not None:
+        return explicit
+    candidate = source / "manifest.json"
+    return candidate if candidate.exists() else None
+
+
+def _print_estimate(rows: list[dict], price_in: float, price_out: float) -> dict:
+    table = Table(title="Estimate (no API calls)")
+    table.add_column("doc")
+    table.add_column("spans", justify="right")
+    table.add_column("chunks", justify="right")
+    table.add_column("prompt chars", justify="right")
+    table.add_column("~in tok", justify="right")
+    table.add_column("~out tok", justify="right")
+    total_in = 0
+    for row in rows:
+        table.add_row(
+            row["doc_id"],
+            str(row["spans"]),
+            str(row["chunks"]),
+            f"{row['chars']:,}",
+            f"{row['tokens']:,}",
+            f"{int(row['tokens'] * OUTPUT_RATIO):,}",
+        )
+        total_in += row["tokens"]
+    console.print(table)
+    out_tokens = int(total_in * OUTPUT_RATIO)
+    cost = total_in / 1_000_000 * price_in + out_tokens / 1_000_000 * price_out
+    console.print(
+        f"Total: ~{total_in:,} input tokens, ~{out_tokens:,} output tokens "
+        f"→ ~${cost:.2f} at ${price_in}/M in, ${price_out}/M out."
+    )
+    console.print(
+        "[dim]Estimate assumes 3.8 chars/token and the Phase 1 output ratio; "
+        "the real number is only known after the run.[/dim]"
+    )
+    return {"input_tokens": total_in, "output_tokens": out_tokens, "cost": round(cost, 2)}
+
+
+@click.command("ingest")
+@click.argument("source", type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.option("-o", "--out", "out_dir", type=click.Path(path_type=Path), default=Path("kb"),
+              help="Knowledge-base directory to write (default: ./kb)")
+@click.option("-m", "--manifest", "manifest_file", type=click.Path(exists=True, dir_okay=False, path_type=Path),
+              default=None, help="Corpus manifest (default: <source>/manifest.json)")
+@click.option("--model", default=None, help="Model id (default: OPENAI_MODEL)")
+@click.option("--base-url", default=None, help="OpenAI-compatible base URL (default: OPENAI_BASE_URL)")
+@click.option("--estimate", is_flag=True, help="Print the token/cost estimate and stop")
+@click.option("--dry-run", is_flag=True, help="Extract and segment, print the plan, write nothing")
+@click.option("--chunk-size", default=15, show_default=True, type=int, help="Spans per model call")
+@click.option("--overlap", default=2, show_default=True, type=int, help="Span overlap between chunks")
+@click.option("--max-tokens", default=10000, show_default=True, type=int, help="Max tokens per reply")
+@click.option("--concurrency", default=1, show_default=True, type=int, help="Parallel model calls")
+@click.option("--resume", is_flag=True, help="Reuse cached replies for identical chunks")
+@click.option("--cache-dir", type=click.Path(path_type=Path), default=None,
+              help="Chunk cache (default: <out>/cache)")
+@click.option("--no-conflicts", is_flag=True, help="Skip the conflict pass")
+@click.option("--price-in", default=0.15, show_default=True, type=float, help="USD per million input tokens")
+@click.option("--price-out", default=0.60, show_default=True, type=float, help="USD per million output tokens")
+@click.option("--question", "questions", multiple=True, help="Demo question to answer in the view (repeatable)")
+@click.option("--questions-file", type=click.Path(exists=True, dir_okay=False, path_type=Path), default=None,
+              help="One demo question per line")
+@click.option("--name", default=None, help="Corpus name shown in the view")
+def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_run,
+               chunk_size, overlap, max_tokens, concurrency, resume, cache_dir,
+               no_conflicts, price_in, price_out, questions, questions_file, name):
+    """Compile a folder of documents into a knowledge base.
+
+    \b
+    Example:
+        ontocore ingest ./corpus -o ./kb --estimate
+        ontocore ingest ./corpus -o ./kb --resume
+        ontocore ask "How long does a party have to report a breach?" --kb ./kb
+    """
+    load_env()
+    if questions_file:
+        questions = tuple(questions) + tuple(
+            line.strip() for line in questions_file.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.startswith("#")
+        )
+
+    model = model or os.environ.get("OPENAI_MODEL", "")
+    base_url = base_url or os.environ.get("OPENAI_BASE_URL", "")
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+
+    try:
+        docs = load_corpus(source, _manifest_path(source, manifest_file))
+    except (ValueError, FileNotFoundError) as exc:
+        raise click.ClickException(str(exc))
+
+    if any(doc.kind == "docx" and not doc.sha256 for doc in docs):
+        console.print("[yellow]warning:[/yellow] manifest entries without SHA-256 cannot be checked")
+
+    try:
+        texts = {doc.doc_id: extract(doc) for doc in docs}
+    except ExtractionError as exc:
+        raise click.ClickException(str(exc))
+
+    spans: dict[str, list[dict]] = {}
+    rows: list[dict] = []
+    for doc in docs:
+        doc_spans = strip_pages(segment(texts[doc.doc_id], doc.segment_meta()), doc.kind)
+        spans[doc.doc_id] = doc_spans
+        chunks = chunk(doc_spans, chunk_size, overlap)
+        chars = sum(len(span["paragraph"]) for span in doc_spans)
+        rows.append(
+            {
+                "doc_id": doc.doc_id,
+                "spans": len(doc_spans),
+                "chunks": len(chunks),
+                "chars": chars,
+                "tokens": int(chars / CHARS_PER_TOKEN) + len(chunks) * 40,
+                "text": texts[doc.doc_id],
+                "spans_list": doc_spans,
+            }
+        )
+
+    if estimate or dry_run:
+        _print_estimate(rows, price_in, price_out)
+        if dry_run:
+            for row in rows:
+                console.print(f"  {row['doc_id']}: {row['chunks']} chunk(s), {row['spans']} span(s)")
+            console.print("[dim]Dry run: nothing written.[/dim]")
+        return
+
+    if not model:
+        raise click.ClickException("no model: set OPENAI_MODEL or pass --model")
+
+    options = CompileOptions(
+        model=model,
+        base_url=base_url,
+        api_key=api_key,
+        chunk_size=chunk_size,
+        overlap=overlap,
+        max_tokens=max_tokens,
+        conflicts=not no_conflicts,
+        concurrency=max(1, concurrency),
+        resume=resume,
+        price_in=price_in,
+        price_out=price_out,
+        cache_dir=cache_dir or (out_dir / "cache"),
+    )
+
+    started = time.time()
+    all_claims: list[dict] = []
+    all_spans: list[dict] = []
+    total_in = total_out = 0
+    for doc, row in zip(docs, rows):
+        with console.status(f"compiling {doc.doc_id} ({len(row['spans_list'])} spans)") as status:
+            def progress(message: str, _status=status) -> None:
+                _status.update(f"[yellow]{message}[/yellow]")
+
+            compiled = compile_document(doc, row["text"], row["spans_list"], options, progress)
+        if compiled.stats.failed:
+            raise click.ClickException(
+                f"{doc.doc_id}: {compiled.stats.failed} model call(s) failed; rerun with --resume"
+            )
+        all_claims.extend(compiled.claims)
+        all_spans.extend(compiled.spans)
+        total_in += compiled.stats.input_tokens
+        total_out += compiled.stats.output_tokens
+        cost = compiled.stats.cost(options)
+        console.print(
+            f"  {doc.doc_id}: {len(compiled.claims)} claim(s), "
+            f"{compiled.stats.calls} call(s), {compiled.stats.cached} cached, "
+            f"{compiled.stats.rejected} rejected, {compiled.stats.merged} merged, ${cost:.3f}"
+        )
+
+    rows_verdicts = verify_all(all_claims, all_spans, texts)
+    report = summarise(rows_verdicts)
+    kb = KnowledgeBase(out_dir)
+    kb.save_texts(texts)
+
+    manifest = {
+        "name": name or source.resolve().name,
+        "description": f"{len(docs)} public documents, compiled into atomic claims with verbatim evidence.",
+        "created": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "model": model,
+        "base_url": base_url,
+        "prompt_hash": PROMPT_HASH,
+        "chunk_size": chunk_size,
+        "overlap": overlap,
+        "documents": len(docs),
+        "pages": sum(
+            _page_count(texts[doc.doc_id]) for doc in docs if doc.kind == "pdf"
+        ),
+        "claims": len(all_claims),
+        "verifier": report["by_verdict"],
+        "cost_usd": round(total_in / 1_000_000 * price_in + total_out / 1_000_000 * price_out, 4),
+        "tokens": {"input": total_in, "output": total_out},
+        "licences": sorted({doc.licence for doc in docs}),
+        "elapsed_s": round(time.time() - started, 1),
+    }
+    rows_docs = []
+    for doc in docs:
+        payload = doc.to_dict()
+        payload["claims"] = sum(1 for claim in all_claims if claim["doc_id"] == doc.doc_id)
+        payload["pages"] = _page_count(texts[doc.doc_id])
+        rows_docs.append(payload)
+
+    kb.write(
+        manifest=manifest,
+        documents=rows_docs,
+        spans=all_spans,
+        claims=all_claims,
+        verifier_rows=rows_verdicts,
+    )
+    answers = [answer(question, Corpus(all_claims, rows_docs)) for question in questions] if questions else []
+    kb.write_view(render_view(kb, answers=answers))
+
+    console.print()
+    console.print(f"[bold]{len(all_claims)}[/bold] claims in [bold]{len(docs)}[/bold] documents")
+    console.print(f"verifier: {json.dumps(report['by_verdict'])}")
+    console.print(
+        f"cost: ${manifest['cost_usd']:.3f} ({total_in:,} in / {total_out:,} out), "
+        f"{manifest['elapsed_s']}s"
+    )
+    console.print(f"written: {out_dir} (view: {out_dir / 'view.html'})")
+    if report["failures"]:
+        console.print(
+            f"[yellow]{len(report['failures'])} claim(s) not ok — see {out_dir / 'verifier.jsonl'}[/yellow]"
+        )
+        for row in report["failures"][:5]:
+            console.print(f"  {row['claim_id']} {row['verdict']}: {'; '.join(row['reasons'])[:160]}")
+
+
+def _page_count(text: str) -> int:
+    return text.count("\f") + 1 if "\f" in text else 1
+
+
+@click.command("ask")
+@click.argument("question")
+@click.option("-k", "--kb", "kb_dir", type=click.Path(exists=True, file_okay=False, path_type=Path),
+              default=Path("kb"), show_default=True, help="Knowledge-base directory")
+@click.option("-n", "--limit", default=12, show_default=True, type=int, help="Max citations")
+@click.option("--json", "as_json", is_flag=True, help="Emit JSON instead of text")
+def ask_cmd(question, kb_dir, limit, as_json):
+    """Answer a question from a compiled corpus, with citations."""
+    kb = KnowledgeBase(kb_dir)
+    claims = kb.claims()
+    if not claims:
+        raise click.ClickException(f"{kb_dir}: no claims.jsonl; run `ontocore ingest` first")
+    corpus = Corpus(claims, kb.documents())
+    result = answer(question, corpus, limit=limit)
+    if as_json:
+        click.echo(json.dumps({
+            "question": result.question,
+            "documents": result.documents,
+            "citations": [citation.__dict__ for citation in result.citations],
+            "tensions": [tension.__dict__ for tension in result.tensions],
+        }, ensure_ascii=False, indent=1))
+        return
+    click.echo(render_text(result))
+    if len(result.documents) < 2:
+        console.print(
+            "[yellow]note:[/yellow] this answer cites one document; the demo's exit criterion "
+            "is at least two per question."
+        )
+
+
+@click.command("view")
+@click.option("-k", "--kb", "kb_dir", type=click.Path(exists=True, file_okay=False, path_type=Path),
+              default=Path("kb"), show_default=True, help="Knowledge-base directory")
+@click.option("-q", "--question", "questions", multiple=True, help="Question to render (repeatable)")
+@click.option("--questions-file", type=click.Path(exists=True, dir_okay=False, path_type=Path), default=None)
+@click.option("-o", "--out", type=click.Path(path_type=Path), default=None, help="Output HTML path")
+@click.option("-n", "--limit", default=12, show_default=True, type=int, help="Max citations per question")
+def view_cmd(kb_dir, questions, questions_file, out, limit):
+    """Render (or re-render) the static view of a compiled corpus."""
+    kb = KnowledgeBase(kb_dir)
+    claims = kb.claims()
+    if not claims:
+        raise click.ClickException(f"{kb_dir}: no claims.jsonl; run `ontocore ingest` first")
+    if questions_file:
+        questions = tuple(questions) + tuple(
+            line.strip() for line in questions_file.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.startswith("#")
+        )
+    corpus = Corpus(claims, kb.documents())
+    answers = [answer(question, corpus, limit=limit) for question in questions]
+    html = render_view(kb, answers=answers)
+    target = out or (kb_dir / "view.html")
+    target.write_text(html, encoding="utf-8")
+    click.echo(f"wrote {target}")
+    for result in answers:
+        if len(result.documents) < 2:
+            console.print(
+                f"[yellow]note:[/yellow] '{result.question}' cites {len(result.documents)} document(s)."
+            )
