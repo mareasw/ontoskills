@@ -769,12 +769,13 @@ first time.
 | **Pooled** | **397** | **389** | **98.0%** |
 
 The verifier's own residual is 378 `ok` / 19 `weak` / 0 `no` / 0 `fabricated`
-(95.21%); the independent census keeps 8 of those 19 weak and adds six the
-verifier passes. The 17 verifier-only weak rows are the known locator class
-(glossary headwords and D6 retention clauses whose record type is in the section
-path); the six census-only rows are `D5-0072`, `D5-0264`–`D5-0267` and the
-reused `D5-0109`, where an operative element comes from a neighbouring unquoted
-line. The full census is `gold/audit.probe.rows.g.md`.
+(95.21%); the independent census finds 8 `weak` in total, only 2 of them shared
+with the verifier, and adds six the verifier passes. The 17 verifier-only weak
+rows are the known locator class (glossary headwords and D6 retention clauses
+whose record type is in the section path); the six census-only rows are
+`D5-0072`, `D5-0264`–`D5-0267` and the reused `D5-0109`, where an operative
+element comes from a neighbouring unquoted line. The full census is
+`gold/audit.probe.rows.g.md`.
 
 Guard activity, recorded in `report.json`: **4 refused drops** (`D5-0006`,
 `D5-0039`, `D5-0339`, `D5-0288`) and **5 refused rewrites** (`D5-0009`,
