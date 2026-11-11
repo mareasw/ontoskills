@@ -788,6 +788,40 @@ demo. The earlier runs remain the measurements of their own pipelines. The
 open technical question is now Phase 0 of ADR 0002 (verifier vs census
 agreement), not another bench iteration; the market gate is unaffected.
 
+## Phase 0 — deterministic verifier vs the census (2026-11-11) — **met**
+
+`docs/adr/0002-evidence-first-extraction.md` blocks Phase 1 on the deterministic
+verifier reproducing the census. `benchmark/docbench/verify_deterministic.py`
+does it with six rules and no model, on the accepted 397-claim artifact, at $0.
+
+| Document | Claims | Agreement |
+|---|---:|---:|
+| D5 | 341 | 332 = 97.36% |
+| D6 | 56 | 56 = 100% |
+| **Pooled** | **397** | **388 = 97.73%** |
+
+The verifier emits **394 `ok` / 3 `weak` / 0 `no`**: it rejects nothing the
+census accepts. Confusion: 387 `ok`/`ok`, 7 `ok`/`weak`, 2 `weak`/`ok`, 1
+`weak`/`weak`. All seven misses are one mechanism — the operative element sits
+in an unquoted lead-in or sibling span (`D5-0039`, `D5-0072`, `D5-0109`,
+`D5-0264`–`D5-0267`, `D5-0288`). The two false `weak` are glossary rows
+(`D5-0315`, `D5-0318`).
+
+The single calibrated parameter is the attestation tolerance: more than 25% of
+a statement's content tokens unattested makes the claim `weak`. A literal
+every-token rule scores 78.1%; 25% sits in an empty band (accepted rows ≤ 24%,
+flagged rows ≥ 30%) and holds on both halves of D5 (97.66% / 97.06%) and on D6.
+
+Modality is a **note, not a verdict**: as a verdict it cost 16 false `weak` as a
+presence test and 8 as a class comparison, and caught none of the census's 8
+`weak` rows. Details, the named disagreements and the limits are in
+`gold/audit.phase0.md`.
+
+**Verdict: Phase 0 met.** The deterministic verifier can be the hard gate for
+`no` (verbatim, locator, page, section, numbers) but not the judge of `weak`:
+the unquoted lead-in is the class the LLM audit exists for, so Phase 1 keeps the
+ADR's 10% sampled QA for support.
+
 ## Limitations
 
 - **n = 39 scored questions, one run, one model.** No confidence interval is
@@ -872,6 +906,16 @@ python benchmark/docbench/run_baselines.py --backend http \
 python benchmark/docbench/score.py --run "$RUN"
 # blind: build_blind_sheet.py, 4 independent reviewers, then
 python benchmark/docbench/blind_metrics.py --run "$RUN"
+```
+
+ADR 0002 Phase 0 — the deterministic verifier against the accepted census, no
+model calls:
+
+```bash
+python benchmark/docbench/verify_deterministic.py \
+  --claims benchmark/docbench/gold/probe.rows.g.compiled.verified.jsonl \
+  --spans benchmark/docbench/gold/probe.rows.g.compiled.jsonl.spans.jsonl \
+  --verdicts benchmark/docbench/gold/probe.rows.g.verdicts.jsonl
 ```
 
 The evidence-support audit (sample and full census) is `gold/audit.run3.md`.
