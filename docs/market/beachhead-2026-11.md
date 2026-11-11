@@ -35,6 +35,16 @@ This is still "contracts with obligations and evidence" — the thing the bench
 actually measures — but with a buyer who has a legal deadline, a budget line and
 a channel that reaches hundreds of companies without a sales team.
 
+**This is the GTM entry point, not the definition of the product.** The product
+is the enterprise knowledge base of ADR 0002: every document compiled into
+claims with verbatim evidence and queried with a citation for every answer. The
+evidence pack is the first **view** sold on top of it, chosen because it has a
+buyer with a clock, a budget and a distribution channel. The document type is
+narrow on purpose for the first five pilots; the pipeline, the schema and the
+graph are the same ones that later ingest policies, board minutes, tenders and
+internal procedures. Selling the view first is how the knowledge base gets its
+first real corpus; it is not a retreat from the knowledge base.
+
 ## 2. What the data says
 
 | Evidence | Number | What it means for us | Source, date |
