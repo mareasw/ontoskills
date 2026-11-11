@@ -163,7 +163,7 @@ NARA text in the public demo.
 
 | Phase | Work | Exit criterion | Cost |
 |---|---|---|---|
-| 0 | Replay the deterministic verifier on the 389-claim artifact; no model calls | ≥ 95% agreement with the census; `D5-0007` survives the drop guard | $0 |
+| 0 | Replay the deterministic verifier on the 389-claim artifact; no model calls | ≥ 95% agreement with the census; `D5-0007` survives the drop guard (done, `PREFLIGHT.md` §10.7(g)(ii): kept as `weak`) | $0 |
 | 1 | Evidence-first prompt + token attestation on D5 and D6 | First-pass support ≥ 90%, 3/3 named claims | ≤ $0.30 |
 | 2 | CLI `ingest` + web claim view + public multi-document corpus | The demo ingests a folder and all three cross-document questions answer with citations from ≥ 2 documents | engineering only |
 | 3 | Five design-partner documents (memo: `docs/market/beachhead-2026-11.md`) | A consultant uses the pack in a real engagement | pilot |
