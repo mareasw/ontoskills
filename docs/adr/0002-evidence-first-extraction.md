@@ -5,8 +5,10 @@
 - **Supersedes:** nothing. Extends ADR 0001 and answers the failure recorded in
   `benchmark/docbench/PREFLIGHT.md` §10.7(f)(ii).
 - **Deciders:** tech lead
-- **Evidence:** `benchmark/docbench/RESULTS.md` (four second-corpus runs),
-  `benchmark/docbench/gold/audit.probe.rows.md` (389-row census)
+- **Evidence:** `benchmark/docbench/RESULTS.md` (five second-corpus runs),
+  `benchmark/docbench/gold/audit.probe.rows.md` (389-row census of the rejected
+  run) and `benchmark/docbench/gold/audit.probe.rows.g.md` (397-row census of
+  the accepted run)
 
 ## What the product is
 
@@ -121,10 +123,10 @@ fixed six-document eval set, then on the public demo corpus.
 | Model cost per 60-page document | ≈ $0.27 (compile + verify, two docs) | **≤ $0.05** | A 30-contract pilot must cost single-digit euros, not hundreds |
 | p95 latency per 60-page document | hours (132 sequential calls) | **≤ 60 s** | A consultant tries it in a meeting or not at all |
 | First-pass support, no repair | 72% (284/394 at first audit) | **≥ 90%** | Repair must be the exception, not the engine |
-| Final support | 98.7% pooled | **≥ 95%** | Keep the measured quality while cutting the cost |
+| Final support | 98.0% pooled (accepted run) | **≥ 95%** | Keep the measured quality while cutting the cost |
 | Fabricated | 0 | **0** | Non-negotiable |
-| Deterministic verifier vs. census agreement | not measured | **≥ 95%** on the 389-row artifact, replay only | The verifier replaces the audit; it must earn it |
-| Named claims of §10.7(f) | 2/3 | **3/3** | The gate that rejected the last run |
+| Deterministic verifier vs. census agreement | not measured | **≥ 95%** on the 397-row accepted artifact, replay only | The verifier replaces the audit; it must earn it |
+| Named claims of §10.7(f) | 3/3 (accepted run) | **3/3** | The gate that rejected the last run |
 | Cross-document demo questions | 0 | **3/3, each citing claims from ≥ 2 documents** | The demo must prove a corpus index, not a single-file reader |
 
 ## Demo
@@ -163,7 +165,7 @@ NARA text in the public demo.
 
 | Phase | Work | Exit criterion | Cost |
 |---|---|---|---|
-| 0 | Replay the deterministic verifier on the 389-claim artifact; no model calls | ≥ 95% agreement with the census; `D5-0007` survives the drop guard (done, `PREFLIGHT.md` §10.7(g)(ii): kept as `weak`) | $0 |
+| 0 | Replay the deterministic verifier on the 397-claim accepted artifact; no model calls | ≥ 95% agreement with the census; `D5-0006` survives the drop guard (done, `PREFLIGHT.md` §10.7(g)(ii) and §10.7(h): kept, census `ok`) | $0 |
 | 1 | Evidence-first prompt + token attestation on D5 and D6 | First-pass support ≥ 90%, 3/3 named claims | ≤ $0.30 |
 | 2 | CLI `ingest` + web claim view + public multi-document corpus | The demo ingests a folder and all three cross-document questions answer with citations from ≥ 2 documents | engineering only |
 | 3 | Five design-partner documents (memo: `docs/market/beachhead-2026-11.md`) | A consultant uses the pack in a real engagement | pilot |
