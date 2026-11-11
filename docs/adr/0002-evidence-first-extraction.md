@@ -165,7 +165,7 @@ NARA text in the public demo.
 
 | Phase | Work | Exit criterion | Cost |
 |---|---|---|---|
-| 0 | Replay the deterministic verifier on the 397-claim accepted artifact; no model calls | ≥ 95% agreement with the census; `D5-0006` survives the drop guard (done, `PREFLIGHT.md` §10.7(g)(ii) and §10.7(h): kept, census `ok`) | $0 |
+| 0 | Replay the deterministic verifier on the 397-claim accepted artifact; no model calls | **Met, 2026-11-11**: 388/397 = 97.73% agreement, 0 `no` (no false rejection), D5 97.36% / D6 100%; `D5-0006` survives the drop guard (`PREFLIGHT.md` §10.7(g)(ii), §10.7(h)). Tool: `benchmark/docbench/verify_deterministic.py`; measurement: `benchmark/docbench/gold/audit.phase0.md` | $0 |
 | 1 | Evidence-first prompt + token attestation on D5 and D6 | First-pass support ≥ 90%, 3/3 named claims | ≤ $0.30 |
 | 2 | CLI `ingest` + web claim view + public multi-document corpus | The demo ingests a folder and all three cross-document questions answer with citations from ≥ 2 documents | engineering only |
 | 3 | Five design-partner documents (memo: `docs/market/beachhead-2026-11.md`) | A consultant uses the pack in a real engagement | pilot |
@@ -174,11 +174,32 @@ Phase 0 is a precondition: if the deterministic verifier cannot reproduce the
 census on data we already have, the architecture is wrong and we do not spend on
 Phase 1.
 
+### Phase 0 result (2026-11-11)
+
+The bar is met, with two qualifications that shape Phase 1. Agreement is
+**97.73%** (388/397) and the verifier emits **0 `no`**, so it rejects nothing the
+census accepts. Its nine misses are one-sided: 7 of the census's 8 `weak` rows
+are called `ok`, all of them because the operative element sits in an unquoted
+lead-in or sibling span (`D5-0039`, `D5-0072`, `D5-0109`, `D5-0264`–`D5-0267`,
+`D5-0288`); the other 2 are glossary rows called `weak` (`D5-0315`,
+`D5-0318`). The attestation tolerance (25% of content tokens) is calibrated on
+this artifact, but it holds on both halves of D5 (97.7% / 97.1%) and on D6
+(100%), and the boundary band is empty (accepted rows ≤ 24% unattested, flagged
+rows ≥ 30%). Modality was demoted from a verdict to a note: as a verdict it cost
+8 false `weak` and caught none of the census `weak`.
+
+So the deterministic verifier can replace the audit as the **hard gate**
+(verbatim, locator, page, section, numbers), but not as the judge of `weak`: the
+unquoted lead-in is exactly the class the LLM audit exists for. Phase 1 keeps the
+ADR's sampled QA (10% stratified) for support, not the verifier alone.
+
 ## Risks
 
 - **Token attestation too strict.** Legal paraphrase is normal ("the Parties shall"
-  vs "each Party must"). Mitigation: lemmatisation, a closed connective list, and
-  a measured false-rejection rate on the existing artifact before Phase 1.
+  vs "each Party must"). Mitigation: inflection matching (shared stem of four
+  characters) plus a 25% paraphrase allowance, measured on the accepted artifact
+  in Phase 0: **0 false rejections**, 2 false `weak` (0.5%), 97.73% agreement
+  (`benchmark/docbench/gold/audit.phase0.md`).
 - **PDF extraction.** Page and section fidelity depends on the extractor. Keep
   page + section paths (ADR 0001, open question 2); do not promise character
   offsets.
