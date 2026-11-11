@@ -25,6 +25,12 @@ This stage closes the gap as a pipeline step, not as a per-document patch:
      with ``no`` or ``fabricated`` (the quote does not state the claim) is
      dropped: an unsupported claim is not shipped.
 
+   A pure guard (``PREFLIGHT.md`` §10.7(g)) bounds what a repair may delete:
+   a `weak` claim whose quote is verbatim in its own section is kept, and a
+   rewrite may not drop the term a row defines or move its evidence out of the
+   claim's section. ``--replay`` re-runs the policy on a recorded cache and
+   aborts on a model call, so the guard can be falsified at zero cost.
+
 Only the claim and a bounded neighbourhood of its own spans are ever shown, so
 the stage measures internal consistency, never agreement with the gold set.
 
@@ -45,6 +51,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -582,10 +589,141 @@ def make_evidence(span: dict, role: str = "supports") -> dict:
     return {"quote": span.get("paragraph", ""), "locator": dict(span.get("locator") or {}), "role": role}
 
 
+# --------------------------------------------------------------------------
+# The drop/rewrite guard (PREFLIGHT.md §10.7(g))
+#
+# The repair policy may not delete a claim, or rewrite away a part of it, when
+# the source text that supports it lies inside the claim's own section. The
+# section path is evidence too (§10.4): a label that lives in the heading is
+# still a fact of the row, and a repair that abandons it produces a different
+# claim. These rules are deterministic and pure; the replay of §10.7(g) runs
+# them on a recorded trace with no model call.
+
+# Grammatical words carry no claim; every other token of a section path does.
+STOPWORDS = frozenset(
+    """a an the of to in for on by with and or nor but if then than that this these
+    those it its as at from into over under within without shall must may might can
+    could will would should is are was were be been being has have had do does did
+    not no such any all each other same there their they them he she his her we our
+    you your i me my which who whom whose when where what how also both either""".split()
+)
+
+
+def content_tokens(text: str) -> list[str]:
+    """Lower-case alphanumeric tokens minus grammatical words."""
+    return [t for t in re.findall(r"[a-z0-9]+", str(text or "").lower()) if t not in STOPWORDS]
+
+
+def _contains(sequence: list[str], gram: list[str]) -> bool:
+    n = len(gram)
+    return any(sequence[i : i + n] == gram for i in range(len(sequence) - n + 1))
+
+
+def claim_sections(claim: dict) -> list[tuple[str, ...]]:
+    """The distinct non-empty section paths of a claim's own evidence."""
+    out: list[tuple[str, ...]] = []
+    for item in evidence_items(claim):
+        path = tuple((item.get("locator") or {}).get("section_path") or [])
+        if path and path not in out:
+            out.append(path)
+    return out
+
+
+def _same_section(left: tuple[str, ...], right: tuple[str, ...]) -> bool:
+    """Equal, or one a prefix of the other: locators may carry a shorter path."""
+    if not left or not right:
+        return False
+    short, long = (left, right) if len(left) <= len(right) else (right, left)
+    return long[: len(short)] == short
+
+
+def evidence_in_own_section(claim: dict, spans: SpanIndex) -> bool:
+    """True when a cited quote is verbatim in a span of the claim's own section.
+
+    This is the fact the guard protects: the text exists, says what the claim
+    says, and sits where the claim says it sits. Deleting such a claim trades a
+    real fact for a higher support number.
+    """
+    sections = claim_sections(claim)
+    if not sections:
+        return False
+    doc = claim.get("doc_id")
+    for item in evidence_items(claim):
+        locator = item.get("locator") or {}
+        span = spans.by_range.get((doc, locator.get("char_start"), locator.get("char_end")))
+        if span is None:
+            span = spans.by_text.get((doc, item.get("quote", "")))
+        if span is None:
+            continue
+        path = tuple((span.get("locator") or {}).get("section_path") or [])
+        if not any(_same_section(path, section) for section in sections):
+            continue
+        quote = " ".join(str(item.get("quote") or "").split()).lower()
+        source = " ".join(str(span.get("paragraph") or "").split()).lower()
+        if quote and quote in source:
+            return True
+    return False
+
+
+# Definitional verbs: a row label followed by one of these is the term the row
+# defines. That is the class rule 2 protects (§10.7(g), amended after the
+# zero-cost replay showed the first form rejected legitimate rewrites).
+COPULAS = frozenset(
+    "is are was were means mean has have refers refer includes include".split()
+)
+
+
+def statement_tokens(text: str) -> list[str]:
+    """Content tokens, keeping the copula that turns a label into a definition."""
+    return [t for t in re.findall(r"[a-z0-9]+", str(text or "").lower()) if t not in STOPWORDS or t in COPULAS]
+
+
+def section_leaf(section: tuple[str, ...]) -> list[str]:
+    """The nearest heading as content tokens, parentheticals removed.
+
+    ``Exporter (who sends the Restricted Transfer)`` is a column label whose
+    headword is ``Exporter``; the parenthesis describes it and a rewrite may
+    drop it. ``Primary place for legal claims to be made by the Parties`` is the
+    term itself and may not be dropped.
+    """
+    if not section:
+        return []
+    leaf = re.sub(r"\([^)]*\)", " ", str(section[-1]))
+    return content_tokens(leaf)
+
+
+def dropped_headword(claim: dict, statement: str) -> str | None:
+    """The defined term a rewrite removed from a definitional claim.
+
+    Rule 2 as first written rejected any section-path n-gram the rewrite lost.
+    The replay showed it also rejected abbreviations of the document title and
+    parenthetical column descriptors, costing named claims. The narrowed rule
+    fires only when the original statement *defines the row's own label* --
+    the leaf heading, at least two content tokens, followed by a copula -- and
+    the rewrite no longer names that term. That is the `D5-0007` shape and the
+    glossary-fragment shape the census keeps finding; a paraphrase of the
+    predicate is still allowed.
+    """
+    new = content_tokens(statement)
+    for section in claim_sections(claim):
+        leaf = section_leaf(section)
+        if len(leaf) < 2:
+            continue
+        old = statement_tokens(claim.get("statement", ""))
+        if old[: len(leaf)] != leaf:
+            continue
+        if len(old) <= len(leaf) or old[len(leaf)] not in COPULAS:
+            continue
+        if not _contains(new, leaf):
+            return " ".join(leaf)
+    return None
+
+
 def apply_repairs(
     claims: list[dict],
     repairs: dict[str, dict],
     spans: SpanIndex,
+    verdicts: dict[str, str] | None = None,
 ) -> tuple[list[dict], dict]:
     """Apply repair records to the claim list.
 
@@ -596,7 +734,13 @@ def apply_repairs(
     it replaces (a citation that abandons the claim's own section is a different
     claim); an unknown action leaves the claim untouched. Rejected records are
     counted, never silently accepted.
+
+    ``verdicts`` carries the audit verdict per claim; it is what the §10.7(g)
+    drop guard needs to tell a true-but-underquoted claim (keep it) from a claim
+    with no basis (drop it). Without it, a drop is treated as ``weak``: the
+    conservative choice, since a claim is never deleted on a guess.
     """
+    verdicts = verdicts or {}
     report = {
         "rewritten": 0,
         "reevidenced": 0,
@@ -605,6 +749,8 @@ def apply_repairs(
         "rejected": 0,
         "section_rejected_ids": [],
         "dropped_ids": [],
+        "guard_rejected_drops": [],
+        "guard_rejected_rewrites": [],
     }
     out: list[dict] = []
     for claim in claims:
@@ -616,6 +762,23 @@ def apply_repairs(
             continue
 
         if action == "drop":
+            verdict = verdicts.get(claim["claim_id"], "weak")
+            if verdict not in HARD_FAIL and evidence_in_own_section(claim, spans):
+                # PREFLIGHT §10.7(g) rule 1: a `weak` claim's problem is a
+                # label that lives in the heading, not a missing source. The
+                # quote is verbatim where the claim says it is, so the claim is
+                # kept with its verdict rather than deleted to lift support.
+                # `no` and `fabricated` stay droppable: there the audit says the
+                # quote does not state the claim, and shipping it would be worse
+                # than losing a row.
+                report["guard_rejected_drops"].append(
+                    {
+                        "claim_id": claim["claim_id"],
+                        "reason": f"verdict {verdict}, evidence verbatim in its own section",
+                    }
+                )
+                out.append(claim)
+                continue
             report["dropped"] += 1
             report["dropped_ids"].append(claim["claim_id"])
             continue
@@ -673,6 +836,34 @@ def apply_repairs(
         statement = clean_statement(record.get("statement", ""))
         if not usable_statement(statement, claim["statement"]):
             report["rejected"] += 1
+            out.append(claim)
+            continue
+        # PREFLIGHT §10.7(g) rule 2. A rewrite may not move the evidence out of
+        # the claim's section, and may not drop an element the section path
+        # attests while keeping the rest of the sentence.
+        chosen = [allowed[sid] for sid in (record.get("evidence_span_ids") or []) if sid in allowed]
+        current = set(claim_sections(claim))
+        replacement = {
+            tuple((span.get("locator") or {}).get("section_path") or []) for span in chosen
+        } - {()}
+        if chosen and current and replacement and all(
+            not any(_same_section(path, section) for section in current) for path in replacement
+        ):
+            report["rejected"] += 1
+            report["guard_rejected_rewrites"].append(
+                {"claim_id": claim["claim_id"], "reason": "new evidence outside the claim's section"}
+            )
+            out.append(claim)
+            continue
+        lost = dropped_headword(claim, statement)
+        if lost:
+            report["rejected"] += 1
+            report["guard_rejected_rewrites"].append(
+                {
+                    "claim_id": claim["claim_id"],
+                    "reason": "drops the defined headword: " + lost,
+                }
+            )
             out.append(claim)
             continue
         updated = dict(claim)
@@ -769,12 +960,34 @@ def run_pipeline(
             usage=usage,
             concurrency=concurrency,
         )
-        claims, round_report = apply_repairs(claims, repairs, spans)
+        # A resumed cache can carry replies for claims this run did not ask
+        # about (a replay, or a resumed run whose failing set changed). A reply
+        # is a decision only for the claims it was requested for.
+        asked = {claim["claim_id"] for claim in failing}
+        repairs = {cid: record for cid, record in repairs.items() if cid in asked}
+        claims, round_report = apply_repairs(
+            claims,
+            repairs,
+            spans,
+            {claim["claim_id"]: verdict_of(claim, audit) for claim in claims},
+        )
         settled.update(round_report.get("section_rejected_ids") or [])
+        settled.update(row["claim_id"] for row in round_report.get("guard_rejected_drops") or [])
+        settled.update(row["claim_id"] for row in round_report.get("guard_rejected_rewrites") or [])
         touched = [claim for claim in claims if claim["claim_id"] in repairs]
+        # A claim the guard kept is unchanged: it keeps the verdict the audit
+        # already gave it. Re-auditing it would spend a call to re-learn `weak`,
+        # and in a replay there is no reply to read because the recorded run
+        # dropped the claim instead.
+        kept_by_guard = {
+            row["claim_id"]
+            for row in (round_report.get("guard_rejected_drops") or [])
+            + (round_report.get("guard_rejected_rewrites") or [])
+        }
+        reaudit = [claim for claim in touched if claim["claim_id"] not in kept_by_guard]
         audit.update(
             audit_claims(
-                touched,
+                reaudit,
                 spans,
                 call,
                 cache_path=work / f"audit.{index + 1}.jsonl",
@@ -926,6 +1139,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-fp", type=int, default=5,
                         help="calibration stop rule: false positives on known-ok claims")
     parser.add_argument("--synthetic", action="store_true", help="skip the model, use an empty call (tests)")
+    parser.add_argument("--replay", action="store_true",
+                        help="re-run the pure policy on a complete --resume cache; a model call aborts")
     args = parser.parse_args(argv)
 
     claims_path = Path(args.claims)
@@ -952,6 +1167,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.synthetic:
         def call(prompt, system, max_tokens):  # noqa: F811 - deliberate override
             return "[]", {"input_tokens": 0, "output_tokens": 0}, "stop"
+
+    if args.replay:
+        def call(prompt, system, max_tokens):  # noqa: F811 - deliberate override
+            # A replay must not spend: every audit and repair decision has to
+            # come from the recorded cache. Reaching this is a failed replay,
+            # not a reason to call the provider.
+            raise RuntimeError("replay: model call attempted, cache is incomplete")
 
     if args.calibrate:
         known: dict[str, str] = {}
