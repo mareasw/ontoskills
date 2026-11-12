@@ -2,7 +2,9 @@
 
 These are thin: the pipeline lives in ``compiler.documents``; the commands load
 credentials, print a cost estimate before spending anything, and write the
-corpus directory. ``ask`` and ``view`` are deterministic and never call a model.
+corpus directory. ``ask`` never calls a paid API: when the KB carries vectors it
+may load the pinned local embedding model, offline, and fuses that ranking with
+BM25; ``view`` is pure BM25.
 """
 
 from __future__ import annotations
@@ -131,9 +133,12 @@ def _print_estimate(rows: list[dict], price_in: float, price_out: float) -> dict
 @click.option("--questions-file", type=click.Path(exists=True, dir_okay=False, path_type=Path), default=None,
               help="One demo question per line")
 @click.option("--name", default=None, help="Corpus name shown in the view")
+@click.option("--semantic", is_flag=True,
+              help="Embed every claim with the local MiniLM model (vectors.jsonl, no network)")
 def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_run,
                chunk_size, overlap, max_tokens, concurrency, resume, cache_dir,
-               no_conflicts, price_in, price_out, questions, questions_file, name):
+               no_conflicts, price_in, price_out, questions, questions_file, name,
+               semantic):
     """Compile a folder of documents into a knowledge base.
 
     \b
@@ -298,6 +303,20 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         verifier_rows=rows_verdicts,
         rejected_rows=all_rejected,
     )
+    if semantic:
+        # The vectors are a derived artifact like graph.ttl: same claims, same
+        # text, so they are built after the KB is written and never call a model
+        # over the network. A missing runtime is a hard error here, because the
+        # operator asked for something the build did not produce.
+        from compiler.documents.store import write_vectors
+        from compiler.documents.vector import MODEL as EMBED_MODEL, embedder_for
+
+        started_vectors = time.time()
+        written = write_vectors(kb, all_claims, embedder_for(kb))
+        console.print(
+            f"vectors: {written} claim(s), model {EMBED_MODEL}, "
+            f"{time.time() - started_vectors:.1f}s"
+        )
     # The view is the audit surface: a claim the verifier did not pass is shown
     # with its badge, not hidden, so a reader can see what the gate caught.
     view_corpus = Corpus(
@@ -348,6 +367,27 @@ def _corpus(kb: KnowledgeBase, include_unverified: bool) -> Corpus:
     )
 
 
+def _enable_semantic(corpus: Corpus, kb: KnowledgeBase, asked: bool = False) -> None:
+    """Add the embedding ranking when the KB has vectors and the runtime loads.
+
+    Silent when the KB was simply built without ``--semantic``: that is a normal
+    KB, not a failure. Anything else — no vectors but the flag was typed, no
+    torch, a vectors file from another model — is one dim line and BM25, because
+    a missing model must never turn a deterministic answer into an error.
+    """
+    vectors = kb.vectors()
+    if not vectors:
+        if asked:
+            console.print("[dim]semantic ranking unavailable (no vectors.jsonl): BM25 only[/dim]")
+        return
+    try:
+        from compiler.documents.vector import embedder_for
+
+        corpus.enable_semantic(vectors, embedder_for(kb))
+    except Exception as exc:  # sentence-transformers, torch, or a foreign model
+        console.print(f"[dim]semantic ranking unavailable ({exc}): BM25 only[/dim]")
+
+
 @click.command("ask")
 @click.argument("question")
 @click.option("-k", "--kb", "kb_dir", type=click.Path(exists=True, file_okay=False, path_type=Path),
@@ -356,13 +396,17 @@ def _corpus(kb: KnowledgeBase, include_unverified: bool) -> Corpus:
 @click.option("--json", "as_json", is_flag=True, help="Emit JSON instead of text")
 @click.option("--include-unverified", is_flag=True,
               help="Also cite claims the verifier did not pass, marked with their verdict")
-def ask_cmd(question, kb_dir, limit, as_json, include_unverified):
+@click.option("--semantic/--no-semantic", "semantic", default=None,
+              help="Fuse a local embedding ranking with BM25 (default: when the KB has vectors)")
+def ask_cmd(question, kb_dir, limit, as_json, include_unverified, semantic):
     """Answer a question from a compiled corpus, with citations."""
     kb = KnowledgeBase(kb_dir)
     claims = kb.claims()
     if not claims:
         raise click.ClickException(f"{kb_dir}: no claims.jsonl; run `ontocore ingest` first")
     corpus = _corpus(kb, include_unverified)
+    if semantic is not False:
+        _enable_semantic(corpus, kb, asked=semantic is True)
     result = answer(question, corpus, limit=limit)
     if as_json:
         click.echo(json.dumps({
