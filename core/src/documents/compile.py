@@ -28,7 +28,7 @@ from compiler.documents.prompt import (
     SYSTEM,
     make_prompt,
 )
-from compiler.documents.segment import chunk
+from compiler.documents.segment import chunk, lead_ins
 from compiler.documents.text import modal_classes, norm, statement_tokens
 
 
@@ -213,7 +213,11 @@ def dedupe_claims(claims: list[dict], threshold: float = 0.85) -> tuple[list[dic
 
 
 def build_claim(
-    raw: dict[str, Any], span_by_id: dict[str, dict], doc: Document, number: int
+    raw: dict[str, Any],
+    span_by_id: dict[str, dict],
+    doc: Document,
+    number: int,
+    lead_map: dict[str, dict] | None = None,
 ) -> dict | None:
     ids = raw.get("span_ids") or raw.get("spans") or []
     if isinstance(ids, str):
@@ -239,6 +243,22 @@ def build_claim(
         )
     if not evidence:
         return None
+    if lead_map:
+        # A list item or a continuation carries no subject of its own: the model
+        # read the lead-in in the chunk and its statement relies on it, so the
+        # claim declares that reliance instead of leaving the verifier to find a
+        # subject that is not in the quote. The quote is a verbatim span, never
+        # an inference. Context comes after the supports items because the
+        # statement is answered from ``evidence[0]``.
+        cited = {item["quote"] for item in evidence}
+        for span in spans:
+            lead = lead_map.get(span["span_id"])
+            if lead is None or lead["paragraph"] in cited:
+                continue
+            cited.add(lead["paragraph"])
+            evidence.append(
+                {"quote": lead["paragraph"], "locator": dict(lead["locator"]), "role": "context"}
+            )
     claim: dict[str, Any] = {
         "claim_id": f"{doc.doc_id}-{number:04d}",
         "doc_id": doc.doc_id,
@@ -406,6 +426,9 @@ def compile_document(
         return CompiledDocument(claims=[], stats=CompileStats(), spans=spans)
 
     span_by_id = {span["span_id"]: span for span in spans}
+    # Only the model-backed claims get a context item: a row claim is built from
+    # the span alone and states exactly what the row says.
+    lead_map = lead_ins(spans)
     chunks = chunk(spans, options.chunk_size, options.overlap)
     cache_dir = options.cache_dir
     jobs: list[tuple[int, str, str, Path | None]] = []
@@ -454,7 +477,7 @@ def compile_document(
     claims: list[dict] = []
     number = 1
     for raw in raw_claims:
-        claim = build_claim(raw, span_by_id, doc, number)
+        claim = build_claim(raw, span_by_id, doc, number, lead_map)
         if claim is None:
             stats.rejected += 1
             continue
