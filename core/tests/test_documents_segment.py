@@ -11,7 +11,7 @@ import importlib.util
 from pathlib import Path
 
 from compiler.documents.model import Document
-from compiler.documents.segment import chunk, record_key_lines, segment
+from compiler.documents.segment import chunk, lead_ins, record_key_lines, segment
 
 REPO = Path(__file__).resolve().parents[2]
 BENCH = REPO / "benchmark" / "docbench" / "compile_claims.py"
@@ -124,3 +124,52 @@ def test_parity_with_docbench_segmenter():
     # Page is removed later by ``strip_pages`` for unpaginated formats; the
     # segmenter itself is expected to agree on every field.
     assert ours == bench
+
+
+def _plain_span(span_id, paragraph, start, section=("Article 5",)):
+    return {
+        "span_id": span_id,
+        "doc_id": "T1",
+        "paragraph": paragraph,
+        "locator": {"kind": "text", "section_path": list(section), "char_start": start, "char_end": start + len(paragraph), "url": "u"},
+    }
+
+
+def test_lead_ins_gives_a_list_item_its_introduction():
+    spans = [
+        _plain_span("S0001", "The binding corporate rules shall specify at least:", 0),
+        _plain_span("S0002", "(k) the mechanisms for reporting and recording changes to the rules.", 57),
+    ]
+    assert lead_ins(spans)["S0002"]["span_id"] == "S0001"
+
+
+def test_lead_ins_gives_a_lowercase_continuation_its_previous_span():
+    spans = [
+        _plain_span("S0001", "The Commission shall engage relevant stakeholders in", 0),
+        _plain_span("S0002", "(c) engage relevant stakeholders in discussion and activities.", 49),
+    ]
+    assert lead_ins(spans)["S0002"]["span_id"] == "S0001"
+
+
+def test_lead_ins_gives_an_anaphoric_sentence_its_previous_span():
+    spans = [
+        _plain_span("S0001", "Measures to reply to a request may be adopted.", 0),
+        _plain_span("S0002", "Such measures may include the transmission of relevant information.", 47),
+    ]
+    assert lead_ins(spans)["S0002"]["span_id"] == "S0001"
+
+
+def test_lead_ins_ignores_a_self_contained_sentence():
+    spans = [
+        _plain_span("S0001", "This Regulation applies to providers.", 0),
+        _plain_span("S0002", "Natural persons shall be enabled to decide.", 40),
+    ]
+    assert lead_ins(spans) == {}
+
+
+def test_lead_ins_does_not_cross_a_section_boundary():
+    spans = [
+        _plain_span("S0001", "The controller shall specify at least:", 0, ("Article 5",)),
+        _plain_span("S0002", "(k) the mechanisms for reporting changes.", 38, ("Article 6",)),
+    ]
+    assert lead_ins(spans) == {}

@@ -198,3 +198,26 @@ def test_a_cached_chunk_still_reports_what_it_cost(tmp_path):
     assert reply == "[{}]"
     assert usage == {"input_tokens": 100, "output_tokens": 50}
     assert finish == "stop"
+
+
+def test_a_list_item_claim_declares_its_lead_in_as_context():
+    lead = _span("S0001", "The binding corporate rules shall specify at least:")
+    item = _span("S0002", "(k) the mechanisms for reporting and recording changes to the rules.")
+    raw = {
+        "statement": "The binding corporate rules shall specify at least the mechanisms for reporting changes.",
+        "span_ids": ["S0002"],
+        "modality": "obligation",
+    }
+    claim = build_claim(raw, {"S0001": lead, "S0002": item}, _doc(), 1, {"S0002": lead})
+    assert claim is not None
+    assert [item["role"] for item in claim["evidence"]] == ["supports", "context"]
+    assert claim["evidence"][0]["quote"] == item["paragraph"]
+    assert claim["evidence"][1]["quote"] == lead["paragraph"]
+    assert claim["evidence"][1]["locator"] == lead["locator"]
+
+
+def test_without_a_lead_in_the_claim_has_one_evidence_item():
+    span = _span("S0001", "Natural persons shall be enabled to decide.")
+    raw = {"statement": "Natural persons shall be enabled to decide.", "span_ids": ["S0001"]}
+    claim = build_claim(raw, {"S0001": span}, _doc(), 1, {})
+    assert [item["role"] for item in claim["evidence"]] == ["supports"]
