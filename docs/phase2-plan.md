@@ -1,7 +1,8 @@
 # Phase 2 — the first end-to-end knowledge base
 
-- **Status:** in progress (engineering complete, paid run pending approval)
-- **Date:** 2026-11-11
+- **Status:** complete (real run 2026-11-12: 5,680 claims, $1.27, exit
+  criterion met — all three questions cite at least two documents)
+- **Date:** 2026-11-11 (engineering), 2026-11-12 (run)
 - **Depends on:** ADR 0001 (document-first kernel), ADR 0002 Phase 0
   (deterministic verifier) and Phase 1 (evidence-first prompt), both accepted.
 - **Exit criterion (ADR 0002):** `ingest` compiles a folder, and all three
@@ -125,18 +126,20 @@ without being asked to compile. `ask` and `view` never call a model.
 ## Cost
 
 Measured, not guessed: Phase 1 cost **$0.145** for 364 claims (96,164 input,
-217,937 output tokens at $0.15 / $0.60 per million). The demo corpus is
-**514,414 input / 1,167,719 output tokens** by the dry run — **4,803 spans**
-over **546 PDF pages**, plus three DOCX and one HTML document — for an estimated
-**~$0.78**. The AI Act alone is 114 of the 375 chunks. The real figure is
-recorded in `manifest.json` after the run, never inferred afterwards.
+217,937 output tokens at $0.15 / $0.60 per million). The demo corpus was
+estimated at 514,414 input / 1,167,719 output tokens by the dry run and cost
+**$1.27** in the real run: **1,004,607 input / 1,856,731 output tokens** for
+5,680 claims, 4,803 spans, 556 PDF pages, 375 chunks and 14 conflict passes.
+The AI Act alone is 114 of the 375 chunks. The planning figure was 1.9x low on
+input; it is left as it was and the manifest carries the measured numbers — a
+rebuild from cache reports them too (`$0.000` only when nothing was cached).
 
 ## Risks and how they are handled
 
 | Risk | Handling |
 |---|---|
-| Gateway 503s during a long run | cache every reply; `--resume`; `failed` calls are an error, not a silent partial artifact |
-| A chunk's reply outlives the client timeout | one reply is returned whole (no streaming); the per-attempt timeout is 600 s, measured against a 6,132-token chunk that took 175 s |
+| Gateway 503s during a long run | cache every reply; `--resume`; a document whose chunks keep failing is skipped, the rest is written, and the command exits non-zero, so `--resume` retries only what is missing |
+| A chunk's reply outlives the client timeout | every call streams; the 600 s ceiling is per socket read, and a stream that ends without `stop`/`length` is retried instead of being parsed into half a claim array |
 | A document silently changes upstream | SHA-256 in the manifest; `fetch.sh` and `ingest` both refuse a mismatch |
 | HTML chrome becomes claims | extractor drops `nav/header/footer/aside/form` and feedback widgets; segmenter drops boilerplate phrases |
 | Page numbers are unstable | page ranges only for published PDFs; DOCX documents carry section paths and offsets, not pages |

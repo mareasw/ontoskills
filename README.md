@@ -130,6 +130,12 @@ ontocore view --kb kb --questions-file questions.txt
 - output: `claims.jsonl`, `graph.ttl`, `evidence.csv`, `text/`, and a
   self-contained read-only `view.html` with copy-citation.
 
+Measured on that corpus with `deepseek-v4.1-flash`, one full run: **5,680 claims**
+from 14 documents and 556 pages, 99.1% `ok` at the verifier, **$1.27**; all three
+demo questions cite claims from at least two documents, one of them with a
+cross-document tension. Numbers and the `weak` / `no` breakdown are in
+`benchmark/docbench/RESULTS.md`.
+
 See `docs/phase2-plan.md` for the pipeline and `examples/demo-corpus/` for the
 corpus manifest, licences and sources. Measured extraction results are in
 `benchmark/docbench/RESULTS.md`.
