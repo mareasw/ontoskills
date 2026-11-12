@@ -115,26 +115,38 @@ cd examples/demo-corpus && ./fetch.sh     # 14 public documents, hashes checked
 
 ontocore ingest . -o kb --estimate        # cost estimate, no API calls
 ontocore ingest . -o kb --resume          # compile (paid, one model per chunk)
+ontocore ingest . -o kb --resume --semantic  # + local vectors, still no network
 ontocore ask "How quickly must a personal-data breach be notified?" --kb kb
 ontocore view --kb kb --questions-file questions.txt
 ```
 
 - the compiler never writes a quote: the model returns span ids, the quote and
-  locator are copied from the segmented text;
+  locator are copied from the segmented text; a list item also carries the span
+  that opens its list as `context` evidence, so an item with no subject of its
+  own is still readable;
 - a **deterministic verifier** (verbatim, locator, page, section, numbers) gates
   every claim and ships `weak` / `no` verdicts visibly instead of hiding them;
+  `ask` answers only claims it passed, `view` shows every claim with its badge;
+- a number that names where a rule lives (`Clause 8.2`, `Directive (EU)
+  2019/790`) is a note, not a failure; a quantity that no quote carries is
+  refused when the claim is built and recorded in `rejected.jsonl`;
 - `ask` ranks with BM25 and groups by document, so a cross-document question
-  shows which document says what;
+  shows which document says what; when the KB carries `vectors.jsonl` it fuses
+  BM25 with a local MiniLM ranking (reciprocal rank fusion), offline and with no
+  paid call, and falls back to BM25 alone if the optional runtime is absent;
 - when two documents give the same topic different numbers, the answer reports
   a **tension** with both citations rather than picking a winner;
 - output: `claims.jsonl`, `graph.ttl`, `evidence.csv`, `text/`, and a
   self-contained read-only `view.html` with copy-citation.
 
 Measured on that corpus with `deepseek-v4.1-flash`, one full run: **5,680 claims**
-from 14 documents and 556 pages, 99.1% `ok` at the verifier, **$1.27**; all three
-demo questions cite claims from at least two documents, one of them with a
-cross-document tension. Numbers and the `weak` / `no` breakdown are in
-`benchmark/docbench/RESULTS.md`.
+from 14 documents and 556 pages, **99.8% `ok`** at the verifier (10 `weak`, 0
+`no`), **$1.27**; all three demo questions cite claims from at least two
+documents, one of them with a cross-document tension. Retrieval is measured, not
+assumed: against a 20-question gold set declared before the first run, BM25 hits
+13/20 and the hybrid 16/20 — both **miss the pre-registered gate** (18/20 and
+0.60 recall), and `RESULTS.md` reports the numbers with the diagnosis. The
+`weak` breakdown and both measurements are in `benchmark/docbench/RESULTS.md`.
 
 See `docs/phase2-plan.md` for the pipeline and `examples/demo-corpus/` for the
 corpus manifest, licences and sources. Measured extraction results are in
