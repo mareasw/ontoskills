@@ -421,14 +421,18 @@ def compile_document(
     spans: list[dict],
     options: CompileOptions,
     progress: Callable[[str], None] | None = None,
+    lead_map: dict[str, dict] | None = None,
 ) -> CompiledDocument:
     if options.dry_run:
         return CompiledDocument(claims=[], stats=CompileStats(), spans=spans)
 
     span_by_id = {span["span_id"]: span for span in spans}
     # Only the model-backed claims get a context item: a row claim is built from
-    # the span alone and states exactly what the row says.
-    lead_map = lead_ins(spans)
+    # the span alone and states exactly what the row says. A caller that has
+    # already repaired the section paths passes its own map, so context and
+    # evidence agree on the section the verifier will see.
+    if lead_map is None:
+        lead_map = lead_ins(spans)
     chunks = chunk(spans, options.chunk_size, options.overlap)
     cache_dir = options.cache_dir
     jobs: list[tuple[int, str, str, Path | None]] = []

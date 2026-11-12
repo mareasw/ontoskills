@@ -244,3 +244,8 @@ def test_a_numbered_paragraph_is_the_opener_not_an_item():
         _plain_span("S0003", "(b) modify the system substantially.", 100),
     ]
     assert lead_ins(spans)["S0003"]["span_id"] == "S0001"
+
+
+def test_sections_cleaning_does_not_change_segmentation():
+    spans = segment(CONTRACT, _product_doc().segment_meta())
+    assert [s["paragraph"] for s in spans] == [s["paragraph"] for s in segment(CONTRACT, _product_doc().segment_meta())]
