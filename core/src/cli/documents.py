@@ -309,10 +309,16 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         # over the network. A missing runtime is a hard error here, because the
         # operator asked for something the build did not produce.
         from compiler.documents.store import write_vectors
-        from compiler.documents.vector import MODEL as EMBED_MODEL, embedder_for
 
-        started_vectors = time.time()
-        written = write_vectors(kb, all_claims, embedder_for(kb))
+        try:
+            from compiler.documents.vector import MODEL as EMBED_MODEL, embedder_for
+
+            started_vectors = time.time()
+            written = write_vectors(kb, all_claims, embedder_for(kb))
+        except (ImportError, OSError, ValueError) as exc:
+            raise click.ClickException(
+                f"--semantic needs the local embedding runtime: {exc}"
+            )
         console.print(
             f"vectors: {written} claim(s), model {EMBED_MODEL}, "
             f"{time.time() - started_vectors:.1f}s"
