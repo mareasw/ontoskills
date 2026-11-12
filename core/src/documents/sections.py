@@ -18,9 +18,16 @@ from __future__ import annotations
 import re
 
 # A page label in its running-header forms: a bare folio ("L 119/29", "12/144"),
-# the Official Journal masthead, and the ELI pointer printed in every footer.
+# the Official Journal masthead, the ELI pointer printed in every footer, and the
+# date line a standards publisher prints on every page ("February 26, 2024").
+# The date must be the whole element: "AI RMF 1.0 (January 2023)" is a heading
+# that happens to carry a date, and a masthead is a date and nothing else.
+MONTHS = r"January|February|March|April|May|June|July|August|September|October|November|December"
 PAGE_LABEL = re.compile(
-    r"^(?:[A-Z]{1,3}\s+)?\d+/\d+$|^OJ\s+L,\s*\d+\.\d+\.\d{4}$|^ELI:\s*https?://\S+$"
+    r"^(?:[A-Z]{1,3}\s+)?\d+/\d+$"
+    r"|^OJ\s+L,\s*\d+\.\d+\.\d{4}$"
+    r"|^ELI:\s*https?://\S+$"
+    rf"|^(?:(?i:{MONTHS})\s+\d{{1,2}},\s*\d{{4}}|\d{{1,2}}\s+(?i:{MONTHS})\s+\d{{4}})$"
 )
 
 MAX_PATH = 3
