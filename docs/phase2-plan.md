@@ -1,7 +1,9 @@
 # Phase 2 — the first end-to-end knowledge base
 
-- **Status:** complete (real run 2026-11-12: 5,680 claims, $1.27, exit
-  criterion met — all three questions cite at least two documents)
+- **Status:** complete and measured (real run 2026-11-12: 5,680 claims, $1.27).
+  The structural exit criterion is met — all three questions cite at least two
+  documents. The retrieval gate added during Phase 2 is **not** met; see
+  *Retrieval* below.
 - **Date:** 2026-11-11 (engineering), 2026-11-12 (run)
 - **Depends on:** ADR 0001 (document-first kernel), ADR 0002 Phase 0
   (deterministic verifier) and Phase 1 (evidence-first prompt), both accepted.
@@ -14,14 +16,23 @@
 Phase 2 is **engineering only**. The extraction prompt is the one accepted in
 Phase 1, byte for byte; changing it is a new experiment with its own
 pre-registration. No threshold is moved after a number is seen, and no claim is
-made about extraction quality from the demo corpus: the demo has a structural
-acceptance criterion (two documents per answer), not a score.
+made about extraction quality from the demo corpus: the demo's acceptance
+criterion is structural (two documents per answer), not a score. Retrieval *is*
+scored, against a gold set and a gate committed before the first measurement;
+see *Retrieval* below.
 
-The one known extraction debt comes from Phase 1 and is deliberately not
-addressed here: **16 of the 20 `weak` rows were sub-items whose parent span
-supplied the actor, the modal or the condition** ("unquoted lead-in"). The fix is
-structural — attach the parent span to the split — and belongs to the segmenter,
-not to another prompt iteration. Phase 2 records it; Phase 3 fixes it.
+The one known extraction debt that came from Phase 1 — **16 of the 20 `weak` rows
+were sub-items whose parent span supplied the actor, the modal or the condition**
+("unquoted lead-in") — was addressed here, structurally and without touching the
+prompt: a list item now carries the span that opens its list as `context`
+evidence, with its own locator. Ten `weak` remain, each documented in
+`RESULTS.md`; none is a fabricated statement, and `ask` does not answer them.
+
+A second defect surfaced with the same repair: a PDF running header
+(`L 119/29`, `OJ L, 12.7.2024`) was taken for a heading, so everything below it
+carried a page number where the article should be. Section paths are now repaired
+after compilation (`sections.py`), on spans and claims that no longer feed a model
+call, so the frozen prompt and the parity-tested segmenter are untouched.
 
 ## Architecture
 
@@ -36,12 +47,15 @@ drifts from the frozen one on the same text.
 | `model.py` | `Document`, manifest loading, SHA-256, stable doc ids |
 | `extract.py` | PDF (`pdftotext`), DOCX (`soffice`), HTML (`bs4`, stdlib fallback), text |
 | `segment.py` | span-first segmentation with locators; product copy of the validated segmenter |
+| `sections.py` | repairs section paths after compilation: page furniture is not a heading |
 | `prompt.py` | the Phase 1 `SYSTEM`, conflict prompt, prompt hash |
 | `llm.py` | one OpenAI-compatible call, six attempts with backoff |
 | `compile.py` | chunking, cache/resume, concurrency, JSON repair, claim build, dedupe, row claims, conflict pass |
-| `verify.py` | six deterministic rules; `ok` / `weak` / `no` + notes |
-| `store.py` | manifest, JSONL, Turtle graph, evidence CSV, atomic writes |
-| `ask.py` | BM25 ranking, cross-document grouping, deterministic tensions |
+| `verify.py` | six deterministic rules; `ok` / `weak` / `no` + notes; quantities vs structural references |
+| `store.py` | manifest, JSONL, vectors, Turtle graph, evidence CSV, atomic writes |
+| `ask.py` | BM25 ranking, optional local-embedding fusion, cross-document grouping, deterministic tensions |
+| `vector.py` | pinned MiniLM embedder (offline), cosine, reciprocal rank fusion |
+| `eval.py` | hit / recall / MRR over a gold set, and the pre-registered gate |
 | `web.py` | self-contained read-only HTML view with copy-citation |
 | `cli/documents.py` | `ontocore ingest`, `ontocore ask`, `ontocore view` |
 
@@ -52,9 +66,11 @@ drifts from the frozen one on the same text.
 - **The verifier is deterministic.** No model, no network, replayed in
   milliseconds. It is a hard gate on the artifact (`weak` / `no` rows are
   written and shown), not a judge of usefulness.
-- **The answer is deterministic.** `ask` is BM25 over statement, actor,
-  conditions and quotes; no model is called. A question that cannot be answered
-  returns no citations rather than a guess.
+- **The answer is deterministic.** `ask` ranks with BM25 over statement, actor,
+  conditions and quotes. When the KB carries `vectors.jsonl` it also ranks with a
+  pinned local embedding model and fuses the two by reciprocal rank: same KB and
+  same model give the same answer, and neither path calls a paid API. A question
+  that cannot be answered returns no citations rather than a guess.
 
 ## Knowledge-base layout
 
@@ -65,6 +81,8 @@ kb/
   spans.jsonl        every span the segmenter emitted
   claims.jsonl       schema v2 claims
   verifier.jsonl     one verdict per claim
+  rejected.jsonl     claims refused at construction, with the reason (only if any)
+  vectors.jsonl      header line + one embedding per claim (`ingest --semantic`)
   graph.ttl          documents, contexts, claims, evidence, conflicts
   evidence.csv       claims flattened for a spreadsheet
   text/<doc>.txt     the extracted text the citations point into
@@ -116,12 +134,19 @@ cd examples/demo-corpus && ./fetch.sh
 
 ontocore ingest . -o kb --estimate          # no API calls
 ontocore ingest . -o kb --resume            # the paid run
+ontocore ingest . -o kb --resume --semantic # + local vectors, no network
 ontocore ask "How quickly must a personal-data breach be notified?" --kb kb
+ontocore ask "…" --kb kb --no-semantic      # BM25 only, ignore vectors.jsonl
 ontocore view --kb kb --questions-file questions.txt
+python examples/demo-corpus/eval_retrieval.py --kb kb [--semantic]
 ```
 
 `ingest` prints the estimate and stops on `--estimate`; it never spends money
-without being asked to compile. `ask` and `view` never call a model.
+without being asked to compile. `ask` and `view` never call a paid model. `ask`
+fuses the local ranking automatically when `vectors.jsonl` is present and the
+optional runtime imports, and prints one dim line and stays on BM25 when it is
+not. The eval script prints hit@12, recall@12 and MRR@12, the gate line, and
+exits non-zero when the gate fails.
 
 ## Cost
 
@@ -133,6 +158,38 @@ estimated at 514,414 input / 1,167,719 output tokens by the dry run and cost
 The AI Act alone is 114 of the 375 chunks. The planning figure was 1.9x low on
 input; it is left as it was and the manifest carries the measured numbers — a
 rebuild from cache reports them too (`$0.000` only when nothing was cached).
+
+## Retrieval
+
+The demo's structural criterion says an answer cites two documents. It says
+nothing about whether the *right* claim was retrieved, so retrieval is measured
+separately, against a gold set written and committed **before** the baseline was
+run: 20 questions, 41 expectations, 14 of 14 documents, 10 questions with
+expectations in more than one document. An expectation is a
+`(document, verbatim fragment)` pair, the fragment at least 40 characters and
+copied from a claim's own quote, so the metric survives re-segmentation and
+cannot be gamed by ranking.
+
+The gate (not moved after the number was seen): **hit@12 ≥ 18 of 20** and
+**mean recall@12 ≥ 0.60**; MRR@12 is reported but not gated.
+
+| configuration | hit@12 | recall@12 | MRR@12 | gate |
+|---|---:|---:|---:|---|
+| BM25 | 13/20 (0.650) | 0.467 | 0.467 | **FAIL** |
+| BM25 + local MiniLM, RRF k=60 | 16/20 (0.800) | 0.592 | 0.588 | **FAIL** |
+
+The hybrid closes three of the seven baseline misses and regresses none, and
+still lands two hits and 0.008 recall short. Two causes, both diagnosed from the
+claims: a singular/plural mismatch (`voucher` vs `vouchers`) means `tokens` gives
+a relevant claim no lexical score at all, and reciprocal rank fusion then buries
+a semantic-only hit; the other three misses ask for two or three specific rules
+at once, and twelve slots fill before all of them appear. The next step is a new
+measurement — light morphological normalisation and a fusion that does not
+drown a semantic-only match — not a re-tuning of this one.
+
+The local model is MiniLM (`all-MiniLM-L6-v2`, pinned by revision), 384
+dimensions, 22 MB for 5,680 claims, 702 s to embed the corpus once on CPU and
+~105 s to load in a fresh process. `ask` works without it.
 
 ## Risks and how they are handled
 
@@ -164,7 +221,13 @@ over the graph.
 - [x] Schema v2 accepts stable doc ids (`^[A-Za-z][A-Za-z0-9_]*-\d{4}$`)
 - [x] Tests: text, model, segmenter parity, compile, verify, ask, store, web, CLI
 - [x] Core suite green
-- [ ] Paid ingest run on the demo corpus (needs approval)
-- [ ] Three cross-document questions validated on the real artifact
-- [ ] `RESULTS.md` / `README.md` updated with the demo numbers
+- [x] Paid ingest run on the demo corpus (approved, 2026-11-12)
+- [x] Three cross-document questions validated on the real artifact
+- [x] `RESULTS.md` / `README.md` updated with the demo numbers
+- [x] List items carry their lead-in as `context` evidence
+- [x] Page furniture removed from section paths
+- [x] Structural references noted, unquoted quantities refused at construction
+- [x] 20-question gold set and retrieval gate, pre-registered
+- [x] Retrieval measured (BM25 and hybrid) — **gate not met**, diagnosis recorded
+- [ ] Light morphological normalisation and a fusion that keeps semantic-only hits
 - [ ] PR merged with the four CI checks green
