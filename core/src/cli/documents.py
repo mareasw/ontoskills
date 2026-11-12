@@ -71,7 +71,11 @@ def _print_estimate(rows: list[dict], price_in: float, price_out: float) -> dict
     table.add_column("prompt chars", justify="right")
     table.add_column("~in tok", justify="right")
     table.add_column("~out tok", justify="right")
+    # Pages are what the reader of a legal PDF navigates by, and the only unit
+    # that can be checked against the source without reading the token count.
+    table.add_column("pages", justify="right")
     total_in = 0
+    total_pages = 0
     for row in rows:
         table.add_row(
             row["doc_id"],
@@ -80,20 +84,27 @@ def _print_estimate(rows: list[dict], price_in: float, price_out: float) -> dict
             f"{row['chars']:,}",
             f"{row['tokens']:,}",
             f"{int(row['tokens'] * OUTPUT_RATIO):,}",
+            "" if row.get("pages") is None else str(row["pages"]),
         )
         total_in += row["tokens"]
+        total_pages += row["pages"] or 0
     console.print(table)
     out_tokens = int(total_in * OUTPUT_RATIO)
     cost = total_in / 1_000_000 * price_in + out_tokens / 1_000_000 * price_out
     console.print(
-        f"Total: ~{total_in:,} input tokens, ~{out_tokens:,} output tokens "
-        f"→ ~${cost:.2f} at ${price_in}/M in, ${price_out}/M out."
+        f"Total: ~{total_in:,} input tokens, ~{out_tokens:,} output tokens, "
+        f"{total_pages} PDF pages → ~${cost:.2f} at ${price_in}/M in, ${price_out}/M out."
     )
     console.print(
         "[dim]Estimate assumes 3.8 chars/token and the Phase 1 output ratio; "
         "the real number is only known after the run.[/dim]"
     )
-    return {"input_tokens": total_in, "output_tokens": out_tokens, "cost": round(cost, 2)}
+    return {
+        "input_tokens": total_in,
+        "output_tokens": out_tokens,
+        "pages": total_pages,
+        "cost": round(cost, 2),
+    }
 
 
 @click.command("ingest")
@@ -169,6 +180,7 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
                 "chunks": len(chunks),
                 "chars": chars,
                 "tokens": int(chars / CHARS_PER_TOKEN) + len(chunks) * 40,
+                "pages": _page_count(texts[doc.doc_id]) if doc.kind == "pdf" else None,
                 "text": texts[doc.doc_id],
                 "spans_list": doc_spans,
             }
@@ -203,7 +215,9 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
     started = time.time()
     all_claims: list[dict] = []
     all_spans: list[dict] = []
+    all_rejected: list[dict] = []
     total_in = total_out = 0
+    total_rejected_numbers = 0
     failed: list[str] = []
     for doc, row in zip(docs, rows):
         with console.status(f"compiling {doc.doc_id} ({len(row['spans_list'])} spans)") as status:
@@ -233,6 +247,8 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
             continue
         all_claims.extend(compiled.claims)
         all_spans.extend(compiled.spans)
+        all_rejected.extend(compiled.rejected)
+        total_rejected_numbers += compiled.stats.rejected_numbers
         total_in += compiled.stats.input_tokens
         total_out += compiled.stats.output_tokens
         cost = compiled.stats.cost(options)
@@ -280,13 +296,24 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         spans=all_spans,
         claims=all_claims,
         verifier_rows=rows_verdicts,
+        rejected_rows=all_rejected,
     )
-    answers = [answer(question, Corpus(all_claims, rows_docs)) for question in questions] if questions else []
+    # The view is the audit surface: a claim the verifier did not pass is shown
+    # with its badge, not hidden, so a reader can see what the gate caught.
+    view_corpus = Corpus(
+        all_claims, rows_docs, verdicts=rows_verdicts, include_unverified=True
+    )
+    answers = [answer(question, view_corpus) for question in questions] if questions else []
     kb.write_view(render_view(kb, answers=answers))
 
     console.print()
     console.print(f"[bold]{len(all_claims)}[/bold] claims in [bold]{len(docs)}[/bold] documents")
     console.print(f"verifier: {json.dumps(report['by_verdict'])}")
+    if total_rejected_numbers:
+        console.print(
+            f"rejected: {total_rejected_numbers} claim(s) whose quantity is not in the "
+            "evidence — see rejected.jsonl"
+        )
     console.print(
         f"cost: ${manifest['cost_usd']:.3f} ({total_in:,} in / {total_out:,} out), "
         f"{manifest['elapsed_s']}s"
@@ -309,19 +336,33 @@ def _page_count(text: str) -> int:
     return text.count("\f") + 1 if "\f" in text else 1
 
 
+def _corpus(kb: KnowledgeBase, include_unverified: bool) -> Corpus:
+    """The corpus `ask` answers from: verified claims only, unless asked otherwise."""
+    verdicts = kb.verifier()
+    if not verdicts:
+        console.print(
+            "[yellow]warning:[/yellow] no verifier.jsonl: unverified claims are shown unfiltered"
+        )
+    return Corpus(
+        kb.claims(), kb.documents(), verdicts=verdicts, include_unverified=include_unverified
+    )
+
+
 @click.command("ask")
 @click.argument("question")
 @click.option("-k", "--kb", "kb_dir", type=click.Path(exists=True, file_okay=False, path_type=Path),
               default=Path("kb"), show_default=True, help="Knowledge-base directory")
 @click.option("-n", "--limit", default=12, show_default=True, type=int, help="Max citations")
 @click.option("--json", "as_json", is_flag=True, help="Emit JSON instead of text")
-def ask_cmd(question, kb_dir, limit, as_json):
+@click.option("--include-unverified", is_flag=True,
+              help="Also cite claims the verifier did not pass, marked with their verdict")
+def ask_cmd(question, kb_dir, limit, as_json, include_unverified):
     """Answer a question from a compiled corpus, with citations."""
     kb = KnowledgeBase(kb_dir)
     claims = kb.claims()
     if not claims:
         raise click.ClickException(f"{kb_dir}: no claims.jsonl; run `ontocore ingest` first")
-    corpus = Corpus(claims, kb.documents())
+    corpus = _corpus(kb, include_unverified)
     result = answer(question, corpus, limit=limit)
     if as_json:
         click.echo(json.dumps({
@@ -357,7 +398,7 @@ def view_cmd(kb_dir, questions, questions_file, out, limit):
             line.strip() for line in questions_file.read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.startswith("#")
         )
-    corpus = Corpus(claims, kb.documents())
+    corpus = _corpus(kb, include_unverified=True)
     answers = [answer(question, corpus, limit=limit) for question in questions]
     html = render_view(kb, answers=answers)
     target = out or (kb_dir / "view.html")

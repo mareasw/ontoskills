@@ -30,6 +30,7 @@ from compiler.documents.prompt import (
 )
 from compiler.documents.segment import chunk, lead_ins
 from compiler.documents.text import modal_classes, norm, statement_tokens
+from compiler.documents.verify import unattested_numbers
 
 
 @dataclass
@@ -56,6 +57,7 @@ class CompileStats:
     input_tokens: int = 0
     output_tokens: int = 0
     rejected: int = 0
+    rejected_numbers: int = 0
     merged: int = 0
     truncated: int = 0
     failed: int = 0
@@ -73,6 +75,9 @@ class CompiledDocument:
     claims: list[dict]
     stats: CompileStats
     spans: list[dict] = field(default_factory=list)
+    # Claims the compiler refused, with the reason: a rejection that leaves no
+    # trace is indistinguishable from a claim the model never produced.
+    rejected: list[dict] = field(default_factory=list)
 
 
 def repair_json_array(text: str) -> list[dict]:
@@ -219,6 +224,18 @@ def build_claim(
     number: int,
     lead_map: dict[str, dict] | None = None,
 ) -> dict | None:
+    """Build a claim, refusing one whose statement states an unquoted quantity."""
+    return _build_claim(raw, span_by_id, doc, number, lead_map, enforce=True)
+
+
+def _build_claim(
+    raw: dict[str, Any],
+    span_by_id: dict[str, dict],
+    doc: Document,
+    number: int,
+    lead_map: dict[str, dict] | None,
+    enforce: bool,
+) -> dict | None:
     ids = raw.get("span_ids") or raw.get("spans") or []
     if isinstance(ids, str):
         ids = [ids]
@@ -277,6 +294,12 @@ def build_claim(
             claim["conditions"] = cleaned
     claim["evidence"] = evidence
     claim["context"] = dict(doc.context)
+    # A quantity the evidence never states is a fabrication, and it must not
+    # reach the artifact: the verifier would flag it, but a flagged claim is
+    # still a claim someone can read. ``compile_document`` builds without
+    # ``enforce`` so it can record *why* the claim was refused.
+    if enforce and unattested_numbers(claim):
+        return None
     return claim
 
 
@@ -479,11 +502,33 @@ def compile_document(
         raw_claims.extend(parse_claims(reply))
 
     claims: list[dict] = []
+    rejected: list[dict] = []
     number = 1
     for raw in raw_claims:
-        claim = build_claim(raw, span_by_id, doc, number, lead_map)
+        claim = _build_claim(raw, span_by_id, doc, number, lead_map, enforce=False)
         if claim is None:
             stats.rejected += 1
+            rejected.append(
+                {
+                    "doc_id": doc.doc_id,
+                    "statement": norm(str(raw.get("statement", ""))),
+                    "span_ids": [str(i) for i in (raw.get("span_ids") or [])],
+                    "reason": "no usable span, or statement shorter than 15 characters",
+                }
+            )
+            continue
+        missing = unattested_numbers(claim)
+        if missing:
+            stats.rejected += 1
+            stats.rejected_numbers += 1
+            rejected.append(
+                {
+                    "doc_id": doc.doc_id,
+                    "statement": claim["statement"],
+                    "span_ids": [str(i) for i in (raw.get("span_ids") or [])],
+                    "reason": "quantity not in the evidence: " + ", ".join(missing),
+                }
+            )
             continue
         claims.append(claim)
         number += 1
@@ -510,7 +555,7 @@ def compile_document(
     if options.conflicts and claims and not options.dry_run:
         _link_conflicts(doc, claims, options, stats, progress)
 
-    return CompiledDocument(claims=claims, stats=stats, spans=spans)
+    return CompiledDocument(claims=claims, stats=stats, spans=spans, rejected=rejected)
 
 
 def _link_conflicts(

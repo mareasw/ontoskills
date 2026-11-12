@@ -7,6 +7,7 @@ A compiled corpus is a directory, not a database:
     spans.jsonl        one row per span the segmenter emitted
     claims.jsonl       one row per claim, schema v2
     verifier.jsonl     one row per claim, deterministic verdict
+    rejected.jsonl     one row per claim the compiler refused, and why
     graph.ttl          the same claims as RDF
     evidence.csv       claims flattened for a spreadsheet
     text/<doc_id>.txt  the extracted, paginated plain text
@@ -34,6 +35,7 @@ DOCUMENTS = "documents.jsonl"
 SPANS = "spans.jsonl"
 CLAIMS = "claims.jsonl"
 VERIFIER = "verifier.jsonl"
+REJECTED = "rejected.jsonl"
 GRAPH = "graph.ttl"
 EVIDENCE = "evidence.csv"
 TEXT_DIR = "text"
@@ -303,6 +305,9 @@ class KnowledgeBase:
     def verifier(self) -> list[dict]:
         return read_jsonl(self.path(VERIFIER))
 
+    def rejected(self) -> list[dict]:
+        return read_jsonl(self.path(REJECTED))
+
     def text(self, doc_id: str) -> str:
         path = self.text_path(doc_id)
         return path.read_text(encoding="utf-8", errors="ignore") if path.exists() else ""
@@ -331,6 +336,7 @@ class KnowledgeBase:
         spans: list[dict],
         claims: list[dict],
         verifier_rows: list[dict] | None = None,
+        rejected_rows: list[dict] | None = None,
         view: str | None = None,
     ) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
@@ -342,6 +348,14 @@ class KnowledgeBase:
         write_jsonl(self.path(CLAIMS), claims)
         rows = verifier_rows or []
         write_jsonl(self.path(VERIFIER), rows)
+        # A rejected claim leaves no other trace, so the file has to be written
+        # when there is one and removed when there is not: a stale file from an
+        # earlier build would report rejections this build did not make.
+        rejected = rejected_rows or []
+        if rejected:
+            write_jsonl(self.path(REJECTED), rejected)
+        else:
+            self.path(REJECTED).unlink(missing_ok=True)
         _atomic_text(self.path(GRAPH), build_graph(documents, claims))
         verdicts = {row["claim_id"]: row["verdict"] for row in rows}
         write_evidence_csv(self.path(EVIDENCE), claims, verdicts)
