@@ -108,3 +108,43 @@ def test_summarise_groups_failures_by_document():
     assert report["by_verdict"] == {"ok": 1, "weak": 1, "no": 1}
     assert len(report["failures"]) == 2
     assert report["by_doc"]["T1"] == {"ok": 1, "weak": 1}
+
+
+def test_verify_all_normalises_each_document_once(monkeypatch):
+    """The rebuild cost is claims × document size unless the text is normalised once."""
+    import compiler.documents.verify as verify_module
+
+    spans = _spans()
+    span = next(s for s in spans if "48 hours" in s["paragraph"])
+    claims = [
+        _claim(span, "The Supplier shall notify the Buyer within 48 hours of a breach.")
+        for _ in range(3)
+    ]
+    calls: list[str] = []
+    real_norm = verify_module.norm
+
+    def counting_norm(text):
+        calls.append(text)
+        return real_norm(text)
+
+    monkeypatch.setattr(verify_module, "norm", counting_norm)
+    verify_module.verify_all(claims, spans, {"T1": TEXT})
+    assert calls.count(TEXT) == 1
+
+
+def test_page_containing_normalises_the_pages_once_per_source(monkeypatch):
+    """Page lookup runs per evidence item; re-splitting the document each time is quadratic."""
+    import compiler.documents.verify as verify_module
+
+    source = "alpha page\fbeta page\fgamma page"
+    calls: list[str] = []
+    real_norm = verify_module.norm
+
+    def counting_norm(text):
+        calls.append(text)
+        return real_norm(text)
+
+    monkeypatch.setattr(verify_module, "norm", counting_norm)
+    assert verify_module.page_containing(source, "alpha page", 1) == 1
+    assert verify_module.page_containing(source, "gamma page", 3) == 3
+    assert calls.count("alpha page") == 1

@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from functools import lru_cache
 from typing import Iterable
 
 from compiler.documents.text import modal_classes, norm, same_word, statement_tokens, tokens
@@ -83,9 +84,22 @@ class SpanIndex:
 NUMBER = re.compile(r"(?<![\w.])\d+(?:[.,]\d+)*(?![\w.])")
 PARAPHRASE_TOLERANCE = 0.25
 
+
+@lru_cache(maxsize=16)
+def _pages(source: str) -> tuple[str, ...]:
+    """The normalised pages of one source.
+
+    ``page_containing`` runs once per evidence item, and splitting plus
+    normalising the whole document each time was 99% of the verification time:
+    the work depended on claims × document size. The text is the cache key, so
+    a caller that verifies many claims in one document pays for it once.
+    """
+    return tuple(norm(page) for page in source.split("\f"))
+
+
 def page_containing(source: str, quote: str, declared: int | None = None) -> int | None:
     """Return the page that carries ``quote``; honour a declared page that does."""
-    pages = [i for i, page in enumerate(source.split("\f"), start=1) if quote in norm(page)]
+    pages = [i for i, page in enumerate(_pages(source), start=1) if quote in page]
     if not pages:
         return None
     if declared in pages:
@@ -111,14 +125,25 @@ def evidence_text(claim: dict) -> tuple[str, str]:
     return " ".join(quotes), " ".join(paths)
 
 
-def verify(claim: dict, spans: SpanIndex, texts: dict[str, str]) -> dict:
-    """Return ``{"verdict", "reasons", "notes"}`` for one claim, rules only."""
+def verify(
+    claim: dict,
+    spans: SpanIndex,
+    texts: dict[str, str],
+    normalised: dict[str, str] | None = None,
+) -> dict:
+    """Return ``{"verdict", "reasons", "notes"}`` for one claim, rules only.
+
+    ``normalised`` lets a caller that verifies many claims in the same document
+    hand in the already-normalised source. Normalising the whole text is the
+    expensive step here, and doing it once per claim made the rebuild cost
+    claims × document size, so ``verify_all`` builds the map once.
+    """
     hard: list[str] = []
     soft: list[str] = []
     notes: list[str] = []
     doc = claim["doc_id"]
     raw = texts.get(doc, "")
-    source = norm(raw)
+    source = (normalised or {}).get(doc) or norm(raw)
 
     for index, item in enumerate(claim.get("evidence") or []):
         quote = norm(item.get("quote", ""))
@@ -189,11 +214,17 @@ def verify(claim: dict, spans: SpanIndex, texts: dict[str, str]) -> dict:
 
 
 def verify_all(claims: list[dict], spans: Iterable[dict], texts: dict[str, str]) -> list[dict]:
-    """Verify every claim; returns one row per claim in input order."""
+    """Verify every claim; returns one row per claim in input order.
+
+    The source is normalised once per document, not once per claim: a rule set
+    that is quadratic in the corpus size is a rebuild that takes minutes for
+    no gain.
+    """
     index = SpanIndex(spans)
+    normalised = {doc: norm(text) for doc, text in texts.items()}
     rows: list[dict] = []
     for claim in claims:
-        out = verify(claim, index, texts)
+        out = verify(claim, index, texts, normalised)
         rows.append({"claim_id": claim["claim_id"], "doc_id": claim["doc_id"], **out})
     return rows
 
