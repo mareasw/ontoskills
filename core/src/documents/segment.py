@@ -1009,8 +1009,7 @@ def _opener(order: list[dict], index: int, furniture: set[str]) -> dict | None:
     """
     span = order[index]
     text = (span.get("paragraph") or "").lstrip()
-    previous = order[index - 1]
-    previous_text = (previous.get("paragraph") or "").lstrip()
+    previous_text = (order[index - 1].get("paragraph") or "").lstrip()
     current_is_item = bool(LIST_MARKER.match(text)) and not _opens_a_paragraph(text)
     needs = bool(text[:1].islower() or ANAPHORA.match(text) or current_is_item)
     if not needs and not LIST_MARKER.match(previous_text):
