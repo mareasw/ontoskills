@@ -203,6 +203,7 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
     all_claims: list[dict] = []
     all_spans: list[dict] = []
     total_in = total_out = 0
+    failed: list[str] = []
     for doc, row in zip(docs, rows):
         with console.status(f"compiling {doc.doc_id} ({len(row['spans_list'])} spans)") as status:
             def progress(message: str, _status=status) -> None:
@@ -210,9 +211,15 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
 
             compiled = compile_document(doc, row["text"], row["spans_list"], options, progress)
         if compiled.stats.failed:
-            raise click.ClickException(
-                f"{doc.doc_id}: {compiled.stats.failed} model call(s) failed; rerun with --resume"
+            # One unservable chunk must not block the rest of the corpus: the
+            # cache keeps every reply that did arrive, so the next --resume
+            # retries only what is missing. The run still exits non-zero.
+            failed.append(doc.doc_id)
+            console.print(
+                f"  [red]{doc.doc_id}: {compiled.stats.failed} model call(s) failed; "
+                "document skipped, rerun with --resume[/red]"
             )
+            continue
         all_claims.extend(compiled.claims)
         all_spans.extend(compiled.spans)
         total_in += compiled.stats.input_tokens
@@ -280,6 +287,11 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         )
         for row in report["failures"][:5]:
             console.print(f"  {row['claim_id']} {row['verdict']}: {'; '.join(row['reasons'])[:160]}")
+    if failed:
+        raise click.ClickException(
+            f"{', '.join(failed)}: model call(s) failed, knowledge base written without "
+            "them; rerun with --resume"
+        )
 
 
 def _page_count(text: str) -> int:
