@@ -183,3 +183,18 @@ def test_conflict_pass_uses_its_own_system_prompt(monkeypatch):
     assert captured["system"].startswith("You are given the claims compiled from ONE document")
     assert claims[0]["conflicts_with"] == ["T1-0002"]
     assert claims[1]["conflicts_with"] == ["T1-0001"]
+
+
+def test_a_cached_chunk_still_reports_what_it_cost(tmp_path):
+    """A resumed build must not look free: the cache keeps the billed usage."""
+    from compiler.documents.compile import _one_chunk, _write_cache
+
+    path = tmp_path / "T1" / "00000.json"
+    _write_cache(path, "fp", "[{}]", {"input_tokens": 100, "output_tokens": 50}, "stop")
+    reply, usage, finish, cached = _one_chunk(
+        "prompt", "fp", path, CompileOptions(model="stub", cache_dir=tmp_path, resume=True)
+    )
+    assert cached is True
+    assert reply == "[{}]"
+    assert usage == {"input_tokens": 100, "output_tokens": 50}
+    assert finish == "stop"

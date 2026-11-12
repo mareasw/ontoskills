@@ -314,7 +314,7 @@ def _cache_path(cache_dir: Path, doc_id: str, index: int) -> Path:
     return cache_dir / doc_id / f"{index:05d}.json"
 
 
-def _read_cache(path: Path, fingerprint: str) -> str | None:
+def _read_cache(path: Path, fingerprint: str) -> dict | None:
     if not path.exists():
         return None
     try:
@@ -323,7 +323,7 @@ def _read_cache(path: Path, fingerprint: str) -> str | None:
         return None
     if data.get("fingerprint") != fingerprint:
         return None
-    return data.get("reply")
+    return data
 
 
 def _write_cache(path: Path, fingerprint: str, reply: str, usage: dict, finish: str) -> None:
@@ -346,7 +346,18 @@ def _one_chunk(
     if cache_path is not None and options.resume:
         cached = _read_cache(cache_path, fingerprint)
         if cached is not None:
-            return cached, {}, "", True
+            # A resumed build still cost what those chunks cost the first
+            # time: report it, otherwise a cached run claims to be free.
+            usage = cached.get("usage") or {}
+            return (
+                str(cached.get("reply") or ""),
+                {
+                    "input_tokens": int(usage.get("input_tokens", 0) or 0),
+                    "output_tokens": int(usage.get("output_tokens", 0) or 0),
+                },
+                str(cached.get("finish") or ""),
+                True,
+            )
     reply, usage, finish = chat(
         options.base_url,
         options.api_key,
