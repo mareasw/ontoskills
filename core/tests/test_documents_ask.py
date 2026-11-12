@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
-from compiler.documents.ask import Citation, Corpus, ask, durations, find_tensions, topic_of
+from compiler.documents.ask import (
+    Answer,
+    Citation,
+    Corpus,
+    ask,
+    durations,
+    find_tensions,
+    render_text,
+    topic_of,
+)
 
 
 def _claim(doc_id, claim_id, statement, quote, page=1, section=None, url=""):
@@ -138,3 +147,30 @@ def test_empty_question_returns_nothing():
     result = ask("", Corpus(CLAIMS, DOCS))
     assert result.citations == []
     assert result.documents == []
+
+
+def _verdict(claim_id, verdict):
+    return {"claim_id": claim_id, "doc_id": "T1", "verdict": verdict, "reasons": [], "notes": []}
+
+
+def test_search_hides_claims_the_verifier_did_not_pass():
+    claims = [
+        _claim("T1", "T1-0001", "Retention is six years.", "retention six years"),
+        _claim("T1", "T1-0002", "Retention is eight years.", "retention eight years"),
+    ]
+    corpus = Corpus(claims, [], verdicts=[_verdict("T1-0001", "ok"), _verdict("T1-0002", "weak")])
+    assert [c.claim_id for c in corpus.search("retention", limit=5)] == ["T1-0001"]
+
+
+def test_search_can_include_unverified_claims_and_marks_them():
+    claims = [_claim("T1", "T1-0002", "Retention is eight years.", "retention eight years")]
+    corpus = Corpus(claims, [], verdicts=[_verdict("T1-0002", "weak")], include_unverified=True)
+    found = corpus.search("retention", limit=5)
+    assert found[0].verdict == "weak"
+    assert "[weak]" in render_text(Answer(question="retention", citations=found))
+
+
+def test_without_verdicts_nothing_is_filtered():
+    claims = [_claim("T1", "T1-0001", "Retention is six years.", "retention six years")]
+    corpus = Corpus(claims, [])
+    assert [c.claim_id for c in corpus.search("retention", limit=5)] == ["T1-0001"]

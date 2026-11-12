@@ -3,7 +3,9 @@
 No model, no network. The answer is a ranked set of claims, each carrying the
 document, page, section and URL of the span it was compiled from, plus the
 verbatim quote. That is the whole point of the knowledge base: an answer you
-can check against the source in one click.
+can check against the source in one click. Only claims the deterministic
+verifier passed are answered; a caller that wants the audit surface asks for
+the rest and sees each verdict badge.
 
 Ranking is BM25 over a claim's statement, actor, conditions and the quotes of
 its evidence. Claims are grouped by document, because the demo's acceptance
@@ -93,6 +95,7 @@ class Citation:
     section_path: list[str]
     url: str
     score: float = 0.0
+    verdict: str = "ok"
 
     def label(self) -> str:
         bits = [self.title or self.doc_id]
@@ -147,8 +150,27 @@ def _claim_text(claim: dict) -> dict[str, str]:
 class Corpus:
     """An in-memory BM25 index over claims."""
 
-    def __init__(self, claims: list[dict], documents: Iterable[dict] = ()) -> None:
-        self.claims = list(claims)
+    def __init__(
+        self,
+        claims: list[dict],
+        documents: Iterable[dict] = (),
+        verdicts: Iterable[dict] = (),
+        include_unverified: bool = False,
+    ) -> None:
+        # The verifier is the only thing that knows whether a claim's evidence
+        # supports it, so an answer must not present a claim it did not pass.
+        # The filter runs before the index is built, so every index array stays
+        # aligned with ``self.claims``; a caller that wants the audit surface
+        # asks for it explicitly.
+        self.verdicts = {row["claim_id"]: row["verdict"] for row in (verdicts or ())}
+        self.include_unverified = include_unverified
+        self.claims = [
+            claim
+            for claim in claims
+            if include_unverified
+            or not self.verdicts
+            or self.verdicts.get(claim["claim_id"], "ok") == "ok"
+        ]
         self.documents = {doc["doc_id"]: doc for doc in documents}
         self.fields: list[dict[str, str]] = []
         self.tokens: list[list[str]] = []
@@ -228,6 +250,7 @@ class Corpus:
             section_path=list(locator.get("section_path") or []),
             url=locator.get("url") or document.get("url", ""),
             score=round(score, 4),
+            verdict=self.verdicts.get(claim["claim_id"], "ok"),
         )
 
 
@@ -318,7 +341,8 @@ def render_text(answer: Answer) -> str:
     for doc_id, citations in groups.items():
         lines.append(f"== {citations[0].title}  [{doc_id}]  ({len(citations)} claim(s))")
         for citation in citations:
-            lines.append(f"  {citation.claim_id}  {citation.statement}")
+            mark = "" if citation.verdict == "ok" else f"[{citation.verdict}] "
+            lines.append(f"  {citation.claim_id}  {mark}{citation.statement}")
             where = citation.label()
             lines.append(f"      source: {where}")
             if citation.quote:
