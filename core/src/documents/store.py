@@ -327,10 +327,16 @@ class KnowledgeBase:
         return out
 
     def vectors_header(self) -> dict:
+        """The model that built the vectors, read from the header line alone.
+
+        The file is one row per claim, so reading it whole to look at line one
+        would cost a few megabytes for a string comparison.
+        """
         path = self.path(VECTORS)
         if not path.exists():
             return {}
-        return json.loads(path.read_text(encoding="utf-8").splitlines()[0])
+        with path.open(encoding="utf-8") as handle:
+            return json.loads(handle.readline())
 
     def text(self, doc_id: str) -> str:
         path = self.text_path(doc_id)
