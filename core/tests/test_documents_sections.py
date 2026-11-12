@@ -87,3 +87,14 @@ def test_a_short_repeated_line_is_furniture():
 def test_consecutive_duplicate_elements_collapse():
     spans = _spans_with([["Human oversight", "Human oversight"]])
     assert clean_sections(spans, "x")[0]["locator"]["section_path"] == ["Human oversight"]
+
+
+def test_a_running_date_line_is_furniture():
+    text = "February 26, 2024\nThe importer shall act.\n\x0cFebruary 26, 2024\nThe importer shall act again.\n"
+    spans = _spans_with([["Article 5"], ["February 26, 2024"]])
+    assert clean_sections(spans, text)[1]["locator"]["section_path"] == ["Article 5"]
+
+
+def test_a_heading_that_mentions_a_year_is_kept():
+    spans = _spans_with([["AI RMF 1.0 (January 2023)"]])
+    assert clean_sections(spans, "x")[0]["locator"]["section_path"] == ["AI RMF 1.0 (January 2023)"]
