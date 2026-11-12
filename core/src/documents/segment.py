@@ -956,10 +956,6 @@ LIST_MARKER = re.compile(r"^[\(\[]?(?:[A-Za-z]|[ivxlcIVXLC]{1,5}|\d{1,3})[\)\].]
 # A demonstrative opener points back at what the previous span said, so the
 # sentence has no subject of its own ("Such measures may include …").
 ANAPHORA = re.compile(r"^(?:Such|This|These|Those|That|It|They|Its|Their)\b")
-# Only a short previous span can be an introduction; a long one is content,
-# and quoting it as context would hand the verifier a statement it does not
-# support.
-MAX_LEAD_IN = 600
 
 # A numbered paragraph is prose that happens to open with a number: "1. Any
 # distributor …", "(164) The AI Office …". An enumeration item is marked with a
@@ -1032,7 +1028,11 @@ def _opener(order: list[dict], index: int, furniture: set[str]) -> dict | None:
             # A lowercase span is the tail of the sentence or of the item above
             # it. It is the antecedent of a continuation, but never the opener
             # of a list: past the first item, a lowercase span is a sibling's
-            # tail, which says nothing about the current item's subject.
+            # tail, which says nothing about the current item's subject. The
+            # exception is the line that ends in a colon: whatever its first
+            # character, it is the lead-in that introduces the enumeration.
+            if candidate_text.rstrip().endswith(":"):
+                return candidate
             if not current_is_item and not seen_item:
                 return candidate
             continue
@@ -1046,12 +1046,15 @@ def lead_ins(spans: list[dict]) -> dict[str, dict]:
     """Map a span id to the span that carries its subject, when it needs one.
 
     Deliberately narrow: only a list item, a lowercase continuation or a
-    demonstrative opener, and only a span in the same section that is short
-    enough to be an introduction. A list item takes the opener of its list, not
-    the sibling item printed before it: "(j)" shares the enumeration with "(k)"
-    but not its subject, so quoting it answers nothing. A wrong context quote is
-    worse than a missing one, because the verifier trusts every evidence quote
-    it is given.
+    demonstrative opener, and only a span in the same section. A list item takes
+    the opener of its list, not the sibling item printed before it: "(j)" shares
+    the enumeration with "(k)" but not its subject, so quoting it answers
+    nothing. A wrong context quote is worse than a missing one, because the
+    verifier trusts every evidence quote it is given.
+
+    The context is always exactly one span: that is the whole guarantee. No
+    length cap applies, because the segmenter already caps a span at what a
+    sentence can be, and a cap here only rejected real openers.
     """
     grouped: dict[str, list[dict]] = {}
     for span in spans:
@@ -1063,11 +1066,7 @@ def lead_ins(spans: list[dict]) -> dict[str, dict]:
         for index in range(1, len(doc_spans)):
             span = doc_spans[index]
             candidate = _opener(doc_spans, index, furniture)
-            if (
-                candidate is not None
-                and _same_section(span, candidate)
-                and len(candidate.get("paragraph") or "") <= MAX_LEAD_IN
-            ):
+            if candidate is not None and _same_section(span, candidate):
                 out[span["span_id"]] = candidate
     return out
 

@@ -24,29 +24,40 @@ PAGE_LABEL = re.compile(
 )
 
 MAX_PATH = 3
+# A line short enough that it is a page marker rather than a heading. Length is
+# the only safe signal: "Security of processing" is a real module heading that a
+# standard-contractual-clauses annex restates on four pages, and repetition
+# alone cannot tell it from a masthead.
+MAX_MARKER = 12
+
+
+def _is_masthead(line: str) -> bool:
+    """True when a line has one of the shapes a running header takes."""
+    return bool(PAGE_LABEL.match(line)) or "official journal" in line.lower()
 
 
 def furniture(text: str) -> set[str]:
     """Lines that are page furniture rather than document text.
 
-    Two definitions, both about the page, not the topic: a label in one of the
-    running-header shapes, and a short line that repeats on two or more pages.
-    This is the rule ``_record_spans`` already applies to a records table, kept
-    in one place so the two paths cannot disagree about what a header is.
+    Furniture is recognised by form, not by frequency: a folio or Official
+    Journal line, or a page marker short enough that it cannot be a heading and
+    that repeats across pages. A repeated phrase is only evidence of furniture
+    in that third case, because documents are allowed to restate a real heading
+    on every page of a module.
     """
     seen: dict[str, set[int]] = {}
-    labels: set[str] = set()
+    marks: set[str] = set()
     for number, page in enumerate(text.split("\f")):
         for raw in page.split("\n"):
             line = raw.strip()
             if not line:
                 continue
-            if PAGE_LABEL.match(line):
-                labels.add(line)
-            if len(line) <= 80:
+            if _is_masthead(line):
+                marks.add(line)
+            if len(line) <= MAX_MARKER:
                 seen.setdefault(line, set()).add(number)
     repeated = {line for line, pages in seen.items() if len(pages) >= 2}
-    return repeated | labels
+    return marks | repeated
 
 
 def clean_sections(spans: list[dict], text: str) -> list[dict]:
@@ -70,16 +81,31 @@ def clean_sections(spans: list[dict], text: str) -> list[dict]:
             path = [
                 part
                 for part in locator.get("section_path") or []
-                if str(part).strip() not in bad
+                if not _is_masthead(str(part).strip()) and str(part).strip() not in bad
             ]
             if path:
-                last = path[-MAX_PATH:]
+                path = _collapse(path)[-MAX_PATH:]
+                last = path
             else:
                 path = list(last)
             locator["section_path"] = path
             cleaned = dict(span)
             cleaned["locator"] = locator
             out.append(cleaned)
+    return out
+
+
+def _collapse(path: list[str]) -> list[str]:
+    """Drop an element that repeats the one before it: ``[a, a, b] -> [a, b]``.
+
+    The heading stack re-pushes a heading it has already recorded when a span
+    under it also starts a new section, so a real heading arrives twice. The
+    duplication says nothing a reader would want to see.
+    """
+    out: list[str] = []
+    for part in path:
+        if not out or part != out[-1]:
+            out.append(part)
     return out
 
 

@@ -70,3 +70,20 @@ def test_claims_take_the_cleaned_path_by_span_id():
     cleaned = clean_sections(spans, PAGE)
     apply_sections([claim], cleaned)
     assert claim["evidence"][0]["locator"]["section_path"] == []
+
+
+def test_a_restated_module_heading_is_kept():
+    text = "Security of processing\nThe importer shall act.\n\x0cSecurity of processing\nThe importer shall act again.\n"
+    spans = _spans_with([["Security of processing"], ["Security of processing"]])
+    assert clean_sections(spans, text)[1]["locator"]["section_path"] == ["Security of processing"]
+
+
+def test_a_short_repeated_line_is_furniture():
+    text = "EN\nThe importer shall act.\n\x0cEN\nThe importer shall act again.\n"
+    spans = _spans_with([["Article 5"], ["EN"]])
+    assert clean_sections(spans, text)[1]["locator"]["section_path"] == ["Article 5"]
+
+
+def test_consecutive_duplicate_elements_collapse():
+    spans = _spans_with([["Human oversight", "Human oversight"]])
+    assert clean_sections(spans, "x")[0]["locator"]["section_path"] == ["Human oversight"]
