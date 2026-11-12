@@ -8,6 +8,7 @@ A compiled corpus is a directory, not a database:
     claims.jsonl       one row per claim, schema v2
     verifier.jsonl     one row per claim, deterministic verdict
     rejected.jsonl     one row per claim the compiler refused, and why
+    vectors.jsonl      one embedding per claim, plus the model that made them
     graph.ttl          the same claims as RDF
     evidence.csv       claims flattened for a spreadsheet
     text/<doc_id>.txt  the extracted, paginated plain text
@@ -36,6 +37,7 @@ SPANS = "spans.jsonl"
 CLAIMS = "claims.jsonl"
 VERIFIER = "verifier.jsonl"
 REJECTED = "rejected.jsonl"
+VECTORS = "vectors.jsonl"
 GRAPH = "graph.ttl"
 EVIDENCE = "evidence.csv"
 TEXT_DIR = "text"
@@ -308,6 +310,28 @@ class KnowledgeBase:
     def rejected(self) -> list[dict]:
         return read_jsonl(self.path(REJECTED))
 
+    def vectors(self) -> dict[str, list[float]]:
+        """Claim id to embedding, empty when the KB was built without them.
+
+        Line one is a header describing the model; the rest are the rows. A
+        caller that has no vectors must fall back to BM25 rather than fail.
+        """
+        path = self.path(VECTORS)
+        if not path.exists():
+            return {}
+        out: dict[str, list[float]] = {}
+        for line in path.read_text(encoding="utf-8").splitlines():
+            row = json.loads(line)
+            if "claim_id" in row:
+                out[row["claim_id"]] = row["vector"]
+        return out
+
+    def vectors_header(self) -> dict:
+        path = self.path(VECTORS)
+        if not path.exists():
+            return {}
+        return json.loads(path.read_text(encoding="utf-8").splitlines()[0])
+
     def text(self, doc_id: str) -> str:
         path = self.text_path(doc_id)
         return path.read_text(encoding="utf-8", errors="ignore") if path.exists() else ""
@@ -361,3 +385,28 @@ class KnowledgeBase:
         write_evidence_csv(self.path(EVIDENCE), claims, verdicts)
         if view is not None:
             _atomic_text(self.path(VIEW), view)
+
+
+def write_vectors(kb: KnowledgeBase, claims: list[dict], embedder) -> int:
+    """Embed every claim's searchable text; returns how many vectors were written.
+
+    The header is written first and names the model and revision, so a KB built
+    by one model can refuse another model's query vectors instead of silently
+    comparing two different spaces.
+    """
+    from compiler.documents.ask import _claim_text
+    from compiler.documents.vector import DIM, MODEL, REVISION
+
+    rows = []
+    texts = [" ".join(value for value in _claim_text(claim).values() if value) for claim in claims]
+    for claim, vector in zip(claims, embedder.encode(texts)):
+        rows.append({"claim_id": claim["claim_id"], "vector": vector})
+    _atomic_text(
+        kb.path(VECTORS),
+        "\n".join(
+            [json.dumps({"model": MODEL, "revision": REVISION, "dim": DIM})]
+            + [json.dumps(row) for row in rows]
+        )
+        + "\n",
+    )
+    return len(rows)
