@@ -221,3 +221,24 @@ def test_without_a_lead_in_the_claim_has_one_evidence_item():
     raw = {"statement": "Natural persons shall be enabled to decide.", "span_ids": ["S0001"]}
     claim = build_claim(raw, {"S0001": span}, _doc(), 1, {})
     assert [item["role"] for item in claim["evidence"]] == ["supports"]
+
+
+def test_build_claim_rejects_a_statement_with_an_unattested_quantity():
+    span = _span("S0001", "the controller shall notify the supervisory authority")
+    raw = {"statement": "The controller shall notify within 8.2 days.", "span_ids": ["S0001"]}
+    assert build_claim(raw, {"S0001": span}, _doc(), 1) is None
+
+
+def test_build_claim_keeps_a_statement_whose_quantity_is_quoted():
+    span = _span("S0001", "the controller shall notify within 72 hours")
+    raw = {"statement": "The controller shall notify within 72 hours.", "span_ids": ["S0001"]}
+    assert build_claim(raw, {"S0001": span}, _doc(), 1) is not None
+
+
+def test_build_claim_keeps_a_structural_reference():
+    span = _span("S0001", "Paragraphs 1, 2 and 3 shall not apply where the data subject has the information.")
+    raw = {
+        "statement": "Paragraphs 1, 2 and 3 of Article 13 shall not apply.",
+        "span_ids": ["S0001"],
+    }
+    assert build_claim(raw, {"S0001": span}, _doc(), 1) is not None
