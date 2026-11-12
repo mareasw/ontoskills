@@ -898,10 +898,19 @@ took 1.9x that input and 1.6x that output. The estimate is not corrected after
 the fact — the manifest now carries the measured numbers, and a rebuild from
 cache reports them too instead of claiming to be free.
 
-The 50 claims that are not `ok` are 0.9% of the corpus: 27 `no`, mostly a
-number in the statement that the quoted span does not contain, and 23 `weak`,
-mostly a quote that starts one sentence before the claim. Quotes are copied from
-the span by construction, so the failure modes are narrower than Phase 1's.
+The 50 claims that are not `ok` are 0.9% of the corpus, and they are two
+near-uniform families, not a long tail. All 27 `no` are a number in the statement
+that the quoted span does not contain (`EU_SCC-0112` claims `8.2`, the span has
+no such figure). 22 of the 23 `weak` share one shape: the span is a list item, a
+continuation or a column cut, so the subject the statement supplies is not in
+the quote — `GDPR-0824` states "The binding corporate rules shall specify at
+least the mechanisms…" while its span begins at "(k) the mechanisms…". That is
+Phase 1's unquoted-context problem seen from the other side: there the quote
+started before the claim, here it starts after. The twenty-third, `UK_AIPB-0445`,
+is a passive paraphrase of an imperative ("must not be relied upon" for "Do not
+rely on"). Quotes are copied from the span by construction, so none of these is a
+fabricated citation — every one is visible as `no` / `weak` in the KB and in the
+view.
 
 The demo's exit criterion is structural, not a score: three questions, each
 answered with claims from **at least two documents**, every claim carrying a
