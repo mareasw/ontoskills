@@ -949,3 +949,49 @@ def chunk(spans: list[dict], size: int, overlap: int = 1) -> list[list[dict]]:
             break
     return out
 
+
+# A span that opens with a list marker — "(k) the mechanisms …", "iv. the
+# authority" — is an item of an enumeration whose lead-in lives above it.
+LIST_MARKER = re.compile(r"^[\(\[]?(?:[A-Za-z]|[ivxlcIVXLC]{1,5}|\d{1,3})[\)\].]\s+")
+# A demonstrative opener points back at what the previous span said, so the
+# sentence has no subject of its own ("Such measures may include …").
+ANAPHORA = re.compile(r"^(?:Such|This|These|Those|That|It|They|Its|Their)\b")
+# Only a short previous span can be an introduction; a long one is content,
+# and quoting it as context would hand the verifier a statement it does not
+# support.
+MAX_LEAD_IN = 600
+
+
+def _continues(span: dict, previous: dict) -> bool:
+    """True when ``span`` cannot stand alone and ``previous`` supplies its subject."""
+    text = (span.get("paragraph") or "").lstrip()
+    if not text or not (text[0].islower() or LIST_MARKER.match(text) or ANAPHORA.match(text)):
+        return False
+    here = (span.get("locator") or {}).get("section_path") or []
+    there = (previous.get("locator") or {}).get("section_path") or []
+    if here != there:
+        return False
+    return len(previous.get("paragraph") or "") <= MAX_LEAD_IN
+
+
+def lead_ins(spans: list[dict]) -> dict[str, dict]:
+    """Map a span id to the span that carries its subject, when it needs one.
+
+    Deliberately narrow: only a list item, a lowercase continuation or a
+    demonstrative opener, only the immediately preceding span, only inside the
+    same section, and only when that span is short enough to be an
+    introduction. A wrong context quote is worse than a missing one, because
+    the verifier trusts every evidence quote it is given.
+    """
+    grouped: dict[str, list[dict]] = {}
+    for span in spans:
+        grouped.setdefault(span["doc_id"], []).append(span)
+    out: dict[str, dict] = {}
+    for doc_spans in grouped.values():
+        doc_spans.sort(key=lambda s: (s.get("locator") or {}).get("char_start") or 0)
+        for index in range(1, len(doc_spans)):
+            span, previous = doc_spans[index], doc_spans[index - 1]
+            if _continues(span, previous):
+                out[span["span_id"]] = previous
+    return out
+
