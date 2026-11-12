@@ -961,27 +961,97 @@ ANAPHORA = re.compile(r"^(?:Such|This|These|Those|That|It|They|Its|Their)\b")
 # support.
 MAX_LEAD_IN = 600
 
+# A numbered paragraph is prose that happens to open with a number: "1. Any
+# distributor …", "(164) The AI Office …". An enumeration item is marked with a
+# letter or a roman numeral in these documents; a number is a clause or recital
+# number. When a document does number its items, the terminal colon says a list
+# follows, and a full-length sentence says a paragraph does.
+NUMBERED_PARAGRAPH = re.compile(r"^(?:\(\d{1,3}\)|\d{1,3}[.)])\s+")
+PARAGRAPH_CHARS = 100
 
-def _continues(span: dict, previous: dict) -> bool:
-    """True when ``span`` cannot stand alone and ``previous`` supplies its subject."""
+
+def _opens_a_paragraph(text: str) -> bool:
+    """True when a numeric marker introduces prose, not an item of an enumeration."""
+    return bool(NUMBERED_PARAGRAPH.match(text)) and (
+        text.rstrip().endswith(":") or len(text) > PARAGRAPH_CHARS
+    )
+
+
+def _same_section(left: dict, right: dict) -> bool:
+    """True when both locators carry the same section path."""
+    here = (left.get("locator") or {}).get("section_path") or []
+    there = (right.get("locator") or {}).get("section_path") or []
+    return here == there
+
+
+def _page_furniture(order: list[dict]) -> set[str]:
+    """Text repeated across pages: a running header or footer, not the document.
+
+    A PDF breaks a sentence and even a list at the page edge, so its furniture
+    lands between two spans of the same enumeration. The walk must pass over it,
+    otherwise a list item borrows the journal's masthead as its subject.
+    """
+    pages: dict[str, set] = {}
+    for span in order:
+        text = span.get("paragraph") or ""
+        if len(text) > 80:
+            continue
+        page = (span.get("locator") or {}).get("page")
+        pages.setdefault(text, set()).add(page)
+    return {text for text, seen in pages.items() if len(seen) >= 2}
+
+
+def _opener(order: list[dict], index: int, furniture: set[str]) -> dict | None:
+    """The span that opens the list this one belongs to, if any.
+
+    Walking back matters: the span before "(k)" is usually "(j)", so taking the
+    immediate predecessor attaches a sibling item as context and the subject the
+    statement names stays unattested. The opener is the first span before the
+    run that is neither a list item nor page furniture. The walk is capped so a
+    malformed enumeration cannot attach a heading from pages above as the
+    subject.
+    """
+    span = order[index]
     text = (span.get("paragraph") or "").lstrip()
-    if not text or not (text[0].islower() or LIST_MARKER.match(text) or ANAPHORA.match(text)):
-        return False
-    here = (span.get("locator") or {}).get("section_path") or []
-    there = (previous.get("locator") or {}).get("section_path") or []
-    if here != there:
-        return False
-    return len(previous.get("paragraph") or "") <= MAX_LEAD_IN
+    previous = order[index - 1]
+    previous_text = (previous.get("paragraph") or "").lstrip()
+    current_is_item = bool(LIST_MARKER.match(text)) and not _opens_a_paragraph(text)
+    needs = bool(text[:1].islower() or ANAPHORA.match(text) or current_is_item)
+    if not needs and not LIST_MARKER.match(previous_text):
+        return None
+    seen_item = False
+    for cursor in range(index - 1, max(-1, index - 21), -1):
+        candidate = order[cursor]
+        candidate_text = (candidate.get("paragraph") or "").lstrip()
+        if candidate_text in furniture:
+            continue
+        if LIST_MARKER.match(candidate_text) and not _opens_a_paragraph(candidate_text):
+            seen_item = True
+            continue
+        if candidate_text[:1].islower():
+            # A lowercase span is the tail of the sentence or of the item above
+            # it. It is the antecedent of a continuation, but never the opener
+            # of a list: past the first item, a lowercase span is a sibling's
+            # tail, which says nothing about the current item's subject.
+            if not current_is_item and not seen_item:
+                return candidate
+            continue
+        # The first span outside the run: a prose sentence, or the line that
+        # ends in the colon introducing the list.
+        return candidate
+    return None
 
 
 def lead_ins(spans: list[dict]) -> dict[str, dict]:
     """Map a span id to the span that carries its subject, when it needs one.
 
     Deliberately narrow: only a list item, a lowercase continuation or a
-    demonstrative opener, only the immediately preceding span, only inside the
-    same section, and only when that span is short enough to be an
-    introduction. A wrong context quote is worse than a missing one, because
-    the verifier trusts every evidence quote it is given.
+    demonstrative opener, and only a span in the same section that is short
+    enough to be an introduction. A list item takes the opener of its list, not
+    the sibling item printed before it: "(j)" shares the enumeration with "(k)"
+    but not its subject, so quoting it answers nothing. A wrong context quote is
+    worse than a missing one, because the verifier trusts every evidence quote
+    it is given.
     """
     grouped: dict[str, list[dict]] = {}
     for span in spans:
@@ -989,9 +1059,15 @@ def lead_ins(spans: list[dict]) -> dict[str, dict]:
     out: dict[str, dict] = {}
     for doc_spans in grouped.values():
         doc_spans.sort(key=lambda s: (s.get("locator") or {}).get("char_start") or 0)
+        furniture = _page_furniture(doc_spans)
         for index in range(1, len(doc_spans)):
-            span, previous = doc_spans[index], doc_spans[index - 1]
-            if _continues(span, previous):
-                out[span["span_id"]] = previous
+            span = doc_spans[index]
+            candidate = _opener(doc_spans, index, furniture)
+            if (
+                candidate is not None
+                and _same_section(span, candidate)
+                and len(candidate.get("paragraph") or "") <= MAX_LEAD_IN
+            ):
+                out[span["span_id"]] = candidate
     return out
 
