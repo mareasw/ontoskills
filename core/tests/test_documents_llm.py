@@ -1,8 +1,9 @@
 """Tests for the one model call: retries, usage parsing and timeouts.
 
 No network: ``urlopen`` is replaced. What matters here is the policy the long
-ingest depends on — a 503 is retried, a 400 is not, and a reply that arrives is
-parsed into the three values the compiler needs.
+ingest depends on — a 503 is retried, a 400 is not, a truncated stream is
+retried instead of being parsed into half a claim array, and a reply that
+arrives is reassembled into the three values the compiler needs.
 """
 
 from __future__ import annotations
@@ -16,12 +17,15 @@ import pytest
 from compiler.documents import llm
 
 
-class _Reply:
-    def __init__(self, payload: dict) -> None:
-        self._body = json.dumps(payload).encode("utf-8")
+class _StreamReply:
+    def __init__(self, events: list[dict], done: bool = True) -> None:
+        lines = [f"data: {json.dumps(event)}\n\n".encode("utf-8") for event in events]
+        if done:
+            lines.append(b"data: [DONE]\n\n")
+        self._lines = lines
 
-    def read(self) -> bytes:
-        return self._body
+    def __iter__(self):
+        return iter(self._lines)
 
     def __enter__(self):
         return self
@@ -30,11 +34,17 @@ class _Reply:
         return False
 
 
-def _payload(content: str = "[]", finish: str = "stop", usage: dict | None = None) -> dict:
-    return {
-        "choices": [{"message": {"content": content}, "finish_reason": finish}],
-        "usage": usage or {"prompt_tokens": 10, "completion_tokens": 5},
-    }
+def _events(
+    content: str = "[]", finish: str | None = "stop", usage: dict | None = None
+) -> list[dict]:
+    events: list[dict] = [
+        {"choices": [{"delta": {"content": content[: len(content) // 2]}}]},
+        {"choices": [{"delta": {"content": content[len(content) // 2 :]}}]},
+    ]
+    if finish:
+        events.append({"choices": [{"delta": {}, "finish_reason": finish}]})
+    events.append({"choices": [], "usage": usage or {"prompt_tokens": 10, "completion_tokens": 5}})
+    return events
 
 
 def _http_error(code: int) -> urllib.error.HTTPError:
@@ -42,15 +52,48 @@ def _http_error(code: int) -> urllib.error.HTTPError:
 
 
 def test_reply_is_split_into_content_usage_and_finish(monkeypatch):
-    monkeypatch.setattr(llm.urllib.request, "urlopen", lambda *a, **k: _Reply(_payload("[{}]")))
+    monkeypatch.setattr(
+        llm.urllib.request, "urlopen", lambda *a, **k: _StreamReply(_events("[{}]"))
+    )
     content, usage, finish = llm.chat("https://example.test", "key", "model", [], 100)
     assert content == "[{}]"
     assert usage == {"input_tokens": 10, "output_tokens": 5}
     assert finish == "stop"
 
 
+def test_the_call_asks_for_a_stream(monkeypatch):
+    seen: list[dict] = []
+
+    def fake_urlopen(request, **kwargs):
+        seen.append(json.loads(request.data.decode("utf-8")))
+        return _StreamReply(_events())
+
+    monkeypatch.setattr(llm.urllib.request, "urlopen", fake_urlopen)
+    llm.chat("https://example.test", "key", "model", [], 100)
+    assert seen[0]["stream"] is True
+    assert seen[0]["stream_options"] == {"include_usage": True}
+
+
+def test_a_truncated_stream_is_retried(monkeypatch):
+    replies = [
+        _StreamReply(_events("[{}", finish=None)),  # connection died mid-reply
+        _StreamReply(_events("[{}]")),
+    ]
+    sleeps: list[float] = []
+
+    def fake_urlopen(*args, **kwargs):
+        return replies.pop(0)
+
+    monkeypatch.setattr(llm.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(llm.time, "sleep", sleeps.append)
+    content, _, finish = llm.chat("https://example.test", "key", "model", [], 100)
+    assert content == "[{}]"
+    assert finish == "stop"
+    assert sleeps == [3]
+
+
 def test_a_retryable_error_is_retried_with_backoff(monkeypatch):
-    replies = [_http_error(503), _http_error(503), _Reply(_payload())]
+    replies = [_http_error(503), _http_error(503), _StreamReply(_events())]
     sleeps: list[float] = []
 
     def fake_urlopen(*args, **kwargs):
