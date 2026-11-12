@@ -170,6 +170,21 @@ def test_search_can_include_unverified_claims_and_marks_them():
     assert "[weak]" in render_text(Answer(question="retention", citations=found))
 
 
+def test_search_fuses_an_injected_semantic_ranking():
+    claims = [_claim("T1", f"T1-{i:04d}", f"Contractual record retention rule {i}.", "retention rule")
+              for i in range(1, 4)]
+    claims.append(
+        _claim("T2", "T2-0001", "Personal data shall be kept no longer than necessary.", "kept no longer")
+    )
+    corpus = Corpus(claims, [])
+    found = corpus.search(
+        "how long may contractual records be kept",
+        limit=2,
+        semantic_ranking=["T2-0001", "T1-0001"],
+    )
+    assert "T2-0001" in [citation.claim_id for citation in found]
+
+
 def test_without_verdicts_nothing_is_filtered():
     claims = [_claim("T1", "T1-0001", "Retention is six years.", "retention six years")]
     corpus = Corpus(claims, [])
