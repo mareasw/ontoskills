@@ -672,6 +672,22 @@ def compile_document(
         claims.append(claim)
         number += 1
 
+    # The language pass needs an id per claim, and it runs before the dedupe: two
+    # claims that quote the same block are comparable only once they are written
+    # in the same language. A bilingual source is answered in whichever language
+    # the chunk leans towards, so a dedupe that runs first compares an English
+    # statement with an Italian one and finds nothing.
+    for position, claim in enumerate(claims, start=1):
+        claim["claim_id"] = f"{doc.doc_id}-{position:04d}"
+
+    # A bilingual document has one language, and it is the language it opens in.
+    # The extractor answered in the other one wherever the two are printed side
+    # by side; the statements are rewritten, the quotes are not.
+    ordered = sorted(spans, key=lambda s: (s.get("locator") or {}).get("char_start") or 0)
+    stats.language = document_language([str(s.get("paragraph") or "") for s in ordered]) or ""
+    if stats.language and claims:
+        _localise_statements(doc, claims, stats.language, options, stats, progress)
+
     claims, merged = dedupe_claims(claims)
     stats.merged = merged
     number = len(claims) + 1
@@ -690,14 +706,6 @@ def compile_document(
     # stable for a given reply set.
     for position, claim in enumerate(claims, start=1):
         claim["claim_id"] = f"{doc.doc_id}-{position:04d}"
-
-    # A bilingual document has one language, and it is the language it opens in.
-    # The extractor answered in the other one wherever the two are printed side
-    # by side; the statements are rewritten, the quotes are not.
-    ordered = sorted(spans, key=lambda s: (s.get("locator") or {}).get("char_start") or 0)
-    stats.language = document_language([str(s.get("paragraph") or "") for s in ordered]) or ""
-    if stats.language and claims:
-        _localise_statements(doc, claims, stats.language, options, stats, progress)
 
     if options.conflicts and claims and not options.dry_run:
         _link_conflicts(doc, claims, options, stats, progress)

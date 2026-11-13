@@ -37,13 +37,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (`certificazione` finds `certificato`, `fornitore` finds `fornitori`), and
   keeps grammatical words out of both the index and the query. On the Italian
   pilot the three rules move hit@12 from 6/10 to 9/10 and MRR from 0.127 to
-  0.342 on the same claim set.
+  0.358 on the same claim set.
 
 ### Changed
 
 - **Semantic fusion is applied only to the languages the model knows** —
   MiniLM is trained on English; on the Italian pilot its ranking was worse than
-  the words themselves (one question lost, MRR 0.342 → 0.311). `enable_semantic`
+  the words themselves (one question lost, MRR 0.358 → 0.309). `enable_semantic`
   returns `False` and the corpus stays lexical when every document is in a
   language the model was not trained on; a KB that declares no language keeps
   the fusion, because there is nothing to compare against.
@@ -82,6 +82,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the next paragraph, the all-caps marker is read again and carried until the
   stack records a new heading (`RIESAME` on the policy: 5 claims move from the
   document band to `… > RIESAME`).
+- **A heading printed inside a page block is a section** — the extractor joins
+  the lines of a page into one span, so a heading printed after the first
+  sentence (`SCOPO E OBIETTIVI`, `CAMPO DI APPLICAZIONE` on the policy) never
+  reached the heading stack and the claims under it inherited the band above. It
+  is now read inside the paragraph with the same evidence as a folded heading —
+  a whole all-caps line of the source, after a full stop, followed by the
+  sentence it titles — and it carries to the spans below. 19 pilot claims gain
+  the section they sit under.
+- **A heading the segmenter dropped is read from the source** — a block read as
+  a page header leaves a hole between two spans, and a real heading printed
+  there goes with it (`RESPONSABILITÀ DI OSSERVAZIONE E ATTUAZIONE` on the
+  policy, at offset 8669). The heading is still in the text, so it is read
+  there and given to the spans below; the shape asked for — a line of its own
+  after a blank line, in capitals, with the sentence it titles printed under it
+  — is what keeps a table label, a fragment of a wrapped title and a masthead
+  out. 8 pilot claims gain the section.
+- **Two headings of one document are siblings, and a claim gets the last one
+  above the text it quotes** — a span that holds the last text of one section
+  and the first of the next declares the path the two share (often none) instead
+  of the band above, or the claim below the heading would resolve back to a span
+  that declares a different section. The section of a claim is then located by
+  its quote when the quote sits on one side of the heading, and by its statement
+  when the quote runs across it: a block-level quote is as wide as the block and
+  locates nothing. Appending would nest `CAMPO DI APPLICAZIONE` under
+  `SCOPO E OBIETTIVI`.
+- **The dedupe runs after the language pass** — a bilingual source answers in
+  whichever language the chunk leans towards, so the same block arrived twice,
+  once in English and once in Italian, and a dedupe that ran first compared two
+  languages and kept both. The statements are rewritten first, then compared:
+  the pilot's 0.90-overlap pair is one claim (295 → 294).
 - **The table of contents is not a parent section** — an `Indice` heading the
   stack never popped put 8 claims under `Indice > Articolo 1`; the contents page
   is now dropped from the path and the article stays.
