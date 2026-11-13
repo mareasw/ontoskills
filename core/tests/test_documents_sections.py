@@ -9,6 +9,7 @@ out: spans and claims are cleaned once the model has already answered.
 from __future__ import annotations
 
 from compiler.documents.sections import apply_sections, clean_sections
+from compiler.documents.text import norm
 
 PAGE = """\
 The Commission shall engage relevant stakeholders.
@@ -142,3 +143,90 @@ def test_a_footer_joined_into_one_heading_is_furniture():
         [["Article 5"], ["Riferimenti sito www.netcaring.it mail: amministrazione@netcaring.it"]]
     )
     assert clean_sections(spans, text)[1]["locator"]["section_path"] == ["Article 5"]
+
+
+def _spans_at(paragraphs, sections, text):
+    """Spans whose char_start is where the paragraph really is, as segment() sets it."""
+    flat = norm(text)
+    spans = []
+    cursor = 0
+    for index, (paragraph, section) in enumerate(zip(paragraphs, sections), start=1):
+        at = flat.find(norm(paragraph), cursor)
+        cursor = at + len(norm(paragraph))
+        spans.append(
+            {
+                "span_id": f"S{index:04d}",
+                "doc_id": "T1",
+                "paragraph": paragraph,
+                "locator": {
+                    "kind": "text",
+                    "section_path": list(section),
+                    "char_start": at,
+                    "char_end": at + len(norm(paragraph)),
+                },
+            }
+        )
+    return spans
+
+
+LONG_ARTICLE = (
+    "DOVERI E RESPONSABILITÀ\n"
+    "\n"
+    "Articolo 4 - Gestione del personale\n"
+    "Il personale opera con diligenza.\n"
+    "\n"
+    "Articolo 5 - Divieto di detenzione di materiale pornografico\n"
+    "Il personale rispetta il divieto.\n"
+)
+
+
+def test_a_long_article_title_is_a_heading_the_segmenter_missed():
+    """Nine words is over the segmenter's cap, but the marker is the heading."""
+    spans = _spans_at(
+        ["Il personale opera con diligenza.", "Il personale rispetta il divieto."],
+        [["Articolo 4 - Gestione del personale"], ["Articolo 4 - Gestione del personale"]],
+        LONG_ARTICLE,
+    )
+    path = clean_sections(spans, LONG_ARTICLE)[1]["locator"]["section_path"]
+    assert path == ["Articolo 5 - Divieto di detenzione di materiale pornografico"]
+
+
+def test_an_article_already_on_the_path_is_not_added_twice():
+    spans = _spans_at(
+        ["Il personale opera con diligenza."],
+        [["DOVERI E RESPONSABILITÀ", "Articolo 4 - Gestione del personale"]],
+        LONG_ARTICLE,
+    )
+    assert clean_sections(spans, LONG_ARTICLE)[0]["locator"]["section_path"] == [
+        "DOVERI E RESPONSABILITÀ",
+        "Articolo 4 - Gestione del personale",
+    ]
+
+
+def test_an_article_is_inserted_above_its_subsection():
+    text = (
+        "Articolo 4 - Gestione del personale\n"
+        "Sezione interna\n"
+        "Il personale opera con diligenza.\n"
+    )
+    spans = _spans_at(["Il personale opera con diligenza."], [["Sezione interna"]], text)
+    assert clean_sections(spans, text)[0]["locator"]["section_path"] == [
+        "Articolo 4 - Gestione del personale",
+        "Sezione interna",
+    ]
+
+
+def test_a_table_of_contents_entry_is_not_the_article_heading():
+    """The index repeats the title with a dot leader; the body line is the heading."""
+    text = (
+        "Indice\n"
+        "Articolo 3 - Imparzialità e conflitto di interessi........4\n"
+        "\n"
+        "Articolo 3 - Imparzialità e conflitto di interessi\n"
+        "Il personale agisce con imparzialità.\n"
+    )
+    spans = _spans_at(["Il personale agisce con imparzialità."], [["Indice"]], text)
+    assert clean_sections(spans, text)[0]["locator"]["section_path"] == [
+        "Indice",
+        "Articolo 3 - Imparzialità e conflitto di interessi",
+    ]
