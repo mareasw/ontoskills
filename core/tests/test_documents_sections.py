@@ -98,3 +98,47 @@ def test_a_running_date_line_is_furniture():
 def test_a_heading_that_mentions_a_year_is_kept():
     spans = _spans_with([["AI RMF 1.0 (January 2023)"]])
     assert clean_sections(spans, "x")[0]["locator"]["section_path"] == ["AI RMF 1.0 (January 2023)"]
+
+
+def test_a_long_running_header_is_furniture_by_its_position():
+    """The Italian corporate header is too long for the short-marker rule."""
+    page = "ISO 9001:2015\nN° QMS18180211 - 33.0017\nThe importer shall act.\n"
+    text = "\f".join([page] * 5)
+    spans = _spans_with([["Article 5"], ["N° QMS18180211 - 33.0017"]])
+    assert clean_sections(spans, text)[1]["locator"]["section_path"] == ["Article 5"]
+
+
+def test_a_heading_restated_on_a_few_pages_is_not_furniture():
+    """A module heading lives on the pages of its module, not on four fifths of the file."""
+    pages = [
+        "Security of processing\nThe importer shall act.\n" if index < 4
+        else "Annex\nThe importer shall act.\n"
+        for index in range(10)
+    ]
+    spans = _spans_with([["Security of processing"]])
+    assert clean_sections(spans, "\f".join(pages))[0]["locator"]["section_path"] == [
+        "Security of processing"
+    ]
+
+
+def test_a_two_page_document_cannot_tell_a_header_from_a_heading():
+    """On two pages every repeated line is 100% of the pages: position proves nothing."""
+    text = "N° QMS18180211 - 33.0017\nThe importer shall act.\n\fN° QMS18180211 - 33.0017\nThe importer shall act again.\n"
+    spans = _spans_with([["N° QMS18180211 - 33.0017"]])
+    assert clean_sections(spans, text)[0]["locator"]["section_path"] == [
+        "N° QMS18180211 - 33.0017"
+    ]
+
+
+def test_a_footer_joined_into_one_heading_is_furniture():
+    """The segmenter joins the footer lines: the element is furniture, not a title."""
+    footer = (
+        "Riferimenti\nsito www.netcaring.it\nmail: amministrazione@netcaring.it\n"
+        "PEC: netcaring@pec.it\nNetwork Partner\nwww.treetechict.com"
+    )
+    page = f"ISO 9001:2015\nN° QMS18180211 - 33.0017\nThe importer shall act.\n{footer}\n"
+    text = "\f".join([page] * 5)
+    spans = _spans_with(
+        [["Article 5"], ["Riferimenti sito www.netcaring.it mail: amministrazione@netcaring.it"]]
+    )
+    assert clean_sections(spans, text)[1]["locator"]["section_path"] == ["Article 5"]

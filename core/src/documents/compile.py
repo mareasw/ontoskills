@@ -44,6 +44,11 @@ class CompileOptions:
     conflicts: bool = True
     concurrency: int = 1
     resume: bool = False
+    # A reply that hits the output ceiling is an incomplete extraction, not a
+    # short one: the model was cut mid-JSON. Splitting the chunk and asking
+    # again recovers the tail; --no-split-truncated turns that off for a run
+    # that must not spend more than its first pass.
+    split_truncated: bool = True
     price_in: float = 0.15
     price_out: float = 0.60
     cache_dir: Path | None = None
@@ -60,6 +65,7 @@ class CompileStats:
     rejected_numbers: int = 0
     merged: int = 0
     truncated: int = 0
+    retried: int = 0
     failed: int = 0
     conflict_calls: int = 0
 
@@ -353,8 +359,10 @@ def _fingerprint(text: str, spans: list[dict], model: str) -> str:
     return digest.hexdigest()
 
 
-def _cache_path(cache_dir: Path, doc_id: str, index: int) -> Path:
-    return cache_dir / doc_id / f"{index:05d}.json"
+def _cache_path(cache_dir: Path, doc_id: str, index: int, suffix: str = "") -> Path:
+    # A retried sub-chunk needs its own cache slot: two halves of the same
+    # index must not overwrite each other's reply.
+    return cache_dir / doc_id / f"{index:05d}{suffix}.json"
 
 
 def _read_cache(path: Path, fingerprint: str) -> dict | None:
@@ -438,6 +446,88 @@ def _conflict_pairs(reply: str, valid_ids: set[str]) -> list[tuple[str, str]]:
     return pairs
 
 
+MAX_SPLIT_DEPTH = 2
+
+
+@dataclass
+class ChunkRun:
+    """One chunk's replies plus every billed call that produced them.
+
+    ``events`` is separate from ``replies`` because a chunk that was split
+    produced one reply per half but cost three calls: the truncated one and the
+    two retries. Cost accounting follows the events, parsing follows the
+    replies.
+    """
+
+    replies: list[tuple[str, dict, str, bool]] = field(default_factory=list)
+    # ``(cached, usage, finish, split)``. A split call still cost what it cost,
+    # but it is not a truncation the operator has to act on.
+    events: list[tuple[bool, dict, str, bool]] = field(default_factory=list)
+    retried: int = 0
+    failed: int = 0
+
+
+def _run_block(
+    doc: Document,
+    text: str,
+    block: list[dict],
+    index: int,
+    suffix: str,
+    options: CompileOptions,
+    progress: Callable[[str], None] | None,
+    depth: int = 0,
+) -> ChunkRun:
+    """Compile one block, halving it when the reply hits the output ceiling.
+
+    The retry is not a second opinion on the same prompt: it is the same spans
+    in a smaller window, because the ceiling applies to the reply and a shorter
+    block produces a shorter one. A block of one span cannot be halved, and a
+    third truncation in a row means the block is too dense for the ceiling, so
+    the walk stops and the run reports what is still missing.
+    """
+    run = ChunkRun()
+    prompt = make_prompt(block, {"doc_id": doc.doc_id, "title": doc.title})
+    fingerprint = _fingerprint(text, block, options.model)
+    path = (
+        _cache_path(options.cache_dir, doc.doc_id, index, suffix)
+        if options.cache_dir
+        else None
+    )
+    try:
+        reply, usage, finish, cached = _one_chunk(prompt, fingerprint, path, options)
+    except ModelError as exc:
+        run.failed += 1
+        if progress:
+            progress(f"{doc.doc_id}: chunk {index}{suffix} failed: {exc}")
+        return run
+    split = (
+        finish == "length"
+        and options.split_truncated
+        and len(block) > 1
+        and depth < MAX_SPLIT_DEPTH
+    )
+    run.events.append((cached, usage, finish, split))
+    if not split:
+        run.replies.append((reply, usage, finish, cached))
+        return run
+    run.retried += 1
+    if progress:
+        progress(
+            f"{doc.doc_id}: chunk {index}{suffix} hit the output ceiling; "
+            f"splitting {len(block)} spans"
+        )
+    middle = len(block) // 2
+    for half, name in ((block[:middle], "a"), (block[middle:], "b")):
+        child = _run_block(
+            doc, text, half, index, suffix + name, options, progress, depth + 1
+        )
+        run.replies.extend(child.replies)
+        run.events.extend(child.events)
+        run.retried += child.retried
+        run.failed += child.failed
+    return run
+
+
 def compile_document(
     doc: Document,
     text: str,
@@ -457,49 +547,36 @@ def compile_document(
     if lead_map is None:
         lead_map = lead_ins(spans)
     chunks = chunk(spans, options.chunk_size, options.overlap)
-    cache_dir = options.cache_dir
-    jobs: list[tuple[int, str, str, Path | None]] = []
-    for index, block in enumerate(chunks):
-        prompt = make_prompt(block, {"doc_id": doc.doc_id, "title": doc.title})
-        fingerprint = _fingerprint(text, block, options.model)
-        path = _cache_path(cache_dir, doc.doc_id, index) if cache_dir else None
-        jobs.append((index, prompt, fingerprint, path))
-
-    replies: dict[int, tuple[str, dict, str, bool]] = {}
     stats = CompileStats()
-    if options.concurrency > 1 and len(jobs) > 1:
+    runs: dict[int, ChunkRun] = {}
+    if options.concurrency > 1 and len(chunks) > 1:
         with ThreadPoolExecutor(max_workers=options.concurrency) as pool:
             futures = {
-                pool.submit(_one_chunk, prompt, fingerprint, path, options): index
-                for index, prompt, fingerprint, path in jobs
+                pool.submit(
+                    _run_block, doc, text, block, index, "", options, progress
+                ): index
+                for index, block in enumerate(chunks)
             }
             for future in as_completed(futures):
-                index = futures[future]
-                try:
-                    replies[index] = future.result()
-                except ModelError as exc:
-                    stats.failed += 1
-                    if progress:
-                        progress(f"{doc.doc_id}: chunk {index} failed: {exc}")
+                runs[futures[future]] = future.result()
     else:
-        for index, prompt, fingerprint, path in jobs:
-            try:
-                replies[index] = _one_chunk(prompt, fingerprint, path, options)
-            except ModelError as exc:
-                stats.failed += 1
-                if progress:
-                    progress(f"{doc.doc_id}: chunk {index} failed: {exc}")
+        for index, block in enumerate(chunks):
+            runs[index] = _run_block(doc, text, block, index, "", options, progress)
 
     raw_claims: list[dict] = []
-    for index in sorted(replies):
-        reply, usage, finish, cached = replies[index]
-        stats.calls += 0 if cached else 1
-        stats.cached += 1 if cached else 0
-        stats.input_tokens += int(usage.get("input_tokens", 0) or 0)
-        stats.output_tokens += int(usage.get("output_tokens", 0) or 0)
-        if finish == "length":
-            stats.truncated += 1
-        raw_claims.extend(parse_claims(reply))
+    for index in sorted(runs):
+        run = runs[index]
+        stats.retried += run.retried
+        stats.failed += run.failed
+        for cached, usage, finish, split in run.events:
+            stats.calls += 0 if cached else 1
+            stats.cached += 1 if cached else 0
+            stats.input_tokens += int(usage.get("input_tokens", 0) or 0)
+            stats.output_tokens += int(usage.get("output_tokens", 0) or 0)
+            if finish == "length" and not split:
+                stats.truncated += 1
+        for reply, _usage, _finish, _cached in run.replies:
+            raw_claims.extend(parse_claims(reply))
 
     claims: list[dict] = []
     rejected: list[dict] = []
