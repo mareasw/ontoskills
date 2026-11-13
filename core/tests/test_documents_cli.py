@@ -203,6 +203,29 @@ def test_ingest_keeps_going_when_one_document_fails(tmp_path, monkeypatch):
     assert "The Supplier shall notify" in claims[0]["evidence"][0]["quote"]
 
 
+def test_ingest_reports_a_truncated_reply_and_fails_the_run(tmp_path, monkeypatch):
+    """A reply cut at the ceiling used to be reported as a successful run."""
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    (corpus / "contract.txt").write_text(
+        "1. Notification\n\n1.1 The Supplier shall notify the Buyer within 48 hours.\n",
+        encoding="utf-8",
+    )
+
+    def fake_chat(*args, **kwargs):
+        return "", {"input_tokens": 100, "output_tokens": 10000}, "length"
+
+    monkeypatch.setattr("compiler.documents.compile.chat", fake_chat)
+    monkeypatch.setenv("OPENAI_MODEL", "stub")
+
+    result = CliRunner().invoke(
+        cli, ["ingest", str(corpus), "-o", str(tmp_path / "kb"), "--no-conflicts"]
+    )
+    assert result.exit_code != 0
+    assert "truncated" in result.output
+    assert KnowledgeBase(tmp_path / "kb").manifest()["truncated_calls"] == 1
+
+
 def test_estimate_prints_the_page_count():
     rows = [
         {"doc_id": "A", "spans": 3, "chunks": 1, "chars": 300, "tokens": 100, "pages": 12},

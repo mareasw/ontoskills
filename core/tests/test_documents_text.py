@@ -1,6 +1,7 @@
 """Tests for the shared text normalisation and tokenisation."""
 
 from compiler.documents.text import (
+    modal_classes,
     norm,
     page_of_offset,
     same_word,
@@ -17,6 +18,26 @@ def test_norm_folds_quotes_dashes_and_whitespace():
 
 def test_tokens_drop_one_letter_noise():
     assert tokens("5.1(b) of the Act") == ["of", "the", "act"]
+
+
+def test_tokens_keep_accented_letters():
+    """A dropped accent turned "può" into "pu" and broke the attestation check."""
+    assert tokens("Può essere più facile") == ["può", "essere", "più", "facile"]
+
+
+def test_italian_grammatical_words_are_not_content():
+    content = statement_tokens("La direzione deve garantire che i dati siano protetti")
+    assert content == ["direzione", "garantire", "dati", "protetti"]
+
+
+def test_italian_modals_are_classified():
+    assert modal_classes("Il fornitore non può cedere i dati") == {"prohibition"}
+    assert modal_classes("Il fornitore deve notificare l'incidente") == {"obligation"}
+    assert modal_classes("Il fornitore può delegare la funzione") == {"permission"}
+
+
+def test_a_negated_permission_is_only_a_prohibition():
+    assert modal_classes("The Supplier may not transfer the data") == {"prohibition"}
 
 
 def test_statement_tokens_remove_grammatical_words():
