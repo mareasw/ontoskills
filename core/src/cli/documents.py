@@ -227,6 +227,7 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
     all_spans: list[dict] = []
     all_rejected: list[dict] = []
     total_in = total_out = 0
+    replayed_in = replayed_out = 0
     total_rejected_numbers = 0
     total_truncated = 0
     total_retried = 0
@@ -271,12 +272,17 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         total_retried += compiled.stats.retried
         total_in += compiled.stats.input_tokens
         total_out += compiled.stats.output_tokens
+        replayed_in += compiled.stats.replayed_input_tokens
+        replayed_out += compiled.stats.replayed_output_tokens
         cost = compiled.stats.cost(options)
+        replayed = compiled.stats.replayed_cost(options)
         detail = ""
         if compiled.stats.retried:
             detail += f", {compiled.stats.retried} split"
         if compiled.stats.truncated:
             detail += f", [red]{compiled.stats.truncated} truncated[/red]"
+        if compiled.stats.cached:
+            detail += f", ${replayed:.3f} replayed from cache"
         console.print(
             f"  {doc.doc_id}: {len(compiled.claims)} claim(s), "
             f"{compiled.stats.calls} call(s), {compiled.stats.cached} cached, "
@@ -306,8 +312,14 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         "verifier": report["by_verdict"],
         "truncated_calls": total_truncated,
         "retried_chunks": total_retried,
+        # What this run paid, and what the cached replies cost when they were
+        # first generated. A resumed build is not free and not a second bill.
         "cost_usd": round(total_in / 1_000_000 * price_in + total_out / 1_000_000 * price_out, 4),
         "tokens": {"input": total_in, "output": total_out},
+        "replayed_cost_usd": round(
+            replayed_in / 1_000_000 * price_in + replayed_out / 1_000_000 * price_out, 4
+        ),
+        "replayed_tokens": {"input": replayed_in, "output": replayed_out},
         "licences": sorted({doc.licence for doc in docs}),
         "elapsed_s": round(time.time() - started, 1),
     }
@@ -366,6 +378,11 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         f"cost: ${manifest['cost_usd']:.3f} ({total_in:,} in / {total_out:,} out), "
         f"{manifest['elapsed_s']}s"
     )
+    if replayed_in or replayed_out:
+        console.print(
+            f"[dim]replayed from cache: ${manifest['replayed_cost_usd']:.3f} "
+            f"({replayed_in:,} in / {replayed_out:,} out), already paid[/dim]"
+        )
     console.print(f"written: {out_dir} (view: {out_dir / 'view.html'})")
     if total_truncated:
         console.print(

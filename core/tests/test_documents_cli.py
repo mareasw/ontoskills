@@ -165,6 +165,42 @@ def test_ingest_end_to_end_with_a_stub_model(tmp_path, monkeypatch):
     assert list((tmp_path / "kb" / "cache").rglob("*.json"))
 
 
+def test_a_resumed_run_reports_what_it_paid_and_what_it_replayed(tmp_path, monkeypatch):
+    """A cached rebuild is not free and not a second bill: report both numbers."""
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    (corpus / "contract.txt").write_text(
+        "1. Notification\n\n1.1 The Supplier shall notify the Buyer within 48 hours.\n",
+        encoding="utf-8",
+    )
+    reply = (
+        '[{"span_ids": ["S0001"], '
+        '"statement": "The Supplier shall notify the Buyer within 48 hours of a breach.", '
+        '"modality": "obligation", "actor": "Supplier", "deadline": "48 hours", '
+        '"conditions": []}]'
+    )
+    calls = []
+
+    def fake_chat(*args, **kwargs):
+        calls.append(args)
+        return reply, {"input_tokens": 1000, "output_tokens": 500}, "stop"
+
+    monkeypatch.setattr("compiler.documents.compile.chat", fake_chat)
+    monkeypatch.setenv("OPENAI_MODEL", "stub")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://gateway.test/v1")
+
+    args = ["ingest", str(corpus), "-o", str(tmp_path / "kb"), "--no-conflicts"]
+    assert CliRunner().invoke(cli, args).exit_code == 0
+    assert CliRunner().invoke(cli, [*args, "--resume"]).exit_code == 0
+
+    assert len(calls) == 1
+    manifest = KnowledgeBase(tmp_path / "kb").manifest()
+    assert manifest["cost_usd"] == 0
+    assert manifest["tokens"] == {"input": 0, "output": 0}
+    assert manifest["replayed_tokens"] == {"input": 1000, "output": 500}
+    assert manifest["replayed_cost_usd"] > 0
+
+
 def test_ingest_keeps_going_when_one_document_fails(tmp_path, monkeypatch):
     """A chunk the gateway will not serve must not block the other documents."""
     corpus = tmp_path / "corpus"
