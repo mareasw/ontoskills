@@ -479,3 +479,51 @@ def test_a_document_in_the_statements_own_language_costs_nothing(monkeypatch):
     _localise_statements(_doc(), claims, "en", CompileOptions(model="stub"), stats, None)
     assert stats.localise_calls == 0
     assert stats.localised == 0
+
+
+def test_the_dedupe_runs_after_the_language_pass(monkeypatch):
+    """Two chunks that quote one block are one claim once both speak the document's language.
+
+    A bilingual source answers in whichever language the chunk leans towards, so
+    the same rule arrives twice, once in each language. A dedupe that runs before
+    the rewrite compares an English statement with an Italian one, finds nothing
+    and keeps both; the identical pair must be merged after the statements are
+    in the document's language.
+    """
+    italian = (
+        "La certificazione è emessa e mantenuta a seguito di audit condotti presso "
+        "l'organizzazione."
+    )
+    english = (
+        "The certification is issued and maintained following audits conducted at "
+        "the organization."
+    )
+    spans = [
+        _span("S0001", "La politica definisce le regole per la sicurezza delle informazioni."),
+        _span("S0002", italian),
+        _span("S0003", "Il riesame dovrà verificare lo stato delle azioni correttive."),
+    ]
+    seen: list[str] = []
+
+    def fake_one_chunk(prompt, fingerprint, cache_path, options, system=""):
+        if system.startswith("You are given claims compiled from one document"):
+            seen.append("language")
+            return f'[{{"id": "T1-0001", "statement": "{italian}"}}]', {}, "stop", False
+        seen.append("extract")
+        statement = english if "[S0001]" in prompt else italian
+        return (
+            f'[{{"span_ids": ["S0002"], "statement": "{statement}"}}]',
+            {"input_tokens": 5, "output_tokens": 20},
+            "stop",
+            False,
+        )
+
+    monkeypatch.setattr("compiler.documents.compile._one_chunk", fake_one_chunk)
+    result = compile_document(
+        _doc(), "text", spans, CompileOptions(model="stub", chunk_size=2, overlap=1)
+    )
+
+    assert seen.count("language") == 1
+    assert result.stats.merged == 1
+    assert len(result.claims) == 1
+    assert result.claims[0]["statement"] == italian

@@ -34,6 +34,13 @@ PAGE_LABEL = re.compile(
 )
 
 MAX_PATH = 3
+
+# Where a heading printed in the middle of a span is, and what it sits on: the
+# offset it starts at, the heading, and the path it belongs to. The base travels
+# with the heading because two headings of one document are siblings, not parent
+# and child, and a claim below the second one must get the same path the span
+# below it gets.
+Breaks = dict[tuple[str, str], list[tuple[int, str, list[str]]]]
 # A line short enough that it is a page marker rather than a heading. Length is
 # the only safe signal: "Security of processing" is a real module heading that a
 # standard-contractual-clauses annex restates on four pages, and repetition
@@ -156,6 +163,16 @@ def _is_page_furniture(part: str, bad: set[str], bad_norm: set[str]) -> bool:
     return _is_joined_furniture(norm(part), bad_norm)
 
 
+def _caps_word(word: str) -> bool:
+    """A word that can be part of an all-caps heading.
+
+    Capitals alone are not enough: an identifier ("EA 33 (NACE 62)"), a legal
+    name ("NETCARING S.R.L.") and a folio print the same shape, and each carries
+    a digit, a dot or a bracket that a heading does not.
+    """
+    return word.isupper() and not any(char in word for char in ".0123456789()")
+
+
 def _folded_heading(
     paragraph: str, lines: set[str], bad: set[str], bad_norm: set[str]
 ) -> str:
@@ -171,7 +188,7 @@ def _folded_heading(
         return ""
     taken: list[str] = []
     for word in words:
-        if not word.isupper() or any(char in word for char in ".0123456789()"):
+        if not _caps_word(word):
             break
         taken.append(word)
     # A span that is nothing but capitals has no sentence under the heading, so
@@ -195,6 +212,48 @@ def _with_heading(path: list[str], heading: str) -> list[str]:
     if path and norm(path[-1]) == norm(heading):
         return path
     return [*path, heading][-MAX_PATH:]
+
+
+def _inline_headings(
+    paragraph: str, lines: set[str], bad: set[str], bad_norm: set[str]
+) -> list[str]:
+    """The all-caps headings printed *inside* a paragraph, in order.
+
+    The extractor joins the lines of a page into one block, so a heading that is
+    not the first line of a span — "… Stakeholder coinvolti. SCOPO E OBIETTIVI
+    La Direzione …" — never reaches the heading stack, and every claim below it
+    inherits the band above. The heading is still a whole line of the source,
+    printed after the end of a sentence and followed by the sentence it titles,
+    which is the same evidence ``_folded_heading`` asks for at the start of a
+    span. They are read separately because they are two positions, not two
+    rules.
+    """
+    out: list[str] = []
+    words = list(re.finditer(r"\S+", paragraph))
+    index = 0
+    while index < len(words):
+        if not _caps_word(words[index].group()):
+            index += 1
+            continue
+        end = index
+        while end < len(words) and _caps_word(words[end].group()):
+            end += 1
+        # A run that reaches the end of the paragraph has no sentence under it,
+        # so nothing says it titles what comes next.
+        if end < len(words):
+            candidate = " ".join(word.group() for word in words[index:end])
+            before = paragraph[: words[index].start()].rstrip()
+            if (
+                before.endswith((".", "!", "?"))
+                and SENTENCE_START.match(words[end].group())
+                and len(candidate) >= 3
+                and norm(candidate) in lines
+                and looks_like_heading(candidate)
+                and not _is_page_furniture(candidate, bad, bad_norm)
+            ):
+                out.append(candidate)
+        index = end
+    return out
 
 
 # The segmenter accepts a heading only if it has seven words or fewer. Italian
@@ -330,7 +389,55 @@ def _add_missed_article(
     return [*kept[:below], line, *kept[below:]][-MAX_PATH:]
 
 
-def clean_sections(spans: list[dict], text: str) -> list[dict]:
+def _starts_sentence(text: str) -> bool:
+    """True when a word opens a sentence: a capital, then a lower-case letter.
+
+    The apostrophe of an Italian elision ("L'osservanza") sits between the two,
+    so the letter after it is what tells a sentence from a label.
+    """
+    word = norm(str(text or "")).strip()
+    if not word:
+        return False
+    if SENTENCE_START.match(word):
+        return True
+    return "'" in word and bool(SENTENCE_START.match(word.replace("'", "")))
+
+
+def _gap_heading(gap: str, bad: set[str], bad_norm: set[str]) -> str:
+    """The heading the segmenter dropped between two spans, or ``""``.
+
+    The extractor leaves a block out of the spans when it reads it as a page
+    header, and a real heading printed at the top of a page goes with it. The
+    heading is still in the source, and it still titles the text below, so the
+    spans that follow are given it. The shape asked for is the one a heading has
+    on the page: a line of its own after a blank line, in capitals, with the
+    sentence it titles printed under it. Those four facts are what keeps a table
+    label ("Prima Emissione"), a fragment of a wrapped title and a masthead out.
+    """
+    lines = gap.split("\n")
+    found = ""
+    for index, line in enumerate(lines):
+        candidate = line.strip()
+        if len(candidate) < 3 or index == 0 or lines[index - 1].strip():
+            continue
+        if not all(_caps_word(word) for word in candidate.split()):
+            continue
+        if not looks_like_heading(candidate):
+            continue
+        if _is_page_furniture(candidate, bad, bad_norm):
+            continue
+        if norm(candidate).casefold() in TOC_MARKERS:
+            continue
+        following = next((other.strip() for other in lines[index + 1:] if other.strip()), "")
+        if not _starts_sentence(following.split()[0] if following else ""):
+            continue
+        found = candidate
+    return found
+
+
+def clean_sections(
+    spans: list[dict], text: str, breaks: Breaks | None = None
+) -> list[dict]:
     """Return the spans with their section paths stripped of page furniture.
 
     A dropped element is not replaced by a guess: the span inherits the last
@@ -341,6 +448,11 @@ def clean_sections(spans: list[dict], text: str) -> list[dict]:
     The same rule applies in the other direction: an article heading the
     segmenter rejected for its word count is added only when it is the heading
     the span actually sits under, and only if it is not already on the path.
+
+    ``breaks``, when given, is filled with the headings printed in the middle of
+    a span, the offset where each one starts and the path it belongs to, so a
+    claim that quotes the text below one can be given that section even though
+    the span above it is not.
     """
     bad = furniture(text)
     bad_norm = {norm(line) for line in bad if len(norm(line)) >= 2}
@@ -354,11 +466,18 @@ def clean_sections(spans: list[dict], text: str) -> list[dict]:
     for doc_spans in grouped.values():
         doc_spans.sort(key=lambda s: (s.get("locator") or {}).get("char_start") or 0)
         last: list[str] = []
+        # Where the previous span ended: the text in between belongs to no span,
+        # and a heading printed there still titles what comes below. The text
+        # before the first span is the title block, and the document's title is
+        # already carried by its metadata, so it is not read as a section.
+        cursor = 0
+        first = True
         # The folded heading in force, with the path it was folded under. A
         # heading the segmenter did record changes the path, and that ends it.
         promoted: tuple[str, list[str]] | None = None
         for span in doc_spans:
             locator = dict(span.get("locator") or {})
+            start = locator.get("char_start")
             raw = [
                 str(part).strip()
                 for part in locator.get("section_path") or []
@@ -372,22 +491,74 @@ def clean_sections(spans: list[dict], text: str) -> list[dict]:
                 last = path
             else:
                 path = list(last)
-            heading = _folded_heading(str(span.get("paragraph") or ""), lines, bad, bad_norm)
+            if start is not None and not first:
+                dropped = _gap_heading(text[cursor:int(start)], bad, bad_norm)
+                if dropped:
+                    # The heading was in the document all along; only the spans
+                    # were missing. It titles everything below it, so it is a
+                    # sibling of the band above and it starts here.
+                    promoted = (dropped, list(path))
+                    path = _with_heading(path, dropped)
+                    last = path
+            paragraph = str(span.get("paragraph") or "")
+            heading = _folded_heading(paragraph, lines, bad, bad_norm)
             if heading:
-                promoted = (heading, list(path))
-                path = _with_heading(path, heading)
+                # A heading is a sibling of the one promoted before it, not its
+                # child: two page-end headings are two sections of the document,
+                # so the base is the path before the first promotion. Appending
+                # would nest "CAMPO DI APPLICAZIONE" under "SCOPO E OBIETTIVI".
+                base = promoted[1] if promoted is not None else list(path)
+                promoted = (heading, list(base))
+                path = _with_heading(base, heading)
                 last = path
             elif promoted is not None:
                 path = _with_heading(path, promoted[0])
                 last = path
-            start = locator.get("char_start")
+            inline = _inline_headings(paragraph, lines, bad, bad_norm)
+            if inline:
+                base = promoted[1] if promoted is not None else list(path)
+                for inline_heading in inline:
+                    promoted = (inline_heading, list(base))
+                # The span itself keeps the band above: the text before the
+                # heading belongs to it. What follows inherits the heading, and
+                # a claim that quotes below it gets it in ``apply_sections``.
+                last = _with_heading(base, inline[-1])
             if start is not None:
                 path = _add_missed_article(path, int(start), missed, flat)
-                last = path
+                last = (
+                    _add_missed_article(last, int(start), missed, flat) if inline else path
+                )
+            if inline and path != base and path[: len(base)] == base:
+                # The span holds text of two sections that are siblings, and
+                # they share only ``base``: its own path has to be that shared
+                # path. Declaring the band above would make the claim below the
+                # heading point at a span that declares a different section,
+                # and the verifier would read a correct claim as a wrong one.
+                # The band travels with ``breaks`` instead, so a claim quoting
+                # above the heading still gets it.
+                if breaks is not None and start is not None:
+                    breaks.setdefault((span["doc_id"], span["span_id"]), []).insert(
+                        0, (int(start), path[-1], list(base))
+                    )
+                path = list(base)
             locator["section_path"] = path
             cleaned = dict(span)
             cleaned["locator"] = locator
             out.append(cleaned)
+            if breaks is not None and inline:
+                at = int(start) if start is not None else 0
+                for inline_heading in inline:
+                    found = flat.find(norm(inline_heading), at)
+                    if found < 0:
+                        continue
+                    breaks.setdefault((span["doc_id"], span["span_id"]), []).append(
+                        (found, inline_heading, list(base))
+                    )
+                    at = found + len(norm(inline_heading))
+            end = locator.get("char_end")
+            if end is not None:
+                cursor = max(cursor, int(end))
+            first = False
     return out
 
 
@@ -405,7 +576,12 @@ def _collapse(path: list[str]) -> list[str]:
     return out
 
 
-def apply_sections(claims: list[dict], cleaned_spans: list[dict]) -> list[dict]:
+def apply_sections(
+    claims: list[dict],
+    cleaned_spans: list[dict],
+    breaks: Breaks | None = None,
+    text: str = "",
+) -> list[dict]:
     """Copy the cleaned path into the claims, which carry a locator of their own.
 
     A claim's evidence locator is a copy taken at build time, and a claim whose
@@ -413,6 +589,12 @@ def apply_sections(claims: list[dict], cleaned_spans: list[dict]) -> list[dict]:
     so the copy has to follow. Schema v2 locators carry a span id only when the
     producer put one there; the (char_start, char_end) range resolves the rest,
     which is the same order the verifier uses.
+
+    A span can hold more than one section, because the extractor joins a page
+    into one block and a heading can be printed in the middle of it. The section
+    of a claim is the last heading printed above the text it quotes, so the
+    quote is located in the document and the headings of the span are applied
+    only when they start before it.
     """
     by_id = {(span["doc_id"], span["span_id"]): span for span in cleaned_spans}
     by_range = {
@@ -420,6 +602,7 @@ def apply_sections(claims: list[dict], cleaned_spans: list[dict]) -> list[dict]:
          (span.get("locator") or {}).get("char_end")): span
         for span in cleaned_spans
     }
+    flat = norm(text)
     for claim in claims:
         doc_id = claim.get("doc_id")
         for item in claim.get("evidence") or []:
@@ -435,7 +618,50 @@ def apply_sections(claims: list[dict], cleaned_spans: list[dict]) -> list[dict]:
                 )
             if span is None:
                 continue
-            locator["section_path"] = list(
-                (span.get("locator") or {}).get("section_path") or []
-            )
+            path = list((span.get("locator") or {}).get("section_path") or [])
+            cuts = (breaks or {}).get((doc_id, span.get("span_id"))) or []
+            if cuts:
+                where = _where_quoted(item, claim, flat, locator, cuts)
+                for offset, heading, base in cuts:
+                    if where is not None and offset <= where:
+                        path = _with_heading(base, heading)
+            locator["section_path"] = path
     return claims
+
+
+def _locate(needle: str, flat: str, start: int, limit: int) -> int | None:
+    """Where ``needle`` starts inside the block, or ``None`` if it is not there."""
+    text = norm(str(needle or ""))
+    if not text:
+        return None
+    found = flat.find(text, start)
+    return found if start <= found < limit else None
+
+
+def _where_quoted(
+    item: dict, claim: dict, flat: str, locator: dict, cuts: list[tuple[int, str, list[str]]]
+) -> int | None:
+    """Where in the block the claim's text starts, if it can be located.
+
+    The locator gives the range of the *block* the claim came from, which is the
+    whole page on a PDF: a block that carries a heading in the middle cannot say
+    which side of it the claim sits on. The quote is verbatim, so it is tried
+    first — but a quote that runs *across* the heading ("… Stakeholder
+    coinvolti. SCOPO E OBIETTIVI La Direzione …") is as wide as the block and
+    locates nothing. Only then does the statement place the claim: it is the
+    model's wording, and it is the text the heading titles. Both are bounded to
+    the block, so a phrase printed elsewhere cannot pull a claim out of its span.
+    """
+    start = int(locator.get("char_start") or 0)
+    end = locator.get("char_end")
+    limit = int(end) if end is not None else len(flat)
+    quote = norm(str(item.get("quote") or ""))
+    quoted = _locate(quote, flat, start, limit)
+    if quoted is not None:
+        stop = quoted + len(quote)
+        if not any(quoted <= offset < stop for offset, _, _ in cuts):
+            return quoted
+    stated = _locate(claim.get("statement"), flat, start, limit)
+    if stated is not None:
+        return stated
+    return quoted if quoted is not None else start

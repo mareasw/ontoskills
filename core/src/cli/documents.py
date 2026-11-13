@@ -25,7 +25,7 @@ from compiler.documents.extract import ExtractionError, extract, strip_pages
 from compiler.documents.model import load_corpus
 from compiler.documents.prompt import PROMPT_HASH
 from compiler.documents.segment import chunk, lead_ins, segment
-from compiler.documents.sections import apply_sections, clean_sections
+from compiler.documents.sections import Breaks, apply_sections, clean_sections
 from compiler.documents.store import KnowledgeBase
 from compiler.documents.verify import summarise, verify_all
 from compiler.documents.web import render_view
@@ -239,7 +239,8 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
             def progress(message: str, _status=status) -> None:
                 _status.update(f"[yellow]{message}[/yellow]")
 
-            cleaned = clean_sections(row["spans_list"], row["text"])
+            breaks: Breaks = {}
+            cleaned = clean_sections(row["spans_list"], row["text"], breaks)
             lead_map = lead_ins(cleaned)
             compiled = compile_document(
                 doc, row["text"], row["spans_list"], options, progress, lead_map=lead_map
@@ -248,7 +249,7 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         # fingerprint covers the text and the span ids, so the repair happens
         # only now: the reply is cached, the claims are built, and from here on
         # the artifact and the verifier see the section a reader would name.
-        apply_sections(compiled.claims, cleaned)
+        apply_sections(compiled.claims, cleaned, breaks, row["text"])
         compiled.spans = cleaned
         if compiled.stats.failed:
             # One unservable chunk must not block the rest of the corpus: the

@@ -339,3 +339,210 @@ def test_a_span_of_capitals_with_no_sentence_is_not_a_heading():
     cleaned = clean_sections(spans, text)
     assert cleaned[0]["locator"]["section_path"] == []
     assert cleaned[1]["locator"]["section_path"] == []
+
+
+INLINE_HEADING = (
+    "Il Sistema di Gestione definisce le linee guida aziendali.\n"
+    "SCOPO E OBIETTIVI\n"
+    "La Direzione ha definito la politica per la sicurezza.\n"
+    "Il riesame dovrà verificare lo stato delle azioni correttive.\n"
+)
+
+
+def test_a_heading_printed_inside_a_paragraph_is_the_section_below_it():
+    """The extractor joins a page into one block: the heading is not its first line."""
+    spans = _spans_at(
+        [
+            "Il Sistema di Gestione definisce le linee guida aziendali. SCOPO E OBIETTIVI "
+            "La Direzione ha definito la politica per la sicurezza.",
+            "Il riesame dovrà verificare lo stato delle azioni correttive.",
+        ],
+        [[], []],
+        INLINE_HEADING,
+    )
+    cleaned = clean_sections(spans, INLINE_HEADING)
+    # The text before the heading sits in the band above, so the span keeps it.
+    assert cleaned[0]["locator"]["section_path"] == []
+    # What comes below the heading inherits it, across the span boundary.
+    assert cleaned[1]["locator"]["section_path"] == ["SCOPO E OBIETTIVI"]
+
+
+SIBLING_HEADINGS = (
+    "RIESAME\n"
+    "Il Responsabile ha la responsabilità del riesame.\n"
+    "La direzione sostiene attivamente la sicurezza.\n"
+    "IMPEGNO DELLA DIREZIONE\n"
+    "La direzione definisce gli obiettivi per la sicurezza.\n"
+    "La direzione riesamina gli obiettivi ogni anno.\n"
+)
+
+
+def test_two_headings_of_the_same_document_are_siblings_not_parent_and_child():
+    """A section that follows another is not its subsection."""
+    spans = _spans_at(
+        [
+            "RIESAME Il Responsabile ha la responsabilità del riesame.",
+            "La direzione sostiene attivamente la sicurezza. IMPEGNO DELLA DIREZIONE "
+            "La direzione definisce gli obiettivi per la sicurezza.",
+            "La direzione riesamina gli obiettivi ogni anno.",
+        ],
+        [[], [], []],
+        SIBLING_HEADINGS,
+    )
+    cleaned = clean_sections(spans, SIBLING_HEADINGS)
+    assert cleaned[0]["locator"]["section_path"] == ["RIESAME"]
+    # The second span holds the last text of ``RIESAME`` and the first text of
+    # ``IMPEGNO DELLA DIREZIONE``, so it declares only what the two share; the
+    # claims below it carry the section each one belongs to.
+    assert cleaned[1]["locator"]["section_path"] == []
+    assert cleaned[2]["locator"]["section_path"] == ["IMPEGNO DELLA DIREZIONE"]
+
+
+def test_a_claim_that_quotes_below_an_inline_heading_gets_that_section():
+    """The section of a claim is the last heading printed above the text it quotes."""
+    text = (
+        "Il Sistema di Gestione definisce le linee guida aziendali.\n"
+        "SCOPO E OBIETTIVI\n"
+        "La Direzione ha definito la politica per la sicurezza.\n"
+    )
+    paragraph = (
+        "Il Sistema di Gestione definisce le linee guida aziendali. SCOPO E OBIETTIVI "
+        "La Direzione ha definito la politica per la sicurezza."
+    )
+    spans = _spans_at([paragraph], [[]], text)
+    breaks: dict = {}
+    cleaned = clean_sections(spans, text, breaks)
+    before = "Il Sistema di Gestione definisce le linee guida aziendali."
+    after = "La Direzione ha definito la politica per la sicurezza."
+    locator = {"span_id": "S0001", "char_start": 0, "char_end": len(paragraph)}
+    claims = [
+        {"claim_id": "T1-0001", "doc_id": "T1", "statement": before,
+         "evidence": [{"quote": before, "locator": dict(locator)}]},
+        {"claim_id": "T1-0002", "doc_id": "T1", "statement": after,
+         "evidence": [{"quote": after, "locator": dict(locator)}]},
+    ]
+    apply_sections(claims, cleaned, breaks, text)
+    assert claims[0]["evidence"][0]["locator"]["section_path"] == []
+    assert claims[1]["evidence"][0]["locator"]["section_path"] == ["SCOPO E OBIETTIVI"]
+
+
+def test_a_quote_that_runs_across_a_heading_does_not_place_the_claim():
+    """A block-level quote is as wide as the block: the statement says which side."""
+    text = (
+        "La presente Politica viene diffusa a tutto il personale.\n"
+        "CAMPO DI APPLICAZIONE\n"
+        "La presente politica si applica a tutti gli organi dell'Azienda.\n"
+    )
+    paragraph = (
+        "La presente Politica viene diffusa a tutto il personale. "
+        "CAMPO DI APPLICAZIONE La presente politica si applica a tutti gli organi dell'Azienda."
+    )
+    spans = _spans_at([paragraph], [[]], text)
+    breaks: dict = {}
+    cleaned = clean_sections(spans, text, breaks)
+    statement = "La presente politica si applica a tutti gli organi dell'Azienda."
+    locator = {"span_id": "S0001", "char_start": 0, "char_end": len(paragraph)}
+    claims = [
+        {
+            "claim_id": "T1-0001",
+            "doc_id": "T1",
+            "statement": statement,
+            # The model quoted the whole page block, not the sentence it states.
+            "evidence": [{"quote": paragraph, "locator": dict(locator)}],
+        }
+    ]
+    apply_sections(claims, cleaned, breaks, text)
+    assert claims[0]["evidence"][0]["locator"]["section_path"] == ["CAMPO DI APPLICAZIONE"]
+
+
+SIBLING_IN_ONE_SPAN = (
+    "RIESAME\n"
+    "Il Responsabile verifica l'efficacia del Sistema.\n"
+    "La direzione sostiene il Sistema di Gestione.\n"
+    "IMPEGNO DELLA DIREZIONE\n"
+    "La direzione definisce gli obiettivi per la sicurezza.\n"
+)
+
+
+def test_a_span_that_holds_two_sibling_sections_declares_what_they_share():
+    """The band above and the heading below are siblings: the span is their base.
+
+    A claim below the heading then resolves back to a span that declares the
+    section it names, instead of one that declares the band above it.
+    """
+    span_one = "RIESAME Il Responsabile verifica l'efficacia del Sistema."
+    span_two = (
+        "La direzione sostiene il Sistema di Gestione. IMPEGNO DELLA DIREZIONE "
+        "La direzione definisce gli obiettivi per la sicurezza."
+    )
+    spans = _spans_at([span_one, span_two], [[], []], SIBLING_IN_ONE_SPAN)
+    breaks: dict = {}
+    cleaned = clean_sections(spans, SIBLING_IN_ONE_SPAN, breaks)
+    assert cleaned[0]["locator"]["section_path"] == ["RIESAME"]
+    # The band above and ``IMPEGNO DELLA DIREZIONE`` share no heading.
+    assert cleaned[1]["locator"]["section_path"] == []
+
+    above = "La direzione sostiene il Sistema di Gestione."
+    below = "La direzione definisce gli obiettivi per la sicurezza."
+    locator = {
+        "span_id": "S0002",
+        "char_start": cleaned[1]["locator"]["char_start"],
+        "char_end": cleaned[1]["locator"]["char_end"],
+    }
+    claims = [
+        {"claim_id": "T1-0001", "doc_id": "T1", "statement": above,
+         "evidence": [{"quote": above, "locator": dict(locator)}]},
+        {"claim_id": "T1-0002", "doc_id": "T1", "statement": below,
+         "evidence": [{"quote": below, "locator": dict(locator)}]},
+    ]
+    apply_sections(claims, cleaned, breaks, SIBLING_IN_ONE_SPAN)
+    assert claims[0]["evidence"][0]["locator"]["section_path"] == ["RIESAME"]
+    assert claims[1]["evidence"][0]["locator"]["section_path"] == ["IMPEGNO DELLA DIREZIONE"]
+
+
+GAP_HEADING = (
+    "Il rischio di sanzioni legali o amministrative va ridotto al minimo.\n"
+    "\n"
+    "RESPONSABILITÀ DI OSSERVAZIONE E ATTUAZIONE\n"
+    "L'osservanza e l'attuazione delle policy sono responsabilità di:\n"
+    "tutto il personale che collabora con l'azienda.\n"
+)
+
+
+def test_a_heading_the_segmenter_dropped_still_titles_the_span_below():
+    """The block carries a real heading; only the spans are missing, not the text."""
+    spans = _spans_at(
+        [
+            "Il rischio di sanzioni legali o amministrative va ridotto al minimo.",
+            "tutto il personale che collabora con l'azienda.",
+        ],
+        [["POLICY SICUREZZA DELLE INFORMAZIONI"], ["POLICY SICUREZZA DELLE INFORMAZIONI"]],
+        GAP_HEADING,
+    )
+    cleaned = clean_sections(spans, GAP_HEADING)
+    assert cleaned[0]["locator"]["section_path"] == ["POLICY SICUREZZA DELLE INFORMAZIONI"]
+    assert cleaned[1]["locator"]["section_path"] == [
+        "POLICY SICUREZZA DELLE INFORMAZIONI",
+        "RESPONSABILITÀ DI OSSERVAZIONE E ATTUAZIONE",
+    ]
+
+
+def test_a_table_label_in_a_gap_is_not_a_section():
+    """Title case and no sentence under it: rows, not a title."""
+    text = (
+        "La validità del certificato è soggetta a sorveglianza periodica.\n"
+        "\n"
+        "Prima Emissione\n"
+        "Emissione Corrente\n"
+        "Il certificato scade il 27/02/2028.\n"
+    )
+    spans = _spans_at(
+        [
+            "La validità del certificato è soggetta a sorveglianza periodica.",
+            "Il certificato scade il 27/02/2028.",
+        ],
+        [["Validità"], ["Validità"]],
+        text,
+    )
+    cleaned = clean_sections(spans, text)
+    assert cleaned[1]["locator"]["section_path"] == ["Validità"]
