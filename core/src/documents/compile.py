@@ -23,13 +23,21 @@ from compiler.documents.llm import ModelError, chat
 from compiler.documents.model import Document
 from compiler.documents.prompt import (
     CONFLICT_SYSTEM,
+    LOCALISE_SYSTEM,
     MODALITIES,
     PROMPT_HASH,
     SYSTEM,
     make_prompt,
 )
 from compiler.documents.segment import chunk, lead_ins
-from compiler.documents.text import modal_classes, norm, statement_tokens
+from compiler.documents.text import (
+    LANGUAGE_NAMES,
+    document_language,
+    language_of,
+    modal_classes,
+    norm,
+    statement_tokens,
+)
 from compiler.documents.verify import unattested_numbers
 
 
@@ -74,6 +82,14 @@ class CompileStats:
     failed: int = 0
     errors: list[str] = field(default_factory=list)
     conflict_calls: int = 0
+    # The language pass: how many statements were rewritten in the document's
+    # language, and what the call that rewrote them cost. Kept apart from the
+    # extraction calls because it is a different prompt and a different bill.
+    language: str = ""
+    localised: int = 0
+    localise_calls: int = 0
+    localise_cached: int = 0
+    localise_failed: int = 0
 
     def cost(self, options: CompileOptions) -> float:
         return (
@@ -104,13 +120,24 @@ def repair_json_array(text: str) -> list[dict]:
     if text.startswith("```"):
         text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
         text = re.sub(r"\n?```$", "", text).strip()
-    start = text.find("[")
-    if start == -1:
-        return []
+    wrapped = text.startswith("{")
+    if wrapped:
+        # A reply may also be a bare list of objects — one per line, no array
+        # brackets at all. ``find("[")`` would land on the first ``span_ids``
+        # array inside the first object and start parsing mid-object, so the
+        # wrap has to be decided on the first character, and the closing
+        # bracket is the one just added.
+        text = "[" + text + "]"
+        start = 0
+    else:
+        start = text.find("[")
+        if start == -1:
+            return []
     body = text[start:]
-    end = body.rfind("]")
-    if end != -1:
-        body = body[: end + 1]
+    if not wrapped:
+        end = body.rfind("]")
+        if end != -1:
+            body = body[: end + 1]
 
     def close_objects(piece: str) -> str:
         return re.sub(r"\}\s*(?=\{)", "},", piece)
@@ -147,11 +174,20 @@ def repair_json_array(text: str) -> list[dict]:
                 last_complete = index
     if last_complete == -1:
         return []
-    try:
-        data = json.loads("[" + body[1 : last_complete + 1] + "]")
-    except json.JSONDecodeError:
-        return []
-    return [item for item in data if isinstance(item, dict)] if isinstance(data, list) else []
+    # ``body[0]`` is the opening bracket. The objects may be separated by
+    # commas or just by newlines — a model asked for an array sometimes opens
+    # one and then emits one object per line — so the comma repair runs here
+    # too: without it, a reply with every object intact and only the bracket
+    # missing parsed to nothing, and a whole chunk was dropped in silence.
+    piece = body[1 : last_complete + 1]
+    for candidate in (piece, close_objects(piece)):
+        try:
+            data = json.loads("[" + candidate + "]")
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, list):
+            return [item for item in data if isinstance(item, dict)]
+    return []
 
 
 def parse_claims(text: str) -> list[dict]:
@@ -655,10 +691,125 @@ def compile_document(
     for position, claim in enumerate(claims, start=1):
         claim["claim_id"] = f"{doc.doc_id}-{position:04d}"
 
+    # A bilingual document has one language, and it is the language it opens in.
+    # The extractor answered in the other one wherever the two are printed side
+    # by side; the statements are rewritten, the quotes are not.
+    ordered = sorted(spans, key=lambda s: (s.get("locator") or {}).get("char_start") or 0)
+    stats.language = document_language([str(s.get("paragraph") or "") for s in ordered]) or ""
+    if stats.language and claims:
+        _localise_statements(doc, claims, stats.language, options, stats, progress)
+
     if options.conflicts and claims and not options.dry_run:
         _link_conflicts(doc, claims, options, stats, progress)
 
     return CompiledDocument(claims=claims, stats=stats, spans=spans, rejected=rejected)
+
+
+def _parse_localised(reply: str, valid_ids: set[str]) -> dict[str, str]:
+    """The rewritten statements, only for the ids the caller asked about."""
+    out: dict[str, str] = {}
+    try:
+        data = json.loads(reply)
+    except (json.JSONDecodeError, TypeError):
+        return out
+    if not isinstance(data, list):
+        return out
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        claim_id = str(item.get("id") or "")
+        statement = norm(str(item.get("statement") or ""))
+        if claim_id in valid_ids and len(statement) >= 15 and claim_id not in out:
+            out[claim_id] = statement
+    return out
+
+
+# The cache slot of the language pass. It is not a chunk index: it must not
+# collide with one, and it is rewritten whenever the statement set changes.
+LANGUAGE_SLOT = 99998
+
+
+def _localise_statements(
+    doc: Document,
+    claims: list[dict],
+    language: str,
+    options: CompileOptions,
+    stats: CompileStats,
+    progress: Callable[[str], None] | None,
+) -> None:
+    """Rewrite in ``language`` the statements the extractor wrote in another.
+
+    A bilingual source prints the same rule twice, and the model answers in
+    whichever language the chunk leans towards. The statement is what the
+    knowledge base says, so it has to be in the document's language; the quote
+    is copied from the source and is never translated. A rewrite that changes a
+    number, or that comes back in the wrong language, is discarded and the
+    extracted statement stays: the verifier shows it, it is not hidden.
+    """
+    targets = [
+        claim
+        for claim in claims
+        if (speaks := language_of(str(claim.get("statement") or ""))) and speaks != language
+    ]
+    if not targets:
+        return
+    listing = json.dumps(
+        [{"id": claim["claim_id"], "statement": claim["statement"]} for claim in targets],
+        ensure_ascii=False,
+    )
+    prompt = (
+        f"DOCUMENT: {doc.title} ({doc.doc_id})\n"
+        f"LANGUAGE: {LANGUAGE_NAMES[language]}\n\n"
+        f"{listing}\n\n"
+        "Return the JSON array now."
+    )
+    system = LOCALISE_SYSTEM.format(language=LANGUAGE_NAMES[language])
+    fingerprint = hashlib.sha256(
+        (PROMPT_HASH + system + options.model + language + listing).encode()
+    ).hexdigest()
+    path = (
+        _cache_path(options.cache_dir, doc.doc_id, LANGUAGE_SLOT)
+        if options.cache_dir
+        else None
+    )
+    try:
+        reply, usage, finish, cached = _one_chunk(
+            prompt, fingerprint, path, options, system=system
+        )
+    except ModelError as exc:
+        stats.localise_failed += 1
+        if progress:
+            progress(f"{doc.doc_id}: language pass failed: {exc}")
+        return
+    stats.localise_calls += 0 if cached else 1
+    stats.localise_cached += 1 if cached else 0
+    tokens_in = int(usage.get("input_tokens", 0) or 0)
+    tokens_out = int(usage.get("output_tokens", 0) or 0)
+    if cached:
+        stats.replayed_input_tokens += tokens_in
+        stats.replayed_output_tokens += tokens_out
+    else:
+        stats.input_tokens += tokens_in
+        stats.output_tokens += tokens_out
+    if finish == "length":
+        # A reply cut mid-JSON is not a set of rewrites: keep what was extracted.
+        stats.truncated += 1
+        return
+    by_id = {claim["claim_id"]: claim for claim in targets}
+    for claim_id, statement in _parse_localised(reply, set(by_id)).items():
+        claim = by_id[claim_id]
+        speaks = language_of(statement)
+        # Only a statement that is positively in another language is refused: a
+        # one-sentence rewrite can be too short to classify, and "Il Settore IAF
+        # è 33." has no lower-case function word at all.
+        if speaks is not None and speaks != language:
+            continue
+        candidate = dict(claim)
+        candidate["statement"] = statement
+        if unattested_numbers(candidate):
+            continue
+        claim["statement"] = statement
+        stats.localised += 1
 
 
 def _link_conflicts(
@@ -685,8 +836,14 @@ def _link_conflicts(
         return
     stats.conflict_calls += 0 if cached else 1
     stats.cached += 1 if cached else 0
-    stats.input_tokens += int(usage.get("input_tokens", 0) or 0)
-    stats.output_tokens += int(usage.get("output_tokens", 0) or 0)
+    tokens_in = int(usage.get("input_tokens", 0) or 0)
+    tokens_out = int(usage.get("output_tokens", 0) or 0)
+    if cached:
+        stats.replayed_input_tokens += tokens_in
+        stats.replayed_output_tokens += tokens_out
+    else:
+        stats.input_tokens += tokens_in
+        stats.output_tokens += tokens_out
     if finish == "length":
         stats.truncated += 1
     by_id = {claim["claim_id"]: claim for claim in claims}

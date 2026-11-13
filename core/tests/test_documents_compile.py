@@ -10,6 +10,8 @@ from pathlib import Path
 
 from compiler.documents.compile import (
     CompileOptions,
+    CompileStats,
+    _localise_statements,
     build_claim,
     compile_document,
     dedupe_claims,
@@ -141,6 +143,27 @@ def test_parse_claims_repairs_missing_commas():
 def test_repair_json_array_salvages_a_truncated_reply():
     reply = '[{"a": 1}, {"b": 2}, {"c":'
     assert repair_json_array(reply) == [{"a": 1}, {"b": 2}]
+
+
+def test_repair_json_array_recovers_objects_separated_by_newlines_only():
+    """The shape that lost three chunks of the Italian pilot.
+
+    The model opened the array and then emitted one object per line, without
+    commas and without the closing bracket. Every object was complete, so the
+    reply was not truncated — it parsed to nothing, and the chunk was dropped
+    without a failed call or a warning.
+    """
+    reply = '[{"a": 1}\n{"b": 2}\n{"c": 3}'
+    assert repair_json_array(reply) == [{"a": 1}, {"b": 2}, {"c": 3}]
+    assert parse_claims(reply) == [{"a": 1}, {"b": 2}, {"c": 3}]
+
+
+def test_repair_json_array_recovers_a_bare_list_of_objects():
+    """No array at all: one object per line, which is the shape of a certificate
+    chunk that was dropped with every object intact."""
+    reply = '{"a": 1}\n{"b": 2}'
+    assert repair_json_array(reply) == [{"a": 1}, {"b": 2}]
+    assert parse_claims(reply) == [{"a": 1}, {"b": 2}]
 
 
 def test_parse_claims_returns_empty_on_prose():
@@ -325,3 +348,134 @@ def test_a_single_span_block_cannot_be_split(monkeypatch):
     assert result.stats.truncated == 1
     assert result.stats.retried == 0
     assert len(calls) == 1
+
+
+def _localisable_claims():
+    return [
+        {
+            "claim_id": "T1-0001",
+            "statement": "The certification is issued following audits conducted by sampling.",
+            "evidence": [{"quote": "La certificazione è emessa a seguito di audit condotti con il criterio del campionamento."}],
+        },
+        {
+            "claim_id": "T1-0002",
+            "statement": "La validità del certificato è subordinata a sorveglianza periodica.",
+            "evidence": [{"quote": "La validità del certificato è subordinata a sorveglianza periodica."}],
+        },
+    ]
+
+
+def test_a_statement_in_another_language_is_rewritten_and_the_quote_is_not(monkeypatch):
+    """The knowledge base speaks the document's language; evidence is copied, never translated."""
+    claims = _localisable_claims()
+    seen = {}
+
+    def fake_one_chunk(prompt, fingerprint, cache_path, options, system=""):
+        seen["prompt"] = prompt
+        seen["system"] = system
+        return (
+            '[{"id": "T1-0001", "statement": "La certificazione è emessa a seguito di audit condotti con il criterio del campionamento."}]',
+            {"input_tokens": 100, "output_tokens": 40},
+            "stop",
+            False,
+        )
+
+    monkeypatch.setattr("compiler.documents.compile._one_chunk", fake_one_chunk)
+    stats = CompileStats()
+    _localise_statements(_doc(), claims, "it", CompileOptions(model="stub"), stats, None)
+
+    assert claims[0]["statement"] == (
+        "La certificazione è emessa a seguito di audit condotti con il criterio del campionamento."
+    )
+    # The quote is the source, not the rewrite.
+    assert claims[0]["evidence"][0]["quote"] == (
+        "La certificazione è emessa a seguito di audit condotti con il criterio del campionamento."
+    )
+    assert claims[1]["statement"] == "La validità del certificato è subordinata a sorveglianza periodica."
+    assert stats.localised == 1
+    assert stats.localise_calls == 1
+    assert "LANGUAGE: Italian" in seen["prompt"]
+    assert seen["system"].startswith("You are given claims compiled from one document")
+    # Only the claim in the wrong language is sent.
+    assert "T1-0002" not in seen["prompt"]
+
+
+def test_a_rewrite_that_changes_a_number_is_discarded(monkeypatch):
+    claims = _localisable_claims()
+
+    def fake_one_chunk(prompt, fingerprint, cache_path, options, system=""):
+        return (
+            '[{"id": "T1-0001", "statement": "La certificazione è emessa a seguito di 12 audit condotti a campione."}]',
+            {"input_tokens": 10, "output_tokens": 10},
+            "stop",
+            False,
+        )
+
+    monkeypatch.setattr("compiler.documents.compile._one_chunk", fake_one_chunk)
+    stats = CompileStats()
+    _localise_statements(_doc(), claims, "it", CompileOptions(model="stub"), stats, None)
+    assert claims[0]["statement"].startswith("The certification")
+    assert stats.localised == 0
+
+
+def test_a_rewrite_in_the_wrong_language_is_discarded(monkeypatch):
+    claims = _localisable_claims()
+
+    def fake_one_chunk(prompt, fingerprint, cache_path, options, system=""):
+        return (
+            '[{"id": "T1-0001", "statement": "The certification is issued following the sampling audits."}]',
+            {"input_tokens": 10, "output_tokens": 10},
+            "stop",
+            False,
+        )
+
+    monkeypatch.setattr("compiler.documents.compile._one_chunk", fake_one_chunk)
+    stats = CompileStats()
+    _localise_statements(_doc(), claims, "it", CompileOptions(model="stub"), stats, None)
+    assert claims[0]["statement"].startswith("The certification")
+    assert stats.localised == 0
+
+
+def test_a_rewrite_too_short_to_classify_is_kept(monkeypatch):
+    """A one-sentence rewrite with no lower-case function word is still Italian."""
+    claims = [
+        {
+            "claim_id": "T1-0005",
+            "statement": "The IAF Sector is 33.",
+            "evidence": [{"quote": "Settore IAF / IAF Sector(s) 33"}],
+        }
+    ]
+
+    def fake_one_chunk(prompt, fingerprint, cache_path, options, system=""):
+        return (
+            '[{"id": "T1-0005", "statement": "Il Settore IAF è 33."}]',
+            {"input_tokens": 10, "output_tokens": 10},
+            "stop",
+            False,
+        )
+
+    monkeypatch.setattr("compiler.documents.compile._one_chunk", fake_one_chunk)
+    stats = CompileStats()
+    _localise_statements(_doc(), claims, "it", CompileOptions(model="stub"), stats, None)
+    assert claims[0]["statement"] == "Il Settore IAF è 33."
+    assert stats.localised == 1
+
+
+def test_a_document_in_the_statements_own_language_costs_nothing(monkeypatch):
+    """An English corpus is not a reason to call the model."""
+
+    def fake_one_chunk(*args, **kwargs):
+        raise AssertionError("no call expected")
+
+    monkeypatch.setattr("compiler.documents.compile._one_chunk", fake_one_chunk)
+    claims = [
+        {
+            "claim_id": "T1-0001",
+            "statement": "The certification is issued following audits conducted by sampling.",
+            "evidence": [{"quote": "The certification is issued following audits."}],
+        }
+    ]
+    stats = CompileStats()
+    _localise_statements(_doc(), claims, "en", CompileOptions(model="stub"), stats, None)
+    assert stats.localise_calls == 0
+    assert stats.localised == 0

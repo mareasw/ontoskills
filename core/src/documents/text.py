@@ -87,6 +87,85 @@ def statement_tokens(text: str) -> list[str]:
     return [t for t in tokens(text) if t not in STOPWORDS]
 
 
+# The words a text cannot borrow from the other language. Only function words
+# are here, and only ones that are unambiguous in both directions: "in" is
+# Italian as well as English and "it" is an e-mail address, so neither can say
+# what a text is written in. Content words are open-class and cannot be listed.
+ITALIAN_MARKERS = frozenset(
+    """
+    il lo la gli le un una del della delle dello degli dei di che sono non per
+    con nel nella nelle nello negli nei alla alle agli al allo dall dalla dalle
+    dallo dagli dai sul sulla sulle sullo sugli sui tra fra questo questa questi
+    queste quello quella come anche più deve devono può possono essere stato
+    stata stati state ha hanno loro suo sua suoi sue nostro nostra ogni tutti
+    tutte tutto tutta altro altra altri altre stesso stessa senza contro verso
+    entro oltre secondo tramite mediante attraverso dopo prima sotto sopra
+    fuori dentro presso viene vengono dell all nell sull sia siano avuto
+    """.split()
+)
+ENGLISH_MARKERS = frozenset(
+    """
+    the of and to is are was were be been being that this these those its with
+    for from by at as not shall must may can will would should has have had they
+    their them which who whom what there here than then such also any all each
+    other same both more most only over under between during or
+    """.split()
+)
+LANGUAGE_NAMES = {"it": "Italian", "en": "English"}
+
+
+def _marker_count(text: str, table: frozenset[str]) -> int:
+    """Marker words printed in lower case.
+
+    Case is part of the signal: "Is." in "Via G. Porzio Is. G7" is the
+    abbreviation for *Isola*, while the English verb "is" is printed in lower
+    case inside a sentence. An all-capitals line has no markers and decides
+    nothing.
+    """
+    return sum(
+        1
+        for word in _WORD.findall(str(text or ""))
+        if len(word) > 1 and word == word.lower() and word in table
+    )
+
+
+def language_of(text: str) -> str | None:
+    """``"it"``, ``"en"`` or ``None`` when the text does not say.
+
+    A margin, not a count: a sentence is English when its English function words
+    outnumber the Italian ones, and the other way round. A text with no marker,
+    or with both in similar numbers, is undecided and must not be rewritten.
+    """
+    words = tokens(text)
+    if len(words) < 4:
+        return None
+    italian = _marker_count(text, ITALIAN_MARKERS)
+    english = _marker_count(text, ENGLISH_MARKERS)
+    if italian >= 2 * english + 1:
+        return "it"
+    if english >= 2 * italian + 1:
+        return "en"
+    return None
+
+
+# A page label, an address or a form field is not prose: "Via G. Porzio Is. G7"
+# has an "is" in it and no sentence. The language of a document is the language
+# of its opening prose paragraph — the way a reader decides in one glance — and
+# the minimum length is what keeps a heading or an address from deciding.
+DOCUMENT_MIN_WORDS = 8
+
+
+def document_language(paragraphs: list[str]) -> str | None:
+    """The language of the first paragraph long enough to be prose and decided."""
+    for paragraph in paragraphs:
+        if len(tokens(paragraph)) < DOCUMENT_MIN_WORDS:
+            continue
+        language = language_of(paragraph)
+        if language:
+            return language
+    return None
+
+
 def same_word(left: str, right: str) -> bool:
     """Share a stem of at least four characters, allowing two trailing letters.
 
