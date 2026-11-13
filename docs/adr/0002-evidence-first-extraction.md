@@ -127,7 +127,7 @@ fixed six-document eval set, then on the public demo corpus.
 | Fabricated | 0 | **0** | Non-negotiable |
 | Deterministic verifier vs. census agreement | not measured | **≥ 95%** on the 397-row accepted artifact, replay only | The verifier replaces the audit; it must earn it |
 | Named claims of §10.7(f) | 3/3 (accepted run) | **3/3** | The gate that rejected the last run |
-| Cross-document demo questions | 0 | **3/3, each citing claims from ≥ 2 documents** | The demo must prove a corpus index, not a single-file reader |
+| Cross-document demo questions | 0 (pipeline ready, paid run pending) | **3/3, each citing claims from ≥ 2 documents** | The demo must prove a corpus index, not a single-file reader |
 
 ## Demo
 
@@ -146,13 +146,24 @@ ontoskills ask "which contracts let us audit the sub-processor?"
   a copy-citation control;
 - **three questions that only a cross-document index can answer**, each answered
   through the existing MCP/SPARQL runtime and citing the claims it used:
-  1. *Which suppliers have a breach-notification window shorter than 72 hours?*
-     (answer assembled from several contracts, one row per contract);
-  2. *Where does this DPA conflict with our own retention policy?*
-     (a conflict between a received document and an internal one);
-  3. *What must we tell a sub-processor before they can use a new AI vendor?*
-     (an obligation chain that crosses a contract, an annex and a policy);
+  1. *How quickly must a personal-data breach be notified, and to whom?*
+     (48 hours in the UK schedule, 72 hours in the GDPR, plus the SCC and the
+     tender annex);
+  2. *How long may contractual records be kept?*
+     (six years in the TNA schedule, the accounting schedule, GDPR storage
+     limitation and the contract's own retention clause);
+  3. *What must a supplier do when it uses a sub-processor for personal data?*
+     (an obligation chain across the schedule, the SCCs, the GDPR and the
+     contract's core terms);
 - export JSONL, TTL, and a CSV evidence pack for an audit file.
+
+The three questions were sharpened for Phase 2. The original second question
+(*"where does this DPA conflict with our own retention policy?"*) needs an
+internal document, and the public demo corpus cannot contain one: it is replaced
+by a retention question answered by two public schedules and the GDPR, which
+still tests the same thing — two documents disagreeing about the same number.
+The examples keep the same shape: a deadline, a retention period and an
+obligation chain.
 
 The demo corpus is **public and redistributable**: 12–15 documents from SEC
 EDGAR exhibits, gov.uk model contracts, EU standard contractual clauses and
@@ -167,7 +178,7 @@ NARA text in the public demo.
 |---|---|---|---|
 | 0 | Replay the deterministic verifier on the 397-claim accepted artifact; no model calls | **Met, 2026-11-11**: 388/397 = 97.73% agreement, 0 `no` (no false rejection), D5 97.36% / D6 100%; `D5-0006` survives the drop guard (`PREFLIGHT.md` §10.7(g)(ii), §10.7(h)). Tool: `benchmark/docbench/verify_deterministic.py`; measurement: `benchmark/docbench/gold/audit.phase0.md` | $0 |
 | 1 | Evidence-first prompt + token attestation on D5 and D6 | **Met, 2026-11-11**: compile-only first pass, D5 296/315 = 93.97%, D6 48/49 = 97.96%, 0 facts absent, 10/10 recall with all three named claims, $0.145 (`PREFLIGHT.md` §10.8, `gold/audit.phase1.md`) | $0.145 |
-| 2 | CLI `ingest` + web claim view + public multi-document corpus | The demo ingests a folder and all three cross-document questions answer with citations from ≥ 2 documents | engineering only |
+| 2 | CLI `ingest` + web claim view + public multi-document corpus | The demo ingests a folder and all three cross-document questions answer with citations from ≥ 2 documents. **Engineering complete, 2026-11-11**; the paid run on the 14-document corpus is pending approval (`docs/phase2-plan.md`) | engineering only |
 | 3 | Five design-partner documents (memo: `docs/market/beachhead-2026-11.md`) | A consultant uses the pack in a real engagement | pilot |
 
 Phase 0 is a precondition: if the deterministic verifier cannot reproduce the
@@ -217,6 +228,37 @@ verifier stays the hard gate, and the lead-in class is a **structural** debt —
 the fix is to attach the parent span when a clause is split, not another prompt
 paragraph. Phase 2 proceeds with the claim graph, the CLI, the web view and the
 public corpus; a further prompt attempt would need its own pre-registration.
+
+### Phase 2 status (2026-11-11)
+
+The engineering is complete; the paid run has not been executed. The extraction
+prompt is the Phase 1 prompt **byte for byte** (its hash is written into the KB
+manifest), and the acceptance criterion is structural — three questions, each
+cited from at least two documents — not a score. No threshold is redefined after
+a run.
+
+What exists:
+
+- `compiler.documents`, the product pipeline (`model`, `extract`, `segment`,
+  `prompt`, `llm`, `compile`, `verify`, `store`, `ask`, `web`), with a parity
+  test that fails if the product segmenter drifts from the frozen DocBench copy;
+- `ontocore ingest|ask|view` (and the `ontoskills` passthrough), where `ingest`
+  prints an estimate and never spends without being asked, and `ask`/`view`
+  never call a model;
+- a 14-document public corpus in `examples/demo-corpus/`, five document types,
+  a checked licence and SHA-256 per file, no binaries committed;
+- 71 tests over the new package plus the frozen DocBench suite still green.
+
+What is not:
+
+- the paid run. The dry run over the real corpus estimates **~$0.78**
+  (514,414 input / 1,167,719 output tokens at $0.15 / $0.60 per million); the
+  actual figure goes into the manifest, not into a forecast.
+
+One target is knowingly not met by default: **p95 ≤ 60 s per 60-page document**.
+Chunking is sequential by default and the AI Act alone is 114 chunks, so a
+document takes minutes at `--concurrency 1`; raising concurrency is the lever,
+and the target is only claimed once measured against a gateway that stays up.
 
 ## Risks
 

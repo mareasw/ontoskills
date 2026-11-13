@@ -21,6 +21,9 @@ function usage() {
   ontoskills rebuild-index
   ontoskills import-source <repo-or-path>
   ontoskills list-installed
+  ontoskills ingest <folder> -o <kb>   (document knowledge base)
+  ontoskills ask "<question>" -k <kb>
+  ontoskills view -k <kb>
   ontoskills doctor
   ontoskills uninstall --all`);
 }
@@ -81,6 +84,22 @@ async function uninstallAll() {
   const { HOME_ROOT } = require("./lib/paths");
   await fsp.rm(HOME_ROOT, { recursive: true, force: true });
   log(`Removed ${HOME_ROOT}`);
+}
+
+function runCore(args) {
+  const fs = require("fs");
+  const path = require("path");
+  const { spawnSync } = require("child_process");
+  const { BIN_DIR } = require("./lib/paths");
+  const wrapper = path.join(BIN_DIR, "ontocore");
+  if (!fs.existsSync(wrapper)) {
+    fail("ontocore is not installed. Run: ontoskills install core");
+  }
+  const result = spawnSync(wrapper, args, { stdio: "inherit" });
+  if (result.error) {
+    fail(String(result.error));
+  }
+  process.exit(result.status === null ? 1 : result.status);
 }
 
 async function main() {
@@ -157,6 +176,10 @@ async function main() {
     const repoRef = args[0];
     if (!repoRef) fail("Missing repo or path");
     return importSource(repoRef);
+  }
+
+  if (command === "ingest" || command === "ask" || command === "view") {
+    return runCore([command, ...args]);
   }
 
   if (command === "doctor") {
