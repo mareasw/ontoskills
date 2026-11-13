@@ -40,6 +40,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   reading any document.
 - **A failed document prints its first error** — next to
   `N model call(s) failed`, instead of the count alone.
+- **A heading at the end of a page is a section** — when the extractor prints a
+  heading on the last line before a page break and the segmenter folds it into
+  the next paragraph, the all-caps marker is read again and carried until the
+  stack records a new heading (`RIESAME` on the policy: 5 claims move from the
+  document band to `… > RIESAME`).
+- **The table of contents is not a parent section** — an `Indice` heading the
+  stack never popped put 8 claims under `Indice > Articolo 1`; the contents page
+  is now dropped from the path and the article stays.
+- **A wrapped article title is completed** — a title printed over two lines
+  (`… aggiornamento e` / `modifiche`) is joined when the first line ends on a
+  conjunction and the next is one or two lower-case words.
+- **A resumed build reports what it paid, not what it replayed** — cached
+  replies used to be added to the tokens the run claimed, so a replay that spent
+  nothing reported the whole history as its cost. The manifest now carries
+  `cost_usd` (paid by this run) and `replayed_cost_usd` (already paid when the
+  replies were first generated), with `replayed_tokens`, and the CLI prints
+  `replayed from cache, already paid` under the total.
 
 ## [1.1.0] - 2026-05-04
 

@@ -61,6 +61,11 @@ class CompileStats:
     cached: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    # What the cached replies cost when they were first generated. Kept apart
+    # from the tokens this run paid for: a resumed build that reported both as
+    # "cost" claimed to have spent the whole history a second time.
+    replayed_input_tokens: int = 0
+    replayed_output_tokens: int = 0
     rejected: int = 0
     rejected_numbers: int = 0
     merged: int = 0
@@ -74,6 +79,12 @@ class CompileStats:
         return (
             self.input_tokens / 1_000_000 * options.price_in
             + self.output_tokens / 1_000_000 * options.price_out
+        )
+
+    def replayed_cost(self, options: CompileOptions) -> float:
+        return (
+            self.replayed_input_tokens / 1_000_000 * options.price_in
+            + self.replayed_output_tokens / 1_000_000 * options.price_out
         )
 
 
@@ -398,8 +409,9 @@ def _one_chunk(
     if cache_path is not None and options.resume:
         cached = _read_cache(cache_path, fingerprint)
         if cached is not None:
-            # A resumed build still cost what those chunks cost the first
-            # time: report it, otherwise a cached run claims to be free.
+            # The reply was paid for when it was first generated. The caller
+            # books it as replayed, not as spent, so a resumed build reports
+            # both the money it cost then and the money it cost now.
             usage = cached.get("usage") or {}
             return (
                 str(cached.get("reply") or ""),
@@ -579,8 +591,14 @@ def compile_document(
         for cached, usage, finish, split in run.events:
             stats.calls += 0 if cached else 1
             stats.cached += 1 if cached else 0
-            stats.input_tokens += int(usage.get("input_tokens", 0) or 0)
-            stats.output_tokens += int(usage.get("output_tokens", 0) or 0)
+            tokens_in = int(usage.get("input_tokens", 0) or 0)
+            tokens_out = int(usage.get("output_tokens", 0) or 0)
+            if cached:
+                stats.replayed_input_tokens += tokens_in
+                stats.replayed_output_tokens += tokens_out
+            else:
+                stats.input_tokens += tokens_in
+                stats.output_tokens += tokens_out
             if finish == "length" and not split:
                 stats.truncated += 1
         for reply, _usage, _finish, _cached in run.replies:
