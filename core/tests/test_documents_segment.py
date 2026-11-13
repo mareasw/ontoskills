@@ -252,3 +252,30 @@ def test_a_long_opener_is_still_the_opener():
         _plain_span("S0002", "(c) engage relevant stakeholders in discussion.", 260),
     ]
     assert lead_ins(spans)["S0002"]["span_id"] == "S0001"
+
+
+def test_an_italian_bullet_run_gets_the_lead_in_not_the_sibling_item():
+    """The bullet is printed after the colon, so the lead-in ends with ": •"."""
+    spans = [
+        _plain_span(
+            "S0001",
+            "La direzione sostiene la sicurezza tramite una struttura i cui compiti sono: •",
+            0,
+        ),
+        _plain_span("S0002", "garantire che siano identificati tutti gli obiettivi;", 86),
+        _plain_span("S0003", "stabilire i ruoli aziendali e le responsabilità;", 134),
+        _plain_span("S0004", "fornire risorse sufficienti alla pianificazione;", 180),
+    ]
+    leads = lead_ins(spans)
+    assert leads["S0003"]["span_id"] == "S0001"
+    assert leads["S0004"]["span_id"] == "S0001"
+
+
+def test_a_lowercase_tail_after_a_semicolon_still_gets_the_span_above():
+    """A semicolon alone does not mean an enumeration: an opener must be above."""
+    spans = [
+        _plain_span("S0001", "The Regulation applies to providers established in the Union.", 0),
+        _plain_span("S0002", "It also applies to providers outside the Union;", 64),
+        _plain_span("S0003", "the representative is the contact point.", 110),
+    ]
+    assert lead_ins(spans)["S0003"]["span_id"] == "S0002"

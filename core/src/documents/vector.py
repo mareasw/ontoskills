@@ -15,6 +15,22 @@ REVISION = "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
 DIM = 384
 RRF_K = 60
 
+# The model is trained on English. On a corpus in another language its cosine
+# ranking is not a second opinion but a guess, and it measured worse than the
+# words themselves on the Italian pilot: hit@12 8 of 10 against 9, MRR 0.326
+# against 0.431, with two questions that the lexical pass answered first pushed
+# out of the top twelve. So the fusion is applied only to the languages the
+# model was trained on. A knowledge base that does not declare its language
+# keeps the fusion: there is nothing to compare against it.
+LANGUAGES = frozenset({"en"})
+
+
+def supports(languages) -> bool:
+    """True when at least one of the corpus languages is one the model knows."""
+    known = {language for language in (languages or ()) if language}
+    return not known or bool(known & LANGUAGES)
+
+
 
 def cosine(left: list[float], right: list[float]) -> float:
     if len(left) != len(right):

@@ -10,6 +10,8 @@ from pathlib import Path
 
 from compiler.documents.compile import (
     CompileOptions,
+    CompileStats,
+    _localise_statements,
     build_claim,
     compile_document,
     dedupe_claims,
@@ -143,6 +145,27 @@ def test_repair_json_array_salvages_a_truncated_reply():
     assert repair_json_array(reply) == [{"a": 1}, {"b": 2}]
 
 
+def test_repair_json_array_recovers_objects_separated_by_newlines_only():
+    """The shape that lost three chunks of the Italian pilot.
+
+    The model opened the array and then emitted one object per line, without
+    commas and without the closing bracket. Every object was complete, so the
+    reply was not truncated — it parsed to nothing, and the chunk was dropped
+    without a failed call or a warning.
+    """
+    reply = '[{"a": 1}\n{"b": 2}\n{"c": 3}'
+    assert repair_json_array(reply) == [{"a": 1}, {"b": 2}, {"c": 3}]
+    assert parse_claims(reply) == [{"a": 1}, {"b": 2}, {"c": 3}]
+
+
+def test_repair_json_array_recovers_a_bare_list_of_objects():
+    """No array at all: one object per line, which is the shape of a certificate
+    chunk that was dropped with every object intact."""
+    reply = '{"a": 1}\n{"b": 2}'
+    assert repair_json_array(reply) == [{"a": 1}, {"b": 2}]
+    assert parse_claims(reply) == [{"a": 1}, {"b": 2}]
+
+
 def test_parse_claims_returns_empty_on_prose():
     assert parse_claims("I cannot answer that.") == []
 
@@ -242,3 +265,265 @@ def test_build_claim_keeps_a_structural_reference():
         "span_ids": ["S0001"],
     }
     assert build_claim(raw, {"S0001": span}, _doc(), 1) is not None
+
+
+def _four_spans() -> list[dict]:
+    return [
+        _span("S0001", "The Supplier shall keep its records."),
+        _span("S0002", "The Buyer shall keep its records."),
+        _span("S0003", "The Supplier shall notify the Buyer."),
+        _span("S0004", "The Buyer shall notify the Supplier."),
+    ]
+
+
+def test_a_truncated_reply_is_split_and_the_tail_recovered(monkeypatch):
+    """A reply cut at the ceiling is incomplete: the halves are asked again."""
+    calls: list[str] = []
+
+    def fake_one_chunk(prompt, fingerprint, cache_path, options, system=""):
+        calls.append(prompt)
+        if len(calls) == 1:
+            return '[{"span_ids": ["S0001"], "statement": "The Supplier shall kee', (
+                {"input_tokens": 10, "output_tokens": 10000}
+            ), "length", False
+        if "[S0003]" in prompt:
+            statement, span_id = "The Buyer shall notify the Supplier.", "S0004"
+        else:
+            statement, span_id = "The Supplier shall keep its records.", "S0001"
+        return (
+            f'[{{"span_ids": ["{span_id}"], "statement": "{statement}"}}]',
+            {"input_tokens": 5, "output_tokens": 20},
+            "stop",
+            False,
+        )
+
+    monkeypatch.setattr("compiler.documents.compile._one_chunk", fake_one_chunk)
+    result = compile_document(
+        _doc(),
+        "text",
+        _four_spans(),
+        CompileOptions(model="stub", conflicts=False),
+    )
+    assert result.stats.retried == 1
+    assert result.stats.truncated == 0
+    assert result.stats.calls == 3
+    assert len(calls) == 3
+    assert {claim["statement"] for claim in result.claims} == {
+        "The Supplier shall keep its records.",
+        "The Buyer shall notify the Supplier.",
+    }
+
+
+def test_truncation_is_reported_when_splitting_is_off(monkeypatch):
+    def fake_one_chunk(prompt, fingerprint, cache_path, options, system=""):
+        return "", {"input_tokens": 10, "output_tokens": 10000}, "length", False
+
+    monkeypatch.setattr("compiler.documents.compile._one_chunk", fake_one_chunk)
+    result = compile_document(
+        _doc(),
+        "text",
+        _four_spans(),
+        CompileOptions(model="stub", conflicts=False, split_truncated=False),
+    )
+    assert result.stats.truncated == 1
+    assert result.stats.retried == 0
+    assert result.stats.calls == 1
+    assert result.claims == []
+
+
+def test_a_single_span_block_cannot_be_split(monkeypatch):
+    calls: list[str] = []
+
+    def fake_one_chunk(prompt, fingerprint, cache_path, options, system=""):
+        calls.append(prompt)
+        return "", {"input_tokens": 10, "output_tokens": 10000}, "length", False
+
+    monkeypatch.setattr("compiler.documents.compile._one_chunk", fake_one_chunk)
+    result = compile_document(
+        _doc(),
+        "text",
+        [_span("S0001", "The Supplier shall keep its records.")],
+        CompileOptions(model="stub", conflicts=False),
+    )
+    assert result.stats.truncated == 1
+    assert result.stats.retried == 0
+    assert len(calls) == 1
+
+
+def _localisable_claims():
+    return [
+        {
+            "claim_id": "T1-0001",
+            "statement": "The certification is issued following audits conducted by sampling.",
+            "evidence": [{"quote": "La certificazione è emessa a seguito di audit condotti con il criterio del campionamento."}],
+        },
+        {
+            "claim_id": "T1-0002",
+            "statement": "La validità del certificato è subordinata a sorveglianza periodica.",
+            "evidence": [{"quote": "La validità del certificato è subordinata a sorveglianza periodica."}],
+        },
+    ]
+
+
+def test_a_statement_in_another_language_is_rewritten_and_the_quote_is_not(monkeypatch):
+    """The knowledge base speaks the document's language; evidence is copied, never translated."""
+    claims = _localisable_claims()
+    seen = {}
+
+    def fake_one_chunk(prompt, fingerprint, cache_path, options, system=""):
+        seen["prompt"] = prompt
+        seen["system"] = system
+        return (
+            '[{"id": "T1-0001", "statement": "La certificazione è emessa a seguito di audit condotti con il criterio del campionamento."}]',
+            {"input_tokens": 100, "output_tokens": 40},
+            "stop",
+            False,
+        )
+
+    monkeypatch.setattr("compiler.documents.compile._one_chunk", fake_one_chunk)
+    stats = CompileStats()
+    _localise_statements(_doc(), claims, "it", CompileOptions(model="stub"), stats, None)
+
+    assert claims[0]["statement"] == (
+        "La certificazione è emessa a seguito di audit condotti con il criterio del campionamento."
+    )
+    # The quote is the source, not the rewrite.
+    assert claims[0]["evidence"][0]["quote"] == (
+        "La certificazione è emessa a seguito di audit condotti con il criterio del campionamento."
+    )
+    assert claims[1]["statement"] == "La validità del certificato è subordinata a sorveglianza periodica."
+    assert stats.localised == 1
+    assert stats.localise_calls == 1
+    assert "LANGUAGE: Italian" in seen["prompt"]
+    assert seen["system"].startswith("You are given claims compiled from one document")
+    # Only the claim in the wrong language is sent.
+    assert "T1-0002" not in seen["prompt"]
+
+
+def test_a_rewrite_that_changes_a_number_is_discarded(monkeypatch):
+    claims = _localisable_claims()
+
+    def fake_one_chunk(prompt, fingerprint, cache_path, options, system=""):
+        return (
+            '[{"id": "T1-0001", "statement": "La certificazione è emessa a seguito di 12 audit condotti a campione."}]',
+            {"input_tokens": 10, "output_tokens": 10},
+            "stop",
+            False,
+        )
+
+    monkeypatch.setattr("compiler.documents.compile._one_chunk", fake_one_chunk)
+    stats = CompileStats()
+    _localise_statements(_doc(), claims, "it", CompileOptions(model="stub"), stats, None)
+    assert claims[0]["statement"].startswith("The certification")
+    assert stats.localised == 0
+
+
+def test_a_rewrite_in_the_wrong_language_is_discarded(monkeypatch):
+    claims = _localisable_claims()
+
+    def fake_one_chunk(prompt, fingerprint, cache_path, options, system=""):
+        return (
+            '[{"id": "T1-0001", "statement": "The certification is issued following the sampling audits."}]',
+            {"input_tokens": 10, "output_tokens": 10},
+            "stop",
+            False,
+        )
+
+    monkeypatch.setattr("compiler.documents.compile._one_chunk", fake_one_chunk)
+    stats = CompileStats()
+    _localise_statements(_doc(), claims, "it", CompileOptions(model="stub"), stats, None)
+    assert claims[0]["statement"].startswith("The certification")
+    assert stats.localised == 0
+
+
+def test_a_rewrite_too_short_to_classify_is_kept(monkeypatch):
+    """A one-sentence rewrite with no lower-case function word is still Italian."""
+    claims = [
+        {
+            "claim_id": "T1-0005",
+            "statement": "The IAF Sector is 33.",
+            "evidence": [{"quote": "Settore IAF / IAF Sector(s) 33"}],
+        }
+    ]
+
+    def fake_one_chunk(prompt, fingerprint, cache_path, options, system=""):
+        return (
+            '[{"id": "T1-0005", "statement": "Il Settore IAF è 33."}]',
+            {"input_tokens": 10, "output_tokens": 10},
+            "stop",
+            False,
+        )
+
+    monkeypatch.setattr("compiler.documents.compile._one_chunk", fake_one_chunk)
+    stats = CompileStats()
+    _localise_statements(_doc(), claims, "it", CompileOptions(model="stub"), stats, None)
+    assert claims[0]["statement"] == "Il Settore IAF è 33."
+    assert stats.localised == 1
+
+
+def test_a_document_in_the_statements_own_language_costs_nothing(monkeypatch):
+    """An English corpus is not a reason to call the model."""
+
+    def fake_one_chunk(*args, **kwargs):
+        raise AssertionError("no call expected")
+
+    monkeypatch.setattr("compiler.documents.compile._one_chunk", fake_one_chunk)
+    claims = [
+        {
+            "claim_id": "T1-0001",
+            "statement": "The certification is issued following audits conducted by sampling.",
+            "evidence": [{"quote": "The certification is issued following audits."}],
+        }
+    ]
+    stats = CompileStats()
+    _localise_statements(_doc(), claims, "en", CompileOptions(model="stub"), stats, None)
+    assert stats.localise_calls == 0
+    assert stats.localised == 0
+
+
+def test_the_dedupe_runs_after_the_language_pass(monkeypatch):
+    """Two chunks that quote one block are one claim once both speak the document's language.
+
+    A bilingual source answers in whichever language the chunk leans towards, so
+    the same rule arrives twice, once in each language. A dedupe that runs before
+    the rewrite compares an English statement with an Italian one, finds nothing
+    and keeps both; the identical pair must be merged after the statements are
+    in the document's language.
+    """
+    italian = (
+        "La certificazione è emessa e mantenuta a seguito di audit condotti presso "
+        "l'organizzazione."
+    )
+    english = (
+        "The certification is issued and maintained following audits conducted at "
+        "the organization."
+    )
+    spans = [
+        _span("S0001", "La politica definisce le regole per la sicurezza delle informazioni."),
+        _span("S0002", italian),
+        _span("S0003", "Il riesame dovrà verificare lo stato delle azioni correttive."),
+    ]
+    seen: list[str] = []
+
+    def fake_one_chunk(prompt, fingerprint, cache_path, options, system=""):
+        if system.startswith("You are given claims compiled from one document"):
+            seen.append("language")
+            return f'[{{"id": "T1-0001", "statement": "{italian}"}}]', {}, "stop", False
+        seen.append("extract")
+        statement = english if "[S0001]" in prompt else italian
+        return (
+            f'[{{"span_ids": ["S0002"], "statement": "{statement}"}}]',
+            {"input_tokens": 5, "output_tokens": 20},
+            "stop",
+            False,
+        )
+
+    monkeypatch.setattr("compiler.documents.compile._one_chunk", fake_one_chunk)
+    result = compile_document(
+        _doc(), "text", spans, CompileOptions(model="stub", chunk_size=2, overlap=1)
+    )
+
+    assert seen.count("language") == 1
+    assert result.stats.merged == 1
+    assert len(result.claims) == 1
+    assert result.claims[0]["statement"] == italian
