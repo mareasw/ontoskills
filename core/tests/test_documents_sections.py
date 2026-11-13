@@ -247,6 +247,27 @@ def test_a_wrapped_article_title_is_completed():
     ]
 
 
+LONG_WRAPPED_TITLE = (
+    "Articolo 8 - Riciclaggio, ricettazione e impiego di denaro, beni o utilità di\n"
+    "provenienza illecita\n"
+    "NETCARING S.r.l. vieta al proprio personale di acquistare denaro.\n"
+)
+
+
+def test_a_wrapped_title_may_be_longer_than_one_line():
+    """The ceiling tells a heading from a paragraph, and the wrap is two lines."""
+    text = LONG_WRAPPED_TITLE
+    spans = _spans_at(
+        ["NETCARING S.r.l. vieta al proprio personale di acquistare denaro."], [[]], text
+    )
+    path = clean_sections(spans, text)[0]["locator"]["section_path"]
+    assert path == [
+        "Articolo 8 - Riciclaggio, ricettazione e impiego di denaro, beni o utilità "
+        "di provenienza illecita",
+    ]
+    assert len(path[0]) > 90
+
+
 POLICY_PAGE = (
     "La Direzione verifica l'efficacia del Sistema di Gestione.\n"
     "RIESAME\n"
