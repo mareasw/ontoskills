@@ -215,6 +215,12 @@ WRAPPING_WORDS = frozenset(
     da dal dalla dalle dai su sul sulla tra fra il la lo le gli i
     """.split()
 )
+# The ceiling exists to tell a heading from a paragraph, and a paragraph is one
+# line. A joined title is two lines of the same title, one of them already
+# checked for shape, so it may run longer than a single line is allowed to
+# ("Articolo 8 - … beni o utilità di" / "provenienza illecita" is 99 characters,
+# and it is the whole title).
+MAX_JOINED_HEADING = 120
 
 
 def _join_wrapped(line: str, following: list[str]) -> str:
@@ -233,7 +239,7 @@ def _join_wrapped(line: str, following: list[str]) -> str:
         if not rest[0].islower() or rest.endswith((".", ";", ":", ",")):
             return line
         joined = f"{line} {rest}"
-        return joined if len(joined) <= MAX_HEADING else line
+        return joined if len(joined) <= MAX_JOINED_HEADING else line
     return line
 
 
@@ -261,9 +267,12 @@ def _missed_headings(text: str) -> list[tuple[int, str]]:
         cursor = at + len(piece)
         if not ARTICLE_HEADING.match(line):
             continue
-        line = _join_wrapped(line, lines[position + 1:])
-        if TOC_ENTRY.search(line) or len(line) > MAX_HEADING:
+        whole = _join_wrapped(line, lines[position + 1:])
+        # The length ceiling rejects a line that is a paragraph; a joined title
+        # is two lines and is judged by the shape of its tail, not its length.
+        if TOC_ENTRY.search(whole) or (whole == line and len(whole) > MAX_HEADING):
             continue
+        line = whole
         if line.endswith((".", ";", ":", ",")):
             continue
         out.append((at, line))
