@@ -23,13 +23,21 @@ from compiler.documents.llm import ModelError, chat
 from compiler.documents.model import Document
 from compiler.documents.prompt import (
     CONFLICT_SYSTEM,
+    LOCALISE_SYSTEM,
     MODALITIES,
     PROMPT_HASH,
     SYSTEM,
     make_prompt,
 )
 from compiler.documents.segment import chunk, lead_ins
-from compiler.documents.text import modal_classes, norm, statement_tokens
+from compiler.documents.text import (
+    LANGUAGE_NAMES,
+    document_language,
+    language_of,
+    modal_classes,
+    norm,
+    statement_tokens,
+)
 from compiler.documents.verify import unattested_numbers
 
 
@@ -44,6 +52,11 @@ class CompileOptions:
     conflicts: bool = True
     concurrency: int = 1
     resume: bool = False
+    # A reply that hits the output ceiling is an incomplete extraction, not a
+    # short one: the model was cut mid-JSON. Splitting the chunk and asking
+    # again recovers the tail; --no-split-truncated turns that off for a run
+    # that must not spend more than its first pass.
+    split_truncated: bool = True
     price_in: float = 0.15
     price_out: float = 0.60
     cache_dir: Path | None = None
@@ -56,17 +69,38 @@ class CompileStats:
     cached: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    # What the cached replies cost when they were first generated. Kept apart
+    # from the tokens this run paid for: a resumed build that reported both as
+    # "cost" claimed to have spent the whole history a second time.
+    replayed_input_tokens: int = 0
+    replayed_output_tokens: int = 0
     rejected: int = 0
     rejected_numbers: int = 0
     merged: int = 0
     truncated: int = 0
+    retried: int = 0
     failed: int = 0
+    errors: list[str] = field(default_factory=list)
     conflict_calls: int = 0
+    # The language pass: how many statements were rewritten in the document's
+    # language, and what the call that rewrote them cost. Kept apart from the
+    # extraction calls because it is a different prompt and a different bill.
+    language: str = ""
+    localised: int = 0
+    localise_calls: int = 0
+    localise_cached: int = 0
+    localise_failed: int = 0
 
     def cost(self, options: CompileOptions) -> float:
         return (
             self.input_tokens / 1_000_000 * options.price_in
             + self.output_tokens / 1_000_000 * options.price_out
+        )
+
+    def replayed_cost(self, options: CompileOptions) -> float:
+        return (
+            self.replayed_input_tokens / 1_000_000 * options.price_in
+            + self.replayed_output_tokens / 1_000_000 * options.price_out
         )
 
 
@@ -86,13 +120,24 @@ def repair_json_array(text: str) -> list[dict]:
     if text.startswith("```"):
         text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
         text = re.sub(r"\n?```$", "", text).strip()
-    start = text.find("[")
-    if start == -1:
-        return []
+    wrapped = text.startswith("{")
+    if wrapped:
+        # A reply may also be a bare list of objects — one per line, no array
+        # brackets at all. ``find("[")`` would land on the first ``span_ids``
+        # array inside the first object and start parsing mid-object, so the
+        # wrap has to be decided on the first character, and the closing
+        # bracket is the one just added.
+        text = "[" + text + "]"
+        start = 0
+    else:
+        start = text.find("[")
+        if start == -1:
+            return []
     body = text[start:]
-    end = body.rfind("]")
-    if end != -1:
-        body = body[: end + 1]
+    if not wrapped:
+        end = body.rfind("]")
+        if end != -1:
+            body = body[: end + 1]
 
     def close_objects(piece: str) -> str:
         return re.sub(r"\}\s*(?=\{)", "},", piece)
@@ -129,11 +174,20 @@ def repair_json_array(text: str) -> list[dict]:
                 last_complete = index
     if last_complete == -1:
         return []
-    try:
-        data = json.loads("[" + body[1 : last_complete + 1] + "]")
-    except json.JSONDecodeError:
-        return []
-    return [item for item in data if isinstance(item, dict)] if isinstance(data, list) else []
+    # ``body[0]`` is the opening bracket. The objects may be separated by
+    # commas or just by newlines — a model asked for an array sometimes opens
+    # one and then emits one object per line — so the comma repair runs here
+    # too: without it, a reply with every object intact and only the bracket
+    # missing parsed to nothing, and a whole chunk was dropped in silence.
+    piece = body[1 : last_complete + 1]
+    for candidate in (piece, close_objects(piece)):
+        try:
+            data = json.loads("[" + candidate + "]")
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, list):
+            return [item for item in data if isinstance(item, dict)]
+    return []
 
 
 def parse_claims(text: str) -> list[dict]:
@@ -353,8 +407,10 @@ def _fingerprint(text: str, spans: list[dict], model: str) -> str:
     return digest.hexdigest()
 
 
-def _cache_path(cache_dir: Path, doc_id: str, index: int) -> Path:
-    return cache_dir / doc_id / f"{index:05d}.json"
+def _cache_path(cache_dir: Path, doc_id: str, index: int, suffix: str = "") -> Path:
+    # A retried sub-chunk needs its own cache slot: two halves of the same
+    # index must not overwrite each other's reply.
+    return cache_dir / doc_id / f"{index:05d}{suffix}.json"
 
 
 def _read_cache(path: Path, fingerprint: str) -> dict | None:
@@ -389,8 +445,9 @@ def _one_chunk(
     if cache_path is not None and options.resume:
         cached = _read_cache(cache_path, fingerprint)
         if cached is not None:
-            # A resumed build still cost what those chunks cost the first
-            # time: report it, otherwise a cached run claims to be free.
+            # The reply was paid for when it was first generated. The caller
+            # books it as replayed, not as spent, so a resumed build reports
+            # both the money it cost then and the money it cost now.
             usage = cached.get("usage") or {}
             return (
                 str(cached.get("reply") or ""),
@@ -438,6 +495,94 @@ def _conflict_pairs(reply: str, valid_ids: set[str]) -> list[tuple[str, str]]:
     return pairs
 
 
+MAX_SPLIT_DEPTH = 2
+
+
+@dataclass
+class ChunkRun:
+    """One chunk's replies plus every billed call that produced them.
+
+    ``events`` is separate from ``replies`` because a chunk that was split
+    produced one reply per half but cost three calls: the truncated one and the
+    two retries. Cost accounting follows the events, parsing follows the
+    replies.
+    """
+
+    replies: list[tuple[str, dict, str, bool]] = field(default_factory=list)
+    # ``(cached, usage, finish, split)``. A split call still cost what it cost,
+    # but it is not a truncation the operator has to act on.
+    events: list[tuple[bool, dict, str, bool]] = field(default_factory=list)
+    retried: int = 0
+    failed: int = 0
+    # The reason each failed call gave. The CLI prints it: "10 model call(s)
+    # failed" without a cause is what a missing base URL looked like from the
+    # operator's side, and it took a corpus to notice.
+    errors: list[str] = field(default_factory=list)
+
+
+def _run_block(
+    doc: Document,
+    text: str,
+    block: list[dict],
+    index: int,
+    suffix: str,
+    options: CompileOptions,
+    progress: Callable[[str], None] | None,
+    depth: int = 0,
+) -> ChunkRun:
+    """Compile one block, halving it when the reply hits the output ceiling.
+
+    The retry is not a second opinion on the same prompt: it is the same spans
+    in a smaller window, because the ceiling applies to the reply and a shorter
+    block produces a shorter one. A block of one span cannot be halved, and a
+    third truncation in a row means the block is too dense for the ceiling, so
+    the walk stops and the run reports what is still missing.
+    """
+    run = ChunkRun()
+    prompt = make_prompt(block, {"doc_id": doc.doc_id, "title": doc.title})
+    fingerprint = _fingerprint(text, block, options.model)
+    path = (
+        _cache_path(options.cache_dir, doc.doc_id, index, suffix)
+        if options.cache_dir
+        else None
+    )
+    try:
+        reply, usage, finish, cached = _one_chunk(prompt, fingerprint, path, options)
+    except ModelError as exc:
+        run.failed += 1
+        run.errors.append(str(exc))
+        if progress:
+            progress(f"{doc.doc_id}: chunk {index}{suffix} failed: {exc}")
+        return run
+    split = (
+        finish == "length"
+        and options.split_truncated
+        and len(block) > 1
+        and depth < MAX_SPLIT_DEPTH
+    )
+    run.events.append((cached, usage, finish, split))
+    if not split:
+        run.replies.append((reply, usage, finish, cached))
+        return run
+    run.retried += 1
+    if progress:
+        progress(
+            f"{doc.doc_id}: chunk {index}{suffix} hit the output ceiling; "
+            f"splitting {len(block)} spans"
+        )
+    middle = len(block) // 2
+    for half, name in ((block[:middle], "a"), (block[middle:], "b")):
+        child = _run_block(
+            doc, text, half, index, suffix + name, options, progress, depth + 1
+        )
+        run.replies.extend(child.replies)
+        run.events.extend(child.events)
+        run.retried += child.retried
+        run.failed += child.failed
+        run.errors.extend(child.errors)
+    return run
+
+
 def compile_document(
     doc: Document,
     text: str,
@@ -457,49 +602,43 @@ def compile_document(
     if lead_map is None:
         lead_map = lead_ins(spans)
     chunks = chunk(spans, options.chunk_size, options.overlap)
-    cache_dir = options.cache_dir
-    jobs: list[tuple[int, str, str, Path | None]] = []
-    for index, block in enumerate(chunks):
-        prompt = make_prompt(block, {"doc_id": doc.doc_id, "title": doc.title})
-        fingerprint = _fingerprint(text, block, options.model)
-        path = _cache_path(cache_dir, doc.doc_id, index) if cache_dir else None
-        jobs.append((index, prompt, fingerprint, path))
-
-    replies: dict[int, tuple[str, dict, str, bool]] = {}
     stats = CompileStats()
-    if options.concurrency > 1 and len(jobs) > 1:
+    runs: dict[int, ChunkRun] = {}
+    if options.concurrency > 1 and len(chunks) > 1:
         with ThreadPoolExecutor(max_workers=options.concurrency) as pool:
             futures = {
-                pool.submit(_one_chunk, prompt, fingerprint, path, options): index
-                for index, prompt, fingerprint, path in jobs
+                pool.submit(
+                    _run_block, doc, text, block, index, "", options, progress
+                ): index
+                for index, block in enumerate(chunks)
             }
             for future in as_completed(futures):
-                index = futures[future]
-                try:
-                    replies[index] = future.result()
-                except ModelError as exc:
-                    stats.failed += 1
-                    if progress:
-                        progress(f"{doc.doc_id}: chunk {index} failed: {exc}")
+                runs[futures[future]] = future.result()
     else:
-        for index, prompt, fingerprint, path in jobs:
-            try:
-                replies[index] = _one_chunk(prompt, fingerprint, path, options)
-            except ModelError as exc:
-                stats.failed += 1
-                if progress:
-                    progress(f"{doc.doc_id}: chunk {index} failed: {exc}")
+        for index, block in enumerate(chunks):
+            runs[index] = _run_block(doc, text, block, index, "", options, progress)
 
     raw_claims: list[dict] = []
-    for index in sorted(replies):
-        reply, usage, finish, cached = replies[index]
-        stats.calls += 0 if cached else 1
-        stats.cached += 1 if cached else 0
-        stats.input_tokens += int(usage.get("input_tokens", 0) or 0)
-        stats.output_tokens += int(usage.get("output_tokens", 0) or 0)
-        if finish == "length":
-            stats.truncated += 1
-        raw_claims.extend(parse_claims(reply))
+    for index in sorted(runs):
+        run = runs[index]
+        stats.retried += run.retried
+        stats.failed += run.failed
+        stats.errors.extend(run.errors)
+        for cached, usage, finish, split in run.events:
+            stats.calls += 0 if cached else 1
+            stats.cached += 1 if cached else 0
+            tokens_in = int(usage.get("input_tokens", 0) or 0)
+            tokens_out = int(usage.get("output_tokens", 0) or 0)
+            if cached:
+                stats.replayed_input_tokens += tokens_in
+                stats.replayed_output_tokens += tokens_out
+            else:
+                stats.input_tokens += tokens_in
+                stats.output_tokens += tokens_out
+            if finish == "length" and not split:
+                stats.truncated += 1
+        for reply, _usage, _finish, _cached in run.replies:
+            raw_claims.extend(parse_claims(reply))
 
     claims: list[dict] = []
     rejected: list[dict] = []
@@ -533,6 +672,22 @@ def compile_document(
         claims.append(claim)
         number += 1
 
+    # The language pass needs an id per claim, and it runs before the dedupe: two
+    # claims that quote the same block are comparable only once they are written
+    # in the same language. A bilingual source is answered in whichever language
+    # the chunk leans towards, so a dedupe that runs first compares an English
+    # statement with an Italian one and finds nothing.
+    for position, claim in enumerate(claims, start=1):
+        claim["claim_id"] = f"{doc.doc_id}-{position:04d}"
+
+    # A bilingual document has one language, and it is the language it opens in.
+    # The extractor answered in the other one wherever the two are printed side
+    # by side; the statements are rewritten, the quotes are not.
+    ordered = sorted(spans, key=lambda s: (s.get("locator") or {}).get("char_start") or 0)
+    stats.language = document_language([str(s.get("paragraph") or "") for s in ordered]) or ""
+    if stats.language and claims:
+        _localise_statements(doc, claims, stats.language, options, stats, progress)
+
     claims, merged = dedupe_claims(claims)
     stats.merged = merged
     number = len(claims) + 1
@@ -556,6 +711,113 @@ def compile_document(
         _link_conflicts(doc, claims, options, stats, progress)
 
     return CompiledDocument(claims=claims, stats=stats, spans=spans, rejected=rejected)
+
+
+def _parse_localised(reply: str, valid_ids: set[str]) -> dict[str, str]:
+    """The rewritten statements, only for the ids the caller asked about."""
+    out: dict[str, str] = {}
+    try:
+        data = json.loads(reply)
+    except (json.JSONDecodeError, TypeError):
+        return out
+    if not isinstance(data, list):
+        return out
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        claim_id = str(item.get("id") or "")
+        statement = norm(str(item.get("statement") or ""))
+        if claim_id in valid_ids and len(statement) >= 15 and claim_id not in out:
+            out[claim_id] = statement
+    return out
+
+
+# The cache slot of the language pass. It is not a chunk index: it must not
+# collide with one, and it is rewritten whenever the statement set changes.
+LANGUAGE_SLOT = 99998
+
+
+def _localise_statements(
+    doc: Document,
+    claims: list[dict],
+    language: str,
+    options: CompileOptions,
+    stats: CompileStats,
+    progress: Callable[[str], None] | None,
+) -> None:
+    """Rewrite in ``language`` the statements the extractor wrote in another.
+
+    A bilingual source prints the same rule twice, and the model answers in
+    whichever language the chunk leans towards. The statement is what the
+    knowledge base says, so it has to be in the document's language; the quote
+    is copied from the source and is never translated. A rewrite that changes a
+    number, or that comes back in the wrong language, is discarded and the
+    extracted statement stays: the verifier shows it, it is not hidden.
+    """
+    targets = [
+        claim
+        for claim in claims
+        if (speaks := language_of(str(claim.get("statement") or ""))) and speaks != language
+    ]
+    if not targets:
+        return
+    listing = json.dumps(
+        [{"id": claim["claim_id"], "statement": claim["statement"]} for claim in targets],
+        ensure_ascii=False,
+    )
+    prompt = (
+        f"DOCUMENT: {doc.title} ({doc.doc_id})\n"
+        f"LANGUAGE: {LANGUAGE_NAMES[language]}\n\n"
+        f"{listing}\n\n"
+        "Return the JSON array now."
+    )
+    system = LOCALISE_SYSTEM.format(language=LANGUAGE_NAMES[language])
+    fingerprint = hashlib.sha256(
+        (PROMPT_HASH + system + options.model + language + listing).encode()
+    ).hexdigest()
+    path = (
+        _cache_path(options.cache_dir, doc.doc_id, LANGUAGE_SLOT)
+        if options.cache_dir
+        else None
+    )
+    try:
+        reply, usage, finish, cached = _one_chunk(
+            prompt, fingerprint, path, options, system=system
+        )
+    except ModelError as exc:
+        stats.localise_failed += 1
+        if progress:
+            progress(f"{doc.doc_id}: language pass failed: {exc}")
+        return
+    stats.localise_calls += 0 if cached else 1
+    stats.localise_cached += 1 if cached else 0
+    tokens_in = int(usage.get("input_tokens", 0) or 0)
+    tokens_out = int(usage.get("output_tokens", 0) or 0)
+    if cached:
+        stats.replayed_input_tokens += tokens_in
+        stats.replayed_output_tokens += tokens_out
+    else:
+        stats.input_tokens += tokens_in
+        stats.output_tokens += tokens_out
+    if finish == "length":
+        # A reply cut mid-JSON is not a set of rewrites: keep what was extracted.
+        stats.truncated += 1
+        return
+    by_id = {claim["claim_id"]: claim for claim in targets}
+    for claim_id, statement in _parse_localised(reply, set(by_id)).items():
+        claim = by_id[claim_id]
+        speaks = language_of(statement)
+        # Only a statement that is positively in another language is refused: a
+        # one-sentence rewrite can be too short to classify, and "Il Settore IAF
+        # è 33." has no lower-case function word at all.
+        if speaks is not None and speaks != language:
+            continue
+        candidate = dict(claim)
+        candidate["statement"] = statement
+        if unattested_numbers(candidate):
+            continue
+        claim["statement"] = statement
+        stats.localised += 1
 
 
 def _link_conflicts(
@@ -582,8 +844,14 @@ def _link_conflicts(
         return
     stats.conflict_calls += 0 if cached else 1
     stats.cached += 1 if cached else 0
-    stats.input_tokens += int(usage.get("input_tokens", 0) or 0)
-    stats.output_tokens += int(usage.get("output_tokens", 0) or 0)
+    tokens_in = int(usage.get("input_tokens", 0) or 0)
+    tokens_out = int(usage.get("output_tokens", 0) or 0)
+    if cached:
+        stats.replayed_input_tokens += tokens_in
+        stats.replayed_output_tokens += tokens_out
+    else:
+        stats.input_tokens += tokens_in
+        stats.output_tokens += tokens_out
     if finish == "length":
         stats.truncated += 1
     by_id = {claim["claim_id"]: claim for claim in claims}

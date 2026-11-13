@@ -6,14 +6,124 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Document knowledge bases** — `ontocore ingest` compiles a folder of PDFs and
+  text files into a knowledge base: atomic claims with a verbatim quote and a
+  locator for each, a deterministic verifier (`ok` / `weak` / `no`), `graph.ttl`,
+  `evidence.csv` and a static `view.html`. `ontocore ask` answers from the claim
+  set and returns the citations behind the answer; `--semantic` adds local
+  MiniLM embeddings for hybrid retrieval, with no network.
+- **Italian corporate layouts** — running headers and footers are removed by
+  position and share of pages rather than by frequency, footers joined to the
+  page body are split back off, and long `Articolo N - …` titles are recognised
+  as headings (13 of 30 → 30 of 30 on the pilot corpus). The segmenter is
+  unchanged; the repair runs on the spans, after the replies are cached.
+- **Truncation repair** — a reply cut at `--max-tokens` is retried as two
+  smaller blocks (twice at most) instead of being silently kept; what is still
+  truncated is counted, printed in red and returned as a non-zero exit.
+- **The knowledge base speaks the language of the document** — a statement the
+  extractor wrote in another language is rewritten in the document's language by
+  a pass that sees the statements and never the quotes. The language is the
+  first paragraph of prose at least eight tokens long, counted on function words
+  that belong to one language and not the other. A rewrite that changes a
+  number, comes back in the wrong language, or loses the claim's attestation is
+  discarded and the extracted statement stays. The scan and the refinement calls
+  are counted apart from extraction (`localised`, `localise_calls`,
+  `localise_cached`) and the manifest records `languages` and
+  `localised_statements`.
+- **Section-aware, stem-aware BM25 ranking** — `ask` now indexes the section
+  path a claim already carried, compares words by a seven-letter stem
+  (`certificazione` finds `certificato`, `fornitore` finds `fornitori`), and
+  keeps grammatical words out of both the index and the query. On the Italian
+  pilot the three rules move hit@12 from 6/10 to 9/10 and MRR from 0.127 to
+  0.358 on the same claim set.
+
 ### Changed
 
+- **Semantic fusion is applied only to the languages the model knows** —
+  MiniLM is trained on English; on the Italian pilot its ranking was worse than
+  the words themselves (one question lost, MRR 0.358 → 0.309). `enable_semantic`
+  returns `False` and the corpus stays lexical when every document is in a
+  language the model was not trained on; a KB that declares no language keeps
+  the fusion, because there is nothing to compare against.
+- **The eval takes its gate from the caller** — `evaluate(rows, hit_gate,
+  recall_gate)` and `eval_retrieval.py --min-hits <n> --recall-gate <r>` report
+  a pre-registered bar that is a number of hits rather than the demo corpus's
+  90%, and `--force-semantic` runs the fusion ablation on a corpus the gate
+  would skip.
 - **LLM client is OpenAI-compatible** — `compiler.llm` wraps the OpenAI SDK and reads
   the standard `OPENAI_BASE_URL` / `OPENAI_API_KEY` / `OPENAI_MODEL`; point the
   base URL at OpenAI, Cascade, or any compatible gateway. The tool-use loop
   (`transformer.py`), the LLM security review and the skeleton parser no longer
   depend on the Anthropic SDK; `anthropic` is replaced by `openai` in the
   package dependencies.
+
+### Fixed
+
+- **A reply that is a list of objects is read** — a model asked for a JSON
+  array sometimes opens one and then emits one object per line, with no commas
+  and no closing bracket, or no array at all. `repair_json_array` applied its
+  comma repair only when the reply already ended with `]`, so a reply with every
+  object intact parsed to `[]`: the chunk was not truncated, not retried and not
+  reported, and the claims were paid for and discarded. Both shapes are now
+  recovered, and `find("[")` no longer lands on the first `span_ids` array when
+  the reply has no outer array. On the pilot this returns 101 claims from seven
+  cached replies, including the policy section a pre-registered question asked
+  about.
+- **`ingest` refuses to start without a base URL** — a missing `OPENAI_BASE_URL`
+  used to surface as one failed model call per chunk with no reason, and a
+  knowledge base silently missing whole documents. It now fails once, before
+  reading any document.
+- **A failed document prints its first error** — next to
+  `N model call(s) failed`, instead of the count alone.
+- **A heading at the end of a page is a section** — when the extractor prints a
+  heading on the last line before a page break and the segmenter folds it into
+  the next paragraph, the all-caps marker is read again and carried until the
+  stack records a new heading (`RIESAME` on the policy: 5 claims move from the
+  document band to `… > RIESAME`).
+- **A heading printed inside a page block is a section** — the extractor joins
+  the lines of a page into one span, so a heading printed after the first
+  sentence (`SCOPO E OBIETTIVI`, `CAMPO DI APPLICAZIONE` on the policy) never
+  reached the heading stack and the claims under it inherited the band above. It
+  is now read inside the paragraph with the same evidence as a folded heading —
+  a whole all-caps line of the source, after a full stop, followed by the
+  sentence it titles — and it carries to the spans below. 19 pilot claims gain
+  the section they sit under.
+- **A heading the segmenter dropped is read from the source** — a block read as
+  a page header leaves a hole between two spans, and a real heading printed
+  there goes with it (`RESPONSABILITÀ DI OSSERVAZIONE E ATTUAZIONE` on the
+  policy, at offset 8669). The heading is still in the text, so it is read
+  there and given to the spans below; the shape asked for — a line of its own
+  after a blank line, in capitals, with the sentence it titles printed under it
+  — is what keeps a table label, a fragment of a wrapped title and a masthead
+  out. 8 pilot claims gain the section.
+- **Two headings of one document are siblings, and a claim gets the last one
+  above the text it quotes** — a span that holds the last text of one section
+  and the first of the next declares the path the two share (often none) instead
+  of the band above, or the claim below the heading would resolve back to a span
+  that declares a different section. The section of a claim is then located by
+  its quote when the quote sits on one side of the heading, and by its statement
+  when the quote runs across it: a block-level quote is as wide as the block and
+  locates nothing. Appending would nest `CAMPO DI APPLICAZIONE` under
+  `SCOPO E OBIETTIVI`.
+- **The dedupe runs after the language pass** — a bilingual source answers in
+  whichever language the chunk leans towards, so the same block arrived twice,
+  once in English and once in Italian, and a dedupe that ran first compared two
+  languages and kept both. The statements are rewritten first, then compared:
+  the pilot's 0.90-overlap pair is one claim (295 → 294).
+- **The table of contents is not a parent section** — an `Indice` heading the
+  stack never popped put 8 claims under `Indice > Articolo 1`; the contents page
+  is now dropped from the path and the article stays.
+- **A wrapped article title is completed** — a title printed over two lines
+  (`… aggiornamento e` / `modifiche`) is joined when the first line ends on a
+  conjunction and the next is one or two lower-case words.
+- **A resumed build reports what it paid, not what it replayed** — cached
+  replies used to be added to the tokens the run claimed, so a replay that spent
+  nothing reported the whole history as its cost. The manifest now carries
+  `cost_usd` (paid by this run) and `replayed_cost_usd` (already paid when the
+  replies were first generated), with `replayed_tokens`, and the CLI prints
+  `replayed from cache, already paid` under the total.
 
 ## [1.1.0] - 2026-05-04
 

@@ -142,6 +142,7 @@ def test_ingest_end_to_end_with_a_stub_model(tmp_path, monkeypatch):
 
     monkeypatch.setattr("compiler.documents.compile.chat", fake_chat)
     monkeypatch.setenv("OPENAI_MODEL", "stub")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://gateway.test/v1")
 
     result = CliRunner().invoke(
         cli, ["ingest", str(corpus), "-o", str(tmp_path / "kb"), "--no-conflicts"]
@@ -162,6 +163,42 @@ def test_ingest_end_to_end_with_a_stub_model(tmp_path, monkeypatch):
     # Replies are cached even on the first run, so a failure mid-corpus is
     # resumable without paying for the completed chunks twice.
     assert list((tmp_path / "kb" / "cache").rglob("*.json"))
+
+
+def test_a_resumed_run_reports_what_it_paid_and_what_it_replayed(tmp_path, monkeypatch):
+    """A cached rebuild is not free and not a second bill: report both numbers."""
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    (corpus / "contract.txt").write_text(
+        "1. Notification\n\n1.1 The Supplier shall notify the Buyer within 48 hours.\n",
+        encoding="utf-8",
+    )
+    reply = (
+        '[{"span_ids": ["S0001"], '
+        '"statement": "The Supplier shall notify the Buyer within 48 hours of a breach.", '
+        '"modality": "obligation", "actor": "Supplier", "deadline": "48 hours", '
+        '"conditions": []}]'
+    )
+    calls = []
+
+    def fake_chat(*args, **kwargs):
+        calls.append(args)
+        return reply, {"input_tokens": 1000, "output_tokens": 500}, "stop"
+
+    monkeypatch.setattr("compiler.documents.compile.chat", fake_chat)
+    monkeypatch.setenv("OPENAI_MODEL", "stub")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://gateway.test/v1")
+
+    args = ["ingest", str(corpus), "-o", str(tmp_path / "kb"), "--no-conflicts"]
+    assert CliRunner().invoke(cli, args).exit_code == 0
+    assert CliRunner().invoke(cli, [*args, "--resume"]).exit_code == 0
+
+    assert len(calls) == 1
+    manifest = KnowledgeBase(tmp_path / "kb").manifest()
+    assert manifest["cost_usd"] == 0
+    assert manifest["tokens"] == {"input": 0, "output": 0}
+    assert manifest["replayed_tokens"] == {"input": 1000, "output": 500}
+    assert manifest["replayed_cost_usd"] > 0
 
 
 def test_ingest_keeps_going_when_one_document_fails(tmp_path, monkeypatch):
@@ -190,17 +227,74 @@ def test_ingest_keeps_going_when_one_document_fails(tmp_path, monkeypatch):
 
     monkeypatch.setattr("compiler.documents.compile.chat", fake_chat)
     monkeypatch.setenv("OPENAI_MODEL", "stub")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://gateway.test/v1")
 
     result = CliRunner().invoke(
         cli, ["ingest", str(corpus), "-o", str(tmp_path / "kb"), "--no-conflicts"]
     )
     assert result.exit_code != 0, result.output
     assert "rerun with --resume" in result.output
+    # The cause, not only the count: the base-URL pilot failed twelve times
+    # with "model call(s) failed" and told the operator nothing.
+    assert "HTTP 503" in result.output
 
     kb = KnowledgeBase(tmp_path / "kb")
     claims = kb.claims()
     assert [claim["doc_id"] for claim in claims] == ["b_good"]
     assert "The Supplier shall notify" in claims[0]["evidence"][0]["quote"]
+
+
+def test_ingest_refuses_to_start_without_a_base_url(tmp_path, monkeypatch):
+    """A misconfigured gateway must fail once, before any document is compiled."""
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    (corpus / "contract.txt").write_text(
+        "1. Notification\n\n1.1 The Supplier shall notify the Buyer within 48 hours.\n",
+        encoding="utf-8",
+    )
+    calls = []
+
+    def fake_chat(*args, **kwargs):
+        calls.append(args)
+        return "[]", {"input_tokens": 1, "output_tokens": 1}, "stop"
+
+    monkeypatch.setattr("compiler.documents.compile.chat", fake_chat)
+    monkeypatch.setenv("OPENAI_MODEL", "stub")
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    # Away from the repository, so load_env() cannot find a .env that would
+    # put the base URL back.
+    monkeypatch.chdir(tmp_path)
+
+    result = CliRunner().invoke(
+        cli, ["ingest", str(corpus), "-o", str(tmp_path / "kb"), "--no-conflicts"]
+    )
+    assert result.exit_code != 0
+    assert "no base URL" in result.output
+    assert calls == []
+
+
+def test_ingest_reports_a_truncated_reply_and_fails_the_run(tmp_path, monkeypatch):
+    """A reply cut at the ceiling used to be reported as a successful run."""
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    (corpus / "contract.txt").write_text(
+        "1. Notification\n\n1.1 The Supplier shall notify the Buyer within 48 hours.\n",
+        encoding="utf-8",
+    )
+
+    def fake_chat(*args, **kwargs):
+        return "", {"input_tokens": 100, "output_tokens": 10000}, "length"
+
+    monkeypatch.setattr("compiler.documents.compile.chat", fake_chat)
+    monkeypatch.setenv("OPENAI_MODEL", "stub")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://gateway.test/v1")
+
+    result = CliRunner().invoke(
+        cli, ["ingest", str(corpus), "-o", str(tmp_path / "kb"), "--no-conflicts"]
+    )
+    assert result.exit_code != 0
+    assert "truncated" in result.output
+    assert KnowledgeBase(tmp_path / "kb").manifest()["truncated_calls"] == 1
 
 
 def test_estimate_prints_the_page_count():
