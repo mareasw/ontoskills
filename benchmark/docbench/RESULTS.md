@@ -870,6 +870,67 @@ conclusion holds, and the LLM census remains the judge of support.
 tables are in `gold/audit.phase1.md`; the pre-registration and its outcome are
 `PREFLIGHT.md` §10.8.
 
+## Phase 2 — knowledge base pipeline (2026-11-12) — real run
+
+Phase 2 is the first end-to-end product path: a folder of documents in, a
+knowledge base with claims, citations, a graph, and a read-only view out. The
+extraction prompt is the Phase 1 prompt byte for byte; its hash is written into
+the KB manifest and the parity test fails if the product segmenter drifts from
+the frozen bench copy.
+
+Real run over `examples/demo-corpus/` with `deepseek-v4.1-flash` through the
+gateway, priced at $0.15 / $0.60 per million tokens:
+
+| | |
+|---|---:|
+| Documents | 14 (10 PDF, 3 DOCX, 1 HTML) |
+| Pages (PDF only) | 556 |
+| Spans | 4,803 |
+| Chunks at 15 spans / 2 overlap | 375, plus 14 conflict passes |
+| Claims | **5,680** |
+| Verifier | 5,630 ok (99.1%), 23 weak, 27 no |
+| Tokens in / out | 1,004,607 / 1,856,731 |
+| Cost | **$1.27** |
+| Wall clock, first full pass | ~15 h, gateway-bound |
+
+The dry-run planning figure was 514,414 / 1,167,719 tokens and ~$0.78; the run
+took 1.9x that input and 1.6x that output. The estimate is not corrected after
+the fact — the manifest now carries the measured numbers, and a rebuild from
+cache reports them too instead of claiming to be free.
+
+The 50 claims that are not `ok` are 0.9% of the corpus, and they are two
+near-uniform families, not a long tail. All 27 `no` are a number in the statement
+that the quoted span does not contain (`EU_SCC-0112` claims `8.2`, the span has
+no such figure). 22 of the 23 `weak` share one shape: the span is a list item, a
+continuation or a column cut, so the subject the statement supplies is not in
+the quote — `GDPR-0824` states "The binding corporate rules shall specify at
+least the mechanisms…" while its span begins at "(k) the mechanisms…". That is
+Phase 1's unquoted-context problem seen from the other side: there the quote
+started before the claim, here it starts after. The twenty-third, `UK_AIPB-0445`,
+is a passive paraphrase of an imperative ("must not be relied upon" for "Do not
+rely on"). Quotes are copied from the span by construction, so none of these is a
+fabricated citation — every one is visible as `no` / `weak` in the KB and in the
+view.
+
+The demo's exit criterion is structural, not a score: three questions, each
+answered with claims from **at least two documents**, every claim carrying a
+verbatim quote and a locator (document, page where the format has pages, section,
+URL). `examples/demo-corpus/check_questions.py --kb` is the mechanical check:
+
+| Question | Claims | Documents | Tension reported |
+|---|---:|---:|---|
+| Breach notification deadline | 12 | 9 | 48 hours vs 3 working days vs 20 working days |
+| Contractual retention | 12 | 4 | none |
+| Sub-processor obligations | 12 | 3 | none |
+
+Measured, not hoped for: only the first question raises a tension, and it is not
+the 48 h vs 72 h contrast the plan predicted — the GDPR 72-hour claim does not
+reach the twelve citations, and the retention question shows the six-year rule
+without the storage-limitation counterpoint. Retrieval is deterministic BM25 over
+statement, quote, actor and conditions, so what keeps those two contrasts out of
+view is ranking, not extraction. Precedence stays out of scope until a rule
+exists.
+
 ## Limitations
 
 - **n = 39 scored questions, one run, one model.** No confidence interval is
