@@ -203,6 +203,8 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
 
     if not model:
         raise click.ClickException("no model: set OPENAI_MODEL or pass --model")
+    if not base_url:
+        raise click.ClickException("no base URL: set OPENAI_BASE_URL or pass --base-url")
 
     options = CompileOptions(
         model=model,
@@ -254,6 +256,12 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
                 f"  [red]{doc.doc_id}: {compiled.stats.failed} model call(s) failed; "
                 "document skipped, rerun with --resume[/red]"
             )
+            if compiled.stats.errors:
+                # The reason, not just the count: a missing base URL showed up
+                # here as twelve identical failures with nothing to act on.
+                console.print(
+                    f"    [red]first failure: {compiled.stats.errors[0][:300]}[/red]"
+                )
             continue
         all_claims.extend(compiled.claims)
         all_spans.extend(compiled.spans)

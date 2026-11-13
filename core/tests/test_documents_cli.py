@@ -142,6 +142,7 @@ def test_ingest_end_to_end_with_a_stub_model(tmp_path, monkeypatch):
 
     monkeypatch.setattr("compiler.documents.compile.chat", fake_chat)
     monkeypatch.setenv("OPENAI_MODEL", "stub")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://gateway.test/v1")
 
     result = CliRunner().invoke(
         cli, ["ingest", str(corpus), "-o", str(tmp_path / "kb"), "--no-conflicts"]
@@ -190,17 +191,50 @@ def test_ingest_keeps_going_when_one_document_fails(tmp_path, monkeypatch):
 
     monkeypatch.setattr("compiler.documents.compile.chat", fake_chat)
     monkeypatch.setenv("OPENAI_MODEL", "stub")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://gateway.test/v1")
 
     result = CliRunner().invoke(
         cli, ["ingest", str(corpus), "-o", str(tmp_path / "kb"), "--no-conflicts"]
     )
     assert result.exit_code != 0, result.output
     assert "rerun with --resume" in result.output
+    # The cause, not only the count: the base-URL pilot failed twelve times
+    # with "model call(s) failed" and told the operator nothing.
+    assert "HTTP 503" in result.output
 
     kb = KnowledgeBase(tmp_path / "kb")
     claims = kb.claims()
     assert [claim["doc_id"] for claim in claims] == ["b_good"]
     assert "The Supplier shall notify" in claims[0]["evidence"][0]["quote"]
+
+
+def test_ingest_refuses_to_start_without_a_base_url(tmp_path, monkeypatch):
+    """A misconfigured gateway must fail once, before any document is compiled."""
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    (corpus / "contract.txt").write_text(
+        "1. Notification\n\n1.1 The Supplier shall notify the Buyer within 48 hours.\n",
+        encoding="utf-8",
+    )
+    calls = []
+
+    def fake_chat(*args, **kwargs):
+        calls.append(args)
+        return "[]", {"input_tokens": 1, "output_tokens": 1}, "stop"
+
+    monkeypatch.setattr("compiler.documents.compile.chat", fake_chat)
+    monkeypatch.setenv("OPENAI_MODEL", "stub")
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    # Away from the repository, so load_env() cannot find a .env that would
+    # put the base URL back.
+    monkeypatch.chdir(tmp_path)
+
+    result = CliRunner().invoke(
+        cli, ["ingest", str(corpus), "-o", str(tmp_path / "kb"), "--no-conflicts"]
+    )
+    assert result.exit_code != 0
+    assert "no base URL" in result.output
+    assert calls == []
 
 
 def test_ingest_reports_a_truncated_reply_and_fails_the_run(tmp_path, monkeypatch):
@@ -217,6 +251,7 @@ def test_ingest_reports_a_truncated_reply_and_fails_the_run(tmp_path, monkeypatc
 
     monkeypatch.setattr("compiler.documents.compile.chat", fake_chat)
     monkeypatch.setenv("OPENAI_MODEL", "stub")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://gateway.test/v1")
 
     result = CliRunner().invoke(
         cli, ["ingest", str(corpus), "-o", str(tmp_path / "kb"), "--no-conflicts"]
