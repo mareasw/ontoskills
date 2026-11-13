@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Document knowledge bases** — `ontocore ingest` compiles a folder of PDFs and
+  text files into a knowledge base: atomic claims with a verbatim quote and a
+  locator for each, a deterministic verifier (`ok` / `weak` / `no`), `graph.ttl`,
+  `evidence.csv` and a static `view.html`. `ontocore ask` answers from the claim
+  set and returns the citations behind the answer; `--semantic` adds local
+  MiniLM embeddings for hybrid retrieval, with no network.
+- **Italian corporate layouts** — running headers and footers are removed by
+  position and share of pages rather than by frequency, footers joined to the
+  page body are split back off, and long `Articolo N - …` titles are recognised
+  as headings (13 of 30 → 30 of 30 on the pilot corpus). The segmenter is
+  unchanged; the repair runs on the spans, after the replies are cached.
+- **Truncation repair** — a reply cut at `--max-tokens` is retried as two
+  smaller blocks (twice at most) instead of being silently kept; what is still
+  truncated is counted, printed in red and returned as a non-zero exit.
+
 ### Changed
 
 - **LLM client is OpenAI-compatible** — `compiler.llm` wraps the OpenAI SDK and reads
@@ -14,6 +31,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (`transformer.py`), the LLM security review and the skeleton parser no longer
   depend on the Anthropic SDK; `anthropic` is replaced by `openai` in the
   package dependencies.
+
+### Fixed
+
+- **`ingest` refuses to start without a base URL** — a missing `OPENAI_BASE_URL`
+  used to surface as one failed model call per chunk with no reason, and a
+  knowledge base silently missing whole documents. It now fails once, before
+  reading any document.
+- **A failed document prints its first error** — next to
+  `N model call(s) failed`, instead of the count alone.
 
 ## [1.1.0] - 2026-05-04
 
