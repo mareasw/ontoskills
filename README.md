@@ -103,6 +103,45 @@ ontocore compile
 
 ---
 
+## Document knowledge base
+
+OntoCore also compiles a **folder of documents** into a knowledge base, not just
+skills. Every statement is an atomic claim with a verbatim quote and a locator
+(document, page, section, URL), and answers are deterministic — no model is
+called at query time.
+
+```bash
+cd examples/demo-corpus && ./fetch.sh     # 14 public documents, hashes checked
+
+ontocore ingest . -o kb --estimate        # cost estimate, no API calls
+ontocore ingest . -o kb --resume          # compile (paid, one model per chunk)
+ontocore ask "How quickly must a personal-data breach be notified?" --kb kb
+ontocore view --kb kb --questions-file questions.txt
+```
+
+- the compiler never writes a quote: the model returns span ids, the quote and
+  locator are copied from the segmented text;
+- a **deterministic verifier** (verbatim, locator, page, section, numbers) gates
+  every claim and ships `weak` / `no` verdicts visibly instead of hiding them;
+- `ask` ranks with BM25 and groups by document, so a cross-document question
+  shows which document says what;
+- when two documents give the same topic different numbers, the answer reports
+  a **tension** with both citations rather than picking a winner;
+- output: `claims.jsonl`, `graph.ttl`, `evidence.csv`, `text/`, and a
+  self-contained read-only `view.html` with copy-citation.
+
+Measured on that corpus with `deepseek-v4.1-flash`, one full run: **5,680 claims**
+from 14 documents and 556 pages, 99.1% `ok` at the verifier, **$1.27**; all three
+demo questions cite claims from at least two documents, one of them with a
+cross-document tension. Numbers and the `weak` / `no` breakdown are in
+`benchmark/docbench/RESULTS.md`.
+
+See `docs/phase2-plan.md` for the pipeline and `examples/demo-corpus/` for the
+corpus manifest, licences and sources. Measured extraction results are in
+`benchmark/docbench/RESULTS.md`.
+
+---
+
 ## Documentation
 
 - **[Overview](https://ontoskills.sh/docs/overview/)** — What is OntoSkills and why it matters

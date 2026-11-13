@@ -70,6 +70,7 @@ from .dev import init_core, rebuild_index_cmd
 from .audit import security_audit, diff_cmd
 from .export import export_embeddings_cmd
 from .lint import lint_cmd
+from .documents import ingest_cmd, ask_cmd, view_cmd
 
 # Register commands
 cli.add_command(compile_cmd, name='compile')
@@ -87,6 +88,9 @@ cli.add_command(security_audit, name='security-audit')
 cli.add_command(diff_cmd, name='diff')
 cli.add_command(export_embeddings_cmd, name='export-embeddings')
 cli.add_command(lint_cmd, name='lint')
+cli.add_command(ingest_cmd, name='ingest')
+cli.add_command(ask_cmd, name='ask')
+cli.add_command(view_cmd, name='view')
 cli.add_command(registry_group, name='registry')
 
 
