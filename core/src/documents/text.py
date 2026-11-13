@@ -11,7 +11,13 @@ from __future__ import annotations
 import re
 
 # Grammatical words. Kept here, next to ``tokens``, so the verifier and the
-# deterministic answerer cannot drift on what counts as a content word.
+# deterministic answerer cannot drift on what counts as a content word. The
+# Italian list is not a translation of the English one for its own sake: the
+# first corpus this pipeline met outside DocBench was Italian, and a content
+# word there was being counted against a statement for the crime of being an
+# article. Words that are content in one language and grammar in the other
+# ("come", "state", "pure", "era") are deliberately left out of the Italian
+# list: removing them would weaken the English check.
 STOPWORDS = frozenset(
     """
     a an the and or but if then than that this these those it its it's is are
@@ -22,6 +28,34 @@ STOPWORDS = frozenset(
     some only own same too very just also about above after before below
     between during through during against among within upon per via i we you
     he she they them their our your his her its who whom whose which what
+    """.split()
+    + """
+    a ad al alla alle allo agli ai
+    che chi cui ci si ne
+    di del della delle dello degli dei dall dalla dalle dallo dagli dai
+    da dal
+    in nel nella nelle nello negli nei
+    su sul sulla sulle sullo sugli sui
+    con coi
+    per
+    tra fra
+    e ed o od ma però se
+    non né anche ancora già sempre mai più meno molto poco troppo
+    il lo la i gli le un uno una
+    è sono essere siano sia stato stata stati
+    ha hanno avere avuto
+    deve devono debbono può possono potrebbe dovrebbe
+    questo questa questi queste quello quella quelli quelle
+    loro suo sua suoi sue nostro nostra nostri nostre
+    ogni qualche alcuni alcune alcuno alcuna
+    tutti tutte tutto tutta altro altra altri altre
+    stesso stessa stessi stesse proprio propria
+    ciascuno ciascuna nessuno nessuna nulla niente qualcosa
+    quale quali quanto quanta tanto tanta
+    senza contro verso entro oltre durante secondo tramite mediante
+    attraverso dopo prima sotto sopra fuori dentro accanto presso
+    viene vengono
+    dell all nell sull coll
     """.split()
 )
 
@@ -36,14 +70,100 @@ def norm(text: str) -> str:
     return text.strip()
 
 
+# Letters and digits, in any script. The earlier ``[a-z0-9]`` silently dropped
+# every accented letter, so an Italian "può" tokenised to "pu" and "qualità" to
+# "qualit": the verifier then compared a truncated word on one side with the
+# whole word on the other, and a correct claim looked paraphrased.
+_WORD = re.compile(r"[^\W_]+", re.UNICODE)
+
+
 def tokens(text: str) -> list[str]:
     """Lower-case alphanumeric tokens; one-letter tokens are noise."""
-    return [t for t in re.findall(r"[a-z0-9]+", str(text or "").lower()) if len(t) > 1]
+    return [t for t in _WORD.findall(str(text or "").lower()) if len(t) > 1]
 
 
 def statement_tokens(text: str) -> list[str]:
     """Content tokens: no grammatical words, no one-letter noise."""
     return [t for t in tokens(text) if t not in STOPWORDS]
+
+
+# The words a text cannot borrow from the other language. Only function words
+# are here, and only ones that are unambiguous in both directions: "in" is
+# Italian as well as English and "it" is an e-mail address, so neither can say
+# what a text is written in. Content words are open-class and cannot be listed.
+ITALIAN_MARKERS = frozenset(
+    """
+    il lo la gli le un una del della delle dello degli dei di che sono non per
+    con nel nella nelle nello negli nei alla alle agli al allo dall dalla dalle
+    dallo dagli dai sul sulla sulle sullo sugli sui tra fra questo questa questi
+    queste quello quella come anche più deve devono può possono essere stato
+    stata stati state ha hanno loro suo sua suoi sue nostro nostra ogni tutti
+    tutte tutto tutta altro altra altri altre stesso stessa senza contro verso
+    entro oltre secondo tramite mediante attraverso dopo prima sotto sopra
+    fuori dentro presso viene vengono dell all nell sull sia siano avuto
+    """.split()
+)
+ENGLISH_MARKERS = frozenset(
+    """
+    the of and to is are was were be been being that this these those its with
+    for from by at as not shall must may can will would should has have had they
+    their them which who whom what there here than then such also any all each
+    other same both more most only over under between during or
+    """.split()
+)
+LANGUAGE_NAMES = {"it": "Italian", "en": "English"}
+
+
+def _marker_count(text: str, table: frozenset[str]) -> int:
+    """Marker words printed in lower case.
+
+    Case is part of the signal: "Is." in "Via G. Porzio Is. G7" is the
+    abbreviation for *Isola*, while the English verb "is" is printed in lower
+    case inside a sentence. An all-capitals line has no markers and decides
+    nothing.
+    """
+    return sum(
+        1
+        for word in _WORD.findall(str(text or ""))
+        if len(word) > 1 and word == word.lower() and word in table
+    )
+
+
+def language_of(text: str) -> str | None:
+    """``"it"``, ``"en"`` or ``None`` when the text does not say.
+
+    A margin, not a count: a sentence is English when its English function words
+    outnumber the Italian ones, and the other way round. A text with no marker,
+    or with both in similar numbers, is undecided and must not be rewritten.
+    """
+    words = tokens(text)
+    if len(words) < 4:
+        return None
+    italian = _marker_count(text, ITALIAN_MARKERS)
+    english = _marker_count(text, ENGLISH_MARKERS)
+    if italian >= 2 * english + 1:
+        return "it"
+    if english >= 2 * italian + 1:
+        return "en"
+    return None
+
+
+# A page label, an address or a form field is not prose: "Via G. Porzio Is. G7"
+# has an "is" in it and no sentence. The language of a document is the language
+# of its opening prose paragraph — the way a reader decides in one glance — and
+# the minimum length is what keeps a heading or an address from deciding.
+DOCUMENT_MIN_WORDS = 8
+
+
+def document_language(paragraphs: list[str]) -> str | None:
+    """The language of the first paragraph long enough to be prose and decided."""
+    for paragraph in paragraphs:
+        if len(tokens(paragraph)) < DOCUMENT_MIN_WORDS:
+            continue
+        language = language_of(paragraph)
+        if language:
+            return language
+    return None
 
 
 def same_word(left: str, right: str) -> bool:
@@ -70,9 +190,24 @@ def attested(token: str, pool: list[str]) -> bool:
 
 
 MODAL_CLASSES = {
-    "prohibition": ("must not", "may not", "cannot", "can not", "shall not", "prohibited"),
-    "obligation": ("must", "shall", "is required", "are required", "required to"),
-    "permission": ("may", "is permitted", "are permitted", "authorized"),
+    "prohibition": (
+        "must not", "may not", "cannot", "can not", "shall not", "prohibited",
+        # Italian: the negative modal, and the adjective/noun a code of ethics
+        # uses for a ban ("è vietato", "divieto di"). The accent-free token is
+        # not a variant here: tokens() keeps è, and one-letter tokens are noise,
+        # so the phrase is matched without it.
+        "non deve", "non devono", "non può", "non possono",
+        "vietato", "vietata", "vietati", "vietate", "divieto",
+    ),
+    "obligation": (
+        "must", "shall", "is required", "are required", "required to",
+        "deve", "devono", "debbono", "tenuto", "tenuti", "tenuta", "tenute",
+    ),
+    "permission": (
+        "may", "is permitted", "are permitted", "authorized",
+        "può", "possono", "consentito", "consentita", "consentiti",
+        "consentite", "autorizzato", "autorizzata",
+    ),
 }
 
 
@@ -81,8 +216,9 @@ def modal_classes(text: str) -> set[str]:
 
     Shared by the deduplicator (never merge opposite modalities) and the
     verifier (report a statement that says permission where evidence says
-    obligation). Prohibition is tested first because "must not" also contains
-    "must".
+    obligation). A negation outranks the modal it contains: "must not" also
+    contains "must", and "non può" also contains "può", so a prohibition
+    discards both the obligation and the permission reading.
     """
     said = " " + " ".join(tokens(text)) + " "
     found: set[str] = set()
@@ -91,6 +227,7 @@ def modal_classes(text: str) -> set[str]:
             found.add(name)
     if "prohibition" in found:
         found.discard("obligation")
+        found.discard("permission")
     return found
 
 

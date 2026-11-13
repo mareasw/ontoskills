@@ -25,7 +25,7 @@ from compiler.documents.extract import ExtractionError, extract, strip_pages
 from compiler.documents.model import load_corpus
 from compiler.documents.prompt import PROMPT_HASH
 from compiler.documents.segment import chunk, lead_ins, segment
-from compiler.documents.sections import apply_sections, clean_sections
+from compiler.documents.sections import Breaks, apply_sections, clean_sections
 from compiler.documents.store import KnowledgeBase
 from compiler.documents.verify import summarise, verify_all
 from compiler.documents.web import render_view
@@ -124,6 +124,8 @@ def _print_estimate(rows: list[dict], price_in: float, price_out: float) -> dict
 @click.option("--max-tokens", default=10000, show_default=True, type=int, help="Max tokens per reply")
 @click.option("--concurrency", default=1, show_default=True, type=int, help="Parallel model calls")
 @click.option("--resume", is_flag=True, help="Reuse cached replies for identical chunks")
+@click.option("--no-split-truncated", is_flag=True,
+              help="Do not halve a chunk whose reply hit --max-tokens; report it instead")
 @click.option("--cache-dir", type=click.Path(path_type=Path), default=None,
               help="Chunk cache (default: <out>/cache)")
 @click.option("--no-conflicts", is_flag=True, help="Skip the conflict pass")
@@ -138,7 +140,7 @@ def _print_estimate(rows: list[dict], price_in: float, price_out: float) -> dict
 def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_run,
                chunk_size, overlap, max_tokens, concurrency, resume, cache_dir,
                no_conflicts, price_in, price_out, questions, questions_file, name,
-               semantic):
+               semantic, no_split_truncated):
     """Compile a folder of documents into a knowledge base.
 
     \b
@@ -201,6 +203,8 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
 
     if not model:
         raise click.ClickException("no model: set OPENAI_MODEL or pass --model")
+    if not base_url:
+        raise click.ClickException("no base URL: set OPENAI_BASE_URL or pass --base-url")
 
     options = CompileOptions(
         model=model,
@@ -212,6 +216,7 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         conflicts=not no_conflicts,
         concurrency=max(1, concurrency),
         resume=resume,
+        split_truncated=not no_split_truncated,
         price_in=price_in,
         price_out=price_out,
         cache_dir=cache_dir or (out_dir / "cache"),
@@ -222,14 +227,20 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
     all_spans: list[dict] = []
     all_rejected: list[dict] = []
     total_in = total_out = 0
+    replayed_in = replayed_out = 0
     total_rejected_numbers = 0
+    total_truncated = 0
+    total_retried = 0
+    total_localised = 0
+    languages: dict[str, str] = {}
     failed: list[str] = []
     for doc, row in zip(docs, rows):
         with console.status(f"compiling {doc.doc_id} ({len(row['spans_list'])} spans)") as status:
             def progress(message: str, _status=status) -> None:
                 _status.update(f"[yellow]{message}[/yellow]")
 
-            cleaned = clean_sections(row["spans_list"], row["text"])
+            breaks: Breaks = {}
+            cleaned = clean_sections(row["spans_list"], row["text"], breaks)
             lead_map = lead_ins(cleaned)
             compiled = compile_document(
                 doc, row["text"], row["spans_list"], options, progress, lead_map=lead_map
@@ -238,7 +249,7 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         # fingerprint covers the text and the span ids, so the repair happens
         # only now: the reply is cached, the claims are built, and from here on
         # the artifact and the verifier see the section a reader would name.
-        apply_sections(compiled.claims, cleaned)
+        apply_sections(compiled.claims, cleaned, breaks, row["text"])
         compiled.spans = cleaned
         if compiled.stats.failed:
             # One unservable chunk must not block the rest of the corpus: the
@@ -249,18 +260,47 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
                 f"  [red]{doc.doc_id}: {compiled.stats.failed} model call(s) failed; "
                 "document skipped, rerun with --resume[/red]"
             )
+            if compiled.stats.errors:
+                # The reason, not just the count: a missing base URL showed up
+                # here as twelve identical failures with nothing to act on.
+                console.print(
+                    f"    [red]first failure: {compiled.stats.errors[0][:300]}[/red]"
+                )
             continue
         all_claims.extend(compiled.claims)
         all_spans.extend(compiled.spans)
         all_rejected.extend(compiled.rejected)
         total_rejected_numbers += compiled.stats.rejected_numbers
+        total_truncated += compiled.stats.truncated
+        total_retried += compiled.stats.retried
+        total_localised += compiled.stats.localised
+        if compiled.stats.language:
+            languages[doc.doc_id] = compiled.stats.language
         total_in += compiled.stats.input_tokens
         total_out += compiled.stats.output_tokens
+        replayed_in += compiled.stats.replayed_input_tokens
+        replayed_out += compiled.stats.replayed_output_tokens
         cost = compiled.stats.cost(options)
+        replayed = compiled.stats.replayed_cost(options)
+        detail = ""
+        if compiled.stats.retried:
+            detail += f", {compiled.stats.retried} split"
+        if compiled.stats.localised:
+            detail += (
+                f", {compiled.stats.localised} statement(s) rewritten in "
+                f"{compiled.stats.language}"
+            )
+        if compiled.stats.localise_failed:
+            detail += f", [red]{compiled.stats.localise_failed} language pass failed[/red]"
+        if compiled.stats.truncated:
+            detail += f", [red]{compiled.stats.truncated} truncated[/red]"
+        if compiled.stats.replayed_input_tokens or compiled.stats.replayed_output_tokens:
+            detail += f", ${replayed:.3f} replayed from cache"
         console.print(
             f"  {doc.doc_id}: {len(compiled.claims)} claim(s), "
             f"{compiled.stats.calls} call(s), {compiled.stats.cached} cached, "
-            f"{compiled.stats.rejected} rejected, {compiled.stats.merged} merged, ${cost:.3f}"
+            f"{compiled.stats.rejected} rejected, {compiled.stats.merged} merged"
+            f"{detail}, ${cost:.3f}"
         )
 
     rows_verdicts = verify_all(all_claims, all_spans, texts)
@@ -283,8 +323,21 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         ),
         "claims": len(all_claims),
         "verifier": report["by_verdict"],
+        "truncated_calls": total_truncated,
+        "retried_chunks": total_retried,
+        # The language each document opens in, and how many statements were
+        # rewritten to match it. A document that opens in an undecided paragraph
+        # has no entry and nothing is rewritten.
+        "languages": languages,
+        "localised_statements": total_localised,
+        # What this run paid, and what the cached replies cost when they were
+        # first generated. A resumed build is not free and not a second bill.
         "cost_usd": round(total_in / 1_000_000 * price_in + total_out / 1_000_000 * price_out, 4),
         "tokens": {"input": total_in, "output": total_out},
+        "replayed_cost_usd": round(
+            replayed_in / 1_000_000 * price_in + replayed_out / 1_000_000 * price_out, 4
+        ),
+        "replayed_tokens": {"input": replayed_in, "output": replayed_out},
         "licences": sorted({doc.licence for doc in docs}),
         "elapsed_s": round(time.time() - started, 1),
     }
@@ -343,18 +396,40 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         f"cost: ${manifest['cost_usd']:.3f} ({total_in:,} in / {total_out:,} out), "
         f"{manifest['elapsed_s']}s"
     )
+    if replayed_in or replayed_out:
+        console.print(
+            f"[dim]replayed from cache: ${manifest['replayed_cost_usd']:.3f} "
+            f"({replayed_in:,} in / {replayed_out:,} out), already paid[/dim]"
+        )
     console.print(f"written: {out_dir} (view: {out_dir / 'view.html'})")
+    if total_truncated:
+        console.print(
+            f"[red]{total_truncated} reply(ies) still hit --max-tokens after splitting: "
+            "the claims they would have carried are missing from this build[/red]"
+        )
+        console.print(
+            "  the replies that stopped cleanly are cached; rerun with --resume "
+            "--chunk-size <smaller>, or raise --max-tokens"
+        )
     if report["failures"]:
         console.print(
             f"[yellow]{len(report['failures'])} claim(s) not ok — see {out_dir / 'verifier.jsonl'}[/yellow]"
         )
         for row in report["failures"][:5]:
             console.print(f"  {row['claim_id']} {row['verdict']}: {'; '.join(row['reasons'])[:160]}")
+    problems: list[str] = []
     if failed:
-        raise click.ClickException(
+        problems.append(
             f"{', '.join(failed)}: model call(s) failed, knowledge base written without "
             "them; rerun with --resume"
         )
+    if total_truncated:
+        problems.append(
+            f"{total_truncated} reply(ies) truncated: the knowledge base is incomplete; "
+            "rerun with --resume --chunk-size <smaller> or raise --max-tokens"
+        )
+    if problems:
+        raise click.ClickException("; ".join(problems))
 
 
 def _page_count(text: str) -> int:
@@ -377,19 +452,30 @@ def _enable_semantic(corpus: Corpus, kb: KnowledgeBase, asked: bool = False) -> 
     """Add the embedding ranking when the KB has vectors and the runtime loads.
 
     Silent when the KB was simply built without ``--semantic``: that is a normal
-    KB, not a failure. Anything else — no vectors but the flag was typed, no
-    torch, a vectors file from another model — is one dim line and BM25, because
-    a missing model must never turn a deterministic answer into an error.
+    KB, not a failure. Anything else — no vectors but the flag was typed, a
+    corpus in a language the model was not trained on, no torch, a vectors file
+    from another model — is one dim line and BM25, because a missing or
+    mismatched model must never turn a deterministic answer into an error.
     """
     vectors = kb.vectors()
     if not vectors:
         if asked:
             console.print("[dim]semantic ranking unavailable (no vectors.jsonl): BM25 only[/dim]")
         return
+    languages = set((kb.manifest().get("languages") or {}).values())
     try:
-        from compiler.documents.vector import embedder_for
+        from compiler.documents.vector import LANGUAGES, MODEL, embedder_for, supports
 
-        corpus.enable_semantic(vectors, embedder_for(kb))
+        # Check the language before loading the model: there is no reason to
+        # import torch to decide not to use it.
+        if not supports(languages):
+            console.print(
+                f"[dim]semantic ranking skipped: {MODEL} is trained on "
+                f"{', '.join(sorted(LANGUAGES))}, the corpus is "
+                f"{', '.join(sorted(languages))}: BM25 only[/dim]"
+            )
+            return
+        corpus.enable_semantic(vectors, embedder_for(kb), languages)
     except Exception as exc:  # sentence-transformers, torch, or a foreign model
         console.print(f"[dim]semantic ranking unavailable ({exc}): BM25 only[/dim]")
 

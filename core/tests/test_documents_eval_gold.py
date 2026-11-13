@@ -50,3 +50,12 @@ def test_the_gate_needs_both_hit_rate_and_recall():
     summary = evaluate(rows)
     assert summary["hit_rate"] == 0.9
     assert summary["gate"] is True
+
+
+def test_a_pilot_gate_is_an_absolute_number_of_hits():
+    """The pilot bar is 8 hits, not the demo's 90%: the tool must be told."""
+    rows = [{"hit": True, "recall": 1.0, "rr": 1.0}] * 8 + [
+        {"hit": False, "recall": 0.0, "rr": 0.0}
+    ] * 2
+    assert evaluate(rows)["gate"] is False  # 0.8 < the demo's 0.90
+    assert evaluate(rows, hit_gate=8 / 10, recall_gate=0.6)["gate"] is True

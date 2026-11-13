@@ -81,6 +81,23 @@ conflict. If there are no conflicts, return [].
 
 PROMPT_HASH = hashlib.sha256(SYSTEM.encode("utf-8")).hexdigest()
 
+# A separate pass, and a separate prompt: the extraction prompt above is frozen
+# and never asks for a language. This one rewrites the statements the extractor
+# wrote in the wrong language, and it cannot touch a quote.
+LOCALISE_SYSTEM = """\
+You are given claims compiled from one document, each with an id and a statement
+written in the wrong language. Rewrite each statement in {language}, the
+language of the document.
+
+Rules:
+- keep every actor, number, deadline, condition, scope and modality exactly as
+  it is stated; do not add a fact and do not drop one;
+- rewrite the statement only; do not quote or translate the source;
+- one sentence per statement;
+- return ONLY a JSON array of objects, one per claim, in the same order, each
+  with "id" and "statement". No prose.
+"""
+
 
 def make_prompt(spans: list[dict], doc: dict) -> str:
     lines = [f"DOCUMENT: {doc['title']} ({doc['doc_id']})", ""]

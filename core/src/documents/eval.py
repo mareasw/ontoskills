@@ -60,7 +60,13 @@ def score(gold: dict, ranked: Iterable[dict]) -> dict:
     }
 
 
-def evaluate(rows: list[dict]) -> dict:
+def evaluate(rows: list[dict], hit_gate: float = HIT_GATE, recall_gate: float = RECALL_GATE) -> dict:
+    """Summarise the rows against a gate the caller names.
+
+    The defaults are the demo corpus gate. The pilot corpus has a bar of its own,
+    pre-registered before the measurement began, and a tool that printed someone
+    else's bar would report the wrong verdict in both directions.
+    """
     total = len(rows) or 1
     hit_rate = sum(1 for row in rows if row["hit"]) / total
     mean_recall = sum(row["recall"] for row in rows) / total
@@ -70,6 +76,8 @@ def evaluate(rows: list[dict]) -> dict:
         "hit_rate": round(hit_rate, 3),
         "mean_recall": round(mean_recall, 3),
         "mrr": round(mrr, 3),
-        "gate": hit_rate >= HIT_GATE and mean_recall >= RECALL_GATE,
+        "gate": hit_rate >= hit_gate and mean_recall >= recall_gate,
         "hits": sum(1 for row in rows if row["hit"]),
+        "hit_gate": hit_gate,
+        "recall_gate": recall_gate,
     }
