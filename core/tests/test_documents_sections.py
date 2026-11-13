@@ -226,7 +226,82 @@ def test_a_table_of_contents_entry_is_not_the_article_heading():
         "Il personale agisce con imparzialità.\n"
     )
     spans = _spans_at(["Il personale agisce con imparzialità."], [["Indice"]], text)
+    # The contents page is not a parent section: the article is the section.
     assert clean_sections(spans, text)[0]["locator"]["section_path"] == [
-        "Indice",
         "Articolo 3 - Imparzialità e conflitto di interessi",
     ]
+
+
+WRAPPED_TITLE = (
+    "Articolo 30 - Entrata in vigore, coordinamento, efficacia, aggiornamento e\n"
+    "modifiche\n"
+    "Il presente Codice è stato adottato.\n"
+)
+
+
+def test_a_wrapped_article_title_is_completed():
+    """The extractor prints the wrap on its own line; the title is one heading."""
+    spans = _spans_at(["Il presente Codice è stato adottato."], [[]], WRAPPED_TITLE)
+    assert clean_sections(spans, WRAPPED_TITLE)[0]["locator"]["section_path"] == [
+        "Articolo 30 - Entrata in vigore, coordinamento, efficacia, aggiornamento e modifiche",
+    ]
+
+
+POLICY_PAGE = (
+    "La Direzione verifica l'efficacia del Sistema di Gestione.\n"
+    "RIESAME\n"
+    "Il Responsabile ha la responsabilità del riesame della politica.\n"
+    "\x0c"
+    "Manuale SGSD\n"
+    "Allegato n. 1\n"
+    "(ISO/IEC 27001:2022)\n"
+    "Ed. 01 Rev. 00\n"
+    "\n"
+    "Il riesame dovrà verificare lo stato delle azioni correttive.\n"
+    "IMPEGNO DELLA DIREZIONE\n"
+    "La direzione sostiene attivamente la sicurezza.\n"
+)
+
+
+def test_a_heading_at_the_page_break_is_the_section():
+    """``RIESAME`` ends its page; the segmenter folds it into the next paragraph."""
+    spans = _spans_at(
+        [
+            "RIESAME Il Responsabile ha la responsabilità del riesame della politica.",
+            "Il riesame dovrà verificare lo stato delle azioni correttive.",
+            "La direzione sostiene attivamente la sicurezza.",
+        ],
+        [
+            ["POLICY SICUREZZA DELLE INFORMAZIONI"],
+            ["POLICY SICUREZZA DELLE INFORMAZIONI"],
+            ["IMPEGNO DELLA DIREZIONE"],
+        ],
+        POLICY_PAGE,
+    )
+    cleaned = clean_sections(spans, POLICY_PAGE)
+    assert cleaned[0]["locator"]["section_path"] == [
+        "POLICY SICUREZZA DELLE INFORMAZIONI",
+        "RIESAME",
+    ]
+    # The page break does not end the section: the next span keeps it.
+    assert cleaned[1]["locator"]["section_path"] == [
+        "POLICY SICUREZZA DELLE INFORMAZIONI",
+        "RIESAME",
+    ]
+    # A heading the segmenter did record ends it.
+    assert cleaned[2]["locator"]["section_path"] == ["IMPEGNO DELLA DIREZIONE"]
+
+
+def test_a_legal_name_is_not_a_heading_at_the_start_of_a_paragraph():
+    """``NETCARING S.R.L. Via …`` opens with capitals and is not a section."""
+    text = (
+        "NETCARING S.R.L. Via Giovanni Porzio, 4 - Napoli.\n"
+        "\x0c"
+        "EA 33 (NACE 62) Certificato N°: I787.\n"
+    )
+    spans = _spans_at(
+        ["NETCARING S.R.L. Via Giovanni Porzio, 4 - Napoli."],
+        [["Sede Legale"]],
+        text,
+    )
+    assert clean_sections(spans, text)[0]["locator"]["section_path"] == ["Sede Legale"]

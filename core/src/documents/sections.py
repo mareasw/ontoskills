@@ -39,6 +39,26 @@ MAX_PATH = 3
 # alone cannot tell it from a masthead.
 MAX_MARKER = 12
 
+# The table of contents is not a section: it is the page that announces the
+# sections. A path element naming it is a heading the stack never popped, so the
+# article below it arrives as "Indice > Articolo 1". The contents page is also
+# where a claim under "Indice" alone would end up, and no document states a rule
+# on its own table of contents.
+TOC_MARKERS = frozenset(
+    {"indice", "sommario", "contenuti", "contenuto", "contents", "table of contents", "index"}
+)
+
+# A heading at the end of a page is folded into the paragraph that starts the
+# next one: the extractor prints "RIESAME" as the last line before the break and
+# the segmenter joins it to the sentence below, so the path never carries it.
+# The marker is still in the text — an all-caps line printed on its own — and it
+# is read again here, on the way out. The guards keep a heading from being
+# mistaken for an identifier ("EA 33 (NACE 62)"), a legal name ("NETCARING
+# S.R.L.") or a running header ("INFORMAZIONI"), which are lines of the same
+# shape.
+MAX_HEADING_WORDS = 6
+SENTENCE_START = re.compile(r"^[A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ]")
+
 # Position is the second signal, for the headers that are too long to be caught
 # by length: "N° QMS18180211 - 33.0017" sits in the header slot of every page of
 # a corporate PDF. A line is furniture when it occupies the first lines of a
@@ -134,6 +154,45 @@ def _is_page_furniture(part: str, bad: set[str], bad_norm: set[str]) -> bool:
     return _is_joined_furniture(norm(part), bad_norm)
 
 
+def _folded_heading(
+    paragraph: str, lines: set[str], bad: set[str], bad_norm: set[str]
+) -> str:
+    """The all-caps heading a paragraph starts with, or ``""``.
+
+    ``paragraph`` is a span: ``RIESAME La Direzione verificherà …``. The heading
+    is real when it is a whole line of the source, in capitals, short enough to
+    be a heading, followed by a sentence, and not furniture or an identifier.
+    """
+    words = paragraph.split()
+    if len(words) < 2:
+        return ""
+    taken: list[str] = []
+    for word in words:
+        if not word.isupper() or any(char in word for char in ".0123456789()"):
+            break
+        taken.append(word)
+        if len(taken) > MAX_HEADING_WORDS:
+            return ""
+    if not taken:
+        return ""
+    following = words[len(taken)]
+    if not SENTENCE_START.match(following):
+        return ""
+    candidate = " ".join(taken).strip()
+    if len(candidate) < 3 or norm(candidate) not in lines:
+        return ""
+    if _is_page_furniture(candidate, bad, bad_norm):
+        return ""
+    return candidate
+
+
+def _with_heading(path: list[str], heading: str) -> list[str]:
+    """Append the heading unless it is already the last element of the path."""
+    if path and norm(path[-1]) == norm(heading):
+        return path
+    return [*path, heading][-MAX_PATH:]
+
+
 # The segmenter accepts a heading only if it has seven words or fewer. Italian
 # article titles are descriptive and often longer — "Articolo 5 - Divieto di
 # detenzione di materiale pornografico" is nine words — so the line stays in the
@@ -146,6 +205,36 @@ ARTICLE_HEADING = re.compile(r"^(?:Articolo|Article|Art\.)\s+\d+(?:\.\d+)*\b")
 # table of contents entry.
 TOC_ENTRY = re.compile(r"\.{3,}\s*\d*\s*$")
 MAX_HEADING = 90
+# A long title wraps, and the extractor prints the wrap on its own line:
+# "Articolo 30 - Entrata in vigore, coordinamento, efficacia, aggiornamento e"
+# followed by "modifiche". Ending a title on a conjunction is the signature of
+# the wrap, and a one- or two-word lower-case line below it is the rest of it.
+WRAPPING_WORDS = frozenset(
+    """
+    e ed o od di del della delle dello degli dei per in con a al alla ai agli
+    da dal dalla dalle dai su sul sulla tra fra il la lo le gli i
+    """.split()
+)
+
+
+def _join_wrapped(line: str, following: list[str]) -> str:
+    """Complete a title whose last word wrapped onto the next line."""
+    last = line.split()[-1].strip(",;:").lower() if line.split() else ""
+    if last not in WRAPPING_WORDS:
+        return line
+    for raw in following:
+        rest = raw.strip()
+        if not rest:
+            continue
+        # A page break, a body line or a table-of-contents entry is not the tail
+        # of the title: the wrap is one or two lower-case words and nothing else.
+        if "\f" in rest or len(rest) > 25 or len(rest.split()) > 2:
+            return line
+        if not rest[0].islower() or rest.endswith((".", ";", ":", ",")):
+            return line
+        joined = f"{line} {rest}"
+        return joined if len(joined) <= MAX_HEADING else line
+    return line
 
 
 def _missed_headings(text: str) -> list[tuple[int, str]]:
@@ -157,7 +246,8 @@ def _missed_headings(text: str) -> list[tuple[int, str]]:
     flat = norm(text)
     out: list[tuple[int, str]] = []
     cursor = 0
-    for raw in text.split("\n"):
+    lines = text.split("\n")
+    for position, raw in enumerate(lines):
         line = raw.strip()
         if not line:
             continue
@@ -171,6 +261,7 @@ def _missed_headings(text: str) -> list[tuple[int, str]]:
         cursor = at + len(piece)
         if not ARTICLE_HEADING.match(line):
             continue
+        line = _join_wrapped(line, lines[position + 1:])
         if TOC_ENTRY.search(line) or len(line) > MAX_HEADING:
             continue
         if line.endswith((".", ";", ":", ",")):
@@ -242,6 +333,7 @@ def clean_sections(spans: list[dict], text: str) -> list[dict]:
     bad_norm = {norm(line) for line in bad if len(norm(line)) >= 2}
     flat = norm(text)
     missed = _missed_headings(text)
+    lines = {norm(line.strip()) for line in text.splitlines() if line.strip()}
     grouped: dict[str, list[dict]] = {}
     for span in spans:
         grouped.setdefault(span["doc_id"], []).append(span)
@@ -249,18 +341,32 @@ def clean_sections(spans: list[dict], text: str) -> list[dict]:
     for doc_spans in grouped.values():
         doc_spans.sort(key=lambda s: (s.get("locator") or {}).get("char_start") or 0)
         last: list[str] = []
+        # The folded heading in force, with the path it was folded under. A
+        # heading the segmenter did record changes the path, and that ends it.
+        promoted: tuple[str, list[str]] | None = None
         for span in doc_spans:
             locator = dict(span.get("locator") or {})
-            path = [
-                part
+            raw = [
+                str(part).strip()
                 for part in locator.get("section_path") or []
                 if not _is_page_furniture(str(part).strip(), bad, bad_norm)
+                and norm(str(part)).casefold() not in TOC_MARKERS
             ]
-            if path:
-                path = _collapse(path)[-MAX_PATH:]
+            if promoted is not None and raw and raw != promoted[1]:
+                promoted = None
+            if raw:
+                path = _collapse(raw)[-MAX_PATH:]
                 last = path
             else:
                 path = list(last)
+            heading = _folded_heading(str(span.get("paragraph") or ""), lines, bad, bad_norm)
+            if heading:
+                promoted = (heading, list(path))
+                path = _with_heading(path, heading)
+                last = path
+            elif promoted is not None:
+                path = _with_heading(path, promoted[0])
+                last = path
             start = locator.get("char_start")
             if start is not None:
                 path = _add_missed_article(path, int(start), missed, flat)
