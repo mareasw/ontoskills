@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 from compiler.documents.ask import Corpus, ask
-from compiler.documents.eval import evaluate, load_gold, score
+from compiler.documents.eval import HIT_GATE, RECALL_GATE, evaluate, load_gold, score
 from compiler.documents.text import norm
 from compiler.documents.store import KnowledgeBase
 
@@ -29,6 +29,18 @@ def main() -> int:
     parser.add_argument("--validate", action="store_true", help="only check the gold set against the KB")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--semantic", action="store_true")
+    parser.add_argument(
+        "--force-semantic",
+        action="store_true",
+        help="fuse the embedding ranking even when the corpus is not in a language the model knows",
+    )
+    parser.add_argument(
+        "--min-hits",
+        type=int,
+        default=None,
+        help="report the gate against an absolute number of hits instead of the demo's rate",
+    )
+    parser.add_argument("--recall-gate", type=float, default=RECALL_GATE)
     args = parser.parse_args()
 
     kb = KnowledgeBase(args.kb)
@@ -54,10 +66,15 @@ def main() -> int:
         return 0 if bad == 0 else 1
 
     corpus = Corpus(claims, kb.documents(), verdicts=kb.verifier())
-    if args.semantic:
+    if args.semantic or args.force_semantic:
         from compiler.documents.vector import embedder_for
 
-        corpus.enable_semantic(kb.vectors(), embedder_for(kb))
+        languages = set((kb.manifest().get("languages") or {}).values())
+        enabled = corpus.enable_semantic(
+            kb.vectors(), embedder_for(kb), None if args.force_semantic else languages
+        )
+        if not enabled:
+            print("semantic ranking skipped: the corpus language is not one the model knows")
 
     rows = []
     for row in gold:
@@ -65,7 +82,8 @@ def main() -> int:
         ranked = [citation.__dict__ for citation in result.citations]
         rows.append(score(row, ranked))
 
-    summary = evaluate(rows)
+    hit_gate = HIT_GATE if args.min_hits is None else args.min_hits / (len(rows) or 1)
+    summary = evaluate(rows, hit_gate=hit_gate, recall_gate=args.recall_gate)
     if args.json:
         print(json.dumps({"summary": summary, "rows": rows}, ensure_ascii=False, indent=1))
     else:
@@ -74,8 +92,11 @@ def main() -> int:
             print(f"{flag} {row['id']} hit={int(row['hit'])} recall={row['recall']:.2f} rr={row['rr']:.2f}  {row['question'][:70]}")
             for missed in row["missed"]:
                 print(f"       missed: {missed}")
+        bar = (
+            f" (bar {args.min_hits})" if args.min_hits is not None else ""
+        )
         print(
-            f"{summary['hits']}/{summary['questions']} hit@12, "
+            f"{summary['hits']}/{summary['questions']} hit@12{bar}, "
             f"recall@12 {summary['mean_recall']:.3f}, MRR@12 {summary['mrr']:.3f} "
             f"-> gate {'PASS' if summary['gate'] else 'FAIL'}"
         )

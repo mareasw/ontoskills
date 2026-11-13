@@ -189,3 +189,80 @@ def test_without_verdicts_nothing_is_filtered():
     claims = [_claim("T1", "T1-0001", "Retention is six years.", "retention six years")]
     corpus = Corpus(claims, [])
     assert [c.claim_id for c in corpus.search("retention", limit=5)] == ["T1-0001"]
+
+
+def test_the_section_path_is_part_of_the_searchable_text():
+    """A claim under "Sanzioni disciplinari" answers a question about them, even
+    when its own wording is about violations."""
+    claims = [
+        _claim(
+            "T1",
+            "T1-0001",
+            "Le violazioni sono punite in modo proporzionato.",
+            "Le violazioni sono punite in modo proporzionato.",
+            section=["Articolo 29 - Sanzioni disciplinari"],
+        ),
+        _claim(
+            "T1",
+            "T1-0002",
+            "Il bilancio è redatto ogni anno.",
+            "Il bilancio è redatto ogni anno.",
+            section=["Articolo 16 - Trasparenza"],
+        ),
+    ]
+    corpus = Corpus(claims, [])
+    found = corpus.search("quali sanzioni disciplinari sono previste", limit=1)
+    assert [c.claim_id for c in found] == ["T1-0001"]
+
+
+def test_an_inflected_form_finds_the_word_it_belongs_to():
+    """The question says "certificazioni", the document says "certificato"."""
+    claims = [
+        _claim(
+            "T1",
+            "T1-0001",
+            "Il certificato è valido tre anni.",
+            "Il certificato è valido tre anni.",
+        ),
+        _claim(
+            "T1",
+            "T1-0002",
+            "Il bilancio è redatto ogni anno.",
+            "Il bilancio è redatto ogni anno.",
+        ),
+    ]
+    corpus = Corpus(claims, [])
+    assert [c.claim_id for c in corpus.search("quali certificazioni possiede", limit=1)] == [
+        "T1-0001"
+    ]
+    # And the other way round: a question in the singular finds the plural.
+    assert [c.claim_id for c in corpus.search("a chi appartiene il certificato", limit=1)] == [
+        "T1-0001"
+    ]
+
+
+def test_a_short_word_is_not_stemmed():
+    """Stemming is for words long enough to have a stem: "oro" is not a prefix
+    of "orologio", and a function word never reaches anything at all."""
+    claims = [
+        _claim("T1", "T1-0001", "L'orologio è fissato alle diciotto.", "L'orologio è fissato."),
+    ]
+    corpus = Corpus(claims, [])
+    assert corpus.search("oro", limit=5) == []
+    assert corpus.search("chi", limit=5) == []
+
+
+
+class _StubEmbedder:
+    def encode_one(self, text):
+        return [0.0, 1.0]
+
+
+def test_semantic_fusion_is_not_applied_in_a_language_the_model_does_not_know():
+    corpus = Corpus(CLAIMS, DOCS)
+    vectors = {claim["claim_id"]: [1.0, 0.0] for claim in CLAIMS}
+    assert corpus.enable_semantic(vectors, _StubEmbedder(), {"it"}) is False
+    assert corpus.semantic_ranking("a breach") == []
+    # The same corpus declared English still fuses, as does an undeclared one.
+    assert corpus.enable_semantic(vectors, _StubEmbedder(), {"en"}) is True
+    assert corpus.semantic_ranking("a breach")

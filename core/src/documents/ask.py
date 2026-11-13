@@ -7,13 +7,14 @@ can check against the source in one click. Only claims the deterministic
 verifier passed are answered; a caller that wants the audit surface asks for
 the rest and sees each verdict badge.
 
-Ranking is BM25 over a claim's statement, actor, conditions and the quotes of
-its evidence. When the knowledge base carries local embeddings, the cosine
-ranking is fused with the lexical one by Reciprocal Rank Fusion — ranks only,
-so there is no weight to tune — and a claim the question's words cannot reach
-is still reachable. Claims are grouped by document, because the demo's
-acceptance criterion is *cross-document*: three questions, each answered from
-at least two documents.
+Ranking is BM25 over a claim's statement, actor, conditions, the quotes of its
+evidence, the document title and the section path — words compared by their
+stem, so a question phrased in the plural still finds the rule written in the
+singular. When the knowledge base carries local embeddings, the cosine ranking is
+fused with the lexical one by Reciprocal Rank Fusion — ranks only, so there is no
+weight to tune — and a claim the question's words cannot reach is still reachable.
+Claims are grouped by document, because the demo's acceptance criterion is
+*cross-document*: three questions, each answered from at least two documents.
 
 Tensions are the deterministic part of "this corpus does not speak with one
 voice". A number is attached to a topic by the words around it — a breach
@@ -30,7 +31,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Iterable
 
-from compiler.documents.text import norm, tokens
+from compiler.documents.text import STOPWORDS, norm, tokens
 from compiler.documents.vector import cosine, fuse
 
 # BM25 parameters. The defaults are the standard ones; the corpus is small
@@ -44,7 +45,38 @@ FIELD_WEIGHTS = {
     "conditions": 2.0,
     "quote": 1.0,
     "title": 1.0,
+    "section": 1.0,
 }
+
+# Italian inflects the end of a word, not the beginning: the same rule is
+# "certificato" in one document and "certificazioni" in a question about it,
+# "fornitore" and "fornitori", "obiettivo" and "obiettivi". A search that
+# compares whole words only answers the first phrasing and misses the second,
+# and a question is written the way a person asks it, not the way the document
+# prints it. Both sides — the index and the question — are cut to the same
+# stem-like key: a word longer than seven letters is indexed by its first seven,
+# a shorter one as it stands, so "chi" stays "chi" and never reaches "chiuso".
+# Seven is the shortest prefix that keeps the Italian lemmas of this corpus
+# apart while joining their forms: at six, "consegnata" and "conseguenza" share a
+# key; at eight, "fornitore" and "fornitori" no longer do.
+STEM_PREFIX = 7
+
+
+def _key(term: str) -> str:
+    """The index form of a word: itself when short, its stem when long."""
+    return term[:STEM_PREFIX] if len(term) > STEM_PREFIX else term
+
+
+def _content(text: str) -> list[str]:
+    """The words a ranking may rest on: no grammatical words.
+
+    A function word carries no subject, and in a corpus of a few hundred claims
+    one of them can be rare enough to outweigh the words that do: "Quali
+    certificazioni possiede l'azienda?" ranked a code-of-ethics preamble first
+    because it was the only claim carrying "quali". BM25 without stopwords is
+    the standard form, and it keeps a question's grammar out of its answer.
+    """
+    return [term for term in tokens(text) if term not in STOPWORDS]
 
 UNIT_HOURS = {
     "hour": 1,
@@ -185,7 +217,10 @@ class Corpus:
         self.df: dict[str, int] = {}
         for claim in self.claims:
             text = _claim_text(claim)
-            field_tokens = {name: tokens(value) for name, value in text.items()}
+            field_tokens = {
+                name: [_key(term) for term in _content(value)]
+                for name, value in text.items()
+            }
             weighted: list[str] = []
             for name, weight in FIELD_WEIGHTS.items():
                 repeats = max(1, int(round(weight)))
@@ -203,9 +238,21 @@ class Corpus:
         df = self.df.get(term, 0)
         return math.log(1 + (total - df + 0.5) / (df + 0.5))
 
-    def enable_semantic(self, vectors: dict[str, list[float]], embedder) -> None:
-        """Keep the vectors and the model; embedding one question is the only model call."""
+    def enable_semantic(
+        self, vectors: dict[str, list[float]], embedder, languages=None
+    ) -> bool:
+        """Keep the vectors and the model; embedding one question is the only model call.
+
+        Returns False, and leaves the corpus lexical, when every document is in a
+        language the embedding model was not trained on: an English model's
+        cosine is not a ranking of Italian claims (see ``vector.LANGUAGES``).
+        """
+        from compiler.documents.vector import supports
+
+        if not supports(languages):
+            return False
         self._semantic = (vectors, embedder)
+        return True
 
     def semantic_ranking(self, question: str, depth: int = 200) -> list[str]:
         """Claim ids by cosine to the question, best first.
@@ -233,7 +280,7 @@ class Corpus:
         limit: int = 12,
         semantic_ranking: list[str] | None = None,
     ) -> list[Citation]:
-        query = tokens(question)
+        query = [_key(term) for term in _content(question)]
         if not query or not self.claims:
             return []
         scores: list[float] = []

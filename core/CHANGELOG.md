@@ -22,9 +22,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Truncation repair** — a reply cut at `--max-tokens` is retried as two
   smaller blocks (twice at most) instead of being silently kept; what is still
   truncated is counted, printed in red and returned as a non-zero exit.
+- **The knowledge base speaks the language of the document** — a statement the
+  extractor wrote in another language is rewritten in the document's language by
+  a pass that sees the statements and never the quotes. The language is the
+  first paragraph of prose at least eight tokens long, counted on function words
+  that belong to one language and not the other. A rewrite that changes a
+  number, comes back in the wrong language, or loses the claim's attestation is
+  discarded and the extracted statement stays. The scan and the refinement calls
+  are counted apart from extraction (`localised`, `localise_calls`,
+  `localise_cached`) and the manifest records `languages` and
+  `localised_statements`.
+- **Section-aware, stem-aware BM25 ranking** — `ask` now indexes the section
+  path a claim already carried, compares words by a seven-letter stem
+  (`certificazione` finds `certificato`, `fornitore` finds `fornitori`), and
+  keeps grammatical words out of both the index and the query. On the Italian
+  pilot the three rules move hit@12 from 6/10 to 9/10 and MRR from 0.127 to
+  0.342 on the same claim set.
 
 ### Changed
 
+- **Semantic fusion is applied only to the languages the model knows** —
+  MiniLM is trained on English; on the Italian pilot its ranking was worse than
+  the words themselves (one question lost, MRR 0.342 → 0.311). `enable_semantic`
+  returns `False` and the corpus stays lexical when every document is in a
+  language the model was not trained on; a KB that declares no language keeps
+  the fusion, because there is nothing to compare against.
+- **The eval takes its gate from the caller** — `evaluate(rows, hit_gate,
+  recall_gate)` and `eval_retrieval.py --min-hits <n> --recall-gate <r>` report
+  a pre-registered bar that is a number of hits rather than the demo corpus's
+  90%, and `--force-semantic` runs the fusion ablation on a corpus the gate
+  would skip.
 - **LLM client is OpenAI-compatible** — `compiler.llm` wraps the OpenAI SDK and reads
   the standard `OPENAI_BASE_URL` / `OPENAI_API_KEY` / `OPENAI_MODEL`; point the
   base URL at OpenAI, Cascade, or any compatible gateway. The tool-use loop
@@ -34,6 +61,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **A reply that is a list of objects is read** — a model asked for a JSON
+  array sometimes opens one and then emits one object per line, with no commas
+  and no closing bracket, or no array at all. `repair_json_array` applied its
+  comma repair only when the reply already ended with `]`, so a reply with every
+  object intact parsed to `[]`: the chunk was not truncated, not retried and not
+  reported, and the claims were paid for and discarded. Both shapes are now
+  recovered, and `find("[")` no longer lands on the first `span_ids` array when
+  the reply has no outer array. On the pilot this returns 101 claims from seven
+  cached replies, including the policy section a pre-registered question asked
+  about.
 - **`ingest` refuses to start without a base URL** — a missing `OPENAI_BASE_URL`
   used to surface as one failed model call per chunk with no reason, and a
   knowledge base silently missing whole documents. It now fails once, before
