@@ -953,6 +953,10 @@ def chunk(spans: list[dict], size: int, overlap: int = 1) -> list[list[dict]]:
 # A span that opens with a list marker — "(k) the mechanisms …", "iv. the
 # authority" — is an item of an enumeration whose lead-in lives above it.
 LIST_MARKER = re.compile(r"^[\(\[]?(?:[A-Za-z]|[ivxlcIVXLC]{1,5}|\d{1,3})[\)\].]\s+")
+# The lead-in of an enumeration closes with the colon that announces it. A PDF
+# often prints the first bullet on the same line, after the colon, so the colon
+# is not the last character: "… i cui compiti sono: •".
+LEAD_IN_CLOSE = re.compile(r"[:\u2022\u2023\u25cf\u00b7\u25aa]\s*$")
 # A demonstrative opener points back at what the previous span said, so the
 # sentence has no subject of its own ("Such measures may include …").
 ANAPHORA = re.compile(r"^(?:Such|This|These|Those|That|It|They|Its|Their)\b")
@@ -997,6 +1001,23 @@ def _page_furniture(order: list[dict]) -> set[str]:
     return {text for text, seen in pages.items() if len(seen) >= 2}
 
 
+def _ends_a_lead_in(text: str) -> bool:
+    """True when the line closes with the colon (and bullet) that opens a list."""
+    return bool(LEAD_IN_CLOSE.search(text.rstrip()))
+
+
+def _above_opens_an_enumeration(
+    order: list[dict], cursor: int, furniture: set[str]
+) -> bool:
+    """True when the span above ``order[cursor]`` is an item or a list lead-in."""
+    for above in range(cursor - 1, max(-1, cursor - 21), -1):
+        text = (order[above].get("paragraph") or "").lstrip()
+        if text in furniture:
+            continue
+        return text.rstrip().endswith(";") or _ends_a_lead_in(text)
+    return False
+
+
 def _opener(order: list[dict], index: int, furniture: set[str]) -> dict | None:
     """The span that opens the list this one belongs to, if any.
 
@@ -1030,8 +1051,17 @@ def _opener(order: list[dict], index: int, furniture: set[str]) -> dict | None:
             # tail, which says nothing about the current item's subject. The
             # exception is the line that ends in a colon: whatever its first
             # character, it is the lead-in that introduces the enumeration.
-            if candidate_text.rstrip().endswith(":"):
+            if _ends_a_lead_in(candidate_text):
                 return candidate
+            if candidate_text.rstrip().endswith(";") and _above_opens_an_enumeration(
+                order, cursor, furniture
+            ):
+                # A semicolon closes an item of an enumeration, not a sentence:
+                # the subject is the lead-in above the run, not the sibling
+                # item. Without this, every bullet after the first gets the
+                # previous bullet as its context, which names no subject at all.
+                seen_item = True
+                continue
             if not current_is_item and not seen_item:
                 return candidate
             continue

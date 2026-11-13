@@ -242,3 +242,86 @@ def test_build_claim_keeps_a_structural_reference():
         "span_ids": ["S0001"],
     }
     assert build_claim(raw, {"S0001": span}, _doc(), 1) is not None
+
+
+def _four_spans() -> list[dict]:
+    return [
+        _span("S0001", "The Supplier shall keep its records."),
+        _span("S0002", "The Buyer shall keep its records."),
+        _span("S0003", "The Supplier shall notify the Buyer."),
+        _span("S0004", "The Buyer shall notify the Supplier."),
+    ]
+
+
+def test_a_truncated_reply_is_split_and_the_tail_recovered(monkeypatch):
+    """A reply cut at the ceiling is incomplete: the halves are asked again."""
+    calls: list[str] = []
+
+    def fake_one_chunk(prompt, fingerprint, cache_path, options, system=""):
+        calls.append(prompt)
+        if len(calls) == 1:
+            return '[{"span_ids": ["S0001"], "statement": "The Supplier shall kee', (
+                {"input_tokens": 10, "output_tokens": 10000}
+            ), "length", False
+        if "[S0003]" in prompt:
+            statement, span_id = "The Buyer shall notify the Supplier.", "S0004"
+        else:
+            statement, span_id = "The Supplier shall keep its records.", "S0001"
+        return (
+            f'[{{"span_ids": ["{span_id}"], "statement": "{statement}"}}]',
+            {"input_tokens": 5, "output_tokens": 20},
+            "stop",
+            False,
+        )
+
+    monkeypatch.setattr("compiler.documents.compile._one_chunk", fake_one_chunk)
+    result = compile_document(
+        _doc(),
+        "text",
+        _four_spans(),
+        CompileOptions(model="stub", conflicts=False),
+    )
+    assert result.stats.retried == 1
+    assert result.stats.truncated == 0
+    assert result.stats.calls == 3
+    assert len(calls) == 3
+    assert {claim["statement"] for claim in result.claims} == {
+        "The Supplier shall keep its records.",
+        "The Buyer shall notify the Supplier.",
+    }
+
+
+def test_truncation_is_reported_when_splitting_is_off(monkeypatch):
+    def fake_one_chunk(prompt, fingerprint, cache_path, options, system=""):
+        return "", {"input_tokens": 10, "output_tokens": 10000}, "length", False
+
+    monkeypatch.setattr("compiler.documents.compile._one_chunk", fake_one_chunk)
+    result = compile_document(
+        _doc(),
+        "text",
+        _four_spans(),
+        CompileOptions(model="stub", conflicts=False, split_truncated=False),
+    )
+    assert result.stats.truncated == 1
+    assert result.stats.retried == 0
+    assert result.stats.calls == 1
+    assert result.claims == []
+
+
+def test_a_single_span_block_cannot_be_split(monkeypatch):
+    calls: list[str] = []
+
+    def fake_one_chunk(prompt, fingerprint, cache_path, options, system=""):
+        calls.append(prompt)
+        return "", {"input_tokens": 10, "output_tokens": 10000}, "length", False
+
+    monkeypatch.setattr("compiler.documents.compile._one_chunk", fake_one_chunk)
+    result = compile_document(
+        _doc(),
+        "text",
+        [_span("S0001", "The Supplier shall keep its records.")],
+        CompileOptions(model="stub", conflicts=False),
+    )
+    assert result.stats.truncated == 1
+    assert result.stats.retried == 0
+    assert len(calls) == 1

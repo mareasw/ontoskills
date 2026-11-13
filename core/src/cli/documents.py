@@ -124,6 +124,8 @@ def _print_estimate(rows: list[dict], price_in: float, price_out: float) -> dict
 @click.option("--max-tokens", default=10000, show_default=True, type=int, help="Max tokens per reply")
 @click.option("--concurrency", default=1, show_default=True, type=int, help="Parallel model calls")
 @click.option("--resume", is_flag=True, help="Reuse cached replies for identical chunks")
+@click.option("--no-split-truncated", is_flag=True,
+              help="Do not halve a chunk whose reply hit --max-tokens; report it instead")
 @click.option("--cache-dir", type=click.Path(path_type=Path), default=None,
               help="Chunk cache (default: <out>/cache)")
 @click.option("--no-conflicts", is_flag=True, help="Skip the conflict pass")
@@ -138,7 +140,7 @@ def _print_estimate(rows: list[dict], price_in: float, price_out: float) -> dict
 def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_run,
                chunk_size, overlap, max_tokens, concurrency, resume, cache_dir,
                no_conflicts, price_in, price_out, questions, questions_file, name,
-               semantic):
+               semantic, no_split_truncated):
     """Compile a folder of documents into a knowledge base.
 
     \b
@@ -212,6 +214,7 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         conflicts=not no_conflicts,
         concurrency=max(1, concurrency),
         resume=resume,
+        split_truncated=not no_split_truncated,
         price_in=price_in,
         price_out=price_out,
         cache_dir=cache_dir or (out_dir / "cache"),
@@ -223,6 +226,8 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
     all_rejected: list[dict] = []
     total_in = total_out = 0
     total_rejected_numbers = 0
+    total_truncated = 0
+    total_retried = 0
     failed: list[str] = []
     for doc, row in zip(docs, rows):
         with console.status(f"compiling {doc.doc_id} ({len(row['spans_list'])} spans)") as status:
@@ -254,13 +259,21 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         all_spans.extend(compiled.spans)
         all_rejected.extend(compiled.rejected)
         total_rejected_numbers += compiled.stats.rejected_numbers
+        total_truncated += compiled.stats.truncated
+        total_retried += compiled.stats.retried
         total_in += compiled.stats.input_tokens
         total_out += compiled.stats.output_tokens
         cost = compiled.stats.cost(options)
+        detail = ""
+        if compiled.stats.retried:
+            detail += f", {compiled.stats.retried} split"
+        if compiled.stats.truncated:
+            detail += f", [red]{compiled.stats.truncated} truncated[/red]"
         console.print(
             f"  {doc.doc_id}: {len(compiled.claims)} claim(s), "
             f"{compiled.stats.calls} call(s), {compiled.stats.cached} cached, "
-            f"{compiled.stats.rejected} rejected, {compiled.stats.merged} merged, ${cost:.3f}"
+            f"{compiled.stats.rejected} rejected, {compiled.stats.merged} merged"
+            f"{detail}, ${cost:.3f}"
         )
 
     rows_verdicts = verify_all(all_claims, all_spans, texts)
@@ -283,6 +296,8 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         ),
         "claims": len(all_claims),
         "verifier": report["by_verdict"],
+        "truncated_calls": total_truncated,
+        "retried_chunks": total_retried,
         "cost_usd": round(total_in / 1_000_000 * price_in + total_out / 1_000_000 * price_out, 4),
         "tokens": {"input": total_in, "output": total_out},
         "licences": sorted({doc.licence for doc in docs}),
@@ -344,17 +359,34 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         f"{manifest['elapsed_s']}s"
     )
     console.print(f"written: {out_dir} (view: {out_dir / 'view.html'})")
+    if total_truncated:
+        console.print(
+            f"[red]{total_truncated} reply(ies) still hit --max-tokens after splitting: "
+            "the claims they would have carried are missing from this build[/red]"
+        )
+        console.print(
+            "  the replies that stopped cleanly are cached; rerun with --resume "
+            "--chunk-size <smaller>, or raise --max-tokens"
+        )
     if report["failures"]:
         console.print(
             f"[yellow]{len(report['failures'])} claim(s) not ok — see {out_dir / 'verifier.jsonl'}[/yellow]"
         )
         for row in report["failures"][:5]:
             console.print(f"  {row['claim_id']} {row['verdict']}: {'; '.join(row['reasons'])[:160]}")
+    problems: list[str] = []
     if failed:
-        raise click.ClickException(
+        problems.append(
             f"{', '.join(failed)}: model call(s) failed, knowledge base written without "
             "them; rerun with --resume"
         )
+    if total_truncated:
+        problems.append(
+            f"{total_truncated} reply(ies) truncated: the knowledge base is incomplete; "
+            "rerun with --resume --chunk-size <smaller> or raise --max-tokens"
+        )
+    if problems:
+        raise click.ClickException("; ".join(problems))
 
 
 def _page_count(text: str) -> int:
