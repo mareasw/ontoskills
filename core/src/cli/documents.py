@@ -281,7 +281,7 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
             detail += f", {compiled.stats.retried} split"
         if compiled.stats.truncated:
             detail += f", [red]{compiled.stats.truncated} truncated[/red]"
-        if compiled.stats.cached:
+        if compiled.stats.replayed_input_tokens or compiled.stats.replayed_output_tokens:
             detail += f", ${replayed:.3f} replayed from cache"
         console.print(
             f"  {doc.doc_id}: {len(compiled.claims)} claim(s), "
