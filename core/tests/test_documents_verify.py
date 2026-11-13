@@ -3,7 +3,14 @@
 from __future__ import annotations
 
 from compiler.documents.segment import segment
-from compiler.documents.verify import SpanIndex, page_containing, summarise, verify
+from compiler.documents.verify import (
+    SpanIndex,
+    page_containing,
+    reference_numbers,
+    summarise,
+    unattested_numbers,
+    verify,
+)
 
 TEXT = (
     "1. Notification\n"
@@ -108,3 +115,119 @@ def test_summarise_groups_failures_by_document():
     assert report["by_verdict"] == {"ok": 1, "weak": 1, "no": 1}
     assert len(report["failures"]) == 2
     assert report["by_doc"]["T1"] == {"ok": 1, "weak": 1}
+
+
+def test_verify_all_normalises_each_document_once(monkeypatch):
+    """The rebuild cost is claims × document size unless the text is normalised once."""
+    import compiler.documents.verify as verify_module
+
+    spans = _spans()
+    span = next(s for s in spans if "48 hours" in s["paragraph"])
+    claims = [
+        _claim(span, "The Supplier shall notify the Buyer within 48 hours of a breach.")
+        for _ in range(3)
+    ]
+    calls: list[str] = []
+    real_norm = verify_module.norm
+
+    def counting_norm(text):
+        calls.append(text)
+        return real_norm(text)
+
+    monkeypatch.setattr(verify_module, "norm", counting_norm)
+    verify_module.verify_all(claims, spans, {"T1": TEXT})
+    assert calls.count(TEXT) == 1
+
+
+def test_page_containing_normalises_the_pages_once_per_source(monkeypatch):
+    """Page lookup runs per evidence item; re-splitting the document each time is quadratic."""
+    import compiler.documents.verify as verify_module
+
+    source = "alpha page\fbeta page\fgamma page"
+    calls: list[str] = []
+    real_norm = verify_module.norm
+
+    def counting_norm(text):
+        calls.append(text)
+        return real_norm(text)
+
+    monkeypatch.setattr(verify_module, "norm", counting_norm)
+    assert verify_module.page_containing(source, "alpha page", 1) == 1
+    assert verify_module.page_containing(source, "gamma page", 3) == 3
+    assert calls.count("alpha page") == 1
+
+
+def _numbered(statement, quote, section=("Article 5",)):
+    return {
+        "doc_id": "T1",
+        "statement": statement,
+        "evidence": [{"quote": quote, "locator": {"section_path": list(section)}}],
+    }
+
+
+def test_a_number_in_a_context_quote_is_attested():
+    claim = {
+        "statement": "Notify within 72 hours.",
+        "evidence": [
+            {"quote": "the controller shall notify", "locator": {}, "role": "supports"},
+            {"quote": "within 72 hours of becoming aware", "locator": {}, "role": "context"},
+        ],
+    }
+    assert unattested_numbers(claim) == []
+
+
+def test_a_number_in_the_section_path_is_attested():
+    assert unattested_numbers(_numbered("Article 33 applies.", "the controller shall notify")) == []
+
+
+def test_a_structural_reference_is_a_note_not_a_failure():
+    quote = (
+        "Paragraphs 1, 2 and 3 shall not apply where the data subject already has the information."
+    )
+    claim = _numbered("Paragraphs 1, 2 and 3 of Article 13 shall not apply.", quote)
+    # The claim must pass verbatim and locator for the number rule to be the one
+    # under test: an empty span index would make every claim "no" for another
+    # reason and prove nothing about references.
+    span = {
+        "span_id": "S0001",
+        "doc_id": "T1",
+        "paragraph": quote,
+        "locator": {
+            "kind": "text",
+            "section_path": ["Article 5"],
+            "char_start": 0,
+            "char_end": len(quote),
+        },
+    }
+    claim["evidence"][0]["locator"].update(
+        {"kind": "text", "char_start": 0, "char_end": len(quote), "span_id": "S0001"}
+    )
+    assert unattested_numbers(claim) == []
+    assert "13" in reference_numbers(claim)
+    out = verify(claim, SpanIndex([span]), {"T1": quote})
+    assert out["verdict"] != "no", out
+    assert any("structural reference" in note for note in out["notes"])
+
+
+def test_a_quantity_nowhere_in_the_evidence_is_still_a_failure():
+    claim = _numbered("The controller shall notify within 8.2 days.", "the controller shall notify")
+    assert unattested_numbers(claim) == ["8.2"]
+
+
+def test_a_quantity_beside_a_reference_is_not_excused():
+    """A reference span excuses the numbers it contains, not every number on the line."""
+    claim = _numbered(
+        "Article 33 requires notification within 72 hours.",
+        "the controller shall notify the supervisory authority",
+    )
+    assert unattested_numbers(claim) == ["72"]
+
+
+def test_a_framework_identifier_is_a_reference():
+    """A NIST CSF subcategory code names where the rule lives; "04" is not a quantity."""
+    claim = _numbered(
+        "Critical objectives are understood and communicated (GV.OC-04).",
+        "Critical objectives are understood and communicated.",
+    )
+    assert unattested_numbers(claim) == []
+    assert "04" in reference_numbers(claim)

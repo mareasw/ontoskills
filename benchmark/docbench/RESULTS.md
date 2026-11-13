@@ -901,7 +901,8 @@ cache reports them too instead of claiming to be free.
 The 50 claims that are not `ok` are 0.9% of the corpus, and they are two
 near-uniform families, not a long tail. All 27 `no` are a number in the statement
 that the quoted span does not contain (`EU_SCC-0112` claims `8.2`, the span has
-no such figure). 22 of the 23 `weak` share one shape: the span is a list item, a
+no such figure) — the next section shows what those numbers turned out to be:
+cross-references, not figures. 22 of the 23 `weak` share one shape: the span is a list item, a
 continuation or a column cut, so the subject the statement supplies is not in
 the quote — `GDPR-0824` states "The binding corporate rules shall specify at
 least the mechanisms…" while its span begins at "(k) the mechanisms…". That is
@@ -930,6 +931,119 @@ without the storage-limitation counterpoint. Retrieval is deterministic BM25 ove
 statement, quote, actor and conditions, so what keeps those two contrasts out of
 view is ranking, not extraction. Precedence stays out of scope until a rule
 exists.
+
+## Phase 2 — retrieval and credibility (2026-11-12) — a gate measured, and failed
+
+The extraction run above is unchanged: same prompt byte for byte, same model,
+same 1,004,607 / 1,856,731 tokens, same $1.27. Everything below runs from the
+reply cache at **$0**, with `0 call(s)` on all 14 documents, so the claim set and
+every number here are reproducible without a paid call.
+
+### What moved, and why
+
+Three defects were repaired on the way out of the compiler. None of them touched
+the frozen prompt or the parity-tested segmenter:
+
+- **a list item declares its lead-in.** A span that opens with `(k)` or a
+  lowercase continuation carries no subject of its own; the model read the
+  lead-in in the chunk, so the claim now carries that span as a second evidence
+  item with role `context` (verbatim, own locator). A list item borrows the
+  opener of its list, not the sibling item printed before it.
+- **a page masthead is not a section.** `L 119/29`, `OJ L, 12.7.2024` and a
+  running date line were taken for headings, so everything below them carried a
+  page number where the article should be. 2,611 claims got their real section
+  back, plus 113 more from the date line. This is user-visible (the view prints
+  the section) and it is what made the quoted item's subject findable.
+- **the verifier normalises each document once**, not once per claim. A rebuild
+  went from 1,109 s to **~50 s**; the remaining cost is extraction replay and
+  the verifier, not hashing the same document 5,680 times.
+
+| | first run | after the repairs |
+|---|---:|---:|
+| `ok` | 5,630 (99.1%) | **5,670 (99.8%)** |
+| `weak` | 23 | **10** |
+| `no` | 27 | **0** |
+
+The 27 `no` were never fabricated figures. Fourteen became attested once the
+context item and the section paths were fixed; the remaining 13 are structural
+references — `Clause 8.2`, `Article 6(1)`, `Paragraphs 1, 2 and 3`,
+`Directive (EU) 2019/790`, `MEASURE 2.4` — whose number the quoted item does not
+repeat because it points at a sibling. They are now recorded as a **note** on
+the claim ("structural reference, not a quantity"), not as a failure. The rule is
+positional, so a reference never excuses a quantity beside it. A quantity that no
+evidence quote or section path carries is still **refused at construction** and
+written to `rejected.jsonl`; in this corpus that fence refuses **0 claims** today,
+which is the honest number — it is a guard, not what closed the 13.
+
+The 10 remaining `weak` are documented rather than hidden: six AI Act claims
+whose subject sits in the sentence that opens the list (an opener is one span and
+the segmenter already caps spans), one real conflict in `MSC_CORE-0114`, one
+column cut in `UK_AIPB-0384`, one passive paraphrase in `UK_AIPB-0445`, and two
+accounting rows where the section had masked an insufficient quote
+(`TNA_ACCOUNTING-0028`, `-0058`) — findings, not regressions.
+
+### Retrieval: a gold set and a gate, declared before the first measurement
+
+20 questions, 41 expectations, **14 of 14 documents**, 10 questions with
+expectations in more than one document. An expectation is a `(document, verbatim
+fragment)` pair, the fragment at least 40 characters and copied from the claim's
+quote, so the metric survives re-segmentation and cannot be gamed by ranking.
+`examples/demo-corpus/gold/questions.jsonl` and the gate below were committed
+**before** the baseline was run:
+
+- **hit@12 ≥ 18 of 20** questions;
+- **mean recall@12 ≥ 0.60**;
+- MRR@12 is reported, not gated: a gate on sharpness would tempt re-ranking the
+  gold set after seeing the number.
+
+| configuration | hit@12 | recall@12 | MRR@12 | gate |
+|---|---:|---:|---:|---|
+| BM25 (pre-registered baseline) | 13/20 (0.650) | 0.467 | 0.467 | **FAIL** |
+| BM25 fused with local MiniLM, RRF k=60 | **16/20 (0.800)** | **0.592** | **0.588** | **FAIL** |
+
+The hybrid closes three of the seven baseline misses (q14, q15, q18), regresses
+none, and still lands two hits and 0.008 recall short. The gate, the questions and
+the fragments were not changed after the number was seen.
+
+Diagnosis of the four remaining misses, from the claims themselves:
+
+- **q19** is a singular/plural mismatch: the question says "voucher", the only
+  claim says "vouchers", and `tokens` does no morphological normalisation — the
+  claim has no lexical score at all. RRF then gives a semantic-only claim
+  `1/(60+rank)`, smaller than any claim both rankers found, so it never enters
+  twelve slots.
+- **q04, q13, q20** ask for two or three specific rules at once; with twelve
+  slots the broad lexical matches fill the window before all of them appear.
+
+And the claim that motivated the work — `GDPR-0543`, storage limitation — is
+still absent from the top twelve of "How long may contractual records be kept?"
+(BM25 raw rank 51 of 4,204; cosine rank 138; fused 54). MiniLM does not bridge
+"personal data" and "contractual records": the semantic pass is a ranked prior,
+not a synonym engine.
+
+### What the local model costs
+
+384 dimensions, 22 MB of vectors for 5,680 claims, 702 s to embed the corpus once
+on CPU, and ~105 s to load the pinned model in a fresh process; embedding one
+question is ~0.04 s. `ask` keeps BM25 when `vectors.jsonl` is absent or torch is
+not installed, so the KB never requires the optional runtime to answer.
+
+A further iteration is not taken here, because it would be a new measurement and
+not a repair: light morphological normalisation in `tokens` (q19's class), and a
+fusion that does not drown a semantic-only hit under the sum of many lexical
+ranks. Both would run against the same gold set and the same gate.
+
+### The demo's exit criterion, after the verdict filter
+
+`ask` answers only claims the verifier passed; `view` keeps every claim and
+badges it. `check_questions.py` therefore counts answers a reader can trust:
+
+| Question | Claims | Documents |
+|---|---:|---:|
+| Breach notification deadline | 12 | 6 |
+| Contractual retention | 12 | 4 |
+| Sub-processor obligations | 12 | 3 |
+
 
 ## Limitations
 
@@ -1043,3 +1157,17 @@ python benchmark/docbench/verify_claims.py \
 ```
 
 `--replay` aborts on any attempted model call, so the command cannot spend.
+
+Phase 2 — rebuild from cache at $0, then the measurement:
+
+```bash
+ontocore ingest examples/demo-corpus -o examples/demo-corpus/kb \
+  --resume --model deepseek-v4.1-flash
+python examples/demo-corpus/check_questions.py --kb examples/demo-corpus/kb
+python examples/demo-corpus/eval_retrieval.py --kb examples/demo-corpus/kb
+python examples/demo-corpus/eval_retrieval.py --kb examples/demo-corpus/kb --semantic
+```
+
+The first eval is BM25; the second needs `vectors.jsonl` (`ingest --semantic`)
+and the optional `sentence-transformers` runtime. Both print the gate line and
+exit non-zero on failure.

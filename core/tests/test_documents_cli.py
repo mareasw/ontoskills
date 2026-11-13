@@ -5,6 +5,7 @@ from __future__ import annotations
 from click.testing import CliRunner
 
 from compiler.cli import cli
+from compiler.cli.documents import _print_estimate
 from compiler.documents.llm import ModelError
 from compiler.documents.store import KnowledgeBase
 
@@ -200,3 +201,11 @@ def test_ingest_keeps_going_when_one_document_fails(tmp_path, monkeypatch):
     claims = kb.claims()
     assert [claim["doc_id"] for claim in claims] == ["b_good"]
     assert "The Supplier shall notify" in claims[0]["evidence"][0]["quote"]
+
+
+def test_estimate_prints_the_page_count():
+    rows = [
+        {"doc_id": "A", "spans": 3, "chunks": 1, "chars": 300, "tokens": 100, "pages": 12},
+        {"doc_id": "B", "spans": 2, "chunks": 1, "chars": 200, "tokens": 60, "pages": None},
+    ]
+    assert _print_estimate(rows, 0.15, 0.60)["pages"] == 12
