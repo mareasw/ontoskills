@@ -67,6 +67,7 @@ class CompileStats:
     truncated: int = 0
     retried: int = 0
     failed: int = 0
+    errors: list[str] = field(default_factory=list)
     conflict_calls: int = 0
 
     def cost(self, options: CompileOptions) -> float:
@@ -465,6 +466,10 @@ class ChunkRun:
     events: list[tuple[bool, dict, str, bool]] = field(default_factory=list)
     retried: int = 0
     failed: int = 0
+    # The reason each failed call gave. The CLI prints it: "10 model call(s)
+    # failed" without a cause is what a missing base URL looked like from the
+    # operator's side, and it took a corpus to notice.
+    errors: list[str] = field(default_factory=list)
 
 
 def _run_block(
@@ -497,6 +502,7 @@ def _run_block(
         reply, usage, finish, cached = _one_chunk(prompt, fingerprint, path, options)
     except ModelError as exc:
         run.failed += 1
+        run.errors.append(str(exc))
         if progress:
             progress(f"{doc.doc_id}: chunk {index}{suffix} failed: {exc}")
         return run
@@ -525,6 +531,7 @@ def _run_block(
         run.events.extend(child.events)
         run.retried += child.retried
         run.failed += child.failed
+        run.errors.extend(child.errors)
     return run
 
 
@@ -568,6 +575,7 @@ def compile_document(
         run = runs[index]
         stats.retried += run.retried
         stats.failed += run.failed
+        stats.errors.extend(run.errors)
         for cached, usage, finish, split in run.events:
             stats.calls += 0 if cached else 1
             stats.cached += 1 if cached else 0
