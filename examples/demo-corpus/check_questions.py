@@ -44,7 +44,9 @@ def main() -> int:
         for line in args.questions.read_text(encoding="utf-8").splitlines()
         if line.strip() and not line.startswith("#")
     ]
-    corpus = Corpus(claims, kb.documents())
+    # The exit criterion is about answers, so count only the claims the
+    # verifier passed: a claim it rejected must not make a question "pass".
+    corpus = Corpus(claims, kb.documents(), verdicts=kb.verifier())
 
     rows = []
     for question in questions:

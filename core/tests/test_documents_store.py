@@ -107,3 +107,32 @@ def test_write_is_atomic_and_leaves_no_temp_files(tmp_path):
 
 def test_missing_claims_means_no_knowledge_base(tmp_path):
     assert not KnowledgeBase(tmp_path).exists()
+
+
+class _FakeEmbedder:
+    """A stand-in for the model: the store's job is the file, not the encoding."""
+
+    def encode(self, texts):
+        return [[float(len(text)), 1.0] for text in texts]
+
+
+def test_vectors_roundtrip_with_a_header(tmp_path):
+    from compiler.documents.store import write_vectors
+    from compiler.documents.vector import DIM, MODEL, REVISION
+
+    _, _, claims = _rows()
+    kb = KnowledgeBase(tmp_path)
+    written = write_vectors(kb, claims, _FakeEmbedder())
+
+    assert written == 1
+    vector = kb.vectors()["T1-0001"]
+    assert len(vector) == 2 and vector[1] == 1.0 and vector[0] > 0
+    assert list(kb.vectors()) == ["T1-0001"]
+    header = kb.vectors_header()
+    assert (header["model"], header["revision"], header["dim"]) == (MODEL, REVISION, DIM)
+
+
+def test_no_vectors_file_means_no_vectors(tmp_path):
+    kb = KnowledgeBase(tmp_path)
+    assert kb.vectors() == {}
+    assert kb.vectors_header() == {}
