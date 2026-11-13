@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 
+from compiler.documents.segment import looks_like_heading
 from compiler.documents.text import norm
 
 # A page label in its running-header forms: a bare folio ("L 119/29", "12/144"),
@@ -55,8 +56,9 @@ TOC_MARKERS = frozenset(
 # is read again here, on the way out. The guards keep a heading from being
 # mistaken for an identifier ("EA 33 (NACE 62)"), a legal name ("NETCARING
 # S.R.L.") or a running header ("INFORMAZIONI"), which are lines of the same
-# shape.
-MAX_HEADING_WORDS = 6
+# shape. What counts as a heading is the segmenter's own definition, imported
+# rather than restated: a candidate that ``looks_like_heading`` rejects is not a
+# heading here either, however many capitals it prints.
 SENTENCE_START = re.compile(r"^[A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ]")
 
 # Position is the second signal, for the headers that are too long to be caught
@@ -160,8 +162,9 @@ def _folded_heading(
     """The all-caps heading a paragraph starts with, or ``""``.
 
     ``paragraph`` is a span: ``RIESAME La Direzione verificherà …``. The heading
-    is real when it is a whole line of the source, in capitals, short enough to
-    be a heading, followed by a sentence, and not furniture or an identifier.
+    is real when it is a whole line of the source, in capitals, a heading by the
+    segmenter's own definition, followed by a sentence, and not furniture or an
+    identifier.
     """
     words = paragraph.split()
     if len(words) < 2:
@@ -171,9 +174,10 @@ def _folded_heading(
         if not word.isupper() or any(char in word for char in ".0123456789()"):
             break
         taken.append(word)
-        if len(taken) > MAX_HEADING_WORDS:
-            return ""
-    if not taken:
+    # A span that is nothing but capitals has no sentence under the heading, so
+    # there is nothing that says the capitals are a heading rather than a title
+    # and the paragraph is somewhere else.
+    if not taken or len(taken) == len(words):
         return ""
     following = words[len(taken)]
     if not SENTENCE_START.match(following):
@@ -181,7 +185,7 @@ def _folded_heading(
     candidate = " ".join(taken).strip()
     if len(candidate) < 3 or norm(candidate) not in lines:
         return ""
-    if _is_page_furniture(candidate, bad, bad_norm):
+    if not looks_like_heading(candidate) or _is_page_furniture(candidate, bad, bad_norm):
         return ""
     return candidate
 

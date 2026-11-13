@@ -326,3 +326,16 @@ def test_a_legal_name_is_not_a_heading_at_the_start_of_a_paragraph():
         text,
     )
     assert clean_sections(spans, text)[0]["locator"]["section_path"] == ["Sede Legale"]
+
+
+def test_a_span_of_capitals_with_no_sentence_is_not_a_heading():
+    """A span that is all capitals has no sentence under it: nothing says it is a heading."""
+    text = "RIESAME E ALTRO\n\nIl riesame dovrà verificare lo stato delle azioni.\n"
+    spans = _spans_at(
+        ["RIESAME E ALTRO", "Il riesame dovrà verificare lo stato delle azioni."],
+        [[], []],
+        text,
+    )
+    cleaned = clean_sections(spans, text)
+    assert cleaned[0]["locator"]["section_path"] == []
+    assert cleaned[1]["locator"]["section_path"] == []
