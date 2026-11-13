@@ -3,12 +3,17 @@
 No model, no network. The answer is a ranked set of claims, each carrying the
 document, page, section and URL of the span it was compiled from, plus the
 verbatim quote. That is the whole point of the knowledge base: an answer you
-can check against the source in one click.
+can check against the source in one click. Only claims the deterministic
+verifier passed are answered; a caller that wants the audit surface asks for
+the rest and sees each verdict badge.
 
 Ranking is BM25 over a claim's statement, actor, conditions and the quotes of
-its evidence. Claims are grouped by document, because the demo's acceptance
-criterion is *cross-document*: three questions, each answered from at least two
-documents.
+its evidence. When the knowledge base carries local embeddings, the cosine
+ranking is fused with the lexical one by Reciprocal Rank Fusion — ranks only,
+so there is no weight to tune — and a claim the question's words cannot reach
+is still reachable. Claims are grouped by document, because the demo's
+acceptance criterion is *cross-document*: three questions, each answered from
+at least two documents.
 
 Tensions are the deterministic part of "this corpus does not speak with one
 voice". A number is attached to a topic by the words around it — a breach
@@ -26,6 +31,7 @@ from dataclasses import dataclass, field
 from typing import Iterable
 
 from compiler.documents.text import norm, tokens
+from compiler.documents.vector import cosine, fuse
 
 # BM25 parameters. The defaults are the standard ones; the corpus is small
 # enough that tuning them would be fitting the demo rather than measuring it.
@@ -93,6 +99,7 @@ class Citation:
     section_path: list[str]
     url: str
     score: float = 0.0
+    verdict: str = "ok"
 
     def label(self) -> str:
         bits = [self.title or self.doc_id]
@@ -147,9 +154,31 @@ def _claim_text(claim: dict) -> dict[str, str]:
 class Corpus:
     """An in-memory BM25 index over claims."""
 
-    def __init__(self, claims: list[dict], documents: Iterable[dict] = ()) -> None:
-        self.claims = list(claims)
+    def __init__(
+        self,
+        claims: list[dict],
+        documents: Iterable[dict] = (),
+        verdicts: Iterable[dict] = (),
+        include_unverified: bool = False,
+    ) -> None:
+        # The verifier is the only thing that knows whether a claim's evidence
+        # supports it, so an answer must not present a claim it did not pass.
+        # The filter runs before the index is built, so every index array stays
+        # aligned with ``self.claims``; a caller that wants the audit surface
+        # asks for it explicitly.
+        self.verdicts = {row["claim_id"]: row["verdict"] for row in (verdicts or ())}
+        self.include_unverified = include_unverified
+        self.claims = [
+            claim
+            for claim in claims
+            if include_unverified
+            or not self.verdicts
+            or self.verdicts.get(claim["claim_id"], "ok") == "ok"
+        ]
         self.documents = {doc["doc_id"]: doc for doc in documents}
+        self._by_id = {claim["claim_id"]: claim for claim in self.claims}
+        # Set by ``enable_semantic``: the vectors and the model, or nothing.
+        self._semantic: tuple[dict[str, list[float]], object] | None = None
         self.fields: list[dict[str, str]] = []
         self.tokens: list[list[str]] = []
         self.lengths: list[int] = []
@@ -174,7 +203,36 @@ class Corpus:
         df = self.df.get(term, 0)
         return math.log(1 + (total - df + 0.5) / (df + 0.5))
 
-    def search(self, question: str, limit: int = 12) -> list[Citation]:
+    def enable_semantic(self, vectors: dict[str, list[float]], embedder) -> None:
+        """Keep the vectors and the model; embedding one question is the only model call."""
+        self._semantic = (vectors, embedder)
+
+    def semantic_ranking(self, question: str, depth: int = 200) -> list[str]:
+        """Claim ids by cosine to the question, best first.
+
+        The model is called once per question, here; every later step works on
+        ranks. ``depth`` bounds the work: beyond it a claim cannot win a fusion
+        against a lexical hit anyway, so scoring the whole corpus would only
+        cost time.
+        """
+        if self._semantic is None:
+            return []
+        vectors, embedder = self._semantic
+        asked = embedder.encode_one(question)
+        scored = [
+            (claim_id, cosine(asked, vector))
+            for claim_id, vector in vectors.items()
+            if claim_id in self._by_id
+        ]
+        scored.sort(key=lambda item: (-item[1], item[0]))
+        return [claim_id for claim_id, _ in scored[:depth]]
+
+    def search(
+        self,
+        question: str,
+        limit: int = 12,
+        semantic_ranking: list[str] | None = None,
+    ) -> list[Citation]:
         query = tokens(question)
         if not query or not self.claims:
             return []
@@ -200,6 +258,24 @@ class Corpus:
             key=lambda index: scores[index],
             reverse=True,
         )
+
+        # Fusion happens before the cut and over the union of both rankings. A
+        # claim the lexical pass cannot reach has zero BM25 score and is absent
+        # from ``ranked``; if it were merged into a re-sorted ``ranked`` it would
+        # never become a candidate, which is the defect this exists to fix.
+        lexical = {self.claims[index]["claim_id"]: scores[index] for index in ranked}
+        weight: dict[str, float] = {}
+        if semantic_ranking:
+            fused = fuse([list(lexical), semantic_ranking])
+            weight = dict(fused)
+            order = {claim_id: position for position, (claim_id, _) in enumerate(fused)}
+            ranked = [
+                index
+                for index in range(len(self.claims))
+                if self.claims[index]["claim_id"] in order
+            ]
+            ranked.sort(key=lambda index: order[self.claims[index]["claim_id"]])
+
         out: list[Citation] = []
         seen_statements: set[str] = set()
         for index in ranked[: max(limit * 4, limit)]:
@@ -208,7 +284,8 @@ class Corpus:
             if key in seen_statements:
                 continue
             seen_statements.add(key)
-            out.append(self._citation(claim, scores[index]))
+            score = weight.get(claim["claim_id"], scores[index])
+            out.append(self._citation(claim, score))
             if len(out) >= limit:
                 break
         return out
@@ -228,6 +305,7 @@ class Corpus:
             section_path=list(locator.get("section_path") or []),
             url=locator.get("url") or document.get("url", ""),
             score=round(score, 4),
+            verdict=self.verdicts.get(claim["claim_id"], "ok"),
         )
 
 
@@ -307,7 +385,10 @@ def find_tensions(citations: list[Citation]) -> list[Tension]:
 
 
 def ask(question: str, corpus: Corpus, limit: int = 12) -> Answer:
-    citations = corpus.search(question, limit=limit)
+    # The model, when one is enabled, runs once per question, here: ``search``
+    # only ever sees the resulting ranks.
+    semantic = corpus.semantic_ranking(question) if tokens(question) else []
+    citations = corpus.search(question, limit=limit, semantic_ranking=semantic)
     return Answer(question=question, citations=citations, tensions=find_tensions(citations))
 
 
@@ -318,7 +399,8 @@ def render_text(answer: Answer) -> str:
     for doc_id, citations in groups.items():
         lines.append(f"== {citations[0].title}  [{doc_id}]  ({len(citations)} claim(s))")
         for citation in citations:
-            lines.append(f"  {citation.claim_id}  {citation.statement}")
+            mark = "" if citation.verdict == "ok" else f"[{citation.verdict}] "
+            lines.append(f"  {citation.claim_id}  {mark}{citation.statement}")
             where = citation.label()
             lines.append(f"      source: {where}")
             if citation.quote:

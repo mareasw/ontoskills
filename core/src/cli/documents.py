@@ -2,7 +2,9 @@
 
 These are thin: the pipeline lives in ``compiler.documents``; the commands load
 credentials, print a cost estimate before spending anything, and write the
-corpus directory. ``ask`` and ``view`` are deterministic and never call a model.
+corpus directory. ``ask`` never calls a paid API: when the KB carries vectors it
+may load the pinned local embedding model, offline, and fuses that ranking with
+BM25; ``view`` is pure BM25.
 """
 
 from __future__ import annotations
@@ -22,7 +24,8 @@ from compiler.documents.compile import CompileOptions, compile_document
 from compiler.documents.extract import ExtractionError, extract, strip_pages
 from compiler.documents.model import load_corpus
 from compiler.documents.prompt import PROMPT_HASH
-from compiler.documents.segment import chunk, segment
+from compiler.documents.segment import chunk, lead_ins, segment
+from compiler.documents.sections import apply_sections, clean_sections
 from compiler.documents.store import KnowledgeBase
 from compiler.documents.verify import summarise, verify_all
 from compiler.documents.web import render_view
@@ -70,7 +73,11 @@ def _print_estimate(rows: list[dict], price_in: float, price_out: float) -> dict
     table.add_column("prompt chars", justify="right")
     table.add_column("~in tok", justify="right")
     table.add_column("~out tok", justify="right")
+    # Pages are what the reader of a legal PDF navigates by, and the only unit
+    # that can be checked against the source without reading the token count.
+    table.add_column("pages", justify="right")
     total_in = 0
+    total_pages = 0
     for row in rows:
         table.add_row(
             row["doc_id"],
@@ -79,20 +86,27 @@ def _print_estimate(rows: list[dict], price_in: float, price_out: float) -> dict
             f"{row['chars']:,}",
             f"{row['tokens']:,}",
             f"{int(row['tokens'] * OUTPUT_RATIO):,}",
+            "" if row.get("pages") is None else str(row["pages"]),
         )
         total_in += row["tokens"]
+        total_pages += row["pages"] or 0
     console.print(table)
     out_tokens = int(total_in * OUTPUT_RATIO)
     cost = total_in / 1_000_000 * price_in + out_tokens / 1_000_000 * price_out
     console.print(
-        f"Total: ~{total_in:,} input tokens, ~{out_tokens:,} output tokens "
-        f"→ ~${cost:.2f} at ${price_in}/M in, ${price_out}/M out."
+        f"Total: ~{total_in:,} input tokens, ~{out_tokens:,} output tokens, "
+        f"{total_pages} PDF pages → ~${cost:.2f} at ${price_in}/M in, ${price_out}/M out."
     )
     console.print(
         "[dim]Estimate assumes 3.8 chars/token and the Phase 1 output ratio; "
         "the real number is only known after the run.[/dim]"
     )
-    return {"input_tokens": total_in, "output_tokens": out_tokens, "cost": round(cost, 2)}
+    return {
+        "input_tokens": total_in,
+        "output_tokens": out_tokens,
+        "pages": total_pages,
+        "cost": round(cost, 2),
+    }
 
 
 @click.command("ingest")
@@ -119,9 +133,12 @@ def _print_estimate(rows: list[dict], price_in: float, price_out: float) -> dict
 @click.option("--questions-file", type=click.Path(exists=True, dir_okay=False, path_type=Path), default=None,
               help="One demo question per line")
 @click.option("--name", default=None, help="Corpus name shown in the view")
+@click.option("--semantic", is_flag=True,
+              help="Embed every claim with the local MiniLM model (vectors.jsonl, no network)")
 def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_run,
                chunk_size, overlap, max_tokens, concurrency, resume, cache_dir,
-               no_conflicts, price_in, price_out, questions, questions_file, name):
+               no_conflicts, price_in, price_out, questions, questions_file, name,
+               semantic):
     """Compile a folder of documents into a knowledge base.
 
     \b
@@ -168,6 +185,7 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
                 "chunks": len(chunks),
                 "chars": chars,
                 "tokens": int(chars / CHARS_PER_TOKEN) + len(chunks) * 40,
+                "pages": _page_count(texts[doc.doc_id]) if doc.kind == "pdf" else None,
                 "text": texts[doc.doc_id],
                 "spans_list": doc_spans,
             }
@@ -202,14 +220,26 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
     started = time.time()
     all_claims: list[dict] = []
     all_spans: list[dict] = []
+    all_rejected: list[dict] = []
     total_in = total_out = 0
+    total_rejected_numbers = 0
     failed: list[str] = []
     for doc, row in zip(docs, rows):
         with console.status(f"compiling {doc.doc_id} ({len(row['spans_list'])} spans)") as status:
             def progress(message: str, _status=status) -> None:
                 _status.update(f"[yellow]{message}[/yellow]")
 
-            compiled = compile_document(doc, row["text"], row["spans_list"], options, progress)
+            cleaned = clean_sections(row["spans_list"], row["text"])
+            lead_map = lead_ins(cleaned)
+            compiled = compile_document(
+                doc, row["text"], row["spans_list"], options, progress, lead_map=lead_map
+            )
+        # The prompt above showed the model the raw headings, and the cache
+        # fingerprint covers the text and the span ids, so the repair happens
+        # only now: the reply is cached, the claims are built, and from here on
+        # the artifact and the verifier see the section a reader would name.
+        apply_sections(compiled.claims, cleaned)
+        compiled.spans = cleaned
         if compiled.stats.failed:
             # One unservable chunk must not block the rest of the corpus: the
             # cache keeps every reply that did arrive, so the next --resume
@@ -222,6 +252,8 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
             continue
         all_claims.extend(compiled.claims)
         all_spans.extend(compiled.spans)
+        all_rejected.extend(compiled.rejected)
+        total_rejected_numbers += compiled.stats.rejected_numbers
         total_in += compiled.stats.input_tokens
         total_out += compiled.stats.output_tokens
         cost = compiled.stats.cost(options)
@@ -269,13 +301,44 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         spans=all_spans,
         claims=all_claims,
         verifier_rows=rows_verdicts,
+        rejected_rows=all_rejected,
     )
-    answers = [answer(question, Corpus(all_claims, rows_docs)) for question in questions] if questions else []
+    if semantic:
+        # The vectors are a derived artifact like graph.ttl: same claims, same
+        # text, so they are built after the KB is written and never call a model
+        # over the network. A missing runtime is a hard error here, because the
+        # operator asked for something the build did not produce.
+        from compiler.documents.store import write_vectors
+
+        try:
+            from compiler.documents.vector import MODEL as EMBED_MODEL, embedder_for
+
+            started_vectors = time.time()
+            written = write_vectors(kb, all_claims, embedder_for(kb))
+        except (ImportError, OSError, ValueError) as exc:
+            raise click.ClickException(
+                f"--semantic needs the local embedding runtime: {exc}"
+            )
+        console.print(
+            f"vectors: {written} claim(s), model {EMBED_MODEL}, "
+            f"{time.time() - started_vectors:.1f}s"
+        )
+    # The view is the audit surface: a claim the verifier did not pass is shown
+    # with its badge, not hidden, so a reader can see what the gate caught.
+    view_corpus = Corpus(
+        all_claims, rows_docs, verdicts=rows_verdicts, include_unverified=True
+    )
+    answers = [answer(question, view_corpus) for question in questions] if questions else []
     kb.write_view(render_view(kb, answers=answers))
 
     console.print()
     console.print(f"[bold]{len(all_claims)}[/bold] claims in [bold]{len(docs)}[/bold] documents")
     console.print(f"verifier: {json.dumps(report['by_verdict'])}")
+    if total_rejected_numbers:
+        console.print(
+            f"rejected: {total_rejected_numbers} claim(s) whose quantity is not in the "
+            "evidence — see rejected.jsonl"
+        )
     console.print(
         f"cost: ${manifest['cost_usd']:.3f} ({total_in:,} in / {total_out:,} out), "
         f"{manifest['elapsed_s']}s"
@@ -298,19 +361,58 @@ def _page_count(text: str) -> int:
     return text.count("\f") + 1 if "\f" in text else 1
 
 
+def _corpus(kb: KnowledgeBase, include_unverified: bool) -> Corpus:
+    """The corpus `ask` answers from: verified claims only, unless asked otherwise."""
+    verdicts = kb.verifier()
+    if not verdicts:
+        console.print(
+            "[yellow]warning:[/yellow] no verifier.jsonl: unverified claims are shown unfiltered"
+        )
+    return Corpus(
+        kb.claims(), kb.documents(), verdicts=verdicts, include_unverified=include_unverified
+    )
+
+
+def _enable_semantic(corpus: Corpus, kb: KnowledgeBase, asked: bool = False) -> None:
+    """Add the embedding ranking when the KB has vectors and the runtime loads.
+
+    Silent when the KB was simply built without ``--semantic``: that is a normal
+    KB, not a failure. Anything else — no vectors but the flag was typed, no
+    torch, a vectors file from another model — is one dim line and BM25, because
+    a missing model must never turn a deterministic answer into an error.
+    """
+    vectors = kb.vectors()
+    if not vectors:
+        if asked:
+            console.print("[dim]semantic ranking unavailable (no vectors.jsonl): BM25 only[/dim]")
+        return
+    try:
+        from compiler.documents.vector import embedder_for
+
+        corpus.enable_semantic(vectors, embedder_for(kb))
+    except Exception as exc:  # sentence-transformers, torch, or a foreign model
+        console.print(f"[dim]semantic ranking unavailable ({exc}): BM25 only[/dim]")
+
+
 @click.command("ask")
 @click.argument("question")
 @click.option("-k", "--kb", "kb_dir", type=click.Path(exists=True, file_okay=False, path_type=Path),
               default=Path("kb"), show_default=True, help="Knowledge-base directory")
 @click.option("-n", "--limit", default=12, show_default=True, type=int, help="Max citations")
 @click.option("--json", "as_json", is_flag=True, help="Emit JSON instead of text")
-def ask_cmd(question, kb_dir, limit, as_json):
+@click.option("--include-unverified", is_flag=True,
+              help="Also cite claims the verifier did not pass, marked with their verdict")
+@click.option("--semantic/--no-semantic", "semantic", default=None,
+              help="Fuse a local embedding ranking with BM25 (default: when the KB has vectors)")
+def ask_cmd(question, kb_dir, limit, as_json, include_unverified, semantic):
     """Answer a question from a compiled corpus, with citations."""
     kb = KnowledgeBase(kb_dir)
     claims = kb.claims()
     if not claims:
         raise click.ClickException(f"{kb_dir}: no claims.jsonl; run `ontocore ingest` first")
-    corpus = Corpus(claims, kb.documents())
+    corpus = _corpus(kb, include_unverified)
+    if semantic is not False:
+        _enable_semantic(corpus, kb, asked=semantic is True)
     result = answer(question, corpus, limit=limit)
     if as_json:
         click.echo(json.dumps({
@@ -346,7 +448,7 @@ def view_cmd(kb_dir, questions, questions_file, out, limit):
             line.strip() for line in questions_file.read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.startswith("#")
         )
-    corpus = Corpus(claims, kb.documents())
+    corpus = _corpus(kb, include_unverified=True)
     answers = [answer(question, corpus, limit=limit) for question in questions]
     html = render_view(kb, answers=answers)
     target = out or (kb_dir / "view.html")

@@ -12,8 +12,11 @@ Six rules, in the order they are applied:
    the declared page is a page the quote occurs on;
 3. **section** — the declared section path and the span's own path agree, one
    being a prefix of the other;
-4. **numbers** — every number in the statement appears in the evidence or the
-   section path;
+4. **numbers** — every *quantity* in the statement appears in the evidence or
+   the section path. A number that is part of a cross-reference ("Article 6(1)",
+   "Clause 8.2") names where a rule lives and is recorded as a note instead:
+   the quote is the item, and the item does not repeat the clause it sits under.
+   The split is positional, so a reference never excuses a quantity beside it;
 5. **attestation** — more than one content token in four of the statement is
    not in the evidence or the section path (``weak``);
 6. **modality** — a statement that says permission where the evidence says
@@ -32,6 +35,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from functools import lru_cache
 from typing import Iterable
 
 from compiler.documents.text import modal_classes, norm, same_word, statement_tokens, tokens
@@ -83,9 +87,52 @@ class SpanIndex:
 NUMBER = re.compile(r"(?<![\w.])\d+(?:[.,]\d+)*(?![\w.])")
 PARAPHRASE_TOLERANCE = 0.25
 
+# A cross-reference names where a rule lives; it does not state a quantity. The
+# model may write "Clause 8.2" when the quote is the item under another clause,
+# and failing that claim over a citation marker is a false alarm that buries the
+# real ones. The forms below are the ones the corpus uses.
+REFERENCE_KEYWORD = (
+    r"Article|Clause|Paragraph|Point|Section|Chapter|Annex|Recital|Rule|Step|"
+    r"Appendix|Schedule"
+)
+REFERENCE_PLURAL = (
+    r"Articles|Clauses|Paragraphs|Points|Sections|Chapters|Annexes|Recitals|Rules|Steps"
+)
+_SUBPOINT = r"(?:\s*[\(\[]\s*[a-z0-9]+\s*[\)\]])?"
+_REFERENCE = re.compile(
+    rf"\b(?:{REFERENCE_KEYWORD})\s+\d+(?:\.\d+)*{_SUBPOINT}"
+    rf"|\b(?:{REFERENCE_PLURAL})\s+\d+(?:\.\d+)*"
+    rf"(?:\s*(?:,|and|to|or|–|-)\s*\d+(?:\.\d+)*)+"
+    # A NIST function label is a name, not a measurement.
+    r"|\b(?:GOVERN|MAP|MEASURE|MANAGE)\s+\d+(?:\.\d+)*"
+    # A framework identifier names a subcategory, not a quantity: a NIST CSF
+    # claim ends "... are understood and communicated (GV.OC-04)", and the "04"
+    # is where the rule lives. The corpus has 33 of these.
+    r"|\b[A-Z]{2}(?:\.[A-Z]{2})?-\d{1,3}\b",
+)
+# A legal act is identified by a year and a number: Directive (EU) 2019/790.
+_ACT = re.compile(
+    r"\(\s*(?:EU|EC|EEC|Euratom)\s*\)\s*\d{1,4}/\d{1,4}"
+    r"|\b(?:Directive|Regulation|Decision)\s+\d{1,4}/\d{1,4}"
+)
+REFERENCES = (_REFERENCE, _ACT)
+
+
+@lru_cache(maxsize=16)
+def _pages(source: str) -> tuple[str, ...]:
+    """The normalised pages of one source.
+
+    ``page_containing`` runs once per evidence item, and splitting plus
+    normalising the whole document each time was 99% of the verification time:
+    the work depended on claims × document size. The text is the cache key, so
+    a caller that verifies many claims in one document pays for it once.
+    """
+    return tuple(norm(page) for page in source.split("\f"))
+
+
 def page_containing(source: str, quote: str, declared: int | None = None) -> int | None:
     """Return the page that carries ``quote``; honour a declared page that does."""
-    pages = [i for i, page in enumerate(source.split("\f"), start=1) if quote in norm(page)]
+    pages = [i for i, page in enumerate(_pages(source), start=1) if quote in page]
     if not pages:
         return None
     if declared in pages:
@@ -111,14 +158,58 @@ def evidence_text(claim: dict) -> tuple[str, str]:
     return " ".join(quotes), " ".join(paths)
 
 
-def verify(claim: dict, spans: SpanIndex, texts: dict[str, str]) -> dict:
-    """Return ``{"verdict", "reasons", "notes"}`` for one claim, rules only."""
+def _number_roles(claim: dict) -> tuple[list[str], list[str]]:
+    """Split the statement's unattested numbers into quantities and references.
+
+    Positional, not value-based: "Article 6(1) binds 6 employees" has one number
+    of each kind, and excusing every ``6`` because one of them is a reference
+    would hide a fabricated quantity behind a citation.
+    """
+    statement = claim.get("statement", "")
+    quote_text, path_text = evidence_text(claim)
+    spans = [(m.start(), m.end()) for pattern in REFERENCES for m in pattern.finditer(statement)]
+    quantities: list[str] = []
+    references: list[str] = []
+    for match in NUMBER.finditer(statement):
+        number = match.group(0)
+        if number in quote_text or number in path_text:
+            continue
+        if any(start <= match.start() and match.end() <= end for start, end in spans):
+            references.append(number)
+        else:
+            quantities.append(number)
+    return quantities, references
+
+
+def unattested_numbers(claim: dict) -> list[str]:
+    """Quantities in the statement that no evidence quote or section path carries."""
+    return _number_roles(claim)[0]
+
+
+def reference_numbers(claim: dict) -> list[str]:
+    """Cross-reference numbers the evidence does not repeat; they need no quote."""
+    return _number_roles(claim)[1]
+
+
+def verify(
+    claim: dict,
+    spans: SpanIndex,
+    texts: dict[str, str],
+    normalised: dict[str, str] | None = None,
+) -> dict:
+    """Return ``{"verdict", "reasons", "notes"}`` for one claim, rules only.
+
+    ``normalised`` lets a caller that verifies many claims in the same document
+    hand in the already-normalised source. Normalising the whole text is the
+    expensive step here, and doing it once per claim made the rebuild cost
+    claims × document size, so ``verify_all`` builds the map once.
+    """
     hard: list[str] = []
     soft: list[str] = []
     notes: list[str] = []
     doc = claim["doc_id"]
     raw = texts.get(doc, "")
-    source = norm(raw)
+    source = (normalised or {}).get(doc) or norm(raw)
 
     for index, item in enumerate(claim.get("evidence") or []):
         quote = norm(item.get("quote", ""))
@@ -176,10 +267,11 @@ def verify(claim: dict, spans: SpanIndex, texts: dict[str, str]) -> dict:
                 + "/".join(sorted(evidence_classes))
             )
 
-    numbers = NUMBER.findall(claim.get("statement", ""))
-    missing_numbers = [n for n in numbers if n not in quote_text and n not in path_text]
+    missing_numbers, references = _number_roles(claim)
     if missing_numbers:
         hard.append("numbers not in the evidence: " + ", ".join(missing_numbers))
+    if references:
+        notes.append("structural reference, not a quantity: " + ", ".join(references))
 
     if hard:
         return {"verdict": "no", "reasons": hard + soft, "notes": notes}
@@ -189,11 +281,17 @@ def verify(claim: dict, spans: SpanIndex, texts: dict[str, str]) -> dict:
 
 
 def verify_all(claims: list[dict], spans: Iterable[dict], texts: dict[str, str]) -> list[dict]:
-    """Verify every claim; returns one row per claim in input order."""
+    """Verify every claim; returns one row per claim in input order.
+
+    The source is normalised once per document, not once per claim: a rule set
+    that is quadratic in the corpus size is a rebuild that takes minutes for
+    no gain.
+    """
     index = SpanIndex(spans)
+    normalised = {doc: norm(text) for doc, text in texts.items()}
     rows: list[dict] = []
     for claim in claims:
-        out = verify(claim, index, texts)
+        out = verify(claim, index, texts, normalised)
         rows.append({"claim_id": claim["claim_id"], "doc_id": claim["doc_id"], **out})
     return rows
 
