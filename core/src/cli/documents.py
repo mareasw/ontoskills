@@ -231,6 +231,8 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
     total_rejected_numbers = 0
     total_truncated = 0
     total_retried = 0
+    total_localised = 0
+    languages: dict[str, str] = {}
     failed: list[str] = []
     for doc, row in zip(docs, rows):
         with console.status(f"compiling {doc.doc_id} ({len(row['spans_list'])} spans)") as status:
@@ -270,6 +272,9 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         total_rejected_numbers += compiled.stats.rejected_numbers
         total_truncated += compiled.stats.truncated
         total_retried += compiled.stats.retried
+        total_localised += compiled.stats.localised
+        if compiled.stats.language:
+            languages[doc.doc_id] = compiled.stats.language
         total_in += compiled.stats.input_tokens
         total_out += compiled.stats.output_tokens
         replayed_in += compiled.stats.replayed_input_tokens
@@ -279,6 +284,13 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         detail = ""
         if compiled.stats.retried:
             detail += f", {compiled.stats.retried} split"
+        if compiled.stats.localised:
+            detail += (
+                f", {compiled.stats.localised} statement(s) rewritten in "
+                f"{compiled.stats.language}"
+            )
+        if compiled.stats.localise_failed:
+            detail += f", [red]{compiled.stats.localise_failed} language pass failed[/red]"
         if compiled.stats.truncated:
             detail += f", [red]{compiled.stats.truncated} truncated[/red]"
         if compiled.stats.replayed_input_tokens or compiled.stats.replayed_output_tokens:
@@ -312,6 +324,11 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         "verifier": report["by_verdict"],
         "truncated_calls": total_truncated,
         "retried_chunks": total_retried,
+        # The language each document opens in, and how many statements were
+        # rewritten to match it. A document that opens in an undecided paragraph
+        # has no entry and nothing is rewritten.
+        "languages": languages,
+        "localised_statements": total_localised,
         # What this run paid, and what the cached replies cost when they were
         # first generated. A resumed build is not free and not a second bill.
         "cost_usd": round(total_in / 1_000_000 * price_in + total_out / 1_000_000 * price_out, 4),
@@ -434,19 +451,30 @@ def _enable_semantic(corpus: Corpus, kb: KnowledgeBase, asked: bool = False) -> 
     """Add the embedding ranking when the KB has vectors and the runtime loads.
 
     Silent when the KB was simply built without ``--semantic``: that is a normal
-    KB, not a failure. Anything else — no vectors but the flag was typed, no
-    torch, a vectors file from another model — is one dim line and BM25, because
-    a missing model must never turn a deterministic answer into an error.
+    KB, not a failure. Anything else — no vectors but the flag was typed, a
+    corpus in a language the model was not trained on, no torch, a vectors file
+    from another model — is one dim line and BM25, because a missing or
+    mismatched model must never turn a deterministic answer into an error.
     """
     vectors = kb.vectors()
     if not vectors:
         if asked:
             console.print("[dim]semantic ranking unavailable (no vectors.jsonl): BM25 only[/dim]")
         return
+    languages = set((kb.manifest().get("languages") or {}).values())
     try:
-        from compiler.documents.vector import embedder_for
+        from compiler.documents.vector import LANGUAGES, MODEL, embedder_for, supports
 
-        corpus.enable_semantic(vectors, embedder_for(kb))
+        # Check the language before loading the model: there is no reason to
+        # import torch to decide not to use it.
+        if not supports(languages):
+            console.print(
+                f"[dim]semantic ranking skipped: {MODEL} is trained on "
+                f"{', '.join(sorted(LANGUAGES))}, the corpus is "
+                f"{', '.join(sorted(languages))}: BM25 only[/dim]"
+            )
+            return
+        corpus.enable_semantic(vectors, embedder_for(kb), languages)
     except Exception as exc:  # sentence-transformers, torch, or a foreign model
         console.print(f"[dim]semantic ranking unavailable ({exc}): BM25 only[/dim]")
 

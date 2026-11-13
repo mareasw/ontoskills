@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from compiler.documents.vector import cosine, fuse
+from compiler.documents.vector import cosine, fuse, supports
 
 
 def test_cosine_of_identical_vectors_is_one():
@@ -53,3 +53,13 @@ def test_the_local_model_encodes_deterministically():
     second = embedder.encode_one("a retention period")
     assert first == second
     assert len(first) == 384
+
+
+def test_the_model_languages_are_declared():
+    """An English model on an Italian corpus is not a second opinion."""
+    assert supports({"en"}) is True
+    assert supports({"en", "it"}) is True
+    assert supports({"it"}) is False
+    # A KB from before the language was recorded has nothing to compare.
+    assert supports(set()) is True
+    assert supports({"", None}) is True
