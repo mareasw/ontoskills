@@ -134,6 +134,98 @@ def _is_page_furniture(part: str, bad: set[str], bad_norm: set[str]) -> bool:
     return _is_joined_furniture(norm(part), bad_norm)
 
 
+# The segmenter accepts a heading only if it has seven words or fewer. Italian
+# article titles are descriptive and often longer — "Articolo 5 - Divieto di
+# detenzione di materiale pornografico" is nine words — so the line stays in the
+# body and every claim under it inherits the band above. The marker is what makes
+# the line a heading, whatever its length, so the article headings the segmenter
+# skipped are read again here, on the way out.
+ARTICLE_HEADING = re.compile(r"^(?:Articolo|Article|Art\.)\s+\d+(?:\.\d+)*\b")
+# An index line is the same heading followed by a page number: "Articolo 4 -
+# Gestione del personale.....................16". It is not a section, it is a
+# table of contents entry.
+TOC_ENTRY = re.compile(r"\.{3,}\s*\d*\s*$")
+MAX_HEADING = 90
+
+
+def _missed_headings(text: str) -> list[tuple[int, str]]:
+    """Article headings present in the text as ``(offset, line)``, in order.
+
+    The offset is into ``norm(text)``, the same string the span locators count
+    characters in, so a heading can be compared with the spans below it.
+    """
+    flat = norm(text)
+    out: list[tuple[int, str]] = []
+    cursor = 0
+    for raw in text.split("\n"):
+        line = raw.strip()
+        if not line:
+            continue
+        # Every line has to advance the cursor, not only the headings, or a
+        # table-of-contents entry would be found again as the body heading it
+        # announces ("Articolo 4 - Gestione del personale……16").
+        piece = norm(line)
+        at = flat.find(piece, cursor)
+        if at < 0:
+            continue
+        cursor = at + len(piece)
+        if not ARTICLE_HEADING.match(line):
+            continue
+        if TOC_ENTRY.search(line) or len(line) > MAX_HEADING:
+            continue
+        if line.endswith((".", ";", ":", ",")):
+            continue
+        out.append((at, line))
+    return out
+
+
+def _last_seen(flat: str, part: str, before: int) -> int | None:
+    """Where the path element last appears above ``before``, if it does."""
+    at = flat.rfind(norm(part), 0, before)
+    return at if at >= 0 else None
+
+
+def _add_missed_article(
+    path: list[str], start: int, missed: list[tuple[int, str]], flat: str
+) -> list[str]:
+    """Put the nearest article heading into the path the span sits under.
+
+    Articles are siblings, so an earlier one the segmenter did record is
+    replaced, not extended. A heading that comes after the article (a
+    subsection) stays, and the article is inserted before it; a heading that
+    comes before the article is the band above it and stays first. A heading
+    already on the path is never repeated.
+    """
+    if not missed:
+        return path
+    nearest = next(((at, line) for at, line in reversed(missed) if at <= start), None)
+    if nearest is None:
+        return path
+    at, line = nearest
+    if any(norm(part) == norm(line) for part in path):
+        return path
+    kept = [
+        part
+        for part in path
+        if not (
+            ARTICLE_HEADING.match(part)
+            and (seen := _last_seen(flat, part, start)) is not None
+            and seen < at
+        )
+    ]
+    below = next(
+        (
+            index
+            for index, part in enumerate(kept)
+            if (seen := _last_seen(flat, part, start)) is not None and seen > at
+        ),
+        None,
+    )
+    if below is None:
+        return [*kept, line][-MAX_PATH:]
+    return [*kept[:below], line, *kept[below:]][-MAX_PATH:]
+
+
 def clean_sections(spans: list[dict], text: str) -> list[dict]:
     """Return the spans with their section paths stripped of page furniture.
 
@@ -141,9 +233,15 @@ def clean_sections(spans: list[dict], text: str) -> list[dict]:
     real path seen above it in the same document, because a page break does not
     start a new article. A span that has nothing to inherit keeps an empty path
     rather than borrowing a heading the document never set.
+
+    The same rule applies in the other direction: an article heading the
+    segmenter rejected for its word count is added only when it is the heading
+    the span actually sits under, and only if it is not already on the path.
     """
     bad = furniture(text)
     bad_norm = {norm(line) for line in bad if len(norm(line)) >= 2}
+    flat = norm(text)
+    missed = _missed_headings(text)
     grouped: dict[str, list[dict]] = {}
     for span in spans:
         grouped.setdefault(span["doc_id"], []).append(span)
@@ -163,6 +261,10 @@ def clean_sections(spans: list[dict], text: str) -> list[dict]:
                 last = path
             else:
                 path = list(last)
+            start = locator.get("char_start")
+            if start is not None:
+                path = _add_missed_article(path, int(start), missed, flat)
+                last = path
             locator["section_path"] = path
             cleaned = dict(span)
             cleaned["locator"] = locator
