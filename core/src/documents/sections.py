@@ -197,7 +197,9 @@ def _folded_heading(
     if not taken or len(taken) == len(words):
         return ""
     following = words[len(taken)]
-    if not SENTENCE_START.match(following):
+    # The sentence may open with an elision ("L'osservanza …"), which is a
+    # sentence and not a label: the same test the gap heading uses.
+    if not starts_sentence(following):
         return ""
     candidate = " ".join(taken).strip()
     if len(candidate) < 3 or norm(candidate) not in lines:
@@ -389,7 +391,7 @@ def _add_missed_article(
     return [*kept[:below], line, *kept[below:]][-MAX_PATH:]
 
 
-def _starts_sentence(text: str) -> bool:
+def starts_sentence(text: str) -> bool:
     """True when a word opens a sentence: a capital, then a lower-case letter.
 
     The apostrophe of an Italian elision ("L'osservanza") sits between the two,
@@ -403,7 +405,7 @@ def _starts_sentence(text: str) -> bool:
     return "'" in word and bool(SENTENCE_START.match(word.replace("'", "")))
 
 
-def _gap_heading(gap: str, bad: set[str], bad_norm: set[str]) -> str:
+def gap_heading(gap: str, bad: set[str], bad_norm: set[str]) -> str:
     """The heading the segmenter dropped between two spans, or ``""``.
 
     The extractor leaves a block out of the spans when it reads it as a page
@@ -429,7 +431,7 @@ def _gap_heading(gap: str, bad: set[str], bad_norm: set[str]) -> str:
         if norm(candidate).casefold() in TOC_MARKERS:
             continue
         following = next((other.strip() for other in lines[index + 1:] if other.strip()), "")
-        if not _starts_sentence(following.split()[0] if following else ""):
+        if not starts_sentence(following.split()[0] if following else ""):
             continue
         found = candidate
     return found
@@ -492,7 +494,7 @@ def clean_sections(
             else:
                 path = list(last)
             if start is not None and not first:
-                dropped = _gap_heading(text[cursor:int(start)], bad, bad_norm)
+                dropped = gap_heading(text[cursor:int(start)], bad, bad_norm)
                 if dropped:
                     # The heading was in the document all along; only the spans
                     # were missing. It titles everything below it, so it is a
