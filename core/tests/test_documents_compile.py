@@ -223,6 +223,23 @@ def test_a_cached_chunk_still_reports_what_it_cost(tmp_path):
     assert finish == "stop"
 
 
+def test_the_cache_key_covers_the_text_a_chunk_shows_not_its_ids():
+    """A repair that inserts a span shifts every id below it.
+
+    A key built from the ids alone names the same chunk while the chunk says
+    something else, and a resumed build hands back a reply about spans that
+    moved. The prompt is what the reply depends on, so the key must change with
+    it.
+    """
+    from compiler.documents.compile import _fingerprint
+
+    before = "S0001 | DEVONO essere garantiti il rispetto delle disposizioni."
+    after = "S0001 | Tutti i soggetti esterni devono garantire il rispetto."
+    assert _fingerprint(before, "stub") == _fingerprint(before, "stub")
+    assert _fingerprint(before, "stub") != _fingerprint(after, "stub")
+    assert _fingerprint(before, "stub") != _fingerprint(before, "other")
+
+
 def test_a_list_item_claim_declares_its_lead_in_as_context():
     lead = _span("S0001", "The binding corporate rules shall specify at least:")
     item = _span("S0002", "(k) the mechanisms for reporting and recording changes to the rules.")

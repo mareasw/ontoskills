@@ -22,6 +22,7 @@ from rich.table import Table
 from compiler.documents.ask import Corpus, ask as answer, render_text
 from compiler.documents.compile import CompileOptions, compile_document
 from compiler.documents.extract import ExtractionError, extract, strip_pages
+from compiler.documents.gaps import recover_lead_ins
 from compiler.documents.model import load_corpus
 from compiler.documents.prompt import PROMPT_HASH
 from compiler.documents.segment import chunk, lead_ins, segment
@@ -176,7 +177,12 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
     spans: dict[str, list[dict]] = {}
     rows: list[dict] = []
     for doc in docs:
-        doc_spans = strip_pages(segment(texts[doc.doc_id], doc.segment_meta()), doc.kind)
+        meta = doc.segment_meta()
+        doc_spans = strip_pages(segment(texts[doc.doc_id], meta), doc.kind)
+        # A heading printed at a page break takes its lead-in with it, and the
+        # model can only state what it is shown: the block becomes a span before
+        # the prompt is built. It is the one repair that changes the span set.
+        doc_spans = recover_lead_ins(doc_spans, texts[doc.doc_id], meta)
         spans[doc.doc_id] = doc_spans
         chunks = chunk(doc_spans, chunk_size, overlap)
         chars = sum(len(span["paragraph"]) for span in doc_spans)

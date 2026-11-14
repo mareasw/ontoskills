@@ -36,14 +36,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   path a claim already carried, compares words by a seven-letter stem
   (`certificazione` finds `certificato`, `fornitore` finds `fornitori`), and
   keeps grammatical words out of both the index and the query. On the Italian
-  pilot the three rules move hit@12 from 6/10 to 9/10 and MRR from 0.127 to
-  0.358 on the same claim set.
+  pilot the three rules move hit@12 from 6/10 to 8/10 and MRR from 0.127 to
+  0.339 on the same claim set (9/10 before the lead-in repair moves one gold
+  fragment out of the cut; the rule itself ranks 4).
 
 ### Changed
 
 - **Semantic fusion is applied only to the languages the model knows** —
   MiniLM is trained on English; on the Italian pilot its ranking was worse than
-  the words themselves (one question lost, MRR 0.358 → 0.309). `enable_semantic`
+  the words themselves (MRR 0.339 → 0.240). `enable_semantic`
   returns `False` and the corpus stays lexical when every document is in a
   language the model was not trained on; a KB that declares no language keeps
   the fusion, because there is nothing to compare against.
@@ -71,6 +72,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the reply has no outer array. On the pilot this returns 101 claims from seven
   cached replies, including the policy section a pre-registered question asked
   about.
+- **The reply cache key is the prompt** — the key covered the document text and
+  the span ids of the chunk, and a repair that inserts a span renumbers every
+  span below it. Chunk *k* of the repaired document showed the same fifteen ids
+  as chunk *k* of the previous build while the spans behind them had moved, so
+  `--resume` replayed a reply about different spans and the build acquired
+  claims whose quote no longer matched their evidence. The key is now
+  `sha256(PROMPT_HASH, model, prompt)`: anything that changes what the model is
+  shown changes the key.
 - **`ingest` refuses to start without a base URL** — a missing `OPENAI_BASE_URL`
   used to surface as one failed model call per chunk with no reason, and a
   knowledge base silently missing whole documents. It now fails once, before
@@ -90,6 +99,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   a whole all-caps line of the source, after a full stop, followed by the
   sentence it titles — and it carries to the spans below. 19 pilot claims gain
   the section they sit under.
+- **A folded heading may be followed by an elided sentence** — the check that a
+  heading is followed by a sentence rejected `L'osservanza …` because the word
+  after the apostrophe is lower-case; `starts_sentence` now looks past the
+  elision, and the check is shared with the gap heading.
+- **A block in no span becomes a span before the prompt** — a heading printed at
+  a page break is dropped with its lead-in, and the earlier repair could name the
+  heading but no claim could quote the sentence under it. `recover_lead_ins`
+  (`documents/gaps.py`) gives the heading and the lead-in one span, in document
+  order, before the prompt is built, so the model can state the rule; on the
+  pilot `NC_POLITICA_27001-0046` is supported by the recovered block and by the
+  list item under it. This is the one repair that changes the span set, and
+  therefore the prompt: the chunks that contain the block are asked again.
 - **A heading the segmenter dropped is read from the source** — a block read as
   a page header leaves a hole between two spans, and a real heading printed
   there goes with it (`RESPONSABILITÀ DI OSSERVAZIONE E ATTUAZIONE` on the
