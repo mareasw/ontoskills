@@ -72,6 +72,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the reply has no outer array. On the pilot this returns 101 claims from seven
   cached replies, including the policy section a pre-registered question asked
   about.
+- **The reply cache key is the prompt** — the key covered the document text and
+  the span ids of the chunk, and a repair that inserts a span renumbers every
+  span below it. Chunk *k* of the repaired document showed the same fifteen ids
+  as chunk *k* of the previous build while the spans behind them had moved, so
+  `--resume` replayed a reply about different spans and the build acquired
+  claims whose quote no longer matched their evidence. The key is now
+  `sha256(PROMPT_HASH, model, prompt)`: anything that changes what the model is
+  shown changes the key.
 - **`ingest` refuses to start without a base URL** — a missing `OPENAI_BASE_URL`
   used to surface as one failed model call per chunk with no reason, and a
   knowledge base silently missing whole documents. It now fails once, before

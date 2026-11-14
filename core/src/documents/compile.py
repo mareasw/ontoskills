@@ -397,13 +397,20 @@ def row_claims(spans: list[dict], doc: Document, start: int) -> list[dict]:
     return out
 
 
-def _fingerprint(text: str, spans: list[dict], model: str) -> str:
+def _fingerprint(prompt: str, model: str) -> str:
+    """The cache key of a reply: the prompt the model was shown.
+
+    Span ids are positions, and a repair that inserts a span in the middle of a
+    document shifts every id below it. A key built from the ids alone then names
+    the same chunk while the chunk says something else, and ``--resume`` hands
+    back a reply about spans that moved — which is how a build can acquire
+    claims whose quote no longer matches its evidence. The prompt is the whole
+    of what the reply depends on, so it is what the key covers.
+    """
     digest = hashlib.sha256()
     digest.update(PROMPT_HASH.encode())
     digest.update(model.encode())
-    digest.update(text.encode("utf-8", errors="ignore"))
-    for span in spans:
-        digest.update(span["span_id"].encode())
+    digest.update(prompt.encode("utf-8", errors="ignore"))
     return digest.hexdigest()
 
 
@@ -522,7 +529,6 @@ class ChunkRun:
 
 def _run_block(
     doc: Document,
-    text: str,
     block: list[dict],
     index: int,
     suffix: str,
@@ -540,7 +546,7 @@ def _run_block(
     """
     run = ChunkRun()
     prompt = make_prompt(block, {"doc_id": doc.doc_id, "title": doc.title})
-    fingerprint = _fingerprint(text, block, options.model)
+    fingerprint = _fingerprint(prompt, options.model)
     path = (
         _cache_path(options.cache_dir, doc.doc_id, index, suffix)
         if options.cache_dir
@@ -573,7 +579,7 @@ def _run_block(
     middle = len(block) // 2
     for half, name in ((block[:middle], "a"), (block[middle:], "b")):
         child = _run_block(
-            doc, text, half, index, suffix + name, options, progress, depth + 1
+            doc, half, index, suffix + name, options, progress, depth + 1
         )
         run.replies.extend(child.replies)
         run.events.extend(child.events)
@@ -608,7 +614,7 @@ def compile_document(
         with ThreadPoolExecutor(max_workers=options.concurrency) as pool:
             futures = {
                 pool.submit(
-                    _run_block, doc, text, block, index, "", options, progress
+                    _run_block, doc, block, index, "", options, progress
                 ): index
                 for index, block in enumerate(chunks)
             }
@@ -616,7 +622,7 @@ def compile_document(
                 runs[futures[future]] = future.result()
     else:
         for index, block in enumerate(chunks):
-            runs[index] = _run_block(doc, text, block, index, "", options, progress)
+            runs[index] = _run_block(doc, block, index, "", options, progress)
 
     raw_claims: list[dict] = []
     for index in sorted(runs):
