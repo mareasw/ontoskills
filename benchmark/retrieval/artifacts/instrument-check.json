@@ -1,0 +1,141 @@
+{
+ "datasets": [
+  {
+   "dataset": "enterpriserag",
+   "questions": 500,
+   "answerable": 480,
+   "unanswerable": 20,
+   "gold_docs": 742,
+   "scoped_questions": 0,
+   "types": [
+    "basic",
+    "completeness",
+    "conflicting_info",
+    "constrained",
+    "high_level",
+    "info_not_found",
+    "intra_document_reasoning",
+    "miscellaneous",
+    "project_related",
+    "semantic"
+   ],
+   "unanswerable_types": [
+    "info_not_found"
+   ],
+   "digest": "d9e53820d4d84736",
+   "notes": [
+    "49 gold ids not in the first 300 documents (corpus is larger)"
+   ],
+   "failures": [],
+   "citation": "Sun et al. 2026, arXiv:2605.05253",
+   "licence": "MIT"
+  },
+  {
+   "dataset": "scifact",
+   "questions": 300,
+   "answerable": 300,
+   "unanswerable": 0,
+   "gold_docs": 339,
+   "scoped_questions": 0,
+   "types": [
+    "scifact"
+   ],
+   "unanswerable_types": [],
+   "digest": "51120903c79a87b2",
+   "notes": [
+    "no answer-level facts (document-level scoring only)",
+    "48 gold ids not in the first 300 documents (corpus is larger)"
+   ],
+   "failures": [],
+   "citation": "BEIR/scifact (Thakur et al. 2021)",
+   "licence": "CC BY 4.0 (SciFact); see the dataset card"
+  },
+  {
+   "dataset": "contractnli",
+   "questions": 2091,
+   "answerable": 1188,
+   "unanswerable": 903,
+   "gold_docs": 2404,
+   "scoped_questions": 2091,
+   "types": [
+    "contradiction",
+    "entailment",
+    "not_mentioned"
+   ],
+   "unanswerable_types": [
+    "not_mentioned"
+   ],
+   "digest": "a6415ef41bccbf82",
+   "notes": [
+    "no answer-level facts (document-level scoring only)"
+   ],
+   "failures": [],
+   "citation": "Koreeda & Manning 2021, arXiv:2110.01799",
+   "licence": "CC BY 4.0"
+  },
+  {
+   "dataset": "qasper",
+   "questions": 1451,
+   "answerable": 1352,
+   "unanswerable": 99,
+   "gold_docs": 3726,
+   "scoped_questions": 1451,
+   "types": [
+    "evidence",
+    "no_evidence",
+    "unanswerable"
+   ],
+   "unanswerable_types": [
+    "no_evidence",
+    "unanswerable"
+   ],
+   "digest": "4c65675b6195dae2",
+   "notes": [
+    "no answer-level facts (document-level scoring only)"
+   ],
+   "failures": [],
+   "citation": "Dasigi et al. 2021, arXiv:2105.03011",
+   "licence": "CC BY 4.0"
+  },
+  {
+   "dataset": "ragbench",
+   "questions": 132,
+   "answerable": 132,
+   "unanswerable": 0,
+   "gold_docs": 870,
+   "scoped_questions": 132,
+   "types": [
+    "supported"
+   ],
+   "unanswerable_types": [],
+   "digest": "5c8b41b116fc7c56",
+   "notes": [
+    "no answer-level facts (document-level scoring only)"
+   ],
+   "failures": [],
+   "citation": "Friel et al. 2024, RAGBench",
+   "licence": "see the dataset card"
+  },
+  {
+   "dataset": "mmarco-it",
+   "questions": 6980,
+   "answerable": 6980,
+   "unanswerable": 0,
+   "gold_docs": 7437,
+   "scoped_questions": 0,
+   "types": [
+    "passage"
+   ],
+   "unanswerable_types": [],
+   "digest": "11eaee694f30a977",
+   "notes": [
+    "no answer-level facts (document-level scoring only)",
+    "corpus not loaded by this adapter; only the questions were checked"
+   ],
+   "failures": [],
+   "citation": "Bonifacio et al. 2021, mMARCO (arXiv:2109.12068)",
+   "licence": "MS MARCO terms; see the dataset card"
+  }
+ ],
+ "failures": 0
+}
