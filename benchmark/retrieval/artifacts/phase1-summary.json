@@ -1,0 +1,388 @@
+{
+ "metric": "ndcg@k",
+ "reference": "bm25",
+ "datasets": {
+  "contractnli": {
+   "systems": {
+    "bm25": {
+     "n": 594,
+     "mean": 0.5641,
+     "ci": [
+      0.5381,
+      0.59
+     ],
+     "recall": 0.7006,
+     "digest": "abfae64dd971ac27",
+     "seconds": 7.4,
+     "retriever": "bm25 (porter-stop)"
+    },
+    "dense": {
+     "n": 594,
+     "mean": 0.5134,
+     "ci": [
+      0.4883,
+      0.5388
+     ],
+     "recall": 0.6957,
+     "digest": "db1037e47c5c91ae",
+     "seconds": 323.5,
+     "retriever": "dense (intfloat/e5-large-v2@f169b11e22de max=512)"
+    },
+    "hybrid": {
+     "n": 594,
+     "mean": 0.5832,
+     "ci": [
+      0.5583,
+      0.6077
+     ],
+     "recall": 0.7356,
+     "digest": "42b70888d572fb32",
+     "seconds": 68.7,
+     "retriever": "bm25+dense (intfloat/e5-large-v2@f169b11e22de max=512) rrf(k=60)"
+    },
+    "hybrid-rerank": {
+     "n": 594,
+     "mean": 0.5821,
+     "ci": [
+      0.5571,
+      0.6067
+     ],
+     "recall": 0.7356,
+     "digest": "021f25ffcea4829c",
+     "seconds": 186.9,
+     "retriever": "bm25+dense (intfloat/e5-large-v2@f169b11e22de max=512) rrf(k=60) + rerank(cross-encoder/ms-marco-MiniLM-L-6-v2@233902d25c44 max=512, depth=50)"
+    }
+   },
+   "spread": 0.0698,
+   "comparisons": {
+    "dense": {
+     "vs": "bm25",
+     "n": 594,
+     "mean_difference": -0.0507,
+     "ci": [
+      -0.0755,
+      -0.0258
+     ],
+     "p_wilcoxon": 1.771829274292904e-05,
+     "mde": 0.0352,
+     "p_holm": 5.3154878228787124e-05
+    },
+    "hybrid": {
+     "vs": "bm25",
+     "n": 594,
+     "mean_difference": 0.0191,
+     "ci": [
+      0.005,
+      0.033
+     ],
+     "p_wilcoxon": 0.01648020430819875,
+     "mde": 0.0199,
+     "p_holm": 0.0329604086163975
+    },
+    "hybrid-rerank": {
+     "vs": "bm25",
+     "n": 594,
+     "mean_difference": 0.018,
+     "ci": [
+      0.0037,
+      0.0321
+     ],
+     "p_wilcoxon": 0.030328691305032046,
+     "mde": 0.0202,
+     "p_holm": 0.06065738261006409
+    }
+   }
+  },
+  "enterpriserag": {
+   "systems": {
+    "bm25": {
+     "n": 236,
+     "mean": 0.5433,
+     "ci": [
+      0.488,
+      0.5975
+     ],
+     "recall": 0.6307,
+     "digest": "512a555b51455966",
+     "seconds": 517.2,
+     "retriever": "bm25 (porter-stop)"
+    }
+   },
+   "spread": null,
+   "comparisons": {}
+  },
+  "qasper": {
+   "systems": {
+    "bm25": {
+     "n": 676,
+     "mean": 0.409,
+     "ci": [
+      0.385,
+      0.4334
+     ],
+     "recall": 0.59,
+     "digest": "1ed5346306d5a042",
+     "seconds": 31.1,
+     "retriever": "bm25 (porter-stop)"
+    },
+    "dense": {
+     "n": 676,
+     "mean": 0.4764,
+     "ci": [
+      0.4525,
+      0.5003
+     ],
+     "recall": 0.6547,
+     "digest": "88df39ba61524bff",
+     "seconds": 2005.4,
+     "retriever": "dense (intfloat/e5-large-v2@f169b11e22de max=512)"
+    },
+    "hybrid": {
+     "n": 676,
+     "mean": 0.4789,
+     "ci": [
+      0.4556,
+      0.503
+     ],
+     "recall": 0.6716,
+     "digest": "c45097fa9e58191d",
+     "seconds": 228.7,
+     "retriever": "bm25+dense (intfloat/e5-large-v2@f169b11e22de max=512) rrf(k=60)"
+    },
+    "hybrid-rerank": {
+     "n": 676,
+     "mean": 0.4932,
+     "ci": [
+      0.469,
+      0.5183
+     ],
+     "recall": 0.6728,
+     "digest": "fb601f3220cc5aa7",
+     "seconds": 409.9,
+     "retriever": "bm25+dense (intfloat/e5-large-v2@f169b11e22de max=512) rrf(k=60) + rerank(cross-encoder/ms-marco-MiniLM-L-6-v2@233902d25c44 max=512, depth=50)"
+    }
+   },
+   "spread": 0.0842,
+   "comparisons": {
+    "dense": {
+     "vs": "bm25",
+     "n": 676,
+     "mean_difference": 0.0675,
+     "ci": [
+      0.044,
+      0.0904
+     ],
+     "p_wilcoxon": 8.119314025795305e-09,
+     "mde": 0.033,
+     "p_holm": 3.247725610318122e-08
+    },
+    "hybrid": {
+     "vs": "bm25",
+     "n": 676,
+     "mean_difference": 0.07,
+     "ci": [
+      0.0548,
+      0.0851
+     ],
+     "p_wilcoxon": 1.678822554628993e-18,
+     "mde": 0.0215,
+     "p_holm": 6.715290218515972e-18
+    },
+    "hybrid-rerank": {
+     "vs": "bm25",
+     "n": 676,
+     "mean_difference": 0.0842,
+     "ci": [
+      0.0678,
+      0.1004
+     ],
+     "p_wilcoxon": 1.7833439652365447e-21,
+     "mde": 0.0234,
+     "p_holm": 7.133375860946179e-21
+    }
+   }
+  },
+  "ragbench": {
+   "systems": {
+    "bm25": {
+     "n": 66,
+     "mean": 0.6175,
+     "ci": [
+      0.5602,
+      0.6736
+     ],
+     "recall": 0.5978,
+     "digest": "3e027f2c3e5a40b3",
+     "seconds": 17.2,
+     "retriever": "bm25 (porter-stop)"
+    },
+    "dense": {
+     "n": 66,
+     "mean": 0.6451,
+     "ci": [
+      0.5954,
+      0.6936
+     ],
+     "recall": 0.6593,
+     "digest": "e0ba0ec247701f25",
+     "seconds": 14.3,
+     "retriever": "dense (intfloat/e5-large-v2@f169b11e22de max=512)"
+    },
+    "hybrid": {
+     "n": 66,
+     "mean": 0.6526,
+     "ci": [
+      0.6015,
+      0.703
+     ],
+     "recall": 0.6544,
+     "digest": "8550e0d8a9424faa",
+     "seconds": 97.0,
+     "retriever": "bm25+dense (intfloat/e5-large-v2@f169b11e22de max=512) rrf(k=60)"
+    },
+    "hybrid-rerank": {
+     "n": 66,
+     "mean": 0.6668,
+     "ci": [
+      0.613,
+      0.7187
+     ],
+     "recall": 0.6518,
+     "digest": "a43a9d3d4c4dd1d6",
+     "seconds": 30.6,
+     "retriever": "bm25+dense (intfloat/e5-large-v2@f169b11e22de max=512) rrf(k=60) + rerank(cross-encoder/ms-marco-MiniLM-L-6-v2@233902d25c44 max=512, depth=50)"
+    }
+   },
+   "spread": 0.0493,
+   "comparisons": {
+    "dense": {
+     "vs": "bm25",
+     "n": 66,
+     "mean_difference": 0.0276,
+     "ci": [
+      -0.019,
+      0.074
+     ],
+     "p_wilcoxon": 0.1723332170666716,
+     "mde": 0.0669,
+     "p_holm": 0.1723332170666716
+    },
+    "hybrid": {
+     "vs": "bm25",
+     "n": 66,
+     "mean_difference": 0.0352,
+     "ci": [
+      0.0059,
+      0.0646
+     ],
+     "p_wilcoxon": 0.019189193621776002,
+     "mde": 0.0432,
+     "p_holm": 0.0329604086163975
+    },
+    "hybrid-rerank": {
+     "vs": "bm25",
+     "n": 66,
+     "mean_difference": 0.0493,
+     "ci": [
+      0.0113,
+      0.0868
+     ],
+     "p_wilcoxon": 0.0023767830701145885,
+     "mde": 0.0546,
+     "p_holm": 0.007130349210343766
+    }
+   }
+  },
+  "scifact": {
+   "systems": {
+    "bm25": {
+     "n": 150,
+     "mean": 0.6828,
+     "ci": [
+      0.6195,
+      0.7434
+     ],
+     "recall": 0.8091,
+     "digest": "ac8b1e7f98981df5",
+     "seconds": 28.5,
+     "retriever": "bm25 (porter-stop)"
+    },
+    "dense": {
+     "n": 150,
+     "mean": 0.727,
+     "ci": [
+      0.6672,
+      0.7851
+     ],
+     "recall": 0.8437,
+     "digest": "ece997fadc9db47e",
+     "seconds": 1162.8,
+     "retriever": "dense (intfloat/e5-large-v2@f169b11e22de max=512)"
+    },
+    "hybrid": {
+     "n": 150,
+     "mean": 0.7365,
+     "ci": [
+      0.681,
+      0.7904
+     ],
+     "recall": 0.8887,
+     "digest": "d69bea38f1d2b476",
+     "seconds": 28.1,
+     "retriever": "bm25+dense (intfloat/e5-large-v2@f169b11e22de max=512) rrf(k=60)"
+    },
+    "hybrid-rerank": {
+     "n": 150,
+     "mean": 0.7055,
+     "ci": [
+      0.6453,
+      0.7642
+     ],
+     "recall": 0.8351,
+     "digest": "4f31642c66ae143b",
+     "seconds": 153.2,
+     "retriever": "bm25+dense (intfloat/e5-large-v2@f169b11e22de max=512) rrf(k=60) + rerank(cross-encoder/ms-marco-MiniLM-L-6-v2@233902d25c44 max=512, depth=50)"
+    }
+   },
+   "spread": 0.0537,
+   "comparisons": {
+    "dense": {
+     "vs": "bm25",
+     "n": 150,
+     "mean_difference": 0.0442,
+     "ci": [
+      0.0022,
+      0.0859
+     ],
+     "p_wilcoxon": 0.028438997359395694,
+     "mde": 0.0603,
+     "p_holm": 0.05687799471879139
+    },
+    "hybrid": {
+     "vs": "bm25",
+     "n": 150,
+     "mean_difference": 0.0537,
+     "ci": [
+      0.0269,
+      0.081
+     ],
+     "p_wilcoxon": 0.00014231068461322094,
+     "mde": 0.0383,
+     "p_holm": 0.00042693205383966286
+    },
+    "hybrid-rerank": {
+     "vs": "bm25",
+     "n": 150,
+     "mean_difference": 0.0227,
+     "ci": [
+      -0.0182,
+      0.0627
+     ],
+     "p_wilcoxon": 0.2874002543891765,
+     "mde": 0.0576,
+     "p_holm": 0.2874002543891765
+    }
+   }
+  }
+ }
+}
