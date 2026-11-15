@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import heapq
+from array import array
 import multiprocessing
 import os
 import re
@@ -27,6 +29,7 @@ import time
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Sequence
 
 import numpy as np
 from scipy.sparse import csr_matrix
@@ -45,11 +48,64 @@ STOPWORDS = frozenset(
     their then there these they this to was will with""".split()
 )
 
+# Lucene's Italian stop words, as `ItalianAnalyzer` loads them: the Snowball
+# `italian_stop.txt` that ships with Lucene, plus the analyser's elision articles
+# — `ElisionFilter` drops the article of "dell'articolo" and keeps the rest, which
+# `[^\W_]+` already does by splitting on the apostrophe, so the articles go in the
+# stop set instead. Both lists are copied verbatim and their sizes asserted in a
+# test, because a stop list that drifts is a number that drifts.
+#   https://raw.githubusercontent.com/apache/lucene/main/lucene/analysis/common/
+#   src/resources/org/apache/lucene/analysis/snowball/italian_stop.txt
+STOPWORDS_IT = frozenset(
+    """
+    a abbia abbiamo abbiano abbiate ad agl agli ai al all
+    alla alle allo anche avemmo avendo avesse avessero avessi avessimo aveste
+    avesti avete aveva avevamo avevano avevate avevi avevo avrai avranno avrebbe
+    avrebbero avrei avremmo avremo avreste avresti avrete avrà avrò avuta avute
+    avuti avuto c che chi ci coi col come con contro
+    cui da dagl dagli dai dal dall dalla dalle dallo degl
+    degli dei del dell della delle dello di dov dove e
+    ebbe ebbero ebbi ed era erano eravamo eravate eri ero essendo
+    faccia facciamo facciano facciate faccio facemmo facendo facesse facessero facessi facessimo
+    faceste facesti faceva facevamo facevano facevate facevi facevo fai fanno farai
+    faranno farebbe farebbero farei faremmo faremo fareste faresti farete farà farò
+    fece fecero feci fosse fossero fossi fossimo foste fosti fu fui
+    fummo furono gli ha hai hanno ho i il in io
+    l la le lei li lo loro lui ma mi mia
+    mie miei mio ne negl negli nei nel nell nella nelle
+    nello noi non nostra nostre nostri nostro o per perché più
+    quale quanta quante quanti quanto quella quelle quelli quello questa queste
+    questi questo sarai saranno sarebbe sarebbero sarei saremmo saremo sareste saresti
+    sarete sarà sarò se sei si sia siamo siano siate siete
+    sono sta stai stando stanno starai staranno starebbe starebbero starei staremmo
+    staremo stareste staresti starete starà starò stava stavamo stavano stavate stavi
+    stavo stemmo stesse stessero stessi stessimo steste stesti stette stettero stetti
+    stia stiamo stiano stiate sto su sua sue sugl sugli sui
+    sul sull sulla sulle sullo suo suoi ti tra tu tua
+    tue tuo tuoi tutti tutto un una uno vi voi vostra
+    vostre vostri vostro è
+    """.split()
+)
+
+# `ItalianAnalyzer.DEFAULT_ARTICLES`, verbatim.
+ITALIAN_ARTICLES = frozenset("c l all dall dell nell sull coll pell gl agl dagl degl negl sugl un m t s v d".split())
+
+LANGUAGES = {
+    "english": STOPWORDS,
+    "italian": STOPWORDS_IT | ITALIAN_ARTICLES,
+}
+
 # Published Anserini BM25 nDCG@10, BEIR Table 2. The tolerance is the Phase-0 gate.
 PUBLISHED = {
     "scifact": 0.665,
     "nfcorpus": 0.325,
 }
+
+# mMARCO Table 2, the Google Translate row, the BM25 column pair: MRR@10 and
+# R@1000 on the 6,980-query dev.small set. The paper uses Pyserini without
+# stating k1 and b; this measures 0.9/0.4, the same configuration as the BEIR
+# gate above, so the two gates are not two different instruments.
+PUBLISHED_MARCO = {"italian": {"mrr@10": 0.153, "r@1000": 0.753}}
 TOLERANCE = 0.01
 
 
@@ -67,10 +123,14 @@ class Analysis:
 
     stemmer: str | None = "porter"
     stopwords: bool = True
+    language: str = "english"
 
     def __post_init__(self) -> None:
         self._stem = None
         self._stems: dict[str, str] = {}
+        if self.language not in LANGUAGES:
+            raise ValueError(f"unknown stop-word language {self.language!r}; known: {sorted(LANGUAGES)}")
+        self._stopset = LANGUAGES[self.language] if self.stopwords else frozenset()
         if self.stemmer is not None:
             import snowballstemmer
 
@@ -78,8 +138,8 @@ class Analysis:
 
     def __call__(self, text: str) -> list[str]:
         tokens = _WORD.findall(str(text or "").lower())
-        if self.stopwords:
-            tokens = [token for token in tokens if token not in STOPWORDS]
+        if self._stopset:
+            tokens = [token for token in tokens if token not in self._stopset]
         if self._stem is None:
             return tokens
         stems = self._stems
@@ -94,7 +154,19 @@ class Analysis:
         return stemmed
 
     def describe(self) -> str:
-        return f"stemmer={self.stemmer or 'none'} stopwords={'lucene' if self.stopwords else 'none'}"
+        """The cache key's human half — and therefore frozen for English.
+
+        Changing this string rebuilds every index that was already built, so the
+        English form is kept exactly as it was and the language is only named when
+        it is not English.
+        """
+        if not self.stopwords:
+            stops = "none"
+        elif self.language == "english":
+            stops = "lucene"
+        else:
+            stops = f"lucene-{self.language}"
+        return f"stemmer={self.stemmer or 'none'} stopwords={stops}"
 
 
 @dataclass(frozen=True)
@@ -135,6 +207,23 @@ def _corpus_digest(documents: dict[str, str]) -> str:
     return digest.hexdigest()
 
 
+def _pack(strings: Sequence[str]) -> np.ndarray:
+    r"""Strings as one newline-separated byte blob.
+
+    `np.asarray(strings, dtype=str)` picks the width of the longest string and
+    applies it to every one of them: EnterpriseRAG-Bench contains a single
+    2,392-character token, which made a 480k-term vocabulary occupy **4.6 GB**
+    instead of 17 MB — and every cache load allocated it. Tokens are produced by
+    `[^\W_]+` and can never contain a newline, so joining them is lossless.
+    """
+    return np.frombuffer("\n".join(strings).encode("utf-8"), dtype=np.uint8)
+
+
+def _unpack(blob: np.ndarray) -> list[str]:
+    text = blob.tobytes().decode("utf-8")
+    return text.split("\n") if text else []
+
+
 def _chunk_size(total: int, workers: int) -> int:
     """Documents per chunk: four chunks per worker, so the pool can rebalance.
 
@@ -146,18 +235,24 @@ def _chunk_size(total: int, workers: int) -> int:
     return max(256, -(-total // max(1, workers * 4)))
 
 
-def _chunk_postings(payload: tuple[str | None, bool, list[str]]) -> dict:
+def _chunk_postings(payload: tuple[str | None, bool, str, list[str]]) -> dict:
     """Tokenise one chunk into a CSR fragment with its own local vocabulary.
 
     Runs in a worker process, so it rebuilds the Analysis rather than receiving
     it: a stem cache is a per-process object, and sending one over a pipe would
-    cost more than filling it.
+    cost more than filling it. The language travels with the payload, because a
+    worker that rebuilt the analyser without it would silently index Italian with
+    the English stop list, and the serial and parallel builds would disagree.
     """
-    stemmer, stopwords, chunk = payload
-    analysis = Analysis(stemmer=stemmer, stopwords=stopwords)
+    stemmer, stopwords, language, chunk = payload
+    analysis = Analysis(stemmer=stemmer, stopwords=stopwords, language=language)
     vocab: dict[str, int] = {}
-    indices: list[int] = []
-    data: list[float] = []
+    # `array` rather than `list`: a Python list holds a pointer and a boxed object
+    # per posting (36 bytes), the typed array holds 4. On the largest corpus a
+    # chunk is tens of millions of postings, and eight chunks are alive at once,
+    # which is where the peak memory went.
+    indices = array("i")
+    data = array("f")
     indptr: list[int] = [0]
     lengths = np.zeros(len(chunk), dtype=np.float32)
     for position, text in enumerate(chunk):
@@ -175,8 +270,8 @@ def _chunk_postings(payload: tuple[str | None, bool, list[str]]) -> dict:
         indptr.append(len(indices))
     return {
         "terms": list(vocab),
-        "indices": np.asarray(indices, dtype=np.int32),
-        "data": np.asarray(data, dtype=np.float32),
+        "indices": indices,
+        "data": data,
         "indptr": np.asarray(indptr, dtype=np.int64),
         "lengths": lengths,
     }
@@ -190,27 +285,37 @@ def _merge(partials: list[dict]) -> tuple[dict[str, int], dict]:
     that chunk, and the chunks are contiguous and ordered.
     """
     vocab: dict[str, int] = {}
-    indices = []
-    data = []
-    indptr = [np.zeros(1, dtype=np.int64)]
-    lengths = []
+    # Preallocated and filled in place. `np.concatenate` would need a second copy
+    # of every posting while all the fragments are still alive, which on a corpus
+    # of hundreds of millions of postings is the difference between fitting and
+    # swapping.
+    postings = sum(len(partial["indices"]) for partial in partials)
+    documents = sum(len(partial["lengths"]) for partial in partials)
+    indices = np.empty(postings, dtype=np.int32)
+    data = np.empty(postings, dtype=np.float32)
+    indptr = np.zeros(documents + 1, dtype=np.int64)
+    lengths = np.empty(documents, dtype=np.float32)
+    cursor = 0
+    document_cursor = 0
     total = 0
     for partial in partials:
         terms = partial["terms"]
         lookup = np.fromiter(
             (vocab.setdefault(term, len(vocab)) for term in terms), dtype=np.int64, count=len(terms)
         )
-        indices.append(lookup[partial["indices"]].astype(np.int32) if len(terms) else partial["indices"])
-        data.append(partial["data"])
-        indptr.append(partial["indptr"][1:] + total)
+        count = len(partial["indices"])
+        if count:
+            # `np.frombuffer` reads the worker's typed array without copying it.
+            local = np.frombuffer(partial["indices"], dtype=np.int32)
+            indices[cursor : cursor + count] = lookup[local] if len(terms) else local
+            data[cursor : cursor + count] = partial["data"]
+        tail = partial["indptr"][1:]
+        indptr[document_cursor + 1 : document_cursor + 1 + len(tail)] = tail + total
+        lengths[document_cursor : document_cursor + len(tail)] = partial["lengths"]
+        cursor += count
+        document_cursor += len(tail)
         total += int(partial["indptr"][-1])
-        lengths.append(partial["lengths"])
-    return vocab, {
-        "indices": np.concatenate(indices) if indices else np.zeros(0, dtype=np.int32),
-        "data": np.concatenate(data) if data else np.zeros(0, dtype=np.float32),
-        "indptr": np.concatenate(indptr),
-        "lengths": np.concatenate(lengths) if lengths else np.zeros(0, dtype=np.float32),
-    }
+    return vocab, {"indices": indices, "data": data, "indptr": indptr, "lengths": lengths}
 
 
 class BM25:
@@ -248,11 +353,15 @@ class BM25:
         self.ids = list(documents)
         payload = self._build_payload(documents, workers)
         self.vocab, matrix = payload
+        self.lengths = matrix["lengths"]
+        # Document-major, then transposed once to term-major for scoring. The
+        # transpose is the only place two copies of the postings are alive at the
+        # same time, so the dict and the tuple are dropped as early as they can be.
         self.matrix = csr_matrix(
             (matrix["data"], matrix["indices"], matrix["indptr"]),
             shape=(len(self.ids), len(self.vocab)),
         ).tocsc()
-        self.lengths = matrix["lengths"]
+        del matrix, payload
         document_frequency = np.diff(self.matrix.indptr).astype(np.float32)
         total = np.float32(len(self.ids))
         self.idf = np.log1p((total - document_frequency + 0.5) / (document_frequency + 0.5)).astype(np.float32)
@@ -264,6 +373,7 @@ class BM25:
             f"{self.analysis.describe()}|{self.config.describe()}|{_corpus_digest(documents)}".encode("utf-8")
         ).hexdigest()
         self.cache_key = key
+        self._buffer: np.ndarray | None = None
         if self.cache is not None:
             cached = self._read_cache(Path(self.cache) / f"{key}.npz")
             if cached is not None:
@@ -275,7 +385,12 @@ class BM25:
         workers = _default_workers() if workers is None else max(1, workers)
         chunks = _chunk_size(len(texts), workers)
         payload = [
-            (self.analysis.stemmer, self.analysis.stopwords, texts[start : start + chunks])
+            (
+                self.analysis.stemmer,
+                self.analysis.stopwords,
+                self.analysis.language,
+                texts[start : start + chunks],
+            )
             for start in range(0, len(texts), chunks)
         ]
         if workers == 1 or len(payload) <= 1 or len(texts) < self.PARALLEL_FROM:
@@ -285,6 +400,9 @@ class BM25:
             with context.Pool(processes=min(workers, len(payload))) as pool:
                 partials = pool.map(_chunk_postings, payload, chunksize=1)
         built = _merge(partials)
+        # The fragments and the merged arrays are the same size; dropping the
+        # fragments before the cache write halves the peak on a large corpus.
+        del partials
         if self.cache is not None:
             self._write_cache(Path(self.cache) / f"{key}.npz", *built)
         return built
@@ -294,10 +412,18 @@ class BM25:
             return None
         try:
             with np.load(path, allow_pickle=False) as saved:
-                ids = [str(value) for value in saved["ids"]]
+                if "ids_blob" in saved.files:
+                    ids = _unpack(saved["ids_blob"])
+                else:
+                    ids = [str(value) for value in saved["ids"]]
                 if ids != self.ids:
                     return None
-                terms = [str(value) for value in saved["terms"]]
+                if "terms" in saved.files:
+                    # The original format: a fixed-width unicode array. Reading it
+                    # is kept so a cache built before the change is still a hit.
+                    terms = [str(value) for value in saved["terms"]]
+                else:
+                    terms = _unpack(saved["terms_blob"])
                 matrix = {name: saved[name] for name in ("indices", "data", "indptr", "lengths")}
         except (OSError, KeyError, ValueError, zipfile.BadZipFile):
             # A truncated, half-written or older-format cache is a miss, not an
@@ -315,8 +441,8 @@ class BM25:
             temporary = path.with_suffix(".tmp.npz")
             np.savez(
                 temporary,
-                ids=np.asarray(self.ids, dtype=str),
-                terms=np.asarray(list(vocab), dtype=str),
+                ids_blob=_pack(self.ids),
+                terms_blob=_pack(list(vocab)),
                 **matrix,
             )
             temporary.replace(path)
@@ -324,13 +450,16 @@ class BM25:
             # A cache that cannot be written is not a failure of the run.
             pass
 
-    def scores(self, query: str) -> dict[str, float]:
-        """BM25 score per document, for the documents the query touches."""
+    def _accumulate(self, query: str, accumulated: np.ndarray) -> bool:
+        """Add this query's contribution into `accumulated`, in place.
+
+        One copy of the scoring formula, because two copies are two definitions of
+        the score and the second one is always the one that drifts.
+        """
         terms = {self.vocab[token] for token in self.analysis(query) if token in self.vocab}
         if not terms:
-            return {}
+            return False
         k1, b = self.config.k1, self.config.b
-        accumulated = np.zeros(len(self.ids), dtype=np.float32)
         for term in terms:
             start, end = self.matrix.indptr[term], self.matrix.indptr[term + 1]
             rows = self.matrix.indices[start:end]
@@ -339,12 +468,60 @@ class BM25:
                 1.0 - b + b * self.lengths[rows] / self.average_length
             )
             accumulated[rows] += self.idf[term] * frequency * (k1 + 1.0) / denominator
+        return True
+
+    def scores(self, query: str) -> dict[str, float]:
+        """BM25 score per document, for the documents the query touches."""
+        accumulated = np.zeros(len(self.ids), dtype=np.float32)
+        if not self._accumulate(query, accumulated):
+            return {}
         touched = np.flatnonzero(accumulated)
         return {self.ids[row]: float(accumulated[row]) for row in touched}
+
+    def top_ids(self, query: str, k: int) -> tuple[tuple[str, ...], float]:
+        """The top `k` under `metrics.rank`'s ordering, without materialising a dict.
+
+        On 8.8M passages a query touches about a million documents, and building a
+        million-entry dict per query — 6,980 times — is what makes the Italian
+        corpus unaffordable. This keeps the same answer: the cutoff is found with
+        `np.partition`, the documents strictly above it are ordered by score, and
+        the boundary ties are resolved by id, exactly as `metrics.rank` does.
+        """
+        if k <= 0:
+            raise ValueError("k must be positive")
+        if self._buffer is None or len(self._buffer) != len(self.ids):
+            self._buffer = np.zeros(len(self.ids), dtype=np.float32)
+        accumulated = self._buffer
+        accumulated.fill(0)
+        if not self._accumulate(query, accumulated):
+            return (), 0.0
+
+        rows = np.flatnonzero(accumulated)
+        values = accumulated[rows]
+        if len(rows) > k:
+            cutoff = float(np.partition(values, len(values) - k)[len(values) - k])
+            above = values > cutoff
+            head_rows, head_values = rows[above], values[above]
+            need = k - int(above.sum())
+            # `head_rows` is strictly above the cutoff, so it holds at most k - 1.
+            ties = rows[values == cutoff]
+            if need > 0 and len(ties):
+                smallest = heapq.nsmallest(need, ties.tolist(), key=self.ids.__getitem__)
+                head_rows = np.concatenate([head_rows, np.asarray(smallest, dtype=rows.dtype)])
+                head_values = np.concatenate([head_values, np.full(len(smallest), cutoff, dtype=values.dtype)])
+        else:
+            head_rows, head_values = rows, values
+
+        order = sorted(range(len(head_rows)), key=lambda position: (-head_values[position], self.ids[head_rows[position]]))
+        chosen = [int(head_rows[position]) for position in order[:k]]
+        return tuple(self.ids[row] for row in chosen), float(head_values[order[0]]) if chosen else 0.0
 
     def search(self, query: str, top_k: int = 100) -> tuple[str, ...]:
         """Ranked ids, ties broken by id so two runs are bit-identical."""
         return metrics.rank(self.scores(query), top_k=top_k)
+
+    def describe(self) -> str:
+        return f"{self.analysis.describe()} {self.config.describe()} documents={len(self.ids)}"
 
 
 class MultiFieldBM25:
@@ -444,18 +621,124 @@ def reproduce(name: str, analysis: Analysis, depth: int = 100, limit: int | None
     }
 
 
+def evaluate_marco(index: BM25, questions: Sequence, depth: int = 1000) -> dict:
+    """MRR@10, R@1000, nDCG@10 and a digest, scored through `top_ids`.
+
+    `scores()` builds a dict of every document the query touches — around a
+    million of them on 8.8M passages — and 6,980 of those is the difference
+    between twelve minutes and an afternoon. The metrics are cut from the same
+    ranked list `metrics.rank` would produce, and a test asserts the two agree.
+    """
+    if depth < 1000:
+        raise ValueError("R@1000 needs a ranking of at least 1000")
+    mrr: list[float] = []
+    recall: list[float] = []
+    ndcg: list[float] = []
+    digest = hashlib.sha256()
+    for question in questions:
+        ranking, _ = index.top_ids(question.text, depth)
+        mrr.append(metrics.mrr_at(ranking, question.gold_docs, 10))
+        recall.append(metrics.recall_at(ranking, question.gold_docs, 1000))
+        ndcg.append(metrics.ndcg_at(ranking, question.gold_docs, 10))
+        digest.update(metrics.ranking_digest(ranking[:10]).encode("ascii"))
+    return {
+        "queries": len(questions),
+        "mrr@10": float(np.mean(mrr)) if mrr else 0.0,
+        "r@1000": float(np.mean(recall)) if recall else 0.0,
+        "ndcg@10": float(np.mean(ndcg)) if ndcg else 0.0,
+        "ranking_digest": digest.hexdigest()[:16],
+    }
+
+
+def reproduce_marco(
+    analysis: Analysis | None = None,
+    limit: int | None = None,
+    depth: int = 1000,
+    workers: int | None = None,
+) -> dict:
+    """Index the Italian collection, retrieve, and compare with the published row.
+
+    This is the gate for the Italian analyser: the corpus is the translation the
+    paper measured, so the only thing that can differ is our instrument. Both
+    numbers must land within `TOLERANCE`, because a stemmer that helps MRR and
+    hurts recall (or the reverse) is a stemmer that has not been reproduced, only
+    reached once.
+    """
+    from benchmark.retrieval import adapters
+
+    started = time.time()
+    analysis = analysis or Analysis(stemmer="italian", language="italian")
+    benchmark = adapters.mmarco_it(collection=True, limit=limit)
+    documents = dict(benchmark.documents())
+    loaded = time.time()
+    index = BM25(documents, analysis=analysis, workers=workers)
+    built = time.time()
+    del documents
+    scores = evaluate_marco(index, benchmark.questions, depth=depth)
+    scored = time.time()
+
+    published = PUBLISHED_MARCO["italian"]
+    observed = {"mrr@10": scores["mrr@10"], "r@1000": scores["r@1000"]}
+    return {
+        "dataset": "mmarco-it",
+        "documents": len(index.ids),
+        "queries": scores["queries"],
+        "config": f"{index.describe()} depth={depth}",
+        "mrr@10": scores["mrr@10"],
+        "r@1000": scores["r@1000"],
+        "ndcg@10": scores["ndcg@10"],
+        "published": published,
+        "difference": {name: observed[name] - value for name, value in published.items()},
+        "within_tolerance": all(
+            abs(observed[name] - value) <= TOLERANCE for name, value in published.items()
+        ),
+        "ranking_digest": scores["ranking_digest"],
+        "seconds": {
+            "load": round(loaded - started, 1),
+            "index": round(built - loaded, 1),
+            "score": round(scored - built, 1),
+            "total": round(scored - started, 1),
+        },
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--reproduce", action="store_true", help="the Phase-0 instrument gate")
+    parser.add_argument(
+        "--reproduce-marco",
+        action="store_true",
+        help="the Italian instrument gate: mMARCO BM25, MRR@10 and R@1000",
+    )
     parser.add_argument("--dataset", default="scifact", help="BEIR dataset name")
     parser.add_argument("--stemmer", default="porter", help="snowball algorithm, or 'none'")
     parser.add_argument("--no-stopwords", action="store_true")
     parser.add_argument("--limit", type=int, default=None, help="debug: score only the first N queries")
     parser.add_argument("--json", type=Path, help="write the result as an artifact")
+    parser.add_argument("--workers", type=int, default=None, help="index build processes")
     args = parser.parse_args(argv)
-    if not args.reproduce:
+    if not args.reproduce and not args.reproduce_marco:
         parser.print_help()
         return 0
+
+    if args.reproduce_marco:
+        result = reproduce_marco(limit=args.limit, workers=args.workers)
+        for key in ("dataset", "documents", "queries", "config", "ranking_digest"):
+            print(f"{key:14s} {result[key]}")
+        for key in ("mrr@10", "r@1000", "ndcg@10"):
+            print(f"{key:14s} {result[key]:.4f}")
+        for name, value in result["published"].items():
+            print(f"{'published ' + name:14s} {value:.3f} (mMARCO Table 2, Google Translate)")
+        for name, value in result["difference"].items():
+            print(f"{'diff ' + name:14s} {value:+.4f}")
+        print(f"{'gate':14s} {'PASS' if result['within_tolerance'] else 'FAIL'} (|difference| <= {TOLERANCE})")
+        print(f"{'seconds':14s} {result['seconds']}")
+        if args.json:
+            import json
+
+            args.json.write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
+            print(f"wrote {args.json}")
+        return 0 if result["within_tolerance"] else 1
 
     analysis = Analysis(
         stemmer=None if args.stemmer in ("none", "") else args.stemmer,
