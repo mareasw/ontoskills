@@ -348,10 +348,11 @@ Every phase states its decision rule **before** it runs.
 **Status 2026-11-15:** Phase 0 is closed and recorded in §12. All six adapters
 pass `--check`; the metric layer reproduces Anserini BM25 on SciFact within one
 point (0.6614 vs 0.665); the locator property test finds every quote at its cited
-offset on both compiled corpora. Phase 1 (the baseline table) is in progress and
-recorded in §13: the lexical column is measured on all five datasets that fit,
-the dense/hybrid column on the four whose corpora this machine can encode, and
-§13.5 states in arithmetic why the other two are not in the table.
+offset on both compiled corpora. Phase 1 (the baseline table) is closed and
+recorded in §13: the lexical column on all five datasets, the dense/hybrid/rerank
+column on the four whose corpora this machine can encode, with §13.5 stating in
+arithmetic why the other two are not in the table. §13.8 records the MDE and the
+measured power at δ before Phase 3 begins.
 
 | Phase | Work | Gate / decision rule |
 |---|---|---|
@@ -734,3 +735,111 @@ construction (the three-label NLI task), so 594 are scored; 10 of
 EnterpriseRAG-Bench's 251 dev questions are `info_not_found`, and 5 of the 241
 answerable ones name a fact with no source document — they are scored on the
 answer-level metrics and listed under `no_gold_docs` in the artifact.
+
+### 13.7 The table, measured
+
+Same corpus, same queries, same split, same k = 10 for all four systems. Systems:
+`bm25` (§13.6), `dense` (B2), `hybrid` (B3, RRF k = 60), `hybrid-rerank` (B4,
+cross-encoder over the fused top 50). Artifact: `artifacts/phase1-summary.json`;
+per-question receipts in `runs/` (ignored by git, reproducible).
+
+| dataset | system | n | nDCG@10 [95% CI] | recall@10 | digest |
+|---|---|---|---|---|---|
+| SciFact | bm25 | 150 | 0.6828 [0.6195, 0.7434] | 0.8091 | `ac8b1e7f98981df5` |
+| SciFact | dense | 150 | 0.7270 [0.6672, 0.7851] | 0.8437 | `ece997fadc9db47e` |
+| SciFact | hybrid | 150 | **0.7365** [0.6810, 0.7904] | 0.8887 | `d69bea38f1d2b476` |
+| SciFact | hybrid-rerank | 150 | 0.7055 [0.6453, 0.7642] | 0.8351 | `4f31642c66ae143b` |
+| ContractNLI | bm25 | 594 | 0.5641 [0.5381, 0.5900] | 0.7006 | `abfae64dd971ac27` |
+| ContractNLI | dense | 594 | 0.5134 [0.4883, 0.5388] | 0.6957 | `db1037e47c5c91ae` |
+| ContractNLI | hybrid | 594 | **0.5832** [0.5583, 0.6077] | 0.7356 | `42b70888d572fb32` |
+| ContractNLI | hybrid-rerank | 594 | 0.5821 [0.5571, 0.6067] | 0.7356 | `021f25ffcea4829c` |
+| QASPER | bm25 | 676 | 0.4090 [0.3850, 0.4334] | 0.5900 | `1ed5346306d5a042` |
+| QASPER | dense | 676 | 0.4764 [0.4525, 0.5003] | 0.6547 | `88df39ba61524bff` |
+| QASPER | hybrid | 676 | 0.4789 [0.4556, 0.5030] | 0.6716 | `c45097fa9e58191d` |
+| QASPER | hybrid-rerank | 676 | **0.4932** [0.4690, 0.5183] | 0.6728 | `fb601f3220cc5aa7` |
+| RAGBench | bm25 | 66 | 0.6175 [0.5602, 0.6736] | 0.5978 | `3e027f2c3e5a40b3` |
+| RAGBench | dense | 66 | 0.6451 [0.5954, 0.6936] | 0.6593 | `e0ba0ec247701f25` |
+| RAGBench | hybrid | 66 | 0.6526 [0.6015, 0.7030] | 0.6544 | `8550e0d8a9424faa` |
+| RAGBench | hybrid-rerank | 66 | **0.6668** [0.6130, 0.7187] | 0.6518 | `a43a9d3d4c4dd1d6` |
+| EnterpriseRAG-Bench | bm25 | 236 | 0.5433 [0.4880, 0.5975] | 0.6307 | `512a555b51455966` |
+| EnterpriseRAG-Bench | dense, hybrid, hybrid-rerank | — | **not run here** (§13.5: 32 h of GPU on this machine) | — | — |
+
+Paired differences against the lexical baseline, with the MDE of each comparison
+and Holm across the four datasets that have one:
+
+| dataset | comparison | Δ nDCG@10 [95% CI] | MDE | p (Wilcoxon) | p (Holm) | spread |
+|---|---|---|---|---|---|---|
+| SciFact | dense − bm25 | +0.0442 [+0.0022, +0.0859] | 0.0603 | 0.0284 | 0.0569 | 0.0537 |
+| SciFact | hybrid − bm25 | +0.0537 [+0.0269, +0.0810] | 0.0383 | 0.0001 | **0.0004** | 0.0537 |
+| SciFact | hybrid-rerank − bm25 | +0.0227 [−0.0182, +0.0627] | 0.0576 | 0.2874 | 0.2874 | 0.0537 |
+| ContractNLI | dense − bm25 | −0.0507 [−0.0755, −0.0258] | 0.0352 | 0.0000 | **0.0001** | 0.0698 |
+| ContractNLI | hybrid − bm25 | +0.0191 [+0.0050, +0.0330] | 0.0199 | 0.0165 | **0.0330** | 0.0698 |
+| ContractNLI | hybrid-rerank − bm25 | +0.0180 [+0.0037, +0.0321] | 0.0202 | 0.0303 | 0.0607 | 0.0698 |
+| QASPER | dense − bm25 | +0.0675 [+0.0440, +0.0904] | 0.0330 | 0.0000 | **0.0000** | 0.0842 |
+| QASPER | hybrid − bm25 | +0.0700 [+0.0548, +0.0851] | 0.0215 | 0.0000 | **0.0000** | 0.0842 |
+| QASPER | hybrid-rerank − bm25 | +0.0842 [+0.0678, +0.1004] | 0.0234 | 0.0000 | **0.0000** | 0.0842 |
+| RAGBench | dense − bm25 | +0.0276 [−0.0190, +0.0740] | 0.0669 | 0.1723 | 0.1723 | 0.0493 |
+| RAGBench | hybrid − bm25 | +0.0352 [+0.0059, +0.0646] | 0.0432 | 0.0192 | **0.0330** | 0.0493 |
+| RAGBench | hybrid-rerank − bm25 | +0.0493 [+0.0113, +0.0868] | 0.0546 | 0.0024 | **0.0071** | 0.0493 |
+
+Four findings, none of them tuned for:
+
+1. **The hybrid is the strongest system on every dataset where it runs**, and it
+   beats lexical search by 1.9 to 7.0 points with Holm-adjusted p ≤ 0.033 on each.
+   The non-inferiority target of §6 is therefore a real baseline, not a straw one.
+2. **Dense alone loses 5.1 points on ContractNLI** while winning elsewhere. That
+   dataset is a within-document clause-matching task: a bi-encoder asked for a
+   single passage vector blurs a clause with the contract around it, while exact
+   clause wording is exactly what lexical matching is good at. A dense baseline
+   that won everywhere would have been suspicious.
+3. **The cross-encoder helps only where the fusion is open-domain**: +1.4 points
+   over hybrid on QASPER and +1.4 on RAGBench, −3.1 on SciFact and −0.1 on
+   ContractNLI. The two datasets where it hurts are the two whose candidates are
+   ranked *within a document* (§7), so the reranker is reordering near-duplicates
+   of the same source with 512-token truncation. Reported as measured; nothing in
+   the protocol predicted the sign.
+4. **The spread between the four systems, per dataset, is 4.9 to 8.4 points.** With
+   a pre-registered δ of 2.0 points (§11), a system sitting 2 points above the
+   baseline is inside the spread of the baselines themselves — which is why the
+   gate is a paired comparison and not a comparison of means.
+
+### 13.8 What Phase 1 bought, and the one thing it changed
+
+§8 says Phase 1 may decide nothing except the MDE and the baseline spread. Here
+they are, and the second one has a consequence that must be written before Phase 3
+runs rather than after it disappoints.
+
+**Measured MDE** (nDCG@10, α = 0.05 two-sided, 80% power) for the comparisons
+above: **2.0 to 6.7 points**. The paired difference between lexical and hybrid is
+the least correlated pair available in this table, so these are upper bounds on
+what a Phase-3 comparison will face.
+
+**Power at δ.** With δ = 1.0 point as the protocol's bar, the power to detect a
+true effect of exactly δ in these comparisons is **7% to 29%**:
+
+| dataset | comparison | MDE | power at δ = 1.0 pt |
+|---|---|---|---|
+| ContractNLI | hybrid − bm25 | 0.0199 | 0.29 |
+| QASPER | hybrid − bm25 | 0.0215 | 0.26 |
+| SciFact | hybrid − bm25 | 0.0383 | 0.11 |
+| RAGBench | hybrid − bm25 | 0.0432 | 0.09 |
+| SciFact | dense − bm25 | 0.0603 | 0.07 |
+| RAGBench | dense − bm25 | 0.0669 | 0.06 |
+
+That is the honest reading of a dev split of this size, and it is not a reason to
+move δ. Lowering the bar after seeing that it is hard to clear is the exact move
+§11 exists to prevent. Three consequences, fixed now:
+
+1. **δ stays at 1.0 point.** It is the materiality bar: a gain smaller than that
+   does not change the product's sentence.
+2. **A Phase-3 step that does not clear the bar is reported as "not established",
+   with its CI and its MDE — never as "no effect", and never dropped.** At this
+   power, a null result at 1 point is uninformative, and saying so is the result.
+3. **The remedy for weak power is more questions, not a smaller bar.** If a step
+   lands at +1 point with a CI that straddles zero, the answer is to add the pooled
+   secondary datasets to the *MDE* — pooled by family, never pooled into the gate,
+   because the datasets answer different questions and averaging them would let a
+   good QASPER hide a bad ContractNLI.
+
+Phase 3 starts from this table, with the numbers in `artifacts/phase1-summary.json`
+and the reproduction path in `--reproduce` and `runner.py` unchanged.
