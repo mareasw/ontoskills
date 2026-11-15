@@ -39,7 +39,7 @@ from typing import Callable, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from benchmark.retrieval import adapters, metrics, partition  # noqa: E402
+from benchmark.retrieval import adapters, dense, metrics, partition  # noqa: E402
 from benchmark.retrieval.baselines import Analysis, BM25  # noqa: E402
 
 PARTITIONS = partition.PARTITIONS
@@ -53,6 +53,9 @@ K_PUBLIC = 10
 # factory, not editing the scoring path.
 SYSTEMS: dict[str, Callable[[dict[str, str], Analysis], object]] = {
     "bm25": lambda documents, analysis: BM25(documents, analysis=analysis),
+    "dense": lambda documents, analysis: dense.Dense(documents),
+    "hybrid": dense.hybrid,
+    "hybrid-rerank": dense.hybrid_rerank,
 }
 
 ANALYSES: dict[str, Analysis] = {
@@ -86,6 +89,7 @@ class Run:
     metrics: dict[str, dict] = field(default_factory=dict)
     per_question: tuple[dict, ...] = ()
     unanswerable: tuple[str, ...] = ()
+    no_gold_docs: tuple[str, ...] = ()
     missing_metrics: tuple[str, ...] = ()
     digest: str = ""
     partition_digest: str = ""
@@ -103,6 +107,7 @@ class Run:
             "metrics": self.metrics,
             "missing_metrics": list(self.missing_metrics),
             "unanswerable": list(self.unanswerable),
+            "no_gold_docs": list(self.no_gold_docs),
             "digest": self.digest,
             "partition_digest": self.partition_digest,
             "seconds": round(self.seconds, 1),
@@ -122,14 +127,20 @@ def _question_metrics(
     k: int,
     texts: dict[str, str],
 ) -> dict:
-    """Every metric this question supports, and nothing it does not."""
+    """Every metric this question supports, and nothing it does not.
+
+    Availability is per question, not per dataset: a question can carry gold
+    facts without naming a gold document (10 of EnterpriseRAG-Bench's 480 do), and
+    scoring it as a document-retrieval miss would invent a failure the system
+    could not avoid. It still scores on the answer-level metrics.
+    """
     gold = set(question.gold_docs)
-    values: dict[str, float] = {
-        "ndcg@k": metrics.ndcg_at(ranked, gold, k),
-        "recall@k": metrics.recall_at(ranked, gold, k),
-        "mrr@k": metrics.mrr_at(ranked, gold, k),
-        "hit@k": metrics.hit_at(ranked, gold, k),
-    }
+    values: dict[str, float] = {}
+    if gold:
+        values["ndcg@k"] = metrics.ndcg_at(ranked, gold, k)
+        values["recall@k"] = metrics.recall_at(ranked, gold, k)
+        values["mrr@k"] = metrics.mrr_at(ranked, gold, k)
+        values["hit@k"] = metrics.hit_at(ranked, gold, k)
     if question.gold_facts:
         returned = [texts.get(doc_id, "") for doc_id in ranked[:k]]
         values["answer_fact_coverage"] = metrics.answer_fact_coverage(question.gold_facts, returned)
@@ -139,6 +150,14 @@ def _question_metrics(
             / len(question.gold_facts)
         )
     return values
+
+
+# Datasets whose loader needs to be told to fetch the corpus. mMARCO's collection
+# is 3.4 GB, so it is opt-in everywhere — including `--check`, which must stay
+# cheap — but the runner must opt in, or it scores every question against nothing.
+ADAPTER_OPTIONS: dict[str, dict] = {
+    "mmarco-it": {"collection": True},
+}
 
 
 def run(
@@ -162,7 +181,7 @@ def run(
         raise SystemExit(f"unknown split {split!r}")
 
     started = time.time()
-    benchmark = adapters.ADAPTERS[dataset]()
+    benchmark = adapters.ADAPTERS[dataset](**ADAPTER_OPTIONS.get(dataset, {}))
     k = k or K_PUBLIC
 
     path = partitions / f"{dataset}.json"
@@ -196,6 +215,12 @@ def run(
         chosen = chosen[:limit]
 
     documents = dict(benchmark.documents())
+    if not documents:
+        # An adapter that ships only the query side would otherwise rank against
+        # nothing and report zeros as if they were a measurement.
+        raise SystemExit(
+            f"{dataset}: the adapter returned no documents; a retrieval run needs the corpus"
+        )
     index = SYSTEMS[system](documents, ANALYSES[analysis])
 
     rows: list[dict] = []
@@ -227,9 +252,15 @@ def run(
     if not rows:
         raise SystemExit(f"{dataset}/{split}: no answerable question to score")
 
-    computed = [name for name in METRIC_ORDER if all(name in row for row in rows)]
+    # A metric is computed if any question supports it, and it is averaged over the
+    # questions that do — the artifact reports each metric's own n, so a subset
+    # average can never be mistaken for a whole-set one.
+    computed = [name for name in METRIC_ORDER if any(name in row for row in rows)]
     missing = tuple(name for name in METRIC_ORDER if name not in computed)
-    aggregates = {name: _aggregate([row[name] for row in rows], resamples=resamples) for name in computed}
+    aggregates = {
+        name: _aggregate([row[name] for row in rows if name in row], resamples=resamples) for name in computed
+    }
+    no_gold_docs = tuple(question.qid for question in chosen if question.answerable and not question.gold_docs)
 
     return Run(
         dataset=dataset,
@@ -241,12 +272,15 @@ def run(
         metrics=aggregates,
         per_question=tuple(rows),
         unanswerable=tuple(unanswerable),
+        no_gold_docs=no_gold_docs,
         missing_metrics=missing,
         digest=metrics.ranking_digest(rankings),
         partition_digest=partition_digest,
         seconds=time.time() - started,
         config={
-            "retriever": f"{system} ({analysis})",
+            # A system that knows what produced its numbers says so; the lexical
+            # baseline's identity is its analysis, a dense one's is its model.
+            "retriever": index.describe() if hasattr(index, "describe") else f"{system} ({analysis})",
             "indexed_documents": len(documents),
             "k": k,
             "bootstrap_resamples": resamples,
@@ -261,6 +295,7 @@ def format_run(result: Run) -> str:
     lines = [
         f"{result.dataset} / {result.split} / {result.system} ({result.analysis}) / k={result.k}",
         f"  questions {result.questions}  unanswerable {len(result.unanswerable)}"
+        f"  no gold document {len(result.no_gold_docs)}"
         f"  documents {result.config.get('indexed_documents')}  {result.seconds:.1f}s",
     ]
     for name in METRIC_ORDER:

@@ -348,7 +348,10 @@ Every phase states its decision rule **before** it runs.
 **Status 2026-11-15:** Phase 0 is closed and recorded in §12. All six adapters
 pass `--check`; the metric layer reproduces Anserini BM25 on SciFact within one
 point (0.6614 vs 0.665); the locator property test finds every quote at its cited
-offset on both compiled corpora. Phase 1 (the baseline table) has not started.
+offset on both compiled corpora. Phase 1 (the baseline table) is in progress and
+recorded in §13: the lexical column is measured on all five datasets that fit,
+the dense/hybrid column on the four whose corpora this machine can encode, and
+§13.5 states in arithmetic why the other two are not in the table.
 
 | Phase | Work | Gate / decision rule |
 |---|---|---|
@@ -534,22 +537,25 @@ have produced a plausible number:
 
 ### 12.5 The tests that make the checks mean something
 
-88 unit tests, all green without a GPU, a network call or an API key:
+106 unit tests, all green without a GPU, a network call or an API key:
 
 | file | tests | what makes them tests and not assertions |
 |---|---|---|
 | `test_retrieval_metrics.py` | 28 | every metric is compared with a value computed by hand in the test, and a deliberately reversed ranker must lose |
 | `test_retrieval_locator.py` | 19 | a shifted offset, an edited quote, a wrong page, a wrong section and a non-span range must each be caught by name |
 | `test_retrieval_partition.py` | 15 | an edited partition file, a changed question set and a changed stratum must each be refused |
-| `test_retrieval_runner.py` | 12 | a missing or drifted partition stops the run instead of scoring; a scoped question never retrieves its out-of-scope distractor; a backwards ranker moves the digest and loses points |
+| `test_retrieval_runner.py` | 15 | a missing or drifted partition stops the run instead of scoring; an empty corpus is refused rather than scored as zeros; a question with facts and no gold document scores on what it has and is listed; a scoped question never retrieves its out-of-scope distractor; a backwards ranker moves the digest and loses points |
 | `test_retrieval_baselines.py` | 14 | four workers must produce a bit-identical index, a cached index must be the same index, and an edited corpus, a different analysis and a truncated cache file must each miss |
+| `test_retrieval_dense.py` | 15 | RRF is checked against a value computed by hand; a truncated embedding cache and a wrong-width one must each miss; a reranker may reorder only what it read, and never promote an unread document over a read one |
 
-Two gaps were found by these tests, both in the harness rather than in the
+Three gaps were found by these tests, all in the harness rather than in the
 datasets. `partition.verify` compared assignments but not strata, so moving every
 question into one stratum passed. `runner.run` let a missing partition file
 surface as a bare `FileNotFoundError`, which reads like a bug; it is now a
 refusal that names the command that fixes it, because a split nobody wrote down
-is not a split.
+is not a split. And metric availability was assumed per dataset rather than per
+question, so a question carrying gold facts but no gold document — 10 of
+EnterpriseRAG-Bench's 480 answerable ones — aborted the run inside `ndcg`.
 
 ### 12.6 The baseline had to be made fast before it could be run at all
 
@@ -596,3 +602,134 @@ whole ERB documents scores `answer_fact_coverage = 0.9459`. That is the
 saturation §4 warns about — ten documents contain almost any fact's tokens — and
 it is why the metric is reported and not gated at document granularity.
 
+
+## 13. Phase-1 record: the reference table
+
+Phase 1 is "run S0, B1, B2, B3, B4 on the public suite, nothing tuned", and its
+only outputs are the baseline spread and the MDE. Everything in 13.1–13.5 was
+written **before** the first dense number existed, because a model choice, a cut
+and a fusion constant are exactly the things that can be tuned afterwards to make
+a claim survive.
+
+### 13.1 What the public suite can measure, and what it cannot
+
+On the public datasets there is no claim layer: the retrieval unit is the
+dataset's own (passage, paragraph, document). **S0 and B1 are therefore the same
+run there**, and the difference between them is identically zero by construction.
+The public suite measures the *backends* — lexical, dense, hybrid, reranked. The
+value of the claim layer is measured where claims exist, in Phase 2 (the Italian
+corpus with claims) and Phase 3 (ablations), not here.
+
+Writing that down prevents the most likely misreading of the table: a reader
+seeing B1 − S0 = 0 must not conclude the claim layer adds nothing.
+
+### 13.2 The dense model: which of the two §6 allows, and why
+
+§6 allows "BGE-M3 or E5-large, pinned". The choice is `intfloat/e5-large-v2` at
+revision `f169b11e22de` (resolved 2026-11-15), 1024 dimensions, 512-token cut.
+BGE-M3 is 568M parameters and multi-vector; on the 4 GB card this harness runs
+on it cannot cover a 512k-document corpus at any usable rate, and a baseline that
+cannot cover the corpus is not a baseline.
+
+Three details that are part of the model, not of the wiring:
+
+* **E5's prefixes.** `query: ` and `passage: ` are applied (`ModelSpec`), because
+  E5 without its prefixes is a several-point loss that reads as "dense is weak".
+* **The cut is 512**, the model's own maximum. It truncates, so truncation is
+  measured rather than assumed away: `dense.py --stats` reports, on a
+  deterministic 500-document sample, the share of documents longer than the cut.
+  That share is reported next to every dense number, because a corpus that is
+  60% truncated makes the dense baseline a statement about its first 512 tokens.
+* **Normalized embeddings, cosine via dot product**, float32, on the corpus in
+  id order, in fixed batches. The embedding cache is content-addressed over the
+  model revision, the cut and every document's text.
+
+Throughput measured on this machine before committing to a plan: **4.4
+documents/second** (fp32, batch 16, 512 tokens, Quadro T2000 4 GB). Half
+precision is *slower* here (1.5 docs/s), so fp32 is used — a decision that
+changes no number.
+
+### 13.3 Fusion and rerank constants
+
+| constant | value | why this value |
+|---|---|---|
+| RRF `k` | 60 | Cormack et al. 2009; the published default, not tuned here |
+| rerank depth | 50 | §6 says "top 50"; fixed there before this file existed |
+| cross-encoder | `cross-encoder/ms-marco-MiniLM-L-6-v2` @ `233902d2`, 512 tokens | the standard pair for this depth; small enough to run where the bi-encoder does |
+
+`reciprocal_rank_fusion` is written here and checked against a value computed by
+hand in a test, rather than imported: the fused order *is* the B3 number.
+
+### 13.4 What determinism means for a float matmul
+
+BM25 is bit-identical, including across machines, and the tests assert it. A
+dense ranking is not claimed to be: float matmul order depends on BLAS and on the
+device. What is claimed is that **the same machine and the same library build
+reproduce the same ranking**, which `metrics.ranking_digest` makes checkable in
+one rerun, and that the cache cannot be a stale one — it is keyed by the corpus
+text and the model revision, and a truncated cache file is a miss, not a crash.
+
+This is a weaker claim than BM25's, and it is the strongest one available.
+
+### 13.5 What this machine cannot run, stated as arithmetic
+
+At 4.4 documents/second, measured above and before any dense run:
+
+| corpus | documents | projected encode time | verdict |
+|---|---|---|---|
+| SciFact | 5,183 | 20 min | run |
+| ContractNLI | 10,061 | 38 min | run |
+| RAGBench | 3,916 | 15 min | run |
+| QASPER | 28,355 | 1 h 47 min | run |
+| EnterpriseRAG-Bench | 511,958 | **32 h** | not run here |
+| mMARCO Italian | 8,840,000 | **23 days** | not run here |
+
+Two consequences, both uncomfortable and both better stated now than discovered
+in Phase 4:
+
+1. **The dense baseline on EnterpriseRAG-Bench is out of reach of this machine.**
+   It is one of the three primary datasets, so the Phase-4 non-inferiority claim
+   against B3 cannot be evaluated on it without a rented GPU. The public table
+   will say so in the cell, and the claim is scoped to the datasets where B3
+   exists.
+2. **The Italian proxy keeps BM25 only.** mMARCO's Phase-2 gate asks that the
+   Italian split load with its qrels and reproduce the published BM25 run — it
+   never required dense — so this costs the gate nothing, but it does mean no
+   dense number is claimed for Italian.
+
+An estimate converted into a decision *here*, with the hardware named, is not a
+result being explained away later.
+
+### 13.6 The lexical column, measured
+
+BM25 (k1 = 0.9, b = 0.4, Porter + Lucene stop words), dev split, k = 10,
+`sha256-rank-alternate-v1` partition. Intervals are paired bootstrap, 10,000
+resamples, over questions.
+
+| dataset | scored | unanswerable | no gold doc | nDCG@10 [95% CI] | recall@10 | digest |
+|---|---|---|---|---|---|---|
+| SciFact | 150 | 0 | 0 | **0.6828** [0.6195, 0.7434] | 0.8091 | `ac8b1e7f98981df5` |
+| EnterpriseRAG-Bench | 241 | 10 | 5 | **0.5433** [0.4880, 0.5975] | 0.6307 | `512a555b51455966` |
+| ContractNLI | 594 | 452 | 0 | **0.5641** [0.5381, 0.5900] | 0.7006 | `abfae64dd971ac27` |
+| RAGBench | 66 | 0 | 0 | **0.6175** [0.5602, 0.6736] | 0.5978 | `3e027f2c3e5a40b3` |
+| QASPER | 676 | 50 | 0 | **0.4090** [0.3850, 0.4334] | 0.5900 | `1ed5346306d5a042` |
+
+mMARCO Italian is Phase 2 and is not in this table.
+
+SciFact's dev figure, 0.6828, is *not* comparable with the Phase-0 reproduction
+figure of 0.6614: that one is the published 300-query BEIR evaluation, this one
+is the 150-query dev half. Both are recorded rather than one being presented as
+the other.
+
+EnterpriseRAG-Bench also carries the answer-level metrics, which no other public
+dataset in the suite has: `answer_fact_coverage` 0.9300, `answer_fact_support`
+0.8037, `numeric_congruence` 0.9506 (n = 241). The first is the saturated one of
+§4 and is not gated; it is in the table because omitting it would look like a
+choice made after seeing it.
+
+Two structural facts, recorded because they explain a number that otherwise looks
+like a bug: 452 of ContractNLI's 1,046 dev questions are unanswerable by
+construction (the three-label NLI task), so 594 are scored; 10 of
+EnterpriseRAG-Bench's 251 dev questions are `info_not_found`, and 5 of the 241
+answerable ones name a fact with no source document — they are scored on the
+answer-level metrics and listed under `no_gold_docs` in the artifact.
