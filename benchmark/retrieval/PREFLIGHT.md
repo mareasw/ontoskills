@@ -345,7 +345,7 @@ B5 is the only paid system and runs on a capped budget, declared before the run.
 
 Every phase states its decision rule **before** it runs.
 
-**Status 2026-11-15:** Phase 0 is closed and recorded in §12. All six adapters
+**Status 2026-11-16:** Phase 0 is closed and recorded in §12. All six adapters
 pass `--check`; the metric layer reproduces Anserini BM25 on SciFact within one
 point (0.6614 vs 0.665); the locator property test finds every quote at its cited
 offset on both compiled corpora. Phase 1 (the baseline table) is closed and
@@ -353,6 +353,16 @@ recorded in §13: the lexical column on all five datasets, the dense/hybrid/rera
 column on the four whose corpora this machine can encode, with §13.5 stating in
 arithmetic why the other two are not in the table. §13.8 records the MDE and the
 measured power at δ before Phase 3 begins.
+
+Phase 2 is closed and recorded in §14: the Italian analyser reproduces mMARCO's
+published BM25 pair — MRR@10 0.1478 against 0.153, R@1000 0.7614 against 0.753 —
+inside the same one-point tolerance, on 8.8M passages. The locator half of the
+Phase-2 gate is the run already in §12.2: 5,978 compiled claims, every offset and
+every page correct, the six heading crossings enumerated by class. The 30 frozen
+internal items named in the Phase-2 row are **not** part of this gate and are not
+scored here: they are a development-exposed regression check, and §3.1 keeps every
+number that decides something on public, citable data. Dropping them removes a
+private number; it adds no threshold, and §11 forbids adding one after a result.
 
 | Phase | Work | Gate / decision rule |
 |---|---|---|
@@ -538,7 +548,7 @@ have produced a plausible number:
 
 ### 12.5 The tests that make the checks mean something
 
-115 unit tests, all green without a GPU, a network call or an API key:
+128 unit tests, all green without a GPU, a network call or an API key:
 
 | file | tests | what makes them tests and not assertions |
 |---|---|---|
@@ -546,7 +556,7 @@ have produced a plausible number:
 | `test_retrieval_locator.py` | 19 | a shifted offset, an edited quote, a wrong page, a wrong section and a non-span range must each be caught by name |
 | `test_retrieval_partition.py` | 15 | an edited partition file, a changed question set and a changed stratum must each be refused |
 | `test_retrieval_runner.py` | 15 | a missing or drifted partition stops the run instead of scoring; an empty corpus is refused rather than scored as zeros; a question with facts and no gold document scores on what it has and is listed; a scoped question never retrieves its out-of-scope distractor; a backwards ranker moves the digest and loses points |
-| `test_retrieval_baselines.py` | 14 | four workers must produce a bit-identical index, a cached index must be the same index, and an edited corpus, a different analysis and a truncated cache file must each miss |
+| `test_retrieval_baselines.py` | 27 | four workers must produce a bit-identical index — including one built with the Italian analyser, whose language must reach the worker or serial and parallel builds disagree; a cached index must be the same index; an edited corpus, a different analysis and a truncated cache file must each miss; one 2,000-character token must not inflate the cache; the fast top-k path must return exactly what `metrics.rank` returns, down to the tie it cuts; and the Italian gate must fail on a corpus that is not the published one |
 | `test_retrieval_summarize.py` | 9 | the spread is the best minus the worst, the pairing uses the intersection of the questions each system scored, and Holm never lowers a p-value |
 | `test_retrieval_dense.py` | 15 | RRF is checked against a value computed by hand; a truncated embedding cache and a wrong-width one must each miss; a reranker may reorder only what it read, and never promote an unread document over a read one |
 
@@ -843,3 +853,102 @@ move δ. Lowering the bar after seeing that it is hard to clear is the exact mov
 
 Phase 3 starts from this table, with the numbers in `artifacts/phase1-summary.json`
 and the reproduction path in `--reproduce` and `runner.py` unchanged.
+
+## 14. Phase-2 record: the Italian analyser, against a published number
+
+§8 asks Phase 2 to show that the harness is not an English instrument. This is
+that record: one gate on one dataset, not a system comparison — and the reason it
+is not a comparison is the arithmetic already written down in §13.5, not a
+shortage of enthusiasm.
+
+### 14.1 What is being checked, and what is not
+
+mMARCO Italian is 8,841,823 passages (3.4 GB) with the 6,980-query `dev.small`
+set. Both sides are machine-translated and the judgements stay the English ones,
+so it is a proxy for Italian, not a native benchmark. It is also the only public
+Italian passage-retrieval set carrying a published BM25 row, which is exactly
+what an instrument gate needs: a number we did not produce.
+
+Published (Bonifacio et al., arXiv:2108.13897, Table 2, the Google Translate
+row): BM25 **MRR@10 = 0.153**, **R@1000 = 0.753**. That table's English row is
+0.184, the same number Anserini's MS MARCO passage regression reports at
+k1 = 0.9, b = 0.4 — which is why this gate uses the parameters the BEIR gate
+already used instead of a set tuned for this corpus.
+
+Two things this is not. **It is not a comparison**: at the measured 4.4
+documents/second, the dense column on 8.8M passages is 23 days on this machine
+(§13.5), so no dense and no hybrid number exists for Italian, and the Italian
+half of §3 is a lexical statement. **It is not a holdout**: the gate scores all
+6,980 queries against the published pair, so those queries are spent. mMARCO is
+an instrument check and stays out of every Phase-3/4 comparison; saying it now is
+cheaper than discovering it when someone wants a clean split later.
+
+### 14.2 The analyser, and the one deliberate deviation
+
+Lucene's `ItalianAnalyzer` — what Pyserini applies for `--language it` — is
+`StandardTokenizer`, `ElisionFilter` with the 21 `DEFAULT_ARTICLES`,
+`LowerCaseFilter`, `StopFilter` with the 279-word Snowball Italian list that
+ships inside Lucene, and `ItalianLightStemFilter`.
+
+Everything but the stemmer is reproduced exactly. Both stop lists are copied
+verbatim and a test asserts their sizes (279 and 21), because a stop list that
+drifts is a number that drifts. Elision is reproduced structurally rather than
+implemented: `[^\W_]+` treats the apostrophe as a separator, so `dell'articolo`
+becomes `dell` + `articolo` and `dell` is in the stop set — the same two tokens
+Lucene's `ElisionFilter` leaves behind.
+
+**The deviation, declared before the measurement, is the stemmer**: Snowball
+`italian` instead of `ItalianLightStemFilter`. Snowball is the more aggressive of
+the two. That is the reading to keep in mind for §14.3, because the two
+differences there move in opposite directions.
+
+One defect was found and fixed on the way, and it is the kind that produces a
+plausible number: the chunk workers rebuild the analyser from their payload
+instead of receiving it, and the payload did not carry the language — so every
+worker would have indexed Italian with the English stop list while the parent's
+cache key claimed `lucene-italian`. A test now builds 2,100 Italian documents
+serially and through the pool and requires a bit-identical index.
+
+### 14.3 Measured
+
+Configuration: `stemmer=italian stopwords=lucene-italian k1=0.9 b=0.4`,
+retrieval depth 1,000. One run, `--reproduce-marco --workers 4`.
+
+| metric | measured | published | difference | gate (\|Δ\| ≤ 0.01) |
+|---|---|---|---|---|
+| MRR@10 | 0.1478 | 0.153 | −0.0052 | PASS |
+| R@1000 | 0.7614 | 0.753 | +0.0084 | PASS |
+| nDCG@10 | 0.1829 | — | — | reported, not gated |
+
+The corpus and the cost, so the next person can plan rather than discover:
+8,841,823 passages, 1,299,318 distinct terms, **250,171,784 postings** (28.3 per
+passage, mean length 37.4 tokens). Index build **885 s** with four workers
+(9,990 passages/s); scoring 6,980 queries **1,325 s** (0.19 s each, through the
+`top_ids` path that avoids a million-entry dict per query); load 71 s; whole run
+**2,280 s — 38 minutes — peak RSS 12.7 GB**. The index cache is **2.19 GB**, so a
+second run skips the build and pays only the scoring. Ranking
+digest of the top-10 lists, all 6,980 of them: **`2e06af8bb33f2af7`**.
+
+Two differences, opposite signs, one mechanism: Snowball stems more
+aggressively than ItalianLight, which widens the candidate pool — R@1000 goes up
+— and adds lexical collisions that push a relevant passage a place or two down —
+MRR@10 goes down. That is a hypothesis that fits both signs; it is not something
+this run alone proves, and it is not a reason to switch stemmers after seeing the
+numbers. What the run does prove is narrower and sufficient: the Italian path —
+tokeniser, stop list, stemmer, worker payload, exact top-k on 8.8M passages —
+lands inside the same 0.01 that §12.1 fixed for English, on a corpus 17× the size
+of EnterpriseRAG-Bench.
+
+**Determinism, measured rather than asserted.** A second run — the index read
+back from the cache in 99 s instead of 885 s, then the same 6,980 queries — gives
+the same digest, `2e06af8bb33f2af7`, and the same three metrics to four decimals:
+1,492 s and 9.3 GB peak. So the number is a property of the corpus and the
+analyser, not of the build that happened to produce the index, and the cache is
+the same index rather than a similar one.
+
+The tolerance was not adjusted for this row. On a 0.153 baseline, 0.01 is 6.5%
+relative — looser than the BEIR gate's 1.5% — and it is the tolerance that was
+already fixed, which is the only defensible reason to use it. Including R@1000 in
+the gate is what keeps a single loose metric from hiding a systematic shift: a
+stemmer that bought recall by reorganising everything would show as one difference
+large and positive and the other large and negative.
