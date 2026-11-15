@@ -19,3 +19,9 @@ snowballstemmer
 # but the adapter imports it by name, so the dependency is stated rather than
 # inherited.
 pyarrow
+
+# The dense baselines (benchmark/retrieval/dense.py, systems `dense`, `hybrid`,
+# `hybrid-rerank`) need torch and sentence-transformers, which are large and CUDA-
+# specific. They are optional on purpose: every lexical run and every test works
+# without them, and the tests inject their own encoder.
+#   pip install torch sentence-transformers

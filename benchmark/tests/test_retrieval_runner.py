@@ -227,6 +227,97 @@ def test_a_limit_truncates_without_changing_the_split(stub):
     assert limited.digest != full.digest
 
 
+def test_a_dataset_with_no_documents_is_refused(monkeypatch, tmp_path):
+    """mMARCO ships only the query side unless asked, so an empty corpus is a
+    real state a run can reach. Ranking against nothing would report zeros that
+    look like a measurement."""
+    questions = (adapters.Question(qid="q", text="anything", gold_docs=("d1",), kind="basic"),)
+    monkeypatch.setitem(
+        adapters.ADAPTERS,
+        "queries-only",
+        lambda: adapters.Benchmark(
+            name="queries-only",
+            questions=questions,
+            documents=lambda: iter(()),
+            citation="stub",
+            licence="none",
+        ),
+    )
+    partition.build("queries-only", questions).write(tmp_path / "queries-only.json")
+    with pytest.raises(SystemExit, match="no documents"):
+        runner.run("queries-only", split="all", partitions=tmp_path, resamples=10)
+
+
+def test_the_runner_asks_for_the_corpus_when_the_loader_needs_it(monkeypatch, tmp_path):
+    """The stub only returns documents when told to, like `mmarco_it(collection=True)`."""
+    received: list[dict] = []
+    questions = (adapters.Question(qid="q", text="capital of france", gold_docs=("d1",), kind="basic"),)
+
+    def loader(**options):
+        received.append(options)
+        return adapters.Benchmark(
+            name="opt-in",
+            questions=questions,
+            documents=(lambda: iter(DOCUMENTS.items())) if options.get("collection") else (lambda: iter(())),
+            citation="stub",
+            licence="none",
+        )
+
+    monkeypatch.setitem(adapters.ADAPTERS, "opt-in", loader)
+    monkeypatch.setitem(runner.ADAPTER_OPTIONS, "opt-in", {"collection": True})
+    partition.build("opt-in", questions).write(tmp_path / "opt-in.json")
+    result = runner.run("opt-in", split="all", partitions=tmp_path, resamples=10)
+    assert received == [{"collection": True}]
+    assert result.config["indexed_documents"] == len(DOCUMENTS)
+
+
+def test_a_question_with_facts_but_no_gold_document_is_scored_on_what_it_has(monkeypatch, tmp_path):
+    """Ten of EnterpriseRAG-Bench's 480 answerable questions name a fact and no
+    source document. Scoring those as document-retrieval misses would invent a
+    failure the system could not avoid, and dropping them would hide the fact
+    that they are scored at all."""
+    questions = (
+        adapters.Question(qid="docs", text="capital of france", gold_docs=("d1",), kind="basic"),
+        adapters.Question(
+            qid="nofacts",
+            text="capital of france",
+            gold_docs=("d1",),
+            kind="basic",
+        ),
+        adapters.Question(
+            qid="nodocs",
+            text="capital of france is paris",
+            gold_facts=("paris is the capital of france",),
+            kind="basic",
+        ),
+    )
+    monkeypatch.setitem(
+        adapters.ADAPTERS,
+        "mixed",
+        lambda: adapters.Benchmark(
+            name="mixed",
+            questions=questions,
+            documents=lambda: iter(DOCUMENTS.items()),
+            citation="stub",
+            licence="none",
+        ),
+    )
+    partition.build("mixed", questions).write(tmp_path / "mixed.json")
+    result = runner.run("mixed", split="all", partitions=tmp_path, resamples=100)
+
+    rows = {row["qid"]: row for row in result.per_question}
+    assert "ndcg@k" in rows["docs"] and "answer_fact_coverage" not in rows["docs"]
+    assert "ndcg@k" not in rows["nodocs"]
+    assert "answer_fact_coverage" in rows["nodocs"]
+
+    # The document metrics are averaged over two questions, the fact metric over one.
+    assert result.metrics["ndcg@k"]["n"] == 2
+    assert result.metrics["answer_fact_coverage"]["n"] == 1
+    assert result.no_gold_docs == ("nodocs",)
+    assert result.as_json()["no_gold_docs"] == ["nodocs"]
+    assert "no gold document 1" in runner.format_run(result)
+
+
 def test_an_unknown_name_is_refused_by_name(stub):
     with pytest.raises(SystemExit, match="unknown dataset"):
         runner.run("not-a-dataset", partitions=stub, resamples=10)
