@@ -711,7 +711,7 @@ resamples, over questions.
 | dataset | scored | unanswerable | no gold doc | nDCG@10 [95% CI] | recall@10 | digest |
 |---|---|---|---|---|---|---|
 | SciFact | 150 | 0 | 0 | **0.6828** [0.6195, 0.7434] | 0.8091 | `ac8b1e7f98981df5` |
-| EnterpriseRAG-Bench | 241 | 10 | 5 | **0.5433** [0.4880, 0.5975] | 0.6307 | `512a555b51455966` |
+| EnterpriseRAG-Bench | 241 | 10 | 5 | **0.5433** [0.4880, 0.5975] (n = 236: five of them carry no gold document) | 0.6307 | `512a555b51455966` |
 | ContractNLI | 594 | 452 | 0 | **0.5641** [0.5381, 0.5900] | 0.7006 | `abfae64dd971ac27` |
 | RAGBench | 66 | 0 | 0 | **0.6175** [0.5602, 0.6736] | 0.5978 | `3e027f2c3e5a40b3` |
 | QASPER | 676 | 50 | 0 | **0.4090** [0.3850, 0.4334] | 0.5900 | `1ed5346306d5a042` |
