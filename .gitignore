@@ -62,3 +62,7 @@ benchmark/docbench/gold/claims.verified.jsonl
 examples/demo-corpus/documents/
 examples/demo-corpus/kb/
 examples/demo-corpus/cache/
+
+# Retrieval benchmark: run outputs are regenerable; the split and the Phase-0
+# evidence are committed, the numbers they produce are not.
+benchmark/retrieval/runs/
