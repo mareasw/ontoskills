@@ -1,0 +1,25 @@
+{
+ "dataset": "mmarco-it",
+ "documents": 8841823,
+ "queries": 6980,
+ "config": "stemmer=italian stopwords=lucene-italian k1=0.9 b=0.4 documents=8841823 depth=1000",
+ "mrr@10": 0.14782735252649296,
+ "r@1000": 0.7614493791786054,
+ "ndcg@10": 0.1829244504237692,
+ "published": {
+  "mrr@10": 0.153,
+  "r@1000": 0.753
+ },
+ "difference": {
+  "mrr@10": -0.005172647473507042,
+  "r@1000": 0.008449379178605443
+ },
+ "within_tolerance": true,
+ "ranking_digest": "2e06af8bb33f2af7",
+ "seconds": {
+  "load": 70.5,
+  "index": 885.1,
+  "score": 1324.7,
+  "total": 2280.2
+ }
+}
