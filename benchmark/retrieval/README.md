@@ -15,7 +15,7 @@ writes questions: the gold is public and citable.
 | `PREFLIGHT.md` | the protocol: claims, metrics, statistics, phases, criteria fixed in §11, Phase-0 record in §12 | — |
 | `adapters.py` | six public datasets, normalised to one `Question`/`Benchmark` shape | `--check` |
 | `metrics.py` | ranking metrics, evidence matching, answer-fact coverage, bootstrap/Wilcoxon/Holm, MDE | imported |
-| `baselines.py` | Lucene BM25 over one or several fields, and the published-number reproduction | `--reproduce` |
+| `baselines.py` | Lucene BM25 over one or several fields, and the published-number reproduction (English BEIR, Italian mMARCO) | `--reproduce`, `--reproduce-marco` |
 | `dense.py` | B2/B3/B4: a pinned bi-encoder, RRF fusion and a cross-encoder rerank, with a content-addressed embedding cache | `--build`, `--stats` |
 | `locator.py` | property test: every compiled claim's quote must be at its cited offset | `--check` |
 | `partition.py` | the committed dev/holdout split and its digest | `--build`, `--verify` |
@@ -26,7 +26,7 @@ writes questions: the gold is public and citable.
 | `runs/` | run outputs (created on demand) | — |
 
 The retrieval suite is `benchmark/tests/test_retrieval_{locator,metrics,partition,runner,baselines,dense,summarize}.py`,
-115 tests, no network and no key: `python3 -m pytest benchmark/tests/test_retrieval_*.py`.
+128 tests, no network and no key: `python3 -m pytest benchmark/tests/test_retrieval_*.py`.
 The locator tests skip themselves when the compiled corpora are absent, which is
 the case in CI — those corpora are derived artifacts and are not in the repo.
 
@@ -36,8 +36,13 @@ the case in CI — those corpora are derived artifacts and are not in the repo.
 # 1. every adapter reads its gold without loss
 python3 benchmark/retrieval/adapters.py --check --json benchmark/retrieval/artifacts/instrument-check.json
 
-# 2. the metric layer reproduces a published number (≈90 s)
+# 2. the metric layer reproduces a published number (~90 s cold, ~25 s with the
+#    index cache warm)
 python3 benchmark/retrieval/baselines.py --reproduce --json benchmark/retrieval/artifacts/reproduce-scifact.json
+
+# 2b. the Italian analyser reproduces a published number (~1 hour the first time:
+#     the 8.8M-passage index is the work; later runs reuse the cached index)
+python3 benchmark/retrieval/baselines.py --reproduce-marco --workers 4 --json benchmark/retrieval/artifacts/reproduce-mmarco-it.json
 
 # 3. the split still describes the datasets
 python3 benchmark/retrieval/partition.py --verify
@@ -92,11 +97,15 @@ every document's text, so it cannot be stale).
 
 - mMARCO Italian ships its 3.4 GB passage collection on demand
   (`mmarco_it(collection=True)`); `--check` validates only the query side by
-  default and says so.
-- EnterpriseRAG-Bench is the heavy corpus: 511,958 documents. The first BM25 build
-  takes **~10 minutes and 16 GB of RAM**; every later run reuses a cached index
-  (**~4.5 minutes, 11 GB**). The cache lives in
-  `~/.cache/ontoskills-bench/index` and is **5.5 GB** for ERB — a key over every
+  default and says so. Its gate scores all 6,980 queries of dev.small, so those
+  queries are spent: mMARCO is an instrument check, not a comparison dataset, and
+  no Phase-3/4 run will use it.
+- EnterpriseRAG-Bench is the heavy corpus: 511,958 documents and 149M postings.
+  The first BM25 build takes **~12 minutes**; the whole run (build, cache, 241
+  questions) **~23 minutes, peak 12 GB** — the peak is mostly pages the eight
+  fork workers share, not eight copies. Every later run reuses the cached index
+  and takes **~9 minutes**. The cache lives in
+  `~/.cache/ontoskills-bench/index` and is **1.2 GB** for ERB — a key over every
   document, so it is never stale, and safe to delete at any time. `--limit` only
   shortens the question list; the index is always the whole corpus, because a
   baseline scored against a truncated corpus is not the baseline.
