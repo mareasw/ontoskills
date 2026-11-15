@@ -13,11 +13,13 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from benchmark.retrieval import baselines  # noqa: E402
+from benchmark.retrieval import adapters, baselines, metrics  # noqa: E402
+from benchmark.retrieval.adapters import Question as _Question  # noqa: E402
 
 CORPUS = {
     f"d{index}": text
@@ -80,11 +82,11 @@ def test_the_chunk_boundaries_do_not_change_the_index():
     """A serial build is one chunk per worker with the same chunk function, so the
     only thing that may differ is how many chunks it was cut into."""
     texts = list(CORPUS.values())
-    one_shot = baselines._merge([baselines._chunk_postings(("porter", True, texts))])
+    one_shot = baselines._merge([baselines._chunk_postings(("porter", True, "english", texts))])
     split = baselines._merge(
         [
-            baselines._chunk_postings(("porter", True, texts[:3])),
-            baselines._chunk_postings(("porter", True, texts[3:])),
+            baselines._chunk_postings(("porter", True, "english", texts[:3])),
+            baselines._chunk_postings(("porter", True, "english", texts[3:])),
         ]
     )
     assert one_shot[0] == split[0]
@@ -137,10 +139,191 @@ def test_a_cache_holding_another_corpus_is_rejected(tmp_path):
     victim = next(tmp_path.glob("*.npz"))
     with np.load(victim, allow_pickle=False) as saved:
         payload = {name: saved[name] for name in saved.files}
-    payload["ids"] = np.asarray(["x", "y"], dtype=str)
+    payload["ids_blob"] = baselines._pack(["x", "y"])
     np.savez(victim, **payload)
     rebuilt = baselines.BM25(CORPUS, workers=1, cache=tmp_path)
     assert rebuilt.from_cache is False
+
+
+def test_a_cache_written_in_the_original_format_is_still_read(tmp_path):
+    """The vocabulary used to be stored as a fixed-width unicode array. A storage
+    change that cannot change the index must not invalidate a cache, because the
+    rebuild it would force is ten minutes on the largest corpus."""
+    fresh = baselines.BM25(CORPUS, workers=1, cache=None)
+    path = tmp_path / f"{fresh.cache_key}.npz"
+    # The cache holds the document-major payload, not the term-major matrix the
+    # scorer uses, so the old file is written from the build itself.
+    vocab, matrix = baselines._merge([baselines._chunk_postings(("porter", True, "english", list(CORPUS.values())))])
+    assert vocab == fresh.vocab
+    np.savez(path, ids=np.asarray(fresh.ids, dtype=str), terms=np.asarray(list(vocab), dtype=str), **matrix)
+    cached = baselines.BM25(CORPUS, workers=1, cache=tmp_path)
+    assert cached.from_cache is True
+    assert cached.vocab == fresh.vocab
+    assert np.array_equal(cached.matrix.toarray(), fresh.matrix.toarray())
+
+
+def test_one_long_token_does_not_inflate_the_cache(tmp_path):
+    """EnterpriseRAG-Bench contains a 2,392-character token. Stored as a fixed-width
+    unicode array it made a 480k-term vocabulary occupy 4.6 GB instead of 17 MB —
+    allocated on every load, for one string."""
+    corpus = {"d1": "alpha beta", "d2": ("a" * 2000) + " gamma delta"}
+    index = baselines.BM25(corpus, workers=1, cache=tmp_path)
+    size = sum(path.stat().st_size for path in tmp_path.glob("*.npz"))
+    assert size < 200_000, f"the cache grew to {size} bytes around one long token"
+    assert max(len(term) for term in index.vocab) >= 2000, "the token is kept, only its storage changed"
+
+    reloaded = baselines.BM25(corpus, workers=1, cache=tmp_path)
+    assert reloaded.from_cache is True
+    assert reloaded.vocab == index.vocab
+
+
+def test_top_ids_returns_exactly_what_rank_returns():
+    """The fast path exists for the 8.8M-passage corpus, and it must not be a
+    second definition of the ranking."""
+    index = baselines.BM25(CORPUS, workers=1, cache=None)
+    for query in ("capital of france", "largest city in the country", "alpha", "nothing matches here"):
+        for k in (1, 3, 10, 100):
+            expected = metrics.rank(index.scores(query), top_k=k)
+            ranked, top = index.top_ids(query, k)
+            assert ranked == expected
+            if expected:
+                assert top == pytest.approx(index.scores(query)[expected[0]])
+
+
+def test_top_ids_breaks_a_boundary_tie_by_id():
+    """Two documents with the same score: the smaller id wins the slot, as it does
+    in `metrics.rank`, and it must win it when k exactly cuts the tie too."""
+    corpus = {"b": "alpha beta", "a": "alpha beta", "c": "gamma"}
+    index = baselines.BM25(corpus, workers=1, cache=None)
+    assert metrics.rank(index.scores("alpha"))[:2] == ("a", "b")
+    ranked, _ = index.top_ids("alpha", 1)
+    assert ranked == ("a",), "a tie at the cutoff must be resolved by id, not by array order"
+
+
+def test_top_ids_handles_a_query_longer_than_the_corpus_and_an_empty_one():
+    index = baselines.BM25(CORPUS, workers=1, cache=None)
+    ranked, top = index.top_ids("capital", 1000)
+    assert ranked and top > 0
+    assert index.top_ids("zzz-nonexistent", 5) == ((), 0.0)
+    with pytest.raises(ValueError):
+        index.top_ids("capital", 0)
+
+
+def test_the_italian_analyser_uses_the_italian_stop_list():
+    italian = baselines.Analysis(stemmer="italian", language="italian")
+    tokens = italian("Il gatto dell'articolo è sul tavolo, ma il cane non c'è")
+    assert "il" not in tokens and "tavolo" not in tokens, "stop words and elided articles are dropped"
+    assert "gatt" in tokens and "tavol" in tokens
+
+
+def test_the_stop_lists_are_the_published_ones():
+    """A stop list that drifts is a number that drifts, and nobody would notice."""
+    assert len(baselines.STOPWORDS_IT) == 279, "Lucene's italian_stop.txt"
+    assert len(baselines.ITALIAN_ARTICLES) == 21, "ItalianAnalyzer.DEFAULT_ARTICLES"
+    assert "perché" in baselines.STOPWORDS_IT
+    assert "sull" in baselines.ITALIAN_ARTICLES
+
+
+def test_the_english_description_is_frozen_because_it_keys_the_cache():
+    """Every built index is cached under this string; renaming it silently rebuilds
+    ten minutes of work per corpus."""
+    assert baselines.Analysis().describe() == "stemmer=porter stopwords=lucene"
+    assert baselines.Analysis(stemmer=None, stopwords=False).describe() == "stemmer=none stopwords=none"
+    assert baselines.Analysis(stemmer="italian", language="italian").describe() == "stemmer=italian stopwords=lucene-italian"
+
+
+def test_an_unknown_stop_word_language_is_refused():
+    with pytest.raises(ValueError, match="unknown stop-word language"):
+        baselines.Analysis(language="klingon")
+
+
+def test_the_worker_is_told_which_language_it_is_indexing():
+    """A worker rebuilds the analyser from the payload. If the language does not
+    travel with it, the worker indexes Italian with the English stop list and the
+    serial and parallel builds disagree — silently, in a number nobody re-derives."""
+    italian = baselines._chunk_postings(("italian", True, "italian", ["Il gatto del vicino"]))
+    assert "il" not in italian["terms"] and "gatt" in italian["terms"]
+    english = baselines._chunk_postings(("italian", True, "english", ["Il gatto del vicino"]))
+    assert "il" in english["terms"], "the language must reach the worker, not be assumed"
+
+
+def test_an_italian_index_is_the_same_serial_and_parallel():
+    corpus = {f"d{i}": f"Il gatto del vicino e sul tavolo numero {i}" for i in range(2100)}
+    analysis = baselines.Analysis(stemmer="italian", language="italian")
+    serial = baselines.BM25(corpus, analysis=analysis, workers=1, cache=None)
+    parallel = baselines.BM25(corpus, analysis=analysis, workers=2, cache=None)
+    assert parallel.vocab == serial.vocab
+    assert "il" not in serial.vocab, "the italian stop list reaches the build, not the english one"
+    for name in ("indices", "data", "indptr"):
+        assert np.array_equal(getattr(parallel.matrix, name), getattr(serial.matrix, name))
+    assert np.array_equal(parallel.lengths, serial.lengths)
+
+
+ITALIAN_CORPUS = {
+    "d1": "Il gatto dorme sul tavolo della cucina",
+    "d2": "Il cane corre nel parco con il pallone",
+    "d3": "La macchina rossa va molto veloce in autostrada",
+    "d4": "Il tavolo del giardino e di legno scuro",
+}
+
+
+def test_the_marco_scorer_agrees_with_the_generic_ranking():
+    """MRR@10 and R@1000 must be cut from the ranking `metrics.rank` produces:
+    the fast path is a speed-up, not a second definition of retrieval."""
+    index = baselines.BM25(ITALIAN_CORPUS, workers=1, cache=None)
+    questions = [
+        _Question(qid="q1", text="gatto tavolo", gold_docs=("d1",)),
+        _Question(qid="q2", text="cane parco pallone", gold_docs=("d2",)),
+        _Question(qid="q3", text="autostrada veloce", gold_docs=("d3",)),
+    ]
+    result = baselines.evaluate_marco(index, questions)
+
+    def generic(question):
+        ranking = metrics.rank(index.scores(question.text), top_k=1000)
+        return (
+            metrics.mrr_at(ranking, question.gold_docs, 10),
+            metrics.recall_at(ranking, question.gold_docs, 1000),
+            metrics.ndcg_at(ranking, question.gold_docs, 10),
+        )
+
+    expected = [generic(question) for question in questions]
+    assert result["queries"] == 3
+    assert result["mrr@10"] == pytest.approx(sum(row[0] for row in expected) / 3)
+    assert result["r@1000"] == pytest.approx(sum(row[1] for row in expected) / 3)
+    assert result["ndcg@10"] == pytest.approx(sum(row[2] for row in expected) / 3)
+
+
+def test_the_marco_gate_is_reproducible_and_can_fail(monkeypatch):
+    """The gate must be a gate: it passes on the published numbers and fails on a
+    corpus that is not the one they were measured on, without pretending."""
+    benchmark = adapters.Benchmark(
+        name="mmarco-it",
+        questions=(
+            _Question(qid="q1", text="gatto tavolo", gold_docs=("d1",)),
+            _Question(qid="q2", text="cane parco", gold_docs=("d2",)),
+        ),
+        documents=lambda: iter(ITALIAN_CORPUS.items()),
+        citation="fake",
+        licence="fake",
+    )
+    monkeypatch.setattr(adapters, "mmarco_it", lambda collection=False, limit=None: benchmark)
+
+    first = baselines.reproduce_marco(workers=1)
+    assert first["documents"] == len(ITALIAN_CORPUS)
+    assert first["queries"] == 2
+    assert "stemmer=italian" in first["config"] and "lucene-italian" in first["config"]
+    assert first["within_tolerance"] is False, "four documents are not the published corpus"
+    assert first["ranking_digest"]
+
+    second = baselines.reproduce_marco(workers=1)
+    assert second["ranking_digest"] == first["ranking_digest"], "same index, same ranking"
+
+    monkeypatch.setitem(
+        baselines.PUBLISHED_MARCO,
+        "italian",
+        {"mrr@10": first["mrr@10"], "r@1000": first["r@1000"]},
+    )
+    assert baselines.reproduce_marco(workers=1)["within_tolerance"] is True
 
 
 def test_the_pool_is_not_used_for_a_corpus_too_small_to_benefit(monkeypatch):

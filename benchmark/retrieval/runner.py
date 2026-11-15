@@ -63,6 +63,9 @@ ANALYSES: dict[str, Analysis] = {
     "porter": Analysis(stemmer="porter", stopwords=False),
     "english-stop": Analysis(stemmer="english", stopwords=True),
     "none": Analysis(stemmer=None, stopwords=True),
+    # Italian needs its own stemmer and its own stop list: the English Porter
+    # stemmer on Italian text is not a stemmer, it is noise.
+    "italian": Analysis(stemmer="italian", stopwords=True, language="italian"),
 }
 
 METRIC_ORDER = (
@@ -231,10 +234,17 @@ def run(
             unanswerable.append(question.qid)
             continue
         scope = frozenset(question.scope) if question.scope else None
-        scores = index.scores(question.text)
-        if scope is not None:
-            scores = {doc_id: score for doc_id, score in scores.items() if doc_id in scope}
-        ranked = metrics.rank(scores, top_k=k)
+        if scope is None and hasattr(index, "top_ids"):
+            # Same ranking as `rank(scores(...), k)`, without building a dict of
+            # every document the query touches: on 8.8M passages that dict is a
+            # million entries per query. A test asserts the two paths agree.
+            ranked, top_score = index.top_ids(question.text, k)
+        else:
+            scores = index.scores(question.text)
+            if scope is not None:
+                scores = {doc_id: score for doc_id, score in scores.items() if doc_id in scope}
+            ranked = metrics.rank(scores, top_k=k)
+            top_score = scores.get(ranked[0], 0.0) if ranked else 0.0
         values = _question_metrics(question, ranked, k, documents)
         rows.append(
             {
@@ -242,7 +252,7 @@ def run(
                 "kind": question.kind,
                 "gold": list(question.gold_docs),
                 "retrieved": list(ranked),
-                "top_score": scores.get(ranked[0], 0.0) if ranked else 0.0,
+                "top_score": top_score,
                 **{name: round(value, 6) for name, value in values.items()},
             }
         )
