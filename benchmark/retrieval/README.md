@@ -16,6 +16,7 @@ writes questions: the gold is public and citable.
 | `adapters.py` | six public datasets, normalised to one `Question`/`Benchmark` shape | `--check` |
 | `metrics.py` | ranking metrics, evidence matching, answer-fact coverage, bootstrap/Wilcoxon/Holm, MDE | imported |
 | `baselines.py` | Lucene BM25 over one or several fields, and the published-number reproduction | `--reproduce` |
+| `dense.py` | B2/B3/B4: a pinned bi-encoder, RRF fusion and a cross-encoder rerank, with a content-addressed embedding cache | `--build`, `--stats` |
 | `locator.py` | property test: every compiled claim's quote must be at its cited offset | `--check` |
 | `partition.py` | the committed dev/holdout split and its digest | `--build`, `--verify` |
 | `runner.py` | one dataset × one system × one split → artifact with per-question receipts | see below |
@@ -23,8 +24,8 @@ writes questions: the gold is public and citable.
 | `artifacts/` | Phase-0 evidence: instrument check, published-number reproduction | do not edit by hand |
 | `runs/` | run outputs (created on demand) | — |
 
-The retrieval suite is `benchmark/tests/test_retrieval_{locator,metrics,partition,runner,baselines}.py`,
-88 tests, no network and no key: `python3 -m pytest benchmark/tests/test_retrieval_*.py`.
+The retrieval suite is `benchmark/tests/test_retrieval_{locator,metrics,partition,runner,baselines,dense}.py`,
+106 tests, no network and no key: `python3 -m pytest benchmark/tests/test_retrieval_*.py`.
 The locator tests skip themselves when the compiled corpora are absent, which is
 the case in CI — those corpora are derived artifacts and are not in the repo.
 
@@ -42,6 +43,16 @@ python3 benchmark/retrieval/partition.py --verify
 
 # 4. one number
 python3 benchmark/retrieval/runner.py --dataset scifact --split dev
+```
+
+Systems: `bm25` (S0/B1), `dense` (B2), `hybrid` (B3, RRF k = 60), `hybrid-rerank`
+(B4, cross-encoder over the fused top 50). The dense systems need the GPU and the
+model once; after that the embedding cache makes a run cheap:
+
+```bash
+python3 benchmark/retrieval/dense.py --dataset scifact --build   # embed + cache
+python3 benchmark/retrieval/dense.py --dataset scifact --stats   # measured truncation share
+python3 benchmark/retrieval/runner.py --dataset scifact --split dev --system hybrid
 ```
 
 `--json` writes an artifact; without it the runner still prints the table and
@@ -71,8 +82,10 @@ the Hugging Face Hub; the cache is `~/.cache/ontoskills-bench` (override with
 `ONTOSKILLS_BENCH_CACHE`). ContractNLI's original 65 MB zip — the only release
 that keeps the evidence spans — is downloaded there once.
 
-No GPU, no API key and no network at scoring time: the index is built from text
-and every number is CPU.
+No API key at scoring time. The lexical systems are pure CPU and rebuild their
+index from text; the dense ones need a GPU for the first encode of a corpus, then
+read a content-addressed cache of the embeddings (model revision + token cut +
+every document's text, so it cannot be stale).
 
 ## Known limits, stated rather than discovered later
 
@@ -89,5 +102,13 @@ and every number is CPU.
 - The handle is `ONTOSKILLS_BENCH_WORKERS` (default: 8, capped at the CPU count);
   below 2,000 documents the index is built serially, because a process pool costs
   more than it saves there.
+- Dense coverage is bounded by the hardware, and the protocol says so before any
+  number: at the measured 4.4 documents/second, EnterpriseRAG-Bench (511,958
+  documents) projects to **32 hours** and mMARCO Italian (8,840,000) to **23
+  days** on this machine. Neither is run here; §13.5 of the protocol carries the
+  arithmetic and the consequence for the non-inferiority claim.
+- `--stats` reports the share of documents longer than the 512-token cut on a
+  deterministic sample, because a truncated dense baseline is a statement about
+  the first 512 tokens and should say so.
 - The 30 frozen internal questions are a development-exposed regression check.
   They are never a gate and never enter this directory's numbers.
