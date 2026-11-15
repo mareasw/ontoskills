@@ -537,7 +537,7 @@ have produced a plausible number:
 
 ### 12.5 The tests that make the checks mean something
 
-106 unit tests, all green without a GPU, a network call or an API key:
+115 unit tests, all green without a GPU, a network call or an API key:
 
 | file | tests | what makes them tests and not assertions |
 |---|---|---|
@@ -546,6 +546,7 @@ have produced a plausible number:
 | `test_retrieval_partition.py` | 15 | an edited partition file, a changed question set and a changed stratum must each be refused |
 | `test_retrieval_runner.py` | 15 | a missing or drifted partition stops the run instead of scoring; an empty corpus is refused rather than scored as zeros; a question with facts and no gold document scores on what it has and is listed; a scoped question never retrieves its out-of-scope distractor; a backwards ranker moves the digest and loses points |
 | `test_retrieval_baselines.py` | 14 | four workers must produce a bit-identical index, a cached index must be the same index, and an edited corpus, a different analysis and a truncated cache file must each miss |
+| `test_retrieval_summarize.py` | 9 | the spread is the best minus the worst, the pairing uses the intersection of the questions each system scored, and Holm never lowers a p-value |
 | `test_retrieval_dense.py` | 15 | RRF is checked against a value computed by hand; a truncated embedding cache and a wrong-width one must each miss; a reranker may reorder only what it read, and never promote an unread document over a read one |
 
 Three gaps were found by these tests, all in the harness rather than in the
