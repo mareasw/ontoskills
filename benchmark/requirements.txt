@@ -1,5 +1,6 @@
 anthropic>=0.40.0
 datasets
+huggingface_hub
 rdflib>=6.0.0
 swebench
 requests
@@ -8,3 +9,13 @@ python-docx
 python-pptx
 pandas
 youtube-transcript-api
+
+# Retrieval benchmark (benchmark/retrieval): the sparse baseline, the statistics,
+# and the Porter-family stemmer that reproduces the published BM25 numbers.
+numpy
+scipy
+snowballstemmer
+# Read directly by the EnterpriseRAG-Bench adapter: `datasets` already pulls it in,
+# but the adapter imports it by name, so the dependency is stated rather than
+# inherited.
+pyarrow
