@@ -531,7 +531,7 @@ def mmarco_it(limit: int | None = None, collection: bool = False) -> Benchmark:
         name="mmarco-it",
         questions=tuple(questions),
         documents=documents if collection else (lambda: iter(())),
-        citation="Bonifacio et al. 2021, mMARCO (arXiv:2109.12068)",
+        citation="Bonifacio et al. 2021, mMARCO (arXiv:2108.13897), Table 2",
         licence="MS MARCO terms; see the dataset card",
     )
 
