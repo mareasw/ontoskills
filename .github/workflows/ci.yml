@@ -122,4 +122,4 @@ jobs:
 
       - name: The harness imports
         run: |
-          python -c "import benchmark.retrieval.adapters, benchmark.retrieval.metrics, benchmark.retrieval.partition, benchmark.retrieval.runner, benchmark.retrieval.baselines, benchmark.retrieval.dense, benchmark.retrieval.locator"
+          python -c "import benchmark.retrieval.adapters, benchmark.retrieval.metrics, benchmark.retrieval.partition, benchmark.retrieval.runner, benchmark.retrieval.baselines, benchmark.retrieval.dense, benchmark.retrieval.summarize, benchmark.retrieval.locator"

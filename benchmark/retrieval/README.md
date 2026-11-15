@@ -20,12 +20,13 @@ writes questions: the gold is public and citable.
 | `locator.py` | property test: every compiled claim's quote must be at its cited offset | `--check` |
 | `partition.py` | the committed dev/holdout split and its digest | `--build`, `--verify` |
 | `runner.py` | one dataset × one system × one split → artifact with per-question receipts | see below |
+| `summarize.py` | the Phase-1 table from the run artifacts: spread, paired Δ, MDE, Holm | `--json` |
 | `partitions/` | the committed splits, one JSON per dataset | do not edit by hand |
 | `artifacts/` | Phase-0 evidence: instrument check, published-number reproduction | do not edit by hand |
 | `runs/` | run outputs (created on demand) | — |
 
-The retrieval suite is `benchmark/tests/test_retrieval_{locator,metrics,partition,runner,baselines,dense}.py`,
-106 tests, no network and no key: `python3 -m pytest benchmark/tests/test_retrieval_*.py`.
+The retrieval suite is `benchmark/tests/test_retrieval_{locator,metrics,partition,runner,baselines,dense,summarize}.py`,
+115 tests, no network and no key: `python3 -m pytest benchmark/tests/test_retrieval_*.py`.
 The locator tests skip themselves when the compiled corpora are absent, which is
 the case in CI — those corpora are derived artifacts and are not in the repo.
 
