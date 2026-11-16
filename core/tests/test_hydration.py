@@ -107,3 +107,89 @@ class TestHydration:
         assert len(sections) == 2
         assert sections[0].content[0].block_type == "frontmatter"
         assert sections[1].content[1].block_type == "html_block"
+
+
+class TestSkeletonNeverLosesContent:
+    """A skeleton that does not account for every block must be refused.
+
+    Skipping the node instead produced a document that parsed fine and was
+    simply missing its preamble — the one failure mode no verifier can see.
+    """
+
+    def _blocks(self, md):
+        from compiler.content_parser import extract_flat_blocks
+        return extract_flat_blocks(md)
+
+    def test_an_invented_block_id_is_refused(self):
+        from compiler.transformer import SkeletonIncomplete, hydrate_skeleton
+
+        blocks = self._blocks("Preamble text.\n\n## First Section\n\nSection text.\n")
+        index = {b.block_id: b for b in blocks}
+        heading = [b.block_id for b in blocks if b.block_type == "heading"][0]
+        # What a real model answers: the prompt says a preamble is a "block_id,
+        # no heading", and the model writes the literal name instead of an id.
+        skeleton = DocumentSkeleton(
+            sections=[
+                {"block_id": "preamble", "children": []},
+                {"block_id": heading, "children": []},
+            ],
+        )
+        with pytest.raises(SkeletonIncomplete) as exc:
+            hydrate_skeleton(skeleton, index)
+        assert exc.value.block_ids == ["preamble"]
+
+    def test_a_missing_child_id_is_refused(self):
+        from compiler.transformer import SkeletonIncomplete, hydrate_skeleton
+
+        blocks = self._blocks("## Overview\n\nIntro text.\n")
+        index = {b.block_id: b for b in blocks}
+        heading = [b.block_id for b in blocks if b.block_type == "heading"][0]
+        skeleton = DocumentSkeleton(
+            sections=[{"block_id": heading, "children": [{"block_id": "blk_999"}]}]
+        )
+        with pytest.raises(SkeletonIncomplete):
+            hydrate_skeleton(skeleton, index)
+
+    def test_a_block_the_skeleton_never_mentions_is_refused(self):
+        """Omitting a paragraph loses it just as surely as naming a bad id."""
+        from compiler.transformer import SkeletonIncomplete, hydrate_skeleton
+
+        blocks = self._blocks("## Overview\n\nIntro text.\n\n## Details\n\nDetail text.\n")
+        index = {b.block_id: b for b in blocks}
+        headings = [b.block_id for b in blocks if b.block_type == "heading"]
+        skeleton = DocumentSkeleton(
+            sections=[{"block_id": headings[0], "children": []}]
+        )
+        with pytest.raises(SkeletonIncomplete):
+            hydrate_skeleton(skeleton, index)
+
+    def test_the_parser_keeps_the_preamble_when_the_skeleton_is_incomplete(self, monkeypatch):
+        """End to end: a bad skeleton degrades to the deterministic tree."""
+        import json
+        import types
+
+        import compiler.llm as llm
+
+        md = "Preamble text.\n\n## First Section\n\nSection text.\n"
+        blocks = self._blocks(md)
+        heading = [b.block_id for b in blocks if b.block_type == "heading"][0]
+        skeleton = {
+            "sections": [
+                {"block_id": "preamble", "children": []},
+                {"block_id": heading, "children": []},
+            ]
+        }
+        monkeypatch.setattr(llm, "api_key", lambda: "test-key")
+        monkeypatch.setattr(
+            llm,
+            "chat",
+            lambda **kwargs: types.SimpleNamespace(text=json.dumps(skeleton)),
+        )
+
+        from compiler.content_parser import extract_structural_content
+
+        result = extract_structural_content(md)
+        assert len(result.sections) == 2
+        assert result.sections[0].title == ""
+        assert "Preamble text" in result.sections[0].content[0].text_content
+        assert result.sections[1].title == "First Section"

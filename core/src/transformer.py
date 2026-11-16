@@ -355,6 +355,24 @@ Use the available tools to:
 # Skeleton Hydration (Phase 1c)
 # ============================================================================
 
+
+class SkeletonIncomplete(Exception):
+    """The skeleton would drop blocks, so its tree is not usable.
+
+    A model asked to arrange block ids sometimes answers with a name that is not
+    one — ``preamble`` was the case found in a real run, invited by the wording
+    of the skeleton prompt. Skipping such a node is silent content loss: the
+    document still parses, it is just missing the text before the first heading,
+    and nothing downstream can tell. The caller has a complete deterministic
+    builder to fall back on, so an incomplete skeleton is refused instead.
+    """
+
+    def __init__(self, block_ids: list[str], reason: str) -> None:
+        self.block_ids = block_ids
+        self.reason = reason
+        super().__init__(f"{reason}: {', '.join(block_ids[:5])}")
+
+
 def hydrate_skeleton(
     skeleton: "DocumentSkeleton",
     blocks_index: dict[str, "FlatBlock"],
@@ -364,6 +382,11 @@ def hydrate_skeleton(
 
     Phase 1c: replaces block_ids in skeleton with actual content from Phase 1a.
     Falls back to v1 deterministic tree builder if skeleton is empty.
+
+    Raises ``SkeletonIncomplete`` if the skeleton names a block that does not
+    exist or leaves a top-level block unplaced: either way the tree it would
+    produce is missing text, and a complete tree without the model's grouping
+    is better than a tidier one with a paragraph silently gone.
     """
     from compiler.schemas import Section
 
@@ -375,14 +398,17 @@ def hydrate_skeleton(
 
     sections = []
     section_order = 0
+    placed: set[str] = set()
 
     for node in skeleton.sections:
         block = blocks_index.get(node.block_id)
         if block is None:
-            logger.warning("Skeleton node references missing block_id=%s, skipping", node.block_id)
-            continue
+            raise SkeletonIncomplete(
+                [node.block_id], "skeleton names a block that does not exist"
+            )
         if block.parent_block_id:
             continue  # child of a list item — already attached via parent
+        placed.add(block.block_id)
 
         if block.block_type == "heading":
             section_order += 1
@@ -391,7 +417,7 @@ def hydrate_skeleton(
                 level=block.content.level,
                 order=section_order,
             )
-            _hydrate_children(section, node, blocks_index)
+            _hydrate_children(section, node, blocks_index, placed)
             sections.append(section)
         else:
             # Non-heading root (frontmatter, paragraphs) — accumulate into single preamble
@@ -401,12 +427,22 @@ def hydrate_skeleton(
                 sections.insert(0, preamble)
             block.content.content_order = len(preamble.content) + 1
             preamble.content.append(block.content)
-            _hydrate_children(preamble, node, blocks_index)
+            _hydrate_children(preamble, node, blocks_index, placed)
+
+    # A top-level block the skeleton never mentioned is text the tree would not
+    # carry either. It counts as incomplete for the same reason as a bad id.
+    unplaced = [
+        block_id
+        for block_id, block in blocks_index.items()
+        if block.parent_block_id is None and block_id not in placed
+    ]
+    if unplaced:
+        raise SkeletonIncomplete(unplaced, "skeleton leaves blocks unplaced")
 
     return sections
 
 
-def _hydrate_children(section, node, blocks_index):
+def _hydrate_children(section, node, blocks_index, placed: set[str]):
     """Recursively hydrate children of a skeleton node into a section."""
     from compiler.schemas import Section
 
@@ -414,10 +450,13 @@ def _hydrate_children(section, node, blocks_index):
     for child_node in node.children:
         block = blocks_index.get(child_node.block_id)
         if block is None:
-            logger.warning("Skeleton child references missing block_id=%s, skipping", child_node.block_id)
-            continue
+            raise SkeletonIncomplete(
+                [child_node.block_id],
+                "skeleton child names a block that does not exist",
+            )
         if block.parent_block_id:
             continue  # child of a list item — already attached via parent
+        placed.add(block.block_id)
 
         if block.block_type == "heading":
             # Subsection
@@ -426,10 +465,10 @@ def _hydrate_children(section, node, blocks_index):
                 level=block.content.level,
                 order=len(section.subsections) + 1,
             )
-            _hydrate_children(sub, child_node, blocks_index)
+            _hydrate_children(sub, child_node, blocks_index, placed)
             section.subsections.append(sub)
         else:
             content_counter += 1
             block.content.content_order = content_counter
             section.content.append(block.content)
-            _hydrate_children(section, child_node, blocks_index)
+            _hydrate_children(section, child_node, blocks_index, placed)

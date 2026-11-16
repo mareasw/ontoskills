@@ -140,6 +140,9 @@ def _try_skeleton_tree(blocks: list[FlatBlock], markdown: str) -> list[Section] 
     import logging
 
     from compiler.llm import api_key as llm_api_key
+    # Imported outside the try below: an `except SkeletonIncomplete` clause
+    # cannot rely on a name the try body might not have reached.
+    from compiler.transformer import SkeletonIncomplete
 
     if not llm_api_key():
         return None
@@ -185,6 +188,17 @@ def _try_skeleton_tree(blocks: list[FlatBlock], markdown: str) -> list[Section] 
             logger.info("Skeleton pipeline produced %d sections", len(sections))
             return sections
 
+        return None
+
+    except SkeletonIncomplete as exc:
+        # The model's grouping would drop text. The deterministic builder below
+        # is complete, so the document gets a correct tree without the hint
+        # rather than a tidier one with the preamble missing.
+        logger.warning(
+            "skeleton %s (%s); using the deterministic tree",
+            exc.reason,
+            ", ".join(exc.block_ids[:5]),
+        )
         return None
 
     except Exception:
