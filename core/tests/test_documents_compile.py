@@ -213,13 +213,137 @@ def test_a_cached_chunk_still_reports_what_it_cost(tmp_path):
     from compiler.documents.compile import _one_chunk, _write_cache
 
     path = tmp_path / "T1" / "00000.json"
-    _write_cache(path, "fp", "[{}]", {"input_tokens": 100, "output_tokens": 50}, "stop")
+    _write_cache(
+        path, "fp", "[{}]", {"input_tokens": 100, "output_tokens": 50}, "stop", max_tokens=10_000
+    )
     reply, usage, finish, cached = _one_chunk(
         "prompt", "fp", path, CompileOptions(model="stub", cache_dir=tmp_path, resume=True)
     )
     assert cached is True
     assert reply == "[{}]"
     assert usage == {"input_tokens": 100, "output_tokens": 50}
+    assert finish == "stop"
+
+
+def test_a_truncated_conflict_pass_does_not_make_the_build_incomplete(monkeypatch):
+    """The claims arrived; only the optional contradiction links did not.
+
+    Counting this as a truncated extraction made a complete knowledge base exit
+    non-zero with "the knowledge base is incomplete", which is a false alarm on
+    the one thing a caller reads as a verdict.
+    """
+    from compiler.documents.compile import CompileStats, _link_conflicts
+
+    monkeypatch.setattr(
+        "compiler.documents.compile._one_chunk",
+        lambda *a, **k: ("", {"input_tokens": 10, "output_tokens": 32_000}, "length", False),
+    )
+    claims = [
+        {"claim_id": "T1-0001", "statement": "The Supplier must notify within 48 hours."},
+        {"claim_id": "T1-0002", "statement": "The Supplier must notify within 72 hours."},
+    ]
+    stats = CompileStats()
+    _link_conflicts(_doc(), claims, CompileOptions(model="stub"), stats, None)
+    assert stats.conflict_truncated == 1
+    assert stats.truncated == 0
+    assert "conflicts_with" not in claims[0]
+
+
+def test_a_truncated_conflict_pass_still_exits_zero(tmp_path, monkeypatch):
+    """End to end: the artifact is written and the command succeeds."""
+    from click.testing import CliRunner
+
+    from compiler.cli import cli
+    from compiler.documents.compile import CONFLICT_SYSTEM
+    from compiler.documents.store import KnowledgeBase
+
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    (corpus / "contract.txt").write_text(
+        "1. Notification\n\n1.1 The Supplier shall notify the Buyer within 48 hours.\n",
+        encoding="utf-8",
+    )
+    reply = (
+        '[{"span_ids": ["S0001"], '
+        '"statement": "The Supplier shall notify the Buyer within 48 hours.", '
+        '"modality": "obligation", "actor": "Supplier", "deadline": "48 hours", '
+        '"conditions": []}]'
+    )
+
+    def fake_chat(base_url, api_key, model, messages, max_tokens, **kwargs):
+        # Only the conflict pass runs out of room; the extraction is clean.
+        if messages[0]["content"] == CONFLICT_SYSTEM:
+            return "", {"input_tokens": 10, "output_tokens": 32_000}, "length"
+        return reply, {"input_tokens": 100, "output_tokens": 50}, "stop"
+
+    monkeypatch.setattr("compiler.documents.compile.chat", fake_chat)
+    monkeypatch.setenv("OPENAI_MODEL", "stub")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://gateway.test/v1")
+
+    result = CliRunner().invoke(
+        cli, ["ingest", str(corpus), "-o", str(tmp_path / "kb")]
+    )
+    assert result.exit_code == 0, result.output
+    assert "conflict pass(es) hit --max-tokens" in result.output
+    assert "the knowledge base is incomplete" not in result.output
+    assert KnowledgeBase(tmp_path / "kb").manifest()["truncated_enrichment"]["conflicts"] == 1
+
+
+def test_a_truncated_reply_is_not_a_cache_hit_for_a_larger_ceiling(tmp_path, monkeypatch):
+    """`raise --max-tokens` has to actually re-ask.
+
+    A reply that stopped at the ceiling is incomplete, so it is not the reply a
+    larger ceiling would produce. Reusing it made the truncation error's own
+    advice inert: the build replayed the same short answer and failed again.
+    """
+    from compiler.documents.compile import _one_chunk, _write_cache
+
+    path = tmp_path / "T1" / "00000.json"
+    _write_cache(
+        path, "fp", "[{}", {"input_tokens": 100, "output_tokens": 50}, "length", max_tokens=10_000
+    )
+
+    same = CompileOptions(model="stub", cache_dir=tmp_path, resume=True, max_tokens=10_000)
+    assert _one_chunk("prompt", "fp", path, same)[3] is True
+
+    asked = []
+
+    def fake_chat(*args, **kwargs):
+        asked.append(kwargs.get("max_tokens") or args[4])
+        return "[{}]", {"input_tokens": 1, "output_tokens": 1}, "stop"
+
+    monkeypatch.setattr("compiler.documents.compile.chat", fake_chat)
+    larger = CompileOptions(model="stub", cache_dir=tmp_path, resume=True, max_tokens=16_000)
+    reply, _usage, finish, cached = _one_chunk("prompt", "fp", path, larger)
+    assert len(asked) == 1
+    assert cached is False
+    assert (reply, finish) == ("[{}]", "stop")
+
+
+def test_a_truncated_reply_from_an_older_cache_is_re_asked(tmp_path, monkeypatch):
+    """Caches written before the ceiling was recorded carry no max_tokens.
+
+    They are exactly the caches that hold today's truncations, so they must miss
+    rather than be trusted forever.
+    """
+    import json
+
+    from compiler.documents.compile import _one_chunk
+
+    path = tmp_path / "T1" / "00000.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps({"fingerprint": "fp", "reply": "[{}", "usage": {}, "finish": "length"}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "compiler.documents.compile.chat",
+        lambda *_a, **_k: ("[{}]", {"input_tokens": 1, "output_tokens": 1}, "stop"),
+    )
+    _reply, _usage, finish, cached = _one_chunk(
+        "prompt", "fp", path, CompileOptions(model="stub", cache_dir=tmp_path, resume=True)
+    )
+    assert cached is False
     assert finish == "stop"
 
 
