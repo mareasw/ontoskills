@@ -252,7 +252,7 @@ Use `--skip-security` to bypass LLM review (regex checks still run).
 
 ## SHACL validation
 
-Every skill must pass SHACL validation before being written. The constitutional shapes are defined in `core/specs/ontoskills.shacl.ttl` and enforce constraints across 6 node shapes.
+Every skill must pass SHACL validation before being written. The constitutional shapes are defined in `core/src/specs/ontoskills.shacl.ttl` and enforce constraints across 6 node shapes.
 
 **Required fields (blocking):**
 
