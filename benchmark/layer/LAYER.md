@@ -326,7 +326,7 @@ resumed from its own cache):
 | truncated chunk calls | 0 |
 | truncated conflict passes | 5 |
 | wall clock | 2 h 12 min |
-| artifact on disk, caches excluded | 49,4 MB in 288 files |
+| artifact on disk, caches excluded | 52,2 MB in 288 files |
 
 The two projections said 4,60 $ and 5,90 $; the build cost 4,11 $. Both were
 above the measurement because both scaled output per character, and the model
@@ -336,7 +336,7 @@ average. The pilot publishes the run's number, not the projection — the
 projection's job was to decide whether to press the button.
 
 **Per claim.** 9,295 claims for 4,11 $ is 0,00044 $ per claim, and 0,70 model
-calls per claim; the artifact is 5,3 kB of JSONL per claim once caches are
+calls per claim; the artifact is 5,6 kB of JSONL per claim once caches are
 excluded.
 
 **Throughput**, measured on 24 documents (178,767 characters) with
@@ -405,7 +405,7 @@ bad score instead of an absent one.
 
 | system | modality | calls | failed | in | out | $ at table | build | artifact |
 |---|---|---:|---:|---:|---:|---:|---|---|
-| ontoskills | evidence | 880 | 0 | 1 418 617 | 6 497 798 | 4,1115 | 2 h 12 min | 49,4 MB |
+| ontoskills | evidence | 880 | 0 | 1 418 617 | 6 497 798 | 4,1115 | 2 h 12 min | 52,2 MB |
 | graphrag | answer | — | — | — | — | — | — | — |
 | lightrag | answer | — | — | — | — | — | — | — |
 | vector-rag-floor | evidence | 0 | 0 | 0 | 0 | 0,0000 | 3 s | 2,0 MB |
@@ -617,7 +617,15 @@ exactly that.
 - [x] smoke run on five documents, measured against the estimate (and the
       estimate was wrong by 8× — see §6)
 - [x] our full build on the 279 documents: 9,295 claims, 4,11 $, 2 h 12 min,
-      49,4 MB, `prompt_hash` unchanged
+      49,4 MB at build time, `prompt_hash` unchanged
+- [x] the document vocabulary moved to its own namespace and its own spec —
+      `core/specs/documents.ttl`, prefix `doc:`, version 1.0.0 — and `graph.ttl`
+      regenerated from the same claims at zero model cost: `claims.jsonl` digest
+      unchanged, 146,073 → 196,809 triples, and the 254 sections plus 12,421
+      structured locators the old writer had flattened into a string are now
+      resources. The artifact grew to 52,2 MB in the same 288 files; §5's rule 5
+      is what that column means, so it is the artifact on disk and not the one the
+      build wrote.
 - [x] capability probes on the full knowledge base: verbatim and locator 100 %
       on the claims the verifier accepted
 - [x] the floor, measured over the whole slice at zero cost
