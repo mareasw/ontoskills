@@ -107,8 +107,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   a page break is dropped with its lead-in, and the earlier repair could name the
   heading but no claim could quote the sentence under it. `recover_lead_ins`
   (`documents/gaps.py`) gives the heading and the lead-in one span, in document
-  order, before the prompt is built, so the model can state the rule; on the
-  pilot `POLICY-0001` is supported by the recovered block and by the
+  order, before the prompt is built, so the model can state the rule; on a
+  pilot policy document it is supported by the recovered block and by the
   list item under it. This is the one repair that changes the span set, and
   therefore the prompt: the chunks that contain the block are asked again.
 - **A heading the segmenter dropped is read from the source** — a block read as
