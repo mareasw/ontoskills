@@ -355,8 +355,10 @@ arithmetic why the other two are not in the table. §13.8 records the MDE and th
 measured power at δ before Phase 3 begins.
 
 Phase 2 is closed and recorded in §14: the Italian analyser reproduces mMARCO's
-published BM25 pair — MRR@10 0.1478 against 0.153, R@1000 0.7614 against 0.753 —
-inside the same one-point tolerance, on 8.8M passages. The locator half of the
+published BM25 pair — MRR@10 0.1479 against 0.153, R@1000 0.7617 against 0.753 —
+inside the same one-point tolerance, on 8.8M passages. The pair quoted here before
+the analyser was corrected was 0.1478/0.7614; §14.4 keeps both runs and says what
+moved. The locator half of the
 Phase-2 gate is the run already in §12.2: 5,978 compiled claims, every offset and
 every page correct, the six heading crossings enumerated by class. The 30 frozen
 internal items named in the Phase-2 row are **not** part of this gate and are not
@@ -548,7 +550,8 @@ have produced a plausible number:
 
 ### 12.5 The tests that make the checks mean something
 
-128 unit tests, all green without a GPU, a network call or an API key:
+132 unit tests, 131 green and one that skips itself when the two local corpora are
+absent, all without a GPU, a network call or an API key:
 
 | file | tests | what makes them tests and not assertions |
 |---|---|---|
@@ -606,7 +609,12 @@ Measurements, this machine:
 |---|---|---|
 | EnterpriseRAG-Bench, 511,958 documents, BM25 porter-stop | 588 s | 265 s |
 | peak RSS | 16.2 GB | 11.1 GB |
-| index cache on disk | 5.5 GB | — |
+| index cache on disk | 1.22 GB | — |
+
+That row said 5.5 GB until 2026-11-16, which was true of the older index
+encoding and stopped being true when `4910220` replaced it: the same corpus and
+analyser now occupy 1.22 GB. The figure was left behind by that commit rather
+than measured again.
 
 What proves the speed-up is not a redefinition:
 
@@ -926,7 +934,7 @@ the 279-word list (`coll`, `pell`, `gl`, `d`, `m`, `s`, `t`, `v`), so standalone
 tokens Lucene keeps were being dropped: **0.11% of all tokens** in a
 200,000-passage sample — 13,648 of 12,052,063, mostly `s` and `d` from
 abbreviations like `s.` and `d.`. Elision is now a rule over the text and the stop
-set is the 279 words; §14.3 reports what the correction moved instead of quietly
+set is the 279 words; §14.4 reports what the correction moved instead of quietly
 replacing the number with the better one.
 
 **The cache key could not see the analyser.** The key was the analyser's
@@ -943,7 +951,13 @@ claimed `lucene-italian`. The language travels with the chunk now, and a test
 builds 2,100 Italian documents serially and through the pool and requires a
 bit-identical index.
 
-### 14.3 Measured
+### 14.3 Measured, before the correction
+
+This is the run made while the analyser was wrong in the three ways §14.2
+describes. It is kept rather than replaced: it is what a description-keyed cache
+would have gone on reporting, and §14.4 measures the distance between it and the
+corrected one. Nothing in this section is superseded as a *description of this
+run*; the number to quote is in §14.4.
 
 Configuration: `stemmer=italian stopwords=lucene-italian k1=0.9 b=0.4`,
 retrieval depth 1,000. One run, `--reproduce-marco --workers 4`.
@@ -961,7 +975,8 @@ passage, mean length 37.4 tokens). Index build **885 s** with four workers
 `top_ids` path that avoids a million-entry dict per query); load 71 s; whole run
 **2,280 s — 38 minutes — peak RSS 12.7 GB**. The index cache is **2.19 GB**, so a
 second run skips the build and pays only the scoring. Ranking
-digest of the top-10 lists, all 6,980 of them: **`2e06af8bb33f2af7`**.
+digest of the top-10 lists, all 6,980 of them: **`2e06af8bb33f2af7`** — the
+pre-fix digest, replaced in §14.4 by `152ba964950ad159`.
 
 Two differences, opposite signs, one mechanism: Snowball stems more
 aggressively than ItalianLight, which widens the candidate pool — R@1000 goes up
@@ -986,3 +1001,64 @@ already fixed, which is the only defensible reason to use it. Including R@1000 i
 the gate is what keeps a single loose metric from hiding a systematic shift: a
 stemmer that bought recall by reorganising everything would show as one difference
 large and positive and the other large and negative.
+
+### 14.4 What the correction moved, measured
+
+Two runs of the same command, on the same machine, with a cold index both times.
+Between them: the elision rule, the stop set's contents, the language in the
+worker payload and the cache key. Nothing else changed.
+
+| metric | §14.3, pre-fix | corrected | published | difference | gate (\|Δ\| ≤ 0.01) |
+|---|---|---|---|---|---|
+| MRR@10 | 0.1478 | **0.1479** | 0.153 | −0.0051 | PASS |
+| R@1000 | 0.7614 | **0.7617** | 0.753 | +0.0087 | PASS |
+| nDCG@10 | 0.1829 | 0.1831 | — | — | reported, not gated |
+| ranking digest | `2e06af8bb33f2af7` | `152ba964950ad159` | — | — | changes by construction |
+
+The bug cost 0.0001 MRR and 0.0003 recall. The index grew from 250,171,784 to
+250,636,962 postings, +0.19%, with six more distinct terms and a mean length of
+37.4337 against 37.4. So the 0.11% of tokens that were being dropped were, for
+this gate, invisible — and a tolerance of 0.01 on a 0.153 baseline, 6.5% relative,
+was never going to see a token-level difference. What catches it is the assertion
+on the stop list's 279 words and the elision rule's own tests. Passing a gate is
+evidence about a system, not a proof about its parts, and this is the row where
+that distinction has a number attached.
+
+The cost of being correct, same corpus, same four workers:
+
+| | pre-fix | corrected |
+|---|---|---|
+| index build | 885 s (9,990 passages/s) | 1,651 s (5,355 passages/s) |
+| scoring, 6,980 queries | 1,325 s | 1,619 s |
+| load | 71 s | 98.5 s |
+| whole run | 2,280 s | **3,369 s — 56 minutes** |
+| peak RSS | 12.7 GB | 12.7 GB |
+| index cache on disk | 2.19 GB | 2.19 GB |
+
+Elision is a regex pass over every passage before it is tokenised, and it is not
+free. On a 60,000-passage sample of the same collection (21.3M characters), with
+the stemmer off so only tokenisation and the elision rule are in play, the analysis
+step measures 10.57 s with the rule, 5,678 passages/s, against 6.90 s without it,
+8,697 passages/s: ×1.53, with the substitution alone accounting for 4.42 s. The
+build grew by ×1.87, not ×1.53, and the scoring phase of the same run grew 22%
+against an index 0.19% larger. Those two ratios multiply to 1.87, which fits, but
+it is an inference from one run each, not a decomposition: the analyser and the
+machine are both candidates and nothing here separates them. What is measured, and
+what a plan should use, is the shipped configuration: 56 minutes cold, 28 of them
+scoring, and a cache key that now changes when the analyser does.
+
+**The control.** EnterpriseRAG-Bench was re-run with a cold cache after the change,
+on the same day. Its analyser is unchanged, and so is its output: digest
+`512a555b51455966` and the same figures to four decimals as §13.6 and §13.7 —
+nDCG@10 0.5433, recall@10 0.6307, MRR@10 0.5470, hit@10 0.6992,
+`answer_fact_coverage` 0.9300, `answer_fact_support` 0.8037,
+`numeric_congruence` 0.9506 — in 740.5 s end to end, peak 11.8 GB. The fingerprint
+also says why: `_ELISION.pattern` enters the key only for a language in `ELIDING`,
+so the English cache key did not move and the Italian one did. The two files under
+`~/.cache/ontoskills-bench/index/` are `9697242d…` for EnterpriseRAG-Bench (1.22 GB)
+and `ba9335a6…` for mMARCO (2.19 GB), which is how a later run can be checked
+against the right index instead of a similar one.
+
+To quote: **0.1479 / 0.7617**. §14.3 stays as the record of the run that was
+wrong, including its digest, so an old table can be recognised as old rather than
+argued with.
