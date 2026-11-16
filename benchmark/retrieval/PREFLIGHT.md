@@ -1043,9 +1043,21 @@ step measures 10.57 s with the rule, 5,678 passages/s, against 6.90 s without it
 build grew by ×1.87, not ×1.53, and the scoring phase of the same run grew 22%
 against an index 0.19% larger. Those two ratios multiply to 1.87, which fits, but
 it is an inference from one run each, not a decomposition: the analyser and the
-machine are both candidates and nothing here separates them. What is measured, and
-what a plan should use, is the shipped configuration: 56 minutes cold, 28 of them
-scoring, and a cache key that now changes when the analyser does.
+machine are both candidates and nothing here separates them, though the run below
+sizes the machine's part at 11% of a scoring phase on identical postings. What is
+measured, and what a plan should use, is the shipped configuration: 56 minutes
+cold, 28 of them scoring, and a cache key that now changes when the analyser does.
+
+**Determinism, on the corrected analyser.** A second run with the index read back
+from the cache returns the same digest, `152ba964950ad159`, and the same three
+metrics to four decimals: load 77.2 s, cache read 108.3 s, scoring 1,448.0 s,
+**1,633.5 s in total — 27 minutes — peak 9.3 GB**. The number is therefore a
+property of the corpus and the analyser, not of the build that produced the index,
+and the cached file is the same index, not a reconstruction of it. The scoring phase
+was also 171 s faster than in the cold run, on the same 6,980 queries and the same
+postings: an 11% run-to-run spread that has nothing to do with the analyser, and
+that is the honest size of the machine component the cost table above cannot
+separate.
 
 **The control.** EnterpriseRAG-Bench was re-run with a cold cache after the change,
 on the same day. Its analyser is unchanged, and so is its output: digest
