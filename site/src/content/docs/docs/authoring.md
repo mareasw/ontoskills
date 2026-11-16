@@ -471,7 +471,7 @@ ontoskills compile my-skill -v
 
 ### SHACL validation rules
 
-The compiler validates skills against constitutional SHACL shapes defined in `core/specs/ontoskills.shacl.ttl`. These rules ensure every compiled skill is logically valid.
+The compiler validates skills against constitutional SHACL shapes defined in `core/src/specs/ontoskills.shacl.ttl`. These rules ensure every compiled skill is logically valid.
 
 **Every skill must have:**
 - At least one `resolvesIntent` — what user intent this skill solves

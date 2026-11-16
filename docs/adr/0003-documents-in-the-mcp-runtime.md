@@ -109,7 +109,7 @@ Contract:
 - The graph is parsed once and cached in memory, invalidated on `graph.ttl`'s
   mtime. 16 MB of Turtle is 1-2 s to parse and that cost belongs to the first
   query, not to every query.
-- The served vocabulary is `core/specs/documents.ttl` at version 1.0.0, inlined
+- The served vocabulary is `core/src/specs/documents.ttl` at version 1.0.0, inlined
   into the binary at build time from the spec file. A knowledge base whose graph
   uses a `doc:` term the server does not know is refused with the term named:
   a version mismatch is an error, not something to guess through.
@@ -178,7 +178,7 @@ agent-reachable layer without writing Python.
 
 **Costs.** The MCP gains a dependency on the core being installed, and a
 subprocess per ask (measured, G5). The binary gains a build-time dependency on
-`core/specs/documents.ttl`, so a spec change must rebuild the server — which is
+`core/src/specs/documents.ttl`, so a spec change must rebuild the server — which is
 the point of versioning the vocabulary.
 
 **What this does not fix.** Coverage is still 63,9 % against the floor's 92,4 %

@@ -135,3 +135,62 @@ def test_a_knowledge_base_without_a_verifier_file_has_no_second_table(tmp_path):
     result = capability.measure(kb)
     assert "accepted" not in result
     assert "verifier accepted" not in capability.format_report(result)
+
+
+def _kb_with_graph(tmp_path, url_object: str):
+    """A one-claim knowledge base plus the graph the store would write for it."""
+    text = "Alpha beta gamma."
+    claims = [json.loads(json.dumps(_claim("Alpha beta gamma.", 0, 17)))]
+    claims[0]["evidence"][0]["locator"]["url"] = "https://example.org/d1"
+    (tmp_path / "text").mkdir(exist_ok=True)
+    (tmp_path / "text" / "d1.txt").write_text(text, encoding="utf-8")
+    (tmp_path / "claims.jsonl").write_text(
+        "".join(json.dumps(claim) + "\n" for claim in claims), encoding="utf-8"
+    )
+    (tmp_path / "graph.ttl").write_text(
+        """@prefix doc: <https://ontoskills.sh/ontology/documents#> .
+@prefix ex: <https://ontoskills.sh/kb/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+
+ex:doc_d1 a doc:Document ;
+    doc:hasTitle "d1" ;
+    doc:hasClaim ex:claim_d1-0001 .
+ex:claim_d1-0001 a doc:Claim ;
+    doc:hasStatement "Alpha beta gamma." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasEvidence ex:ev_1 .
+ex:ev_1 a doc:Evidence ;
+    doc:hasQuote "Alpha beta gamma." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_1 ;
+    prov:wasDerivedFrom ex:doc_d1 .
+ex:loc_1 a doc:Locator ;
+"""
+        + url_object
+        + """    doc:hasCharStart 0 ;
+    doc:hasCharEnd 17 ;
+    doc:inSection ex:sec_1 .
+ex:sec_1 a doc:Section ;
+    doc:hasSectionTitle "1. Start" ;
+    doc:hasSectionPath "1. Start" .
+""",
+        encoding="utf-8",
+    )
+    return tmp_path
+
+
+def test_the_graph_probe_passes_a_graph_that_agrees_with_its_vocabulary(tmp_path):
+    kb = _kb_with_graph(tmp_path, "    doc:hasSourceUrl <https://example.org/d1> ;\n")
+    probes = {probe["name"]: probe for probe in capability.measure(kb)["probes"]}
+    assert probes["graph"]["value"] == 1.0
+    assert probes["graph"]["sections"] == 1
+    assert "every doc: term declared" in probes["graph"]["detail"]
+
+
+def test_the_graph_probe_catches_a_url_written_as_a_string(tmp_path):
+    """The defect this probe was written for: a declared object property holding
+    a literal, which is how `xsd:anyURI` was declared over IRI objects."""
+    kb = _kb_with_graph(tmp_path, '    doc:hasSourceUrl "https://example.org/d1" ;\n')
+    probes = {probe["name"]: probe for probe in capability.measure(kb)["probes"]}
+    assert probes["graph"]["value"] == 0.0
+    assert "wrong kind: hasSourceUrl" in probes["graph"]["detail"]

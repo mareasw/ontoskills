@@ -56,12 +56,12 @@ PREFIXES = """\
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 """
 
-# The TBox is a file, not a string literal: `core/specs/documents.ttl` is the
+# The TBox is a file, not a string literal: `core/src/specs/documents.ttl` is the
 # normative definition, versioned on its own and published at
 # https://ontoskills.sh/ontology/documents. It is read once and inlined into
 # every graph so the artifact parses offline, without a network fetch and
 # without asking the reader to trust that two copies agree.
-ONTOLOGY_PATH = Path(__file__).resolve().parent.parent.parent / "specs" / "documents.ttl"
+ONTOLOGY_PATH = Path(__file__).resolve().parent.parent / "specs" / "documents.ttl"
 
 
 @lru_cache(maxsize=1)
@@ -93,20 +93,23 @@ MODALITY = {
 }
 
 ROLE = {"supports": "doc:supportsRole", "context": "doc:contextRole"}
-DEFAULT_ROLE = "doc:supportsRole"
 
-# An IRIREF may not contain these. A source URL that does is not an address this
-# writer can hand to a reader, so it is dropped rather than mangled: a broken
-# link is worse than an absent one, and the locator still carries offsets and
-# section.
+# An IRIREF may not contain these. A URL that is not an address this writer can
+# publish is an error, not something to drop: dropping it would produce a graph
+# that looks complete and quietly lacks a link the claim file still carries.
 _IRIREF_UNSAFE = re.compile(r'[\s<>"{}|^`\\]')
 
 
-def _url_iri(value: Any) -> str | None:
+def _url_iri(value: Any, where: str) -> str | None:
     url = str(value or "").strip()
-    if url.startswith(("http://", "https://")) and not _IRIREF_UNSAFE.search(url):
-        return f"<{url}>"
-    return None
+    if not url:
+        return None
+    if not url.startswith(("http://", "https://")) or _IRIREF_UNSAFE.search(url):
+        raise ValueError(
+            f"{where}: {url!r} is not an IRI this writer can publish; correct the "
+            "source URL instead of letting the graph lose it"
+        )
+    return f"<{url}>"
 
 
 CSV_FIELDS = [
@@ -246,7 +249,7 @@ def build_graph(documents: list[dict], claims: list[dict]) -> str:
         out.append("")
 
         ctx_pairs: list[tuple[str, str]] = []
-        ctx_url = _url_iri(doc.get("url"))
+        ctx_url = _url_iri(doc.get("url"), f"{doc_id}: document url")
         if ctx_url:
             ctx_pairs.append(("doc:hasSourceUrl", ctx_url))
         if doc.get("jurisdiction"):
@@ -300,7 +303,14 @@ def build_graph(documents: list[dict], claims: list[dict]) -> str:
             for index, item in enumerate(evidence):
                 locator = item.get("locator") or {}
                 loc_iri = f"ex:loc_{cid}_{index}"
-                role = ROLE.get(str(item.get("role", "supports")), DEFAULT_ROLE)
+                role_name = str(item.get("role", "supports"))
+                if role_name not in ROLE:
+                    raise ValueError(
+                        f"{claim['claim_id']}: evidence role {role_name!r} is not one of "
+                        f"{sorted(ROLE)}; asserting 'supports' for it would be a claim "
+                        "the document does not make"
+                    )
+                role = ROLE[role_name]
                 ev_pairs = [
                     ("doc:hasQuote", _lit(item.get("quote", ""))),
                     ("doc:evidenceRole", role),
@@ -318,7 +328,7 @@ def build_graph(documents: list[dict], claims: list[dict]) -> str:
                         loc_pairs.append((predicate, str(int(locator[key]))))
                 if locator.get("page") is not None:
                     loc_pairs.append(("doc:hasPage", str(int(locator["page"]))))
-                loc_url = _url_iri(locator.get("url"))
+                loc_url = _url_iri(locator.get("url"), f"{claim['claim_id']} locator {index}")
                 if loc_url:
                     loc_pairs.append(("doc:hasSourceUrl", loc_url))
                 path = tuple(locator.get("section_path") or [])

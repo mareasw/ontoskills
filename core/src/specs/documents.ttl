@@ -13,6 +13,7 @@
     dcterms:title "OntoSkills Document Layer Ontology" ;
     owl:versionIRI <https://ontoskills.sh/ontology/documents/1.0.0> ;
     owl:versionInfo "1.0.0" ;
+    rdfs:seeAlso <https://ontoskills.sh/ontology/documents.ttl> ;
     rdfs:comment "The vocabulary of the compiled layer, kept separate from the skill ontology (https://ontoskills.sh/ontology#) because the two describe different things. A skill is a procedure a system can execute; a claim is a sentence a company can check. Sharing one namespace made oc:hasVersion mean two things at once and made oc:Section ambiguous, so this file is the document side's own TBox, versioned on its own." ;
     rdfs:seeAlso <https://ontoskills.sh/ontology> .
 
@@ -129,9 +130,14 @@ doc:Recommendation a owl:Class ;
 # shows up in a reasoner instead of in a customer's answer.
 doc:Document owl:disjointWith doc:Section .
 doc:Document owl:disjointWith doc:Claim .
+doc:Document owl:disjointWith doc:Evidence .
 doc:Claim owl:disjointWith doc:Evidence .
 doc:Claim owl:disjointWith doc:Section .
 doc:Evidence owl:disjointWith doc:Section .
+doc:Locator owl:disjointWith doc:Document .
+doc:Locator owl:disjointWith doc:Section .
+doc:Locator owl:disjointWith doc:Claim .
+doc:Locator owl:disjointWith doc:Evidence .
 
 # ============================================================================
 # Properties
@@ -163,7 +169,7 @@ doc:hasCharEnd a owl:DatatypeProperty ;
     rdfs:domain doc:Locator ;
     rdfs:label "has character end" ;
     rdfs:range xsd:integer ;
-    rdfs:comment "Exclusive end offset in the extracted text, in Unicode code points. With doc:hasCharStart it is what makes 'verbatim' checkable rather than asserted." ;
+    rdfs:comment "Exclusive end offset, in Unicode code points, into the *normalised* text: the source with curly quotes and dashes folded to ASCII and whitespace runs collapsed (compiler.documents.text.norm). The basis is named because it is not the bytes on disk: a consumer holding the raw file must map the offset through compiler.documents.gaps.raw_offsets, and a consumer that slices the raw file at this offset will read the wrong sentence. With doc:hasCharStart it is what makes 'verbatim' checkable rather than asserted." ;
     skos:prefLabel "has character end" .
 
 doc:hasCharStart a owl:DatatypeProperty ;
@@ -285,10 +291,9 @@ doc:hasSha256 a owl:DatatypeProperty ;
     rdfs:comment "Hex digest of the extracted text. What makes two builds comparable: same digest, same bytes read." ;
     skos:prefLabel "has SHA-256" .
 
-doc:hasSourceUrl a owl:DatatypeProperty ;
+doc:hasSourceUrl a owl:ObjectProperty ;
     rdfs:label "has source URL" ;
-    rdfs:range xsd:anyURI ;
-    rdfs:comment "An IRI, not a string: the point of the address is that it resolves. Used on doc:Context and doc:Locator." ;
+    rdfs:comment "An IRI, not a string, and therefore an object property: the point of an address is that it resolves. `xsd:anyURI` would have made it a datatype, so an IRI object would violate the declared range — which is what an earlier version of this file did. Used on doc:Context and doc:Locator; no declared range, because the object is an external resource this ontology does not own." ;
     skos:prefLabel "has source URL" .
 
 doc:hasStatement a owl:DatatypeProperty ;

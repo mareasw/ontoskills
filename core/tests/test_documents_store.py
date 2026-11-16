@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from compiler.documents.store import KnowledgeBase
 
 
@@ -252,3 +254,23 @@ def test_no_vectors_file_means_no_vectors(tmp_path):
     kb = KnowledgeBase(tmp_path)
     assert kb.vectors() == {}
     assert kb.vectors_header() == {}
+
+
+def test_an_unknown_evidence_role_is_refused(tmp_path):
+    """A role the vocabulary does not have must not be silently called support."""
+    documents, spans, claims = _rows()
+    claims[0]["evidence"][0]["role"] = "maybe"
+    with pytest.raises(ValueError, match="evidence role 'maybe'"):
+        KnowledgeBase(tmp_path).write(
+            manifest={}, documents=documents, spans=spans, claims=claims
+        )
+
+
+def test_a_source_url_that_is_not_an_iri_is_refused(tmp_path):
+    """The declared range is an IRI, so a malformed URL is an error, not a gap."""
+    documents, spans, claims = _rows()
+    documents[0]["url"] = "not a url"
+    with pytest.raises(ValueError, match="not an IRI"):
+        KnowledgeBase(tmp_path).write(
+            manifest={}, documents=documents, spans=spans, claims=claims
+        )

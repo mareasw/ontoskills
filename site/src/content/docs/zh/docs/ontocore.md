@@ -252,7 +252,7 @@ OntoCore 是**缓存感知**的：
 
 ## SHACL 验证
 
-每个技能在写入前必须通过 SHACL 验证。宪法形状定义在 `core/specs/ontoskills.shacl.ttl` 中，跨 6 个节点形状强制执行约束。
+每个技能在写入前必须通过 SHACL 验证。宪法形状定义在 `core/src/specs/ontoskills.shacl.ttl` 中，跨 6 个节点形状强制执行约束。
 
 **必需字段（阻止）：**
 

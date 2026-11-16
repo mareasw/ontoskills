@@ -474,7 +474,7 @@ ontoskills compile my-skill -v
 
 ### SHACL 验证规则
 
-编译器根据 `core/specs/ontoskills.shacl.ttl` 中定义的宪法 SHACL 形状验证技能。这些规则确保每个编译的技能逻辑有效。
+编译器根据 `core/src/specs/ontoskills.shacl.ttl` 中定义的宪法 SHACL 形状验证技能。这些规则确保每个编译的技能逻辑有效。
 
 **每个技能必须具有：**
 - 至少一个 `resolvesIntent` — 此技能解决什么用户意图

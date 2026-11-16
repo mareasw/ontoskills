@@ -225,6 +225,7 @@ is involved:
 | contradiction | can it say *which* documents disagree, and where? |
 | verbatim quote | does every statement carry a quote that occurs in the source? |
 | locator | does the quote resolve to a page and an offset? |
+| graph | does the RDF artifact agree with its own vocabulary and with the text? |
 | offline query | can a question be answered without a model call? |
 | abstention | does it refuse when the corpus cannot answer? |
 
@@ -234,9 +235,14 @@ the product named in its own output: **verbatim** is the pipeline's `norm`
 (curly quotes and dashes folded to ASCII, whitespace collapsed) and the
 byte-exact share is printed beside it, so a folded em dash is not sold as an
 exact match; **offsets** index the normalised text, which `gaps.raw_offsets` maps
-back to the bytes on disk. The remaining two probes are outcomes of a run —
-**offline query** is the absence of a meter log during `answers.py`, and
-**abstention** is `abstention_rate` in `score.py` — and are not asserted here.
+back to the bytes on disk. **graph** is a lint rather than a rate: the artifact
+either agrees with its own vocabulary and its own text, or the probe names the
+term that does not. It is the probe that caught `doc:hasSourceUrl` declared as a
+datatype while the writer emitted an IRI, which is the class of defect a table of
+percentages cannot see. The other two rows are outcomes of a run, not properties
+of the artifact — **offline query** is the absence of a meter log during
+`answers.py`, and **abstention** is `abstention_rate` in `score.py` — and are not
+asserted here.
 
 ## 5. Fairness, written down once
 
@@ -473,7 +479,7 @@ On EnterpriseRAG-Bench's lexical metrics, a chunk-and-BM25 floor — 2,55 second
 to build, zero model calls, zero dollars, 4 ms per question — covers **92,4 %**
 of the gold facts at k=10, and our compiled layer covers **63,9 %**. Its support
 (best single passage) is 77,7 % against our 46,6 %. The layer that costs 4,11 $
-to build and 49,4 MB to keep is *behind* the free baseline on both numbers.
+to build and 52,2 MB to keep is *behind* the free baseline on both numbers.
 
 This is not a bug in the measurement, and the pilot does not hide it. Two things
 explain it, and both are worth stating plainly:
@@ -519,8 +525,9 @@ the pilot supports is narrower and still worth having:
 | quotes that also match byte-for-byte | 2,192 of 12,310 (17,8 %) |
 | claims linked to a claim they contradict | 150 claims in 82 pairs; none across documents — see below |
 | predicates carrying a modality and an actor | 39,9 % (all 9,295 carry a modality; 3,676 carry an actor) |
+| graph agrees with its own vocabulary and its own text | 100 % — every `doc:` term declared, 254 of 254 sections titled, 12,327 of 12,327 locators with offsets reproduce their quote read back out of the graph (94 quotes carry none) |
 | model calls at query time | 0, at 0,42 s per question |
-| build cost / artifact | 4,11 $ / 49,4 MB for 9,295 claims |
+| build cost / artifact | 4,11 $ / 52,2 MB for 9,295 claims |
 
 **How sure is one run.** The table reports means over 192 questions, and a mean
 without an interval is a point pretending to be a measurement.
@@ -619,15 +626,18 @@ exactly that.
 - [x] our full build on the 279 documents: 9,295 claims, 4,11 $, 2 h 12 min,
       49,4 MB at build time, `prompt_hash` unchanged
 - [x] the document vocabulary moved to its own namespace and its own spec —
-      `core/specs/documents.ttl`, prefix `doc:`, version 1.0.0 — and `graph.ttl`
+      `core/src/specs/documents.ttl`, prefix `doc:`, version 1.0.0 — and `graph.ttl`
       regenerated from the same claims at zero model cost: `claims.jsonl` digest
-      unchanged, 146,073 → 196,809 triples, and the 254 sections plus 12,421
+      unchanged, 146,073 → 196,814 triples, and the 254 sections plus 12,421
       structured locators the old writer had flattened into a string are now
       resources. The artifact grew to 52,2 MB in the same 288 files; §5's rule 5
       is what that column means, so it is the artifact on disk and not the one the
       build wrote.
 - [x] capability probes on the full knowledge base: verbatim and locator 100 %
-      on the claims the verifier accepted
+      on the claims the verifier accepted, and the graph probe passing — every
+      `doc:` term declared, 254 of 254 sections titled, 12,327 locators
+      reproducing their quote when read back out of `graph.ttl` instead of out of
+      `claims.jsonl`
 - [x] the floor, measured over the whole slice at zero cost
 - [x] answers to the 200 questions, scored in both modalities, no model at query
       time
