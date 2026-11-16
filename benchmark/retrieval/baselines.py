@@ -87,13 +87,27 @@ STOPWORDS_IT = frozenset(
     """.split()
 )
 
-# `ItalianAnalyzer.DEFAULT_ARTICLES`, verbatim.
-ITALIAN_ARTICLES = frozenset("c l all dall dell nell sull coll pell gl agl dagl degl negl sugl un m t s v d".split())
+# `ItalianAnalyzer.DEFAULT_ARTICLES`, verbatim. These are **not** stop words: in
+# Lucene they are what `ElisionFilter` strips from `dell'articolo`, and only there.
+# Adding them to the stop set instead would also drop the standalone tokens — and
+# eight of the twenty-one are not in the 279-word list (`coll`, `pell`, `gl`, `d`,
+# `m`, `s`, `t`, `v`), so it would drop tokens Lucene keeps: 0.11% of the tokens in
+# a 200,000-passage sample, measured before the fix.
+ITALIAN_ARTICLES = (
+    "c", "l", "all", "dall", "dell", "nell", "sull", "coll", "pell", "gl",
+    "agl", "dagl", "degl", "negl", "sugl", "un", "m", "t", "s", "v", "d",
+)
+
+# Longest first, so `dall'` is matched before `d'`.
+_ELISION = re.compile(r"\b(?:%s)['\u2019]" % "|".join(sorted(ITALIAN_ARTICLES, key=len, reverse=True)))
 
 LANGUAGES = {
     "english": STOPWORDS,
-    "italian": STOPWORDS_IT | ITALIAN_ARTICLES,
+    "italian": STOPWORDS_IT,
 }
+
+# Languages whose analyser carries Lucene's `ElisionFilter`.
+ELIDING = frozenset({"italian"})
 
 # Published Anserini BM25 nDCG@10, BEIR Table 2. The tolerance is the Phase-0 gate.
 PUBLISHED = {
@@ -131,13 +145,21 @@ class Analysis:
         if self.language not in LANGUAGES:
             raise ValueError(f"unknown stop-word language {self.language!r}; known: {sorted(LANGUAGES)}")
         self._stopset = LANGUAGES[self.language] if self.stopwords else frozenset()
+        self._elide = self.language in ELIDING
         if self.stemmer is not None:
             import snowballstemmer
 
             self._stem = snowballstemmer.stemmer(self.stemmer)
 
     def __call__(self, text: str) -> list[str]:
-        tokens = _WORD.findall(str(text or "").lower())
+        text = str(text or "").lower()
+        if self._elide:
+            # Lucene's `ElisionFilter` runs before its lower-case filter, so a
+            # sentence-initial `Dell'articolo` keeps its prefix there and loses it
+            # here. Declared in PREFLIGHT §14.2; the gate bounds the combined size
+            # of this and the two other approximations.
+            text = _ELISION.sub("", text)
+        tokens = _WORD.findall(text)
         if self._stopset:
             tokens = [token for token in tokens if token not in self._stopset]
         if self._stem is None:
@@ -153,12 +175,33 @@ class Analysis:
                 stemmed.append(stem)
         return stemmed
 
-    def describe(self) -> str:
-        """The cache key's human half — and therefore frozen for English.
+    def fingerprint(self) -> str:
+        """What the cache key is computed from: the analyser's behaviour, not its name.
 
-        Changing this string rebuilds every index that was already built, so the
-        English form is kept exactly as it was and the language is only named when
-        it is not English.
+        `describe()` is a human label, and a label can be true while the code under
+        it changes. This is the digest of everything that decides a token — the
+        stemmer, the tokeniser, the elision rule and the stop set's *contents* —
+        so editing a stop word invalidates the cache instead of silently reusing an
+        index built with the old one. A test asserts exactly that.
+        """
+        material = "\x00".join(
+            (
+                self.stemmer or "",
+                self.language,
+                str(self.stopwords),
+                _WORD.pattern,
+                _ELISION.pattern if self._elide else "",
+                "\x01".join(sorted(self._stopset)),
+            )
+        )
+        return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
+
+    def describe(self) -> str:
+        """The human half of an index's identity — frozen for English.
+
+        Every Phase-0/1 artifact quotes this string, so the English form is kept
+        exactly as it was and the language is only named when it is not English.
+        The cache key itself is `fingerprint()`, which cannot drift silently.
         """
         if not self.stopwords:
             stops = "none"
@@ -369,8 +412,12 @@ class BM25:
 
     def _build_payload(self, documents: dict[str, str], workers: int | None) -> tuple[dict[str, int], dict]:
         """The postings, from the cache if it holds exactly this corpus."""
+        # `k1` and `b` are scoring parameters, not index parameters: the postings
+        # are the same for every value, so they are deliberately not in the key.
+        # A sensitivity probe over them therefore reuses the index instead of
+        # rebuilding fifteen minutes of it per value.
         key = hashlib.sha256(
-            f"{self.analysis.describe()}|{self.config.describe()}|{_corpus_digest(documents)}".encode("utf-8")
+            f"{self.analysis.fingerprint()}|{_corpus_digest(documents)}".encode("utf-8")
         ).hexdigest()
         self.cache_key = key
         self._buffer: np.ndarray | None = None
@@ -655,6 +702,7 @@ def reproduce_marco(
     limit: int | None = None,
     depth: int = 1000,
     workers: int | None = None,
+    config: BM25Config | None = None,
 ) -> dict:
     """Index the Italian collection, retrieve, and compare with the published row.
 
@@ -671,7 +719,7 @@ def reproduce_marco(
     benchmark = adapters.mmarco_it(collection=True, limit=limit)
     documents = dict(benchmark.documents())
     loaded = time.time()
-    index = BM25(documents, analysis=analysis, workers=workers)
+    index = BM25(documents, analysis=analysis, config=config, workers=workers)
     built = time.time()
     del documents
     scores = evaluate_marco(index, benchmark.questions, depth=depth)
@@ -716,13 +764,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, default=None, help="debug: score only the first N queries")
     parser.add_argument("--json", type=Path, help="write the result as an artifact")
     parser.add_argument("--workers", type=int, default=None, help="index build processes")
+    parser.add_argument("--k1", type=float, default=0.9, help="BM25 term saturation (scoring only)")
+    parser.add_argument("--b", type=float, default=0.4, help="BM25 length normalisation (scoring only)")
     args = parser.parse_args(argv)
     if not args.reproduce and not args.reproduce_marco:
         parser.print_help()
         return 0
 
     if args.reproduce_marco:
-        result = reproduce_marco(limit=args.limit, workers=args.workers)
+        result = reproduce_marco(
+            limit=args.limit,
+            workers=args.workers,
+            config=BM25Config(k1=args.k1, b=args.b),
+        )
         for key in ("dataset", "documents", "queries", "config", "ranking_digest"):
             print(f"{key:14s} {result[key]}")
         for key in ("mrr@10", "r@1000", "ndcg@10"):

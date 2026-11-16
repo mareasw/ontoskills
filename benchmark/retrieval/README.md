@@ -26,7 +26,7 @@ writes questions: the gold is public and citable.
 | `runs/` | run outputs (created on demand) | — |
 
 The retrieval suite is `benchmark/tests/test_retrieval_{locator,metrics,partition,runner,baselines,dense,summarize}.py`,
-128 tests, no network and no key: `python3 -m pytest benchmark/tests/test_retrieval_*.py`.
+132 tests, no network and no key: `python3 -m pytest benchmark/tests/test_retrieval_*.py`.
 The locator tests skip themselves when the compiled corpora are absent, which is
 the case in CI — those corpora are derived artifacts and are not in the repo.
 
@@ -105,8 +105,12 @@ every document's text, so it cannot be stale).
   questions) **~23 minutes, peak 12 GB** — the peak is mostly pages the eight
   fork workers share, not eight copies. Every later run reuses the cached index
   and takes **~9 minutes**. The cache lives in
-  `~/.cache/ontoskills-bench/index` and is **1.2 GB** for ERB — a key over every
-  document, so it is never stale, and safe to delete at any time. `--limit` only
+  `~/.cache/ontoskills-bench/index` and is **1.2 GB** for ERB — the key is a
+  digest of every document's id and text *and* of the analyser's own behaviour
+  (stemmer, tokeniser, elision rule, stop-word contents), so it cannot be stale,
+  not even after an analyser change, and it is safe to delete at any time. `k1`
+  and `b` are scoring parameters and are deliberately not in the key: changing
+  them reuses the index. `--limit` only
   shortens the question list; the index is always the whole corpus, because a
   baseline scored against a truncated corpus is not the baseline.
 - The handle is `ONTOSKILLS_BENCH_WORKERS` (default: 8, capped at the CPU count);

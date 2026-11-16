@@ -490,11 +490,11 @@ bug inside `norm` shows up as a disagreement instead of hiding from its own chec
 | corpus | claims | evidence | offset | page | section | heading crossings |
 |---|---|---|---|---|---|---|
 | demo (`examples/demo-corpus/kb`) | 5,680 | 6,457 | 6,457/6,457 | 5,346/5,346 | 6,457/6,457 | 0 |
-| pilot (`pilot/kb-final5`) | 298 | 388 | 388/388 | 388/388 | 388/388 | 6 in 2 spans |
+| pilot (private corpus, `ONTOSKILLS_PILOT_CORPUS`) | 298 | 388 | 388/388 | 388/388 | 388/388 | 6 in 2 spans |
 
 The pilot's six crossings are one compiler defect class, enumerated rather than
-hidden: `POLICY-0001` S0004 and S0017 each contain a heading that opens the
-next section, so the span belongs to two sections and no single `section_path` is
+hidden: in two documents of the pilot, two spans (S0004 and S0017) each contain a
+heading that opens the next section, so the span belongs to two sections and no single `section_path` is
 right. They are reported as `heading_crossing`, which is not a citation failure;
 what would be a failure is the checker assuming they cannot exist.
 
@@ -556,7 +556,7 @@ have produced a plausible number:
 | `test_retrieval_locator.py` | 19 | a shifted offset, an edited quote, a wrong page, a wrong section and a non-span range must each be caught by name |
 | `test_retrieval_partition.py` | 15 | an edited partition file, a changed question set and a changed stratum must each be refused |
 | `test_retrieval_runner.py` | 15 | a missing or drifted partition stops the run instead of scoring; an empty corpus is refused rather than scored as zeros; a question with facts and no gold document scores on what it has and is listed; a scoped question never retrieves its out-of-scope distractor; a backwards ranker moves the digest and loses points |
-| `test_retrieval_baselines.py` | 27 | four workers must produce a bit-identical index — including one built with the Italian analyser, whose language must reach the worker or serial and parallel builds disagree; a cached index must be the same index; an edited corpus, a different analysis and a truncated cache file must each miss; one 2,000-character token must not inflate the cache; the fast top-k path must return exactly what `metrics.rank` returns, down to the tie it cuts; and the Italian gate must fail on a corpus that is not the published one |
+| `test_retrieval_baselines.py` | 31 | four workers must produce a bit-identical index — including one built with the Italian analyser, whose language must reach the worker or serial and parallel builds disagree; a cached index must be the same index; an edited corpus, a different analysis and a truncated cache file must each miss; one 2,000-character token must not inflate the cache; the fast top-k path must return exactly what `metrics.rank` returns, down to the tie it cuts; the Italian gate must fail on a corpus that is not the published one; and editing one stop word must invalidate the cached index, because a key that cannot see the analyser is a verification that verifies nothing |
 | `test_retrieval_summarize.py` | 9 | the spread is the best minus the worst, the pairing uses the intersection of the questions each system scored, and Holm never lowers a p-value |
 | `test_retrieval_dense.py` | 15 | RRF is checked against a value computed by hand; a truncated embedding cache and a wrong-width one must each miss; a reranker may reorder only what it read, and never promote an unread document over a read one |
 
@@ -589,8 +589,16 @@ workers keeping local vocabularies that the parent merges *in document order*. T
 global term numbering is therefore the same as a serial build's — which is why
 `test_a_parallel_index_is_bit_identical_to_a_serial_one` can assert equality of
 the vocabulary, the postings and the idf, rather than the weaker "the scores
-agree". The cache is keyed by a SHA-256 over every document id and text, so a
-cached index cannot be a stale one; a truncated cache file is a miss.
+agree". The cache is keyed by a SHA-256 over every document id and text **and over the
+analyser's own behaviour** — stemmer, tokeniser, elision rule and the stop set's
+contents — so a cached index cannot be a stale one; a truncated cache file is a
+miss. The second half was added on 2026-11-16 and it is worth saying why: the key
+used to be a description string, which stayed identical when the analyser under it
+changed, so a re-run after an analyser fix would have reproduced the old index and
+been read as a verification of the new analyser. A test now edits a stop list and
+requires a cache miss. The key also stopped carrying `k1` and `b`: they score the
+postings rather than build them, so a sensitivity probe over them now reuses the
+index instead of rebuilding it once per value. A test asserts that too.
 
 Measurements, this machine:
 
@@ -883,31 +891,57 @@ half of §3 is a lexical statement. **It is not a holdout**: the gate scores all
 an instrument check and stays out of every Phase-3/4 comparison; saying it now is
 cheaper than discovering it when someone wants a clean split later.
 
-### 14.2 The analyser, and the one deliberate deviation
+### 14.2 The analyser, and the two places it differs from Lucene's
 
-Lucene's `ItalianAnalyzer` — what Pyserini applies for `--language it` — is
-`StandardTokenizer`, `ElisionFilter` with the 21 `DEFAULT_ARTICLES`,
-`LowerCaseFilter`, `StopFilter` with the 279-word Snowball Italian list that
-ships inside Lucene, and `ItalianLightStemFilter`.
+Lucene's `ItalianAnalyzer` — what Pyserini applies for `--language it` — is, read
+from the source rather than remembered: `StandardTokenizer` → `ElisionFilter` with
+the 21 `DEFAULT_ARTICLES` (a `CharArraySet` built with `ignoreCase = true`, which
+is why a sentence-initial `Dell'articolo` is elided there too) → `LowerCaseFilter`
+→ `StopFilter` with the 279-word Snowball Italian list that ships inside Lucene →
+`ItalianLightStemFilter`. Everything in that chain is reproduced. Two
+approximations are declared, and the gate is what bounds their combined size.
 
-Everything but the stemmer is reproduced exactly. Both stop lists are copied
-verbatim and a test asserts their sizes (279 and 21), because a stop list that
-drifts is a number that drifts. Elision is reproduced structurally rather than
-implemented: `[^\W_]+` treats the apostrophe as a separator, so `dell'articolo`
-becomes `dell` + `articolo` and `dell` is in the stop set — the same two tokens
-Lucene's `ElisionFilter` leaves behind.
+**Word boundaries are `[^\W_]+`, not UAX #29.** Hyphenated compounds split in both
+(`e-mail` → `e`, `mail`); numeric sequences do not (`3.14`, `1.000` are two tokens
+here and one there), and an apostrophe-joined non-elision stays whole in Lucene and
+splits here. This is the same tokeniser the English gate uses, and that gate
+reproduces 0.6614 against 0.665 — so the approximation is validated where it can
+be validated, and replacing it now would break Phase-1 comparability for a
+difference smaller than the tolerance it already clears.
 
-**The deviation, declared before the measurement, is the stemmer**: Snowball
-`italian` instead of `ItalianLightStemFilter`. Snowball is the more aggressive of
-the two. That is the reading to keep in mind for §14.3, because the two
-differences there move in opposite directions.
+**Snowball `italian` instead of `ItalianLightStemFilter`**, the more aggressive of
+the two, declared before the measurement. It is the deviation to hold in mind for
+§14.3, because it predicts a direction: more stems means a wider candidate pool and
+more collisions.
 
-One defect was found and fixed on the way, and it is the kind that produces a
-plausible number: the chunk workers rebuild the analyser from their payload
-instead of receiving it, and the payload did not carry the language — so every
-worker would have indexed Italian with the English stop list while the parent's
-cache key claimed `lucene-italian`. A test now builds 2,100 Italian documents
-serially and through the pool and requires a bit-identical index.
+Both stop lists are copied verbatim and a test asserts their sizes (279 and 21),
+because a stop list that drifts is a number that drifts.
+
+#### What writing this section found
+
+**The articles were in the wrong place.** They had been added to the *stop set*,
+which deletes them wherever they appear, instead of implemented as an elision rule,
+which deletes them only before an apostrophe. Eight of the twenty-one are not in
+the 279-word list (`coll`, `pell`, `gl`, `d`, `m`, `s`, `t`, `v`), so standalone
+tokens Lucene keeps were being dropped: **0.11% of all tokens** in a
+200,000-passage sample — 13,648 of 12,052,063, mostly `s` and `d` from
+abbreviations like `s.` and `d.`. Elision is now a rule over the text and the stop
+set is the 279 words; §14.3 reports what the correction moved instead of quietly
+replacing the number with the better one.
+
+**The cache key could not see the analyser.** The key was the analyser's
+description string, which does not change when the code under it does — so the run
+meant to verify this fix would have reloaded the index built before it and
+reproduced the old number, and that rerun would have been read as a verification.
+The key is now a fingerprint of the analyser's behaviour (§12.6), and a test edits
+one stop word and requires a cache miss.
+
+**The workers had no language.** They rebuild the analyser from their payload
+instead of receiving it, and the payload did not carry the language, so every
+worker would have indexed Italian with the English stop list while the parent's key
+claimed `lucene-italian`. The language travels with the chunk now, and a test
+builds 2,100 Italian documents serially and through the pool and requires a
+bit-identical index.
 
 ### 14.3 Measured
 
