@@ -9,6 +9,7 @@ something.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from functools import lru_cache
 from pathlib import Path
@@ -21,7 +22,7 @@ sys.path.insert(0, str(ROOT))
 from benchmark.retrieval import locator  # noqa: E402
 
 DEMO = ROOT / "examples" / "demo-corpus" / "kb"
-PILOT = ROOT.parent / "pilot" / "kb-final5"
+PILOT = Path(os.environ.get("ONTOSKILLS_PILOT_CORPUS", ROOT.parent / "pilot" / "kb-final5"))
 
 
 @lru_cache(maxsize=None)

@@ -105,6 +105,17 @@ def test_a_cached_index_is_the_same_index(tmp_path):
     assert cached.scores("capital of france") == fresh.scores("capital of france")
 
 
+def test_changing_k1_or_b_reuses_the_index(tmp_path):
+    """`k1` and `b` score the postings, they do not build them. Putting them in the
+    key would rebuild fifteen minutes of index per value of a sensitivity probe."""
+    baselines.BM25(CORPUS, workers=1, cache=tmp_path)
+    rescored = baselines.BM25(
+        CORPUS, workers=1, cache=tmp_path, config=baselines.BM25Config(k1=0.82, b=0.68)
+    )
+    assert rescored.from_cache is True
+    assert rescored.config.k1 == 0.82
+
+
 def test_an_edited_corpus_does_not_hit_the_cache(tmp_path):
     """The key is a digest over every document, so a one-character edit misses."""
     baselines.BM25(CORPUS, workers=1, cache=tmp_path)
@@ -224,9 +235,42 @@ def test_the_stop_lists_are_the_published_ones():
     assert "sull" in baselines.ITALIAN_ARTICLES
 
 
-def test_the_english_description_is_frozen_because_it_keys_the_cache():
-    """Every built index is cached under this string; renaming it silently rebuilds
-    ten minutes of work per corpus."""
+def test_elision_strips_the_article_and_only_the_article():
+    """Lucene's articles are an elision rule, not a stop list. Dropping the
+    standalone forms too removed 0.11% of the tokens in a 200,000-passage sample —
+    `s`, `d`, `m`, `t`, `v`, `gl`, `pell`, `coll`, eight of the twenty-one that are
+    not in the 279-word list."""
+    italian = baselines.Analysis(stemmer="italian", language="italian")
+    tokens = italian("dell'articolo, l'altro, d'accordo, un'idea")
+    assert "dell" not in tokens and "articol" in tokens
+    assert "s" in italian("s.") and "d" in italian("d."), "standalone letters are kept, as Lucene keeps them"
+    assert "coll" not in baselines.LANGUAGES["italian"], "the articles are not stop words"
+
+
+def test_the_fingerprint_follows_the_behaviour_it_keys(monkeypatch):
+    """The cache key is computed from this digest, so it has to move whenever
+    anything that decides a token moves — including the stop set's contents, which
+    `describe()` cannot see."""
+    fresh = baselines.Analysis()
+    assert fresh.fingerprint() != baselines.Analysis(stemmer="italian", language="italian").fingerprint()
+    assert fresh.fingerprint() != baselines.Analysis(stopwords=False).fingerprint()
+    monkeypatch.setitem(baselines.LANGUAGES, "english", frozenset(baselines.STOPWORDS | {"zzz"}))
+    assert baselines.Analysis().fingerprint() != fresh.fingerprint()
+
+
+def test_a_changed_stop_list_does_not_reuse_the_cache(tmp_path, monkeypatch):
+    """The trap this closes: the key used to be a description string, so editing a
+    stop word left every cached index silently valid — and a re-run that reproduced
+    the old number would look like a verification of the new analyser."""
+    baselines.BM25(CORPUS, workers=1, cache=tmp_path)
+    monkeypatch.setitem(baselines.LANGUAGES, "english", frozenset(baselines.STOPWORDS | {"capital"}))
+    rebuilt = baselines.BM25(CORPUS, workers=1, cache=tmp_path)
+    assert rebuilt.from_cache is False
+
+
+def test_the_english_description_is_frozen_because_every_artifact_quotes_it():
+    """It is no longer the cache key — the fingerprint is — but it is what the
+    Phase-0/1 artifacts record, so renaming it would orphan every one of them."""
     assert baselines.Analysis().describe() == "stemmer=porter stopwords=lucene"
     assert baselines.Analysis(stemmer=None, stopwords=False).describe() == "stemmer=none stopwords=none"
     assert baselines.Analysis(stemmer="italian", language="italian").describe() == "stemmer=italian stopwords=lucene-italian"

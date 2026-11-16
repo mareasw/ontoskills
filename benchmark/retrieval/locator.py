@@ -31,14 +31,15 @@ is exactly one span — but a checker that assumed it would not notice the day i
 stops being true.
 
     python3 benchmark/retrieval/locator.py --check
-    python3 benchmark/retrieval/locator.py --check ../pilot/kb-final5 \\
-        examples/demo-corpus/kb --json /tmp/locator.json
+    ONTOSKILLS_PILOT_CORPUS=path/to/private/kb \\
+        python3 benchmark/retrieval/locator.py --check --json /tmp/locator.json
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
@@ -503,7 +504,14 @@ def main(argv: list[str] | None = None) -> int:
         "corpora",
         nargs="*",
         type=Path,
-        default=[Path("../pilot/kb-final5"), Path("examples/demo-corpus/kb")],
+        # The first corpus is private and not in this repository: a knowledge base
+        # compiled from documents we may not redistribute. Only its path is
+        # configured, never its contents, and the checks that need it skip when it
+        # is absent (which is the case in CI).
+        default=[
+            Path(os.environ.get("ONTOSKILLS_PILOT_CORPUS", "../pilot/kb-final5")),
+            Path("examples/demo-corpus/kb"),
+        ],
         help="knowledge-base directories holding claims/spans/text",
     )
     parser.add_argument("--check", action="store_true", help="run the property test (the default)")
