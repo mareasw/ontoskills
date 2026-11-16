@@ -158,7 +158,16 @@ measured at all, and it is written here rather than left implicit.
 
 **Build cost** — from the provider's `usage` block, never estimated:
 
-- input tokens, output tokens, cached tokens;
+- input tokens and output tokens, per call, plus the HTTP status — a refused
+  call stays visible in the table and costs nothing;
+- cached and reasoning tokens as the gateway reports them, recorded and never
+  added to the bill: `reasoning_tokens` is already inside `completion_tokens` —
+  it is there to show *where* the output went, which §8 item 5 needs — and the
+  price table has no cached discount, so `cached_tokens` is visibility, not a
+  correction. A reply served from the local cache is counted separately as
+  `replayed`, so a fresh bill is not flattered by replays. Both columns were
+  added after the 279-document build: that row carries the prompt/completion
+  split and is not back-filled;
 - normalised dollars at **0,15 $/M in, 0,60 $/M out**, the price table at which
   the repository's existing compile figures were computed;
 - wall clock to build, and the size of the artifact in bytes;
@@ -737,10 +746,10 @@ expose. That is what the pilot is for.
    the retries. The clean rerun, streamed at two in flight, made **12 calls,
    48,813 input and 94,366 output tokens, 0,0639 $**, in 597 s, with no refusal:
    six chunks, 116 entities, 233 relations. That is the number the table
-   publishes. It projects to **17,8 $** per document and **13,3 $** per character
-   — the corpus mean is 6,579 characters against this document's 8,839, so the
-   honest range for 279 documents is **13-18 $**, not the 22,8 $ the first
-   measurement suggested.
+   publishes. Projected over the corpus two ways: **17,8 $** if every document
+   cost what this one did, **13,3 $** by character count — the corpus mean is
+   6,579 characters against this document's 8,839, so the honest range for the
+   279 documents is **13-18 $**, not the 22,8 $ the first measurement suggested.
    Twelve calls for six chunks is also the shape of the cost: extraction asks for
    entities and relations per chunk with one gleaning pass, and the merge phase
    that reconciles 116 entities and 233 relations across chunks makes no model

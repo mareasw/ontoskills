@@ -64,13 +64,34 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 TIMEOUT = 900
 
 
-def usage_from_body(payload: dict) -> dict:
-    """Tokens from a non-streamed completion body."""
-    usage = payload.get("usage") or {}
+def _split(usage: dict) -> dict:
+    """The four numbers, from either the flat or the nested OpenAI shape.
+
+    A reasoning model's output is reported twice — once as `completion_tokens`
+    and once inside it as `reasoning_tokens` — so the second is a diagnostic
+    column, never an addition to the bill. `cached_tokens` is a discount the
+    price table in LAYER.md does not model, and is recorded for the same reason:
+    the reader can see it, and no column silently changes meaning.
+    """
+    prompt_details = usage.get("prompt_tokens_details") or {}
+    completion_details = usage.get("completion_tokens_details") or {}
     return {
         "prompt_tokens": int(usage.get("prompt_tokens") or 0),
         "completion_tokens": int(usage.get("completion_tokens") or 0),
+        "cached_tokens": int(
+            usage.get("cached_tokens") or prompt_details.get("cached_tokens") or 0
+        ),
+        "reasoning_tokens": int(
+            usage.get("reasoning_tokens")
+            or completion_details.get("reasoning_tokens")
+            or 0
+        ),
     }
+
+
+def usage_from_body(payload: dict) -> dict:
+    """Tokens from a non-streamed completion body."""
+    return _split(payload.get("usage") or {})
 
 
 def usage_from_stream(text: str) -> dict:
@@ -98,11 +119,8 @@ def usage_from_stream(text: str) -> dict:
         if usage:
             last = usage
     if last is None:
-        return {"prompt_tokens": 0, "completion_tokens": 0}
-    return {
-        "prompt_tokens": int(last.get("prompt_tokens") or 0),
-        "completion_tokens": int(last.get("completion_tokens") or 0),
-    }
+        return {"prompt_tokens": 0, "completion_tokens": 0, "cached_tokens": 0, "reasoning_tokens": 0}
+    return _split(last)
 
 
 def assemble_stream(text: str) -> dict | None:
@@ -236,6 +254,8 @@ def record_line(
         "status": status,
         "prompt_tokens": usage["prompt_tokens"],
         "completion_tokens": usage["completion_tokens"],
+        "cached_tokens": int(usage.get("cached_tokens") or 0),
+        "reasoning_tokens": int(usage.get("reasoning_tokens") or 0),
         "streamed": streamed,
     }
     row.update(shape or {})

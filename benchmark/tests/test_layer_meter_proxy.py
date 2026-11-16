@@ -24,6 +24,8 @@ def test_usage_comes_from_the_usage_block():
     assert meter_proxy.usage_from_body(body) == {
         "prompt_tokens": 1200,
         "completion_tokens": 340,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0,
     }
 
 
@@ -31,6 +33,8 @@ def test_a_body_without_usage_is_zero_and_not_an_estimate():
     assert meter_proxy.usage_from_body({"choices": []}) == {
         "prompt_tokens": 0,
         "completion_tokens": 0,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0,
     }
 
 
@@ -50,6 +54,8 @@ def test_a_stream_carries_its_usage_in_the_last_chunk():
     assert meter_proxy.usage_from_stream(stream) == {
         "prompt_tokens": 900,
         "completion_tokens": 40,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0,
     }
 
 
@@ -65,7 +71,12 @@ def test_a_stream_that_repeats_a_running_total_is_taken_once():
     # The deltas sum to more than the total, which is why the last total wins
     # when every chunk repeats one number.
     usage = meter_proxy.usage_from_stream(stream)
-    assert usage == {"prompt_tokens": 10, "completion_tokens": 9}
+    assert usage == {
+        "prompt_tokens": 10,
+        "completion_tokens": 9,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0,
+    }
 
 
 def test_the_recorded_line_names_the_system_and_the_model():
@@ -80,6 +91,8 @@ def test_the_recorded_line_names_the_system_and_the_model():
         "status": 200,
         "prompt_tokens": 3,
         "completion_tokens": 4,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0,
         "streamed": False,
     }
 
@@ -160,6 +173,8 @@ def test_a_forwarded_call_is_passed_through_and_metered(tmp_path):
             "status": 200,
             "prompt_tokens": 11,
             "completion_tokens": 7,
+            "cached_tokens": 0,
+            "reasoning_tokens": 0,
             "streamed": False,
             "max_tokens": None,
             "stream": False,
@@ -384,3 +399,35 @@ def test_the_proxy_streams_upstream_and_answers_with_one_body(tmp_path):
         proxy.server_close()
         upstream.shutdown()
         upstream.server_close()
+
+
+def test_reasoning_tokens_are_a_subset_of_the_completion_and_never_added():
+    """The gateway reports this model's thinking twice: in the completion total
+    and inside it. Recording both is a diagnostic; summing them would bill it
+    twice, so the cost formula keeps reading `completion_tokens` alone."""
+    body = {
+        "usage": {
+            "prompt_tokens": 79,
+            "completion_tokens": 9000,
+            "cached_tokens": 0,
+            "reasoning_tokens": 6180,
+            "prompt_tokens_details": {"cached_tokens": 0},
+        }
+    }
+    usage = meter_proxy.usage_from_body(body)
+    assert usage["reasoning_tokens"] == 6180
+    assert usage["completion_tokens"] == 9000
+
+
+def test_the_nested_openai_details_are_read_too():
+    body = {
+        "usage": {
+            "prompt_tokens": 100,
+            "completion_tokens": 50,
+            "prompt_tokens_details": {"cached_tokens": 64},
+            "completion_tokens_details": {"reasoning_tokens": 30},
+        }
+    }
+    usage = meter_proxy.usage_from_body(body)
+    assert usage["cached_tokens"] == 64
+    assert usage["reasoning_tokens"] == 30
