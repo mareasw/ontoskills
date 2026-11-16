@@ -111,15 +111,15 @@ jobs:
       - name: Lint (syntax, undefined names, unused imports)
         # Scoped to the files this harness owns: the rest of benchmark/tests has
         # pre-existing debt that a retrieval change has no business rewriting.
-        run: ruff check benchmark/retrieval benchmark/tests/test_retrieval_*.py --select E9,F63,F7,F82,F401,F841
+        run: ruff check benchmark/retrieval benchmark/layer benchmark/tests/test_retrieval_*.py benchmark/tests/test_layer_*.py --select E9,F63,F7,F82,F401,F841
 
       - name: Test the metric layer, the split, the runner and the baseline fusion
         # These tests are offline by construction: they build their own corpora
         # and never call an adapter that streams from the Hub. The locator tests
         # that need the compiled corpora skip themselves, because those corpora
         # are derived artifacts and are not in the repository.
-        run: python -m pytest -q benchmark/tests/test_retrieval_*.py
+        run: python -m pytest -q benchmark/tests/test_retrieval_*.py benchmark/tests/test_layer_*.py
 
       - name: The harness imports
         run: |
-          python -c "import benchmark.retrieval.adapters, benchmark.retrieval.metrics, benchmark.retrieval.partition, benchmark.retrieval.runner, benchmark.retrieval.baselines, benchmark.retrieval.dense, benchmark.retrieval.summarize, benchmark.retrieval.locator"
+          python -c "import benchmark.retrieval.adapters, benchmark.retrieval.metrics, benchmark.retrieval.partition, benchmark.retrieval.runner, benchmark.retrieval.baselines, benchmark.retrieval.dense, benchmark.retrieval.summarize, benchmark.retrieval.locator, benchmark.layer.corpus, benchmark.layer.score, benchmark.layer.answers, benchmark.layer.embed_server, benchmark.layer.meter_proxy, benchmark.layer.text_refusal, benchmark.layer.run_lightrag, benchmark.layer.run_graphrag, benchmark.layer.report, benchmark.layer.artifacts, benchmark.layer.capability, benchmark.layer.build_record, benchmark.layer.interval"
