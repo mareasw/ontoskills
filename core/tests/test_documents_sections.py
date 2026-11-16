@@ -316,12 +316,12 @@ def test_a_heading_at_the_page_break_is_the_section():
 def test_a_legal_name_is_not_a_heading_at_the_start_of_a_paragraph():
     """``ACME S.R.L. Via …`` opens with capitals and is not a section."""
     text = (
-        "ACME S.R.L. Via Esempio, 4 - Napoli.\n"
+        "ACME S.R.L. Via Esempio, 4 - Roma.\n"
         "\x0c"
         "EA 33 (NACE 62) Certificato N°: I787.\n"
     )
     spans = _spans_at(
-        ["ACME S.R.L. Via Esempio, 4 - Napoli."],
+        ["ACME S.R.L. Via Esempio, 4 - Roma."],
         [["Sede Legale"]],
         text,
     )
