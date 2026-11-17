@@ -482,6 +482,12 @@ bad score instead of an absent one.
 
 <!-- /PILOT-TABLE -->
 
+The 418 ms on the `ontoskills` row is `ontocore ask`'s per-question cost with the
+corpus already in memory — the path the pilot was scored on. The same ranking,
+served by the MCP over the same 200 questions, costs **3,5 ms p50 and 5,2 ms p95**
+and returns the same claim ids in the same order; §10 is that measurement and the
+eight gates it had to pass first.
+
 ### The floor is the strongest thing on this table, and that is the finding
 
 On EnterpriseRAG-Bench's lexical metrics, a chunk-and-BM25 floor — 2,55 seconds
@@ -655,6 +661,12 @@ exactly that.
 - [x] LightRAG: decided against the full build, with the measured cost published
       (§7.1)
 - [x] pilot table rendered from the artifacts (§7)
+- [x] the read path served by `ontomcp` in Rust, the compiler left in Python
+      (`docs/adr/0003-documents-in-the-mcp-runtime.md`): 200 of 200 questions
+      rank identically through the MCP, 279 of 279 documents tokenise
+      identically, no quote outside its offsets, no knowledge-base file
+      modified, the same answers inside an empty network namespace, p95 5,5 ms
+      against a 300 ms gate — §10
 
 ### What the smoke run found, and what it cost to find
 
@@ -875,6 +887,22 @@ python3 -m benchmark.layer.report --manifest /tmp/layer/manifest.json \
     --into benchmark/layer/LAYER.md
 ```
 
+**The read path the client actually sees** (ADR 0003), with its gates:
+
+```
+cargo build --release --offline --manifest-path mcp/Cargo.toml
+python3 -m benchmark.layer.mcp_parity --kb /tmp/layer/kb \
+    --selection /tmp/layer/corpus/selection.json \
+    --binary mcp/target/release/ontomcp --out /tmp/layer/runs/mcp-parity-200.json
+python3 -m benchmark.layer.mcp_parity --kb /tmp/layer/kb \
+    --selection /tmp/layer/corpus/selection.json --tokenizer      # G7, 279 documents
+unshare -rn python3 -m benchmark.layer.mcp_parity ...              # G8, same command
+```
+
+The first command is G1, G2, G5 and G6 at once; the second writes the Python
+token stream of every document and has the Rust test compare itself to it; the
+third is the first one with no route off the machine, which is G8.
+
 `interval.py` is the one step whose absence would be easiest to miss and hardest
 to defend: it is what turns three point estimates into a claim about the
 ordering, and it resamples questions rather than facts because a question's facts
@@ -889,3 +917,80 @@ and the wall clock of any build that ran in more than one attempt, which
 `build_record.py --wall-clock` takes from the command line because a resumed
 build's own timer covers only the attempt that finished. A repeat build, and the
 variance it would measure, is in §6's full-run budget, not in this pilot.
+
+## 10. The read path in the MCP
+
+`docs/adr/0003-documents-in-the-mcp-runtime.md` decided that the layer's
+client-facing surface is three tools in `ontomcp` — `documents_ask`,
+`documents_claim`, `documents_query` — and that the ranking they answer with is a
+Rust port of `compiler.documents.ask`, not a call into Python. The compiler is
+untouched: `ontocore documents ingest` still writes the artifact, and the server
+only reads it — no model call, no network, no file written.
+
+| tool | input | answer |
+|---|---|---|
+| `documents_ask` | `q`, `kb`, `k` (10), `include_unverified` (false) | citations in rank order, each with its quote, locator, score and verdict; the documents they come from; the durations the corpus disagrees about |
+| `documents_claim` | `claim_id`, `kb` | every evidence item with role, quote and locator — each quote re-checked against the document at query time — the verifier's reasons and notes, `conflicts_with`, the source document |
+| `documents_query` | `sparql`, `kb` | the bound rows of a read-only `SELECT` or `ASK` over `graph.ttl` |
+
+A second implementation of the ranking is acceptable only if something proves it
+is not a different system, so eight gates are the price of the port. All eight
+are green on the pilot artifact, and the reports are
+`runs/mcp-parity-200.json` and `runs/mcp-parity-200-netns.json`:
+
+| gate | what it checks | measured |
+|---|---|---|
+| **G1** parity, exact | 200 questions through the MCP against `ontocore ask`, claim ids position by position; ties compared as sets inside a tie group, because two float implementations may break a tie differently | **0 mismatches** in 200 |
+| **G2** the quote is real | every citation's quote at the offsets it reports, normalised the way the compiler's verifier normalises | **0 of 2 000** citations off |
+| **G3** read-only by construction | `INSERT`, `DELETE`, `LOAD`, `CLEAR`, `DROP`, `CREATE`, `SERVICE`, `DESCRIBE` refused with the keyword named; a query whose *literal* or prefixed name contains `delete` still runs; both caps named when hit | 8 keywords refused, each naming itself; refusal **0 ms**; `2000 rows` and `2 s` named when hit |
+| **G4** vocabulary | a graph using a `doc:` term the binary does not know is refused, term named | test green; the pilot graph passes — 196 814 triples, 0 unknown terms |
+| **G5** latency, published | p95 per `ask` ≤ 300 ms on the pilot KB, release build | **p50 3,5 ms, p95 5,2 ms, max 8,6 ms** over 200 questions |
+| **G6** read-only at runtime | no knowledge-base file modified by the run | sizes and mtimes identical before and after |
+| **G7** tokenizer parity | the Rust token stream equals the Python one for **every** text file, not a sample | **279 of 279** documents, byte for byte |
+| **G8** no network | the 200 asks inside an empty network namespace | same answers, same ids, same order; p50 3,4 ms, p95 5,8 ms |
+
+### What the port costs and what it bought
+
+| operation | cost (release build, pilot artifact) |
+|---|---|
+| first `documents_ask` of a process — artifact load plus the lexical index build, once | **1,16 s** |
+| `documents_ask`, steady state | **3,5 ms p50, 5,2 ms p95, 8,6 ms max** |
+| first `documents_query` of a process — 16,7 MB of Turtle parsed and the vocabulary checked, once | **2,76 s** |
+| `documents_query`, steady state (SELECT, ASK, GROUP BY over 196 814 triples) | **1-17 ms** |
+| a refused mutation | **0 ms** — the guard runs before the graph is opened |
+| a query over the row cap | 19 ms, and the error says `2000 rows` |
+
+The 418 ms in §7's Query table is the same ranking computed by the Python
+implementation the pilot was scored on, and the difference is worth stating
+precisely rather than as a speed-up. `Corpus.search` rebuilds every claim's term
+counts on every question — 1,4 M tokens revisited per question — while the Rust
+index is inverted and built once. G1 is what makes this a statement about *the
+same answers*: the work moved, the ranking did not. Nothing in §7's quality table
+changes because the port is faster.
+
+Three of the Python behaviours the port reproduces are the kind that look like
+defects and are deliberately kept, because they are what was measured: the
+`max(limit * 4, limit)` window is applied *before* duplicate statements are
+dropped; a claim the verifier does not mention is `ok`; and there is no `refused`
+field — an empty citation list is the answer, and the pilot's 0,0 % false
+refusal rate exists because the system never abstains. `mcp/docs/documents-read-path.md`
+records all fourteen suspected defects and the thirty-four traps, with the
+location of each in the Python source.
+
+### What these numbers do not say
+
+- They describe **this artifact on this machine**. The gate is a command, not a
+  promise: another corpus is checked by running the same harness, `--tokenizer`
+  included, and a corpus that fails G7 fails loudly with the document named.
+- They are a **parity** result, not a quality result. Coverage is still 63,9 %
+  against the floor's 92,4 % with non-overlapping intervals (§7), and serving the
+  layer in 3,5 ms instead of 418 ms does not move it by a character. The ADR says
+  this in its own words and §5's rule is what stops the port from being cited as
+  an improvement in quality.
+- `documents_query` speaks `SELECT` and `ASK`, capped at 2 000 rows and 2 s, and
+  refuses `CONSTRUCT` and `DESCRIBE` because they return a graph rather than
+  bound rows. No SPARQL conformance suite was run: nine tests and the pilot's own
+  probes — claims per document, sections, contradictions, `FILTER NOT EXISTS` —
+  are what is green. A query language this large has corners this pilot never
+  touches, and the honest description of the tool is "the queries the probes use,
+  plus whatever else the standard gives for free".
