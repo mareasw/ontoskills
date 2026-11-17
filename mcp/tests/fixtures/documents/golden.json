@@ -36,6 +36,20 @@
      "quote": "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;"
     },
     {
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0012",
+     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+     "score": 13.3203,
+     "verdict": "ok",
+     "quote": "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:"
+    },
+    {
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0021",
+     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+     "score": 4.3671,
+     "verdict": "ok",
+     "quote": "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:"
+    },
+    {
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0008",
      "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
      "score": 17.6997,
@@ -48,13 +62,6 @@
      "score": 14.7614,
      "verdict": "ok",
      "quote": "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;"
-    },
-    {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0012",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 13.3203,
-     "verdict": "ok",
-     "quote": "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:"
     },
     {
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0011",
@@ -90,13 +97,6 @@
      "score": 11.9241,
      "verdict": "ok",
      "quote": "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;"
-    },
-    {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0010",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 11.609,
-     "verdict": "ok",
-     "quote": "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:"
     }
    ],
    "documents": [
@@ -110,11 +110,18 @@
    "kind": "project_related",
    "citations": [
     {
-     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0027",
+     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0009",
      "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
-     "score": 13.7108,
+     "score": 10.9007,
      "verdict": "ok",
-     "quote": "Follow-ups (next week): 1) Ava: update Confluence owner mapping + decision tree language and link it from the incident classification policy. ETA Tue 1/13. 2) Rafael: confirm escalation rule wording for CAPACITY incidents (Fleet primary + Routing notified) and align with incident-bot closure gating. ETA Wed 1/14. 3) Mina/Vanessa: provide 2-3 concrete examples each for the taxonomy page (what to pick, what not to pick). ETA Wed 1/14. 4) Routing team: ensure fallback_reason enums land + are visible in the incident channel bot summary (ENG-4824). Tracking separately."
+     "quote": "Rationale: - Primary owner must align to the team accountable for preventing recurrence (forecasting, provisioning, pool sizing, regional capacity posture). - Routing absolutely remains critical for mitigation; we'll formalize it as required secondary/consulted for CAPACITY incidents."
+    },
+    {
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0028",
+     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+     "score": 9.9149,
+     "verdict": "ok",
+     "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
     },
     {
      "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0018",
@@ -124,11 +131,25 @@
      "quote": "Action items (please assign owners + dates): - Update the owner mapping table and control-plane config to reflect this (ENG-4825). - Ensure incident-bot can set a secondary/escalation target (Routing) when CAPACITY incident includes fallback/admission symptoms (ENG-4823)."
     },
     {
-     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0009",
+     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0022",
      "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
-     "score": 10.9007,
+     "score": 5.9184,
      "verdict": "ok",
-     "quote": "Rationale: - Primary owner must align to the team accountable for preventing recurrence (forecasting, provisioning, pool sizing, regional capacity posture). - Routing absolutely remains critical for mitigation; we'll formalize it as required secondary/consulted for CAPACITY incidents."
+     "quote": "Final mapping (v1): - CAPACITY > Regional capacity exhaustion - Primary: Fleet; Secondary: Routing; Consulted: SRE - CAPACITY > Provisioning lag / scale-up stalled - Primary: Fleet; Secondary: SRE; Consulted: Routing - CAPACITY > Pool saturation (GPU/utilization) - Primary: Fleet; Secondary: Routing; Consulted: SRE - ROUTING/FALLBACK > Fallback misbehavior (policy/health/compat bugs) - Primary: Routing; Secondary: SRE; Consulted: Fleet"
+    },
+    {
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0007",
+     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+     "score": 8.5017,
+     "verdict": "ok",
+     "quote": "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;"
+    },
+    {
+     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0027",
+     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
+     "score": 13.7108,
+     "verdict": "ok",
+     "quote": "Follow-ups (next week): 1) Ava: update Confluence owner mapping + decision tree language and link it from the incident classification policy. ETA Tue 1/13. 2) Rafael: confirm escalation rule wording for CAPACITY incidents (Fleet primary + Routing notified) and align with incident-bot closure gating. ETA Wed 1/14. 3) Mina/Vanessa: provide 2-3 concrete examples each for the taxonomy page (what to pick, what not to pick). ETA Wed 1/14. 4) Routing team: ensure fallback_reason enums land + are visible in the incident channel bot summary (ENG-4824). Tracking separately."
     },
     {
      "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0010",
@@ -145,20 +166,6 @@
      "quote": "Action items (please assign owners + dates): - Update the owner mapping table and control-plane config to reflect this (ENG-4825). - Ensure incident-bot can set a secondary/escalation target (Routing) when CAPACITY incident includes fallback/admission symptoms (ENG-4823)."
     },
     {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0028",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 9.9149,
-     "verdict": "ok",
-     "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
-    },
-    {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0007",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 8.5017,
-     "verdict": "ok",
-     "quote": "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;"
-    },
-    {
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0035",
      "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
      "score": 8.2112,
@@ -169,13 +176,6 @@
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0029",
      "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
      "score": 8.1388,
-     "verdict": "ok",
-     "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
-    },
-    {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0030",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 8.026,
      "verdict": "ok",
      "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
     }
@@ -206,6 +206,27 @@
      "quote": "Follow-ups (next week): 1) Ava: update Confluence owner mapping + decision tree language and link it from the incident classification policy. ETA Tue 1/13. 2) Rafael: confirm escalation rule wording for CAPACITY incidents (Fleet primary + Routing notified) and align with incident-bot closure gating. ETA Wed 1/14. 3) Mina/Vanessa: provide 2-3 concrete examples each for the taxonomy page (what to pick, what not to pick). ETA Wed 1/14. 4) Routing team: ensure fallback_reason enums land + are visible in the incident channel bot summary (ENG-4824). Tracking separately."
     },
     {
+     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0019",
+     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
+     "score": 4.9847,
+     "verdict": "ok",
+     "quote": "Final mapping (v1): - CAPACITY > Regional capacity exhaustion - Primary: Fleet; Secondary: Routing; Consulted: SRE - CAPACITY > Provisioning lag / scale-up stalled - Primary: Fleet; Secondary: SRE; Consulted: Routing - CAPACITY > Pool saturation (GPU/utilization) - Primary: Fleet; Secondary: Routing; Consulted: SRE - ROUTING/FALLBACK > Fallback misbehavior (policy/health/compat bugs) - Primary: Routing; Secondary: SRE; Consulted: Fleet"
+    },
+    {
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0033",
+     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+     "score": 5.1882,
+     "verdict": "ok",
+     "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
+    },
+    {
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0023",
+     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+     "score": 3.7534,
+     "verdict": "ok",
+     "quote": "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:"
+    },
+    {
      "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0009",
      "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
      "score": 5.7853,
@@ -218,20 +239,6 @@
      "score": 5.4922,
      "verdict": "ok",
      "quote": "Two proposed options: A) Own by symptom: anything involving fallback/admission control defaults to Routing. B) Own by controllable lever / root cause: capacity scarcity -> Fleet; policy/selection bugs -> Routing."
-    },
-    {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0033",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 5.1882,
-     "verdict": "ok",
-     "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
-    },
-    {
-     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0019",
-     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
-     "score": 4.9847,
-     "verdict": "ok",
-     "quote": "Final mapping (v1): - CAPACITY > Regional capacity exhaustion - Primary: Fleet; Secondary: Routing; Consulted: SRE - CAPACITY > Provisioning lag / scale-up stalled - Primary: Fleet; Secondary: SRE; Consulted: Routing - CAPACITY > Pool saturation (GPU/utilization) - Primary: Fleet; Secondary: Routing; Consulted: SRE - ROUTING/FALLBACK > Fallback misbehavior (policy/health/compat bugs) - Primary: Routing; Secondary: SRE; Consulted: Fleet"
     },
     {
      "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0010",
@@ -253,13 +260,6 @@
      "score": 4.1354,
      "verdict": "ok",
      "quote": "To address Mina's first-30-minutes concern: - Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved. - Classification rule for ICs (write this into the decision tree): 1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet). 2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing)."
-    },
-    {
-     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0028",
-     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
-     "score": 3.9197,
-     "verdict": "ok",
-     "quote": "Follow-ups (next week): 1) Ava: update Confluence owner mapping + decision tree language and link it from the incident classification policy. ETA Tue 1/13. 2) Rafael: confirm escalation rule wording for CAPACITY incidents (Fleet primary + Routing notified) and align with incident-bot closure gating. ETA Wed 1/14. 3) Mina/Vanessa: provide 2-3 concrete examples each for the taxonomy page (what to pick, what not to pick). ETA Wed 1/14. 4) Routing team: ensure fallback_reason enums land + are visible in the incident channel bot summary (ENG-4824). Tracking separately."
     }
    ],
    "documents": [
@@ -274,18 +274,18 @@
    "kind": "basic",
    "citations": [
     {
-     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0001",
-     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
-     "score": 6.884,
-     "verdict": "ok",
-     "quote": "Two proposed options: A) Own by symptom: anything involving fallback/admission control defaults to Routing. B) Own by controllable lever / root cause: capacity scarcity -> Fleet; policy/selection bugs -> Routing."
-    },
-    {
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0010",
      "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
      "score": 5.8686,
      "verdict": "ok",
      "quote": "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:"
+    },
+    {
+     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0001",
+     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
+     "score": 6.884,
+     "verdict": "ok",
+     "quote": "Two proposed options: A) Own by symptom: anything involving fallback/admission control defaults to Routing. B) Own by controllable lever / root cause: capacity scarcity -> Fleet; policy/selection bugs -> Routing."
     },
     {
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0016",
@@ -345,8 +345,8 @@
     }
    ],
    "documents": [
-    "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
-    "dsid_03af1e44970d4d6db6e85bc2c5fce8de"
+    "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+    "dsid_020bac2fb6ac4de28d5afb63e39a0c10"
    ],
    "tensions": []
   },
@@ -361,6 +361,20 @@
      "score": 8.7393,
      "verdict": "ok",
      "quote": "# Corrective actions 1. Add fragmentation metric: \"sched_place_fail_rate\" + \"gpu_mem_slack\" (owner: Eng Infra) 2. Publish runbook for defragmentation and safe evacuation in private clusters (owner: Eng Infra) 3. Add preflight capacity validation before maintenance rotations (owner: Eng SRE)"
+    },
+    {
+     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0014",
+     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
+     "score": 4.3483,
+     "verdict": "ok",
+     "quote": "To address Mina's first-30-minutes concern: - Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved. - Classification rule for ICs (write this into the decision tree): 1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet). 2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing)."
+    },
+    {
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0023",
+     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+     "score": 1.8117,
+     "verdict": "ok",
+     "quote": "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:"
     },
     {
      "claim_id": "dsid_02f0cd8c874b431cbdec5455721ce8c1-0003",
@@ -405,30 +419,17 @@
      "quote": "Final mapping (v1): - CAPACITY > Regional capacity exhaustion - Primary: Fleet; Secondary: Routing; Consulted: SRE - CAPACITY > Provisioning lag / scale-up stalled - Primary: Fleet; Secondary: SRE; Consulted: Routing - CAPACITY > Pool saturation (GPU/utilization) - Primary: Fleet; Secondary: Routing; Consulted: SRE - ROUTING/FALLBACK > Fallback misbehavior (policy/health/compat bugs) - Primary: Routing; Secondary: SRE; Consulted: Fleet"
     },
     {
-     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0014",
-     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
-     "score": 4.3483,
-     "verdict": "ok",
-     "quote": "To address Mina's first-30-minutes concern: - Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved. - Classification rule for ICs (write this into the decision tree): 1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet). 2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing)."
-    },
-    {
      "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0011",
      "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
      "score": 2.5936,
-     "verdict": "ok",
-     "quote": "To address Mina's first-30-minutes concern: - Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved. - Classification rule for ICs (write this into the decision tree): 1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet). 2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing)."
-    },
-    {
-     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0012",
-     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
-     "score": 2.3787,
      "verdict": "ok",
      "quote": "To address Mina's first-30-minutes concern: - Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved. - Classification rule for ICs (write this into the decision tree): 1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet). 2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing)."
     }
    ],
    "documents": [
     "dsid_02f0cd8c874b431cbdec5455721ce8c1",
-    "dsid_020bac2fb6ac4de28d5afb63e39a0c10"
+    "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
+    "dsid_03af1e44970d4d6db6e85bc2c5fce8de"
    ],
    "tensions": []
   },
@@ -527,6 +528,27 @@
      "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
     },
     {
+     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0009",
+     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
+     "score": 4.8014,
+     "verdict": "ok",
+     "quote": "Rationale: - Primary owner must align to the team accountable for preventing recurrence (forecasting, provisioning, pool sizing, regional capacity posture). - Routing absolutely remains critical for mitigation; we'll formalize it as required secondary/consulted for CAPACITY incidents."
+    },
+    {
+     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0012",
+     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
+     "score": 4.2618,
+     "verdict": "ok",
+     "quote": "To address Mina's first-30-minutes concern: - Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved. - Classification rule for ICs (write this into the decision tree): 1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet). 2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing)."
+    },
+    {
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0007",
+     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+     "score": 3.4862,
+     "verdict": "ok",
+     "quote": "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;"
+    },
+    {
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0035",
      "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
      "score": 9.4549,
@@ -567,27 +589,6 @@
      "score": 7.8098,
      "verdict": "ok",
      "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
-    },
-    {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0034",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 7.6977,
-     "verdict": "ok",
-     "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
-    },
-    {
-     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0009",
-     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
-     "score": 4.8014,
-     "verdict": "ok",
-     "quote": "Rationale: - Primary owner must align to the team accountable for preventing recurrence (forecasting, provisioning, pool sizing, regional capacity posture). - Routing absolutely remains critical for mitigation; we'll formalize it as required secondary/consulted for CAPACITY incidents."
-    },
-    {
-     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0030",
-     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
-     "score": 4.6747,
-     "verdict": "ok",
-     "quote": "Follow-ups (next week): 1) Ava: update Confluence owner mapping + decision tree language and link it from the incident classification policy. ETA Tue 1/13. 2) Rafael: confirm escalation rule wording for CAPACITY incidents (Fleet primary + Routing notified) and align with incident-bot closure gating. ETA Wed 1/14. 3) Mina/Vanessa: provide 2-3 concrete examples each for the taxonomy page (what to pick, what not to pick). ETA Wed 1/14. 4) Routing team: ensure fallback_reason enums land + are visible in the incident channel bot summary (ENG-4824). Tracking separately."
     }
    ],
    "documents": [
@@ -690,25 +691,11 @@
      "quote": "To address Mina's first-30-minutes concern: - Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved. - Classification rule for ICs (write this into the decision tree): 1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet). 2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing)."
     },
     {
-     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0016",
-     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
-     "score": 7.2712,
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0038",
+     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+     "score": 5.9373,
      "verdict": "ok",
-     "quote": "To address Mina's first-30-minutes concern: - Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved. - Classification rule for ICs (write this into the decision tree): 1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet). 2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing)."
-    },
-    {
-     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0004",
-     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
-     "score": 7.1299,
-     "verdict": "ok",
-     "quote": "Proposed owner mapping if we choose B: - CAPACITY.* => Primary: Fleet; Secondary/Consulted: Routing (for traffic steering, safe-mode, policy constraints) - ROUTING/FALLBACK.* => Primary: Routing; Consulted: Fleet (if capacity constraints are suspected)"
-    },
-    {
-     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0013",
-     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
-     "score": 6.41,
-     "verdict": "ok",
-     "quote": "To address Mina's first-30-minutes concern: - Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved. - Classification rule for ICs (write this into the decision tree): 1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet). 2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing)."
+     "quote": "- Procurement notes: finance wants committed capacity discount tiers and an option to convert to Dedicated Reserved on annual renewal. Legal flagged service credit language and liability cap. - Quote history: pricing deck sent 2026-02-28 (drive link). Redwood gave two sizing options: 8x reserved (latency-priority) and 12x with burst (cost amortized). Horizon Quay prefers 8x + autoscale to shared. - Direct quotes from stakeholders: \"We cannot accept blackouts during port shift windows - any maintenance must be out of peak or have a clear failover plan.\" - Head of Ops. - Next steps (concrete): Redwood to produce SLA redline + SOW by 2026-03-17; schedule legal review call 2026-03-22;"
     },
     {
      "claim_id": "dsid_02f0cd8c874b431cbdec5455721ce8c1-0001",
@@ -718,11 +705,25 @@
      "quote": "# Corrective actions 1. Add fragmentation metric: \"sched_place_fail_rate\" + \"gpu_mem_slack\" (owner: Eng Infra) 2. Publish runbook for defragmentation and safe evacuation in private clusters (owner: Eng Infra) 3. Add preflight capacity validation before maintenance rotations (owner: Eng SRE)"
     },
     {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0038",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 5.9373,
+     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0004",
+     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
+     "score": 7.1299,
      "verdict": "ok",
-     "quote": "- Procurement notes: finance wants committed capacity discount tiers and an option to convert to Dedicated Reserved on annual renewal. Legal flagged service credit language and liability cap. - Quote history: pricing deck sent 2026-02-28 (drive link). Redwood gave two sizing options: 8x reserved (latency-priority) and 12x with burst (cost amortized). Horizon Quay prefers 8x + autoscale to shared. - Direct quotes from stakeholders: \"We cannot accept blackouts during port shift windows - any maintenance must be out of peak or have a clear failover plan.\" - Head of Ops. - Next steps (concrete): Redwood to produce SLA redline + SOW by 2026-03-17; schedule legal review call 2026-03-22;"
+     "quote": "Proposed owner mapping if we choose B: - CAPACITY.* => Primary: Fleet; Secondary/Consulted: Routing (for traffic steering, safe-mode, policy constraints) - ROUTING/FALLBACK.* => Primary: Routing; Consulted: Fleet (if capacity constraints are suspected)"
+    },
+    {
+     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0016",
+     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
+     "score": 7.2712,
+     "verdict": "ok",
+     "quote": "To address Mina's first-30-minutes concern: - Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved. - Classification rule for ICs (write this into the decision tree): 1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet). 2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing)."
+    },
+    {
+     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0013",
+     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
+     "score": 6.41,
+     "verdict": "ok",
+     "quote": "To address Mina's first-30-minutes concern: - Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved. - Classification rule for ICs (write this into the decision tree): 1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet). 2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing)."
     },
     {
      "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0011",
@@ -755,8 +756,8 @@
    ],
    "documents": [
     "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
-    "dsid_02f0cd8c874b431cbdec5455721ce8c1",
-    "dsid_03af1e44970d4d6db6e85bc2c5fce8de"
+    "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+    "dsid_02f0cd8c874b431cbdec5455721ce8c1"
    ],
    "tensions": []
   },
@@ -766,6 +767,13 @@
    "kind": "basic",
    "citations": [
     {
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0016",
+     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+     "score": 7.4932,
+     "verdict": "ok",
+     "quote": "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:"
+    },
+    {
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0033",
      "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
      "score": 7.6092,
@@ -773,11 +781,11 @@
      "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
     },
     {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0016",
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0026",
      "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 7.4932,
+     "score": 3.2115,
      "verdict": "ok",
-     "quote": "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:"
+     "quote": "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:"
     },
     {
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0014",
@@ -827,13 +835,6 @@
      "score": 4.7148,
      "verdict": "ok",
      "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
-    },
-    {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0029",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 4.6755,
-     "verdict": "ok",
-     "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
     }
    ],
    "documents": [
@@ -847,11 +848,25 @@
    "kind": "basic",
    "citations": [
     {
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0003",
+     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+     "score": 3.1249,
+     "verdict": "ok",
+     "quote": "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;"
+    },
+    {
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0028",
      "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
      "score": 3.4637,
      "verdict": "ok",
      "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
+    },
+    {
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0019",
+     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+     "score": 3.3396,
+     "verdict": "ok",
+     "quote": "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:"
     },
     {
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0029",
@@ -889,13 +904,6 @@
      "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
     },
     {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0019",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 3.3396,
-     "verdict": "ok",
-     "quote": "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:"
-    },
-    {
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0034",
      "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
      "score": 3.2876,
@@ -908,13 +916,6 @@
      "score": 3.2583,
      "verdict": "ok",
      "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
-    },
-    {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0003",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 3.1249,
-     "verdict": "ok",
-     "quote": "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;"
     }
    ],
    "documents": [
@@ -935,18 +936,25 @@
      "quote": "- Procurement notes: finance wants committed capacity discount tiers and an option to convert to Dedicated Reserved on annual renewal. Legal flagged service credit language and liability cap. - Quote history: pricing deck sent 2026-02-28 (drive link). Redwood gave two sizing options: 8x reserved (latency-priority) and 12x with burst (cost amortized). Horizon Quay prefers 8x + autoscale to shared. - Direct quotes from stakeholders: \"We cannot accept blackouts during port shift windows - any maintenance must be out of peak or have a clear failover plan.\" - Head of Ops. - Next steps (concrete): Redwood to produce SLA redline + SOW by 2026-03-17; schedule legal review call 2026-03-22;"
     },
     {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0009",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 7.6396,
-     "verdict": "ok",
-     "quote": "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;"
-    },
-    {
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0013",
      "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
      "score": 7.2868,
      "verdict": "ok",
      "quote": "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:"
+    },
+    {
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0021",
+     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+     "score": 4.6893,
+     "verdict": "ok",
+     "quote": "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:"
+    },
+    {
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0009",
+     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+     "score": 7.6396,
+     "verdict": "ok",
+     "quote": "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;"
     },
     {
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0012",
@@ -989,13 +997,6 @@
      "score": 7.0396,
      "verdict": "ok",
      "quote": "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:"
-    },
-    {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0039",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 6.9272,
-     "verdict": "ok",
-     "quote": "- Procurement notes: finance wants committed capacity discount tiers and an option to convert to Dedicated Reserved on annual renewal. Legal flagged service credit language and liability cap. - Quote history: pricing deck sent 2026-02-28 (drive link). Redwood gave two sizing options: 8x reserved (latency-priority) and 12x with burst (cost amortized). Horizon Quay prefers 8x + autoscale to shared. - Direct quotes from stakeholders: \"We cannot accept blackouts during port shift windows - any maintenance must be out of peak or have a clear failover plan.\" - Head of Ops. - Next steps (concrete): Redwood to produce SLA redline + SOW by 2026-03-17; schedule legal review call 2026-03-22;"
     }
    ],
    "documents": [
@@ -1014,6 +1015,20 @@
      "score": 11.9571,
      "verdict": "ok",
      "quote": "Decision: choose option B (own by controllable boundary / root cause). We'll treat \"capacity-driven fallback storms\" as a CAPACITY incident for primary ownership."
+    },
+    {
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0033",
+     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+     "score": 3.471,
+     "verdict": "ok",
+     "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
+    },
+    {
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0010",
+     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+     "score": 3.7846,
+     "verdict": "ok",
+     "quote": "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:"
     },
     {
      "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0002",
@@ -1035,20 +1050,6 @@
      "score": 7.211,
      "verdict": "ok",
      "quote": "Two proposed options: A) Own by symptom: anything involving fallback/admission control defaults to Routing. B) Own by controllable lever / root cause: capacity scarcity -> Fleet; policy/selection bugs -> Routing."
-    },
-    {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0010",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 3.7846,
-     "verdict": "ok",
-     "quote": "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:"
-    },
-    {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0033",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 3.471,
-     "verdict": "ok",
-     "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
     },
     {
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0016",
@@ -1198,6 +1199,13 @@
      "quote": "- Procurement notes: finance wants committed capacity discount tiers and an option to convert to Dedicated Reserved on annual renewal. Legal flagged service credit language and liability cap. - Quote history: pricing deck sent 2026-02-28 (drive link). Redwood gave two sizing options: 8x reserved (latency-priority) and 12x with burst (cost amortized). Horizon Quay prefers 8x + autoscale to shared. - Direct quotes from stakeholders: \"We cannot accept blackouts during port shift windows - any maintenance must be out of peak or have a clear failover plan.\" - Head of Ops. - Next steps (concrete): Redwood to produce SLA redline + SOW by 2026-03-17; schedule legal review call 2026-03-22;"
     },
     {
+     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0021",
+     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
+     "score": 2.1551,
+     "verdict": "ok",
+     "quote": "Final mapping (v1): - CAPACITY > Regional capacity exhaustion - Primary: Fleet; Secondary: Routing; Consulted: SRE - CAPACITY > Provisioning lag / scale-up stalled - Primary: Fleet; Secondary: SRE; Consulted: Routing - CAPACITY > Pool saturation (GPU/utilization) - Primary: Fleet; Secondary: Routing; Consulted: SRE - ROUTING/FALLBACK > Fallback misbehavior (policy/health/compat bugs) - Primary: Routing; Secondary: SRE; Consulted: Fleet"
+    },
+    {
      "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0011",
      "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
      "score": 2.5936,
@@ -1238,13 +1246,6 @@
      "score": 2.5105,
      "verdict": "ok",
      "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
-    },
-    {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0032",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 2.4949,
-     "verdict": "ok",
-     "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
     }
    ],
    "documents": [
@@ -1266,6 +1267,13 @@
      "quote": "# Corrective actions 1. Add fragmentation metric: \"sched_place_fail_rate\" + \"gpu_mem_slack\" (owner: Eng Infra) 2. Publish runbook for defragmentation and safe evacuation in private clusters (owner: Eng Infra) 3. Add preflight capacity validation before maintenance rotations (owner: Eng SRE)"
     },
     {
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0029",
+     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+     "score": 1.5559,
+     "verdict": "ok",
+     "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
+    },
+    {
      "claim_id": "dsid_02f0cd8c874b431cbdec5455721ce8c1-0003",
      "doc_id": "dsid_02f0cd8c874b431cbdec5455721ce8c1",
      "score": 3.7708,
@@ -1278,13 +1286,6 @@
      "score": 3.6274,
      "verdict": "ok",
      "quote": "# Corrective actions 1. Add fragmentation metric: \"sched_place_fail_rate\" + \"gpu_mem_slack\" (owner: Eng Infra) 2. Publish runbook for defragmentation and safe evacuation in private clusters (owner: Eng Infra) 3. Add preflight capacity validation before maintenance rotations (owner: Eng SRE)"
-    },
-    {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0029",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 1.5559,
-     "verdict": "ok",
-     "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
     },
     {
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0027",
@@ -1341,11 +1342,32 @@
    "kind": "basic",
    "citations": [
     {
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0032",
+     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+     "score": 4.9499,
+     "verdict": "ok",
+     "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
+    },
+    {
+     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0011",
+     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
+     "score": 2.5936,
+     "verdict": "ok",
+     "quote": "To address Mina's first-30-minutes concern: - Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved. - Classification rule for ICs (write this into the decision tree): 1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet). 2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing)."
+    },
+    {
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0009",
      "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
      "score": 6.8225,
      "verdict": "ok",
      "quote": "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;"
+    },
+    {
+     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0016",
+     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+     "score": 2.1447,
+     "verdict": "ok",
+     "quote": "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:"
     },
     {
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0005",
@@ -1369,13 +1391,6 @@
      "quote": "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;"
     },
     {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0032",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 4.9499,
-     "verdict": "ok",
-     "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
-    },
-    {
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0002",
      "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
      "score": 4.7329,
@@ -1395,24 +1410,11 @@
      "score": 4.2158,
      "verdict": "ok",
      "quote": "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;"
-    },
-    {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0007",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 4.1415,
-     "verdict": "ok",
-     "quote": "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;"
-    },
-    {
-     "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0001",
-     "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-     "score": 3.9817,
-     "verdict": "ok",
-     "quote": "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;"
     }
    ],
    "documents": [
-    "dsid_03af1e44970d4d6db6e85bc2c5fce8de"
+    "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
+    "dsid_020bac2fb6ac4de28d5afb63e39a0c10"
    ],
    "tensions": []
   },
@@ -1518,6 +1520,13 @@
      "quote": "# Corrective actions 1. Add fragmentation metric: \"sched_place_fail_rate\" + \"gpu_mem_slack\" (owner: Eng Infra) 2. Publish runbook for defragmentation and safe evacuation in private clusters (owner: Eng Infra) 3. Add preflight capacity validation before maintenance rotations (owner: Eng SRE)"
     },
     {
+     "claim_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10-0028",
+     "doc_id": "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
+     "score": 1.3818,
+     "verdict": "ok",
+     "quote": "Follow-ups (next week): 1) Ava: update Confluence owner mapping + decision tree language and link it from the incident classification policy. ETA Tue 1/13. 2) Rafael: confirm escalation rule wording for CAPACITY incidents (Fleet primary + Routing notified) and align with incident-bot closure gating. ETA Wed 1/14. 3) Mina/Vanessa: provide 2-3 concrete examples each for the taxonomy page (what to pick, what not to pick). ETA Wed 1/14. 4) Routing team: ensure fallback_reason enums land + are visible in the incident channel bot summary (ENG-4824). Tracking separately."
+    },
+    {
      "claim_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de-0028",
      "doc_id": "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
      "score": 3.9141,
@@ -1565,18 +1574,12 @@
      "score": 3.783,
      "verdict": "ok",
      "quote": "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending."
-    },
-    {
-     "claim_id": "dsid_02f0cd8c874b431cbdec5455721ce8c1-0003",
-     "doc_id": "dsid_02f0cd8c874b431cbdec5455721ce8c1",
-     "score": 3.7708,
-     "verdict": "ok",
-     "quote": "# Corrective actions 1. Add fragmentation metric: \"sched_place_fail_rate\" + \"gpu_mem_slack\" (owner: Eng Infra) 2. Publish runbook for defragmentation and safe evacuation in private clusters (owner: Eng Infra) 3. Add preflight capacity validation before maintenance rotations (owner: Eng SRE)"
     }
    ],
    "documents": [
     "dsid_03af1e44970d4d6db6e85bc2c5fce8de",
-    "dsid_02f0cd8c874b431cbdec5455721ce8c1"
+    "dsid_02f0cd8c874b431cbdec5455721ce8c1",
+    "dsid_020bac2fb6ac4de28d5afb63e39a0c10"
    ],
    "tensions": []
   },

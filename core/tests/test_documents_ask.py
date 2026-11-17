@@ -7,6 +7,7 @@ from compiler.documents.ask import (
     Citation,
     Corpus,
     ask,
+    cover,
     durations,
     find_tensions,
     render_text,
@@ -89,6 +90,62 @@ def test_citation_carries_page_section_and_url():
     citation = next(c for c in result.citations if c.doc_id == "GDPR")
     assert citation.page == 46
     assert citation.section_path == ["Article 33"]
+
+
+def test_cover_picks_the_claim_that_adds_an_uncovered_question_term():
+    """The most valuable uncovered word wins first, and the duplicate adds nothing.
+
+    ``retained`` is rarer than ``breach`` in this small corpus, so its claim is
+    taken first even though it ranks last; the second ``breach`` claim is then
+    worth nothing and is left out.
+    """
+    corpus = Corpus(CLAIMS, DOCS)
+    citations = [
+        _citation(CLAIMS[0]),  # breach
+        _citation(CLAIMS[1]),  # breach again
+        _citation(CLAIMS[2]),  # retained
+    ]
+    chosen = cover(citations, corpus, "breach retained", k=2)
+    assert [citation.claim_id for citation in chosen] == [
+        "TNA_CONTRACTS-0001",
+        "MT_SCH20-0001",
+    ]
+
+
+def test_cover_breaks_a_tie_by_the_rankers_order():
+    corpus = Corpus(CLAIMS, DOCS)
+    citations = [_citation(CLAIMS[0]), _citation(CLAIMS[1])]
+    chosen = cover(citations, corpus, "breach", k=2)
+    assert [citation.claim_id for citation in chosen] == [
+        CLAIMS[0]["claim_id"],
+        CLAIMS[1]["claim_id"],
+    ]
+
+
+def test_cover_fills_to_k_with_the_rankers_order_when_nothing_covers():
+    corpus = Corpus(CLAIMS, DOCS)
+    citations = [_citation(CLAIMS[3]), _citation(CLAIMS[2])]
+    chosen = cover(citations, corpus, "breach", k=2)
+    assert [citation.claim_id for citation in chosen] == [
+        CLAIMS[3]["claim_id"],
+        CLAIMS[2]["claim_id"],
+    ]
+
+
+def test_cover_never_returns_more_than_k_or_than_the_pool():
+    corpus = Corpus(CLAIMS, DOCS)
+    citations = [_citation(CLAIMS[0]), _citation(CLAIMS[1])]
+    assert len(cover(citations, corpus, "breach", k=5)) == 2
+    assert len(cover(citations, corpus, "breach", k=1)) == 1
+
+
+def test_ask_chooses_from_a_pool_wider_than_the_answer():
+    corpus = Corpus(CLAIMS, DOCS)
+    question = "How quickly must a personal data breach be notified?"
+    result = ask(question, corpus, limit=2)
+    pool = {citation.claim_id for citation in corpus.search(question, limit=100)}
+    assert len(result.citations) == 2
+    assert {citation.claim_id for citation in result.citations} <= pool
 
 
 def test_tension_between_48_and_72_hours():
