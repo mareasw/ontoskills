@@ -1,5 +1,6 @@
 mod catalog;
 mod bm25_engine;
+mod documents;
 mod compact;
 #[cfg(feature = "embeddings")]
 mod embeddings;
@@ -144,7 +145,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             "listChanged": false
                         }
                     },
-                    "instructions": "Use the consolidated OntoSkills tools to discover skills, retrieve full skill context, evaluate execution plans, and query epistemic rules."
+                    "instructions": "Use the consolidated OntoSkills tools to discover skills, retrieve full skill context, evaluate execution plans, and query epistemic rules. The `documents_*` tools answer questions over a compiled knowledge base of documents: `documents_ask` returns cited claims with verbatim quotes and locators, `documents_claim` opens one claim and its evidence, `documents_query` runs read-only SPARQL over the graph. Pass `kb` with the knowledge-base directory, or set ONTOSKILLS_KB_ROOT."
                 });
                 respond_ok(&mut writer, wire_mode, request.id, result)?;
             }
@@ -514,6 +515,11 @@ fn handle_tool_call(
                 }
             }
         }
+        // Document layer: read-only over a knowledge base `ontocore documents`
+        // wrote. No arm here compiles, writes, or calls a model.
+        "documents_ask" => documents::tools::ask(&arguments)?,
+        "documents_claim" => documents::tools::claim(&arguments)?,
+        "documents_query" => documents::tools::query(&arguments)?,
         // Internal tools — not in tool_definitions() but kept for prefetch_knowledge
         // and backward compatibility with existing clients.
         "search" => {
@@ -906,6 +912,44 @@ fn tool_definitions() -> Vec<Value> {
                     "top_k": { "type": "integer", "description": "Max results for search mode (default 5)", "default": 5 }
                 },
                 "required": ["q"]
+            }),
+        ),
+        tool(
+            "documents_ask",
+            "Answer a question from a compiled corpus of documents. Returns cited claims in rank order: the claim, its verbatim quote, the locator (section path, character offsets, page, url), the BM25 score and the verifier verdict, plus the documents cited and any durations on the same topic that disagree across documents. Read-only: no model call, no network, no file written.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "q": { "type": "string", "description": "The question, in the language of the documents" },
+                    "kb": { "type": "string", "description": "Knowledge-base directory written by `ontocore documents ingest`. Defaults to ONTOSKILLS_KB_ROOT." },
+                    "k": { "type": "integer", "description": "Maximum citations to return (default 10)", "default": 10 },
+                    "include_unverified": { "type": "boolean", "description": "Also cite claims the verifier rejected (weak/no), each with its verdict. Default false: only claims the verifier passed.", "default": false }
+                },
+                "required": ["q"]
+            }),
+        ),
+        tool(
+            "documents_claim",
+            "Open one claim by id: its statement, every evidence item with role, quote and locator, the verifier verdict with reasons and notes, the claims it conflicts with, and the source document. Use it to check what a citation from `documents_ask` actually rests on.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "claim_id": { "type": "string", "description": "A claim id as returned by `documents_ask` (e.g. 'dsid_…-0001')" },
+                    "kb": { "type": "string", "description": "Knowledge-base directory. Defaults to ONTOSKILLS_KB_ROOT." }
+                },
+                "required": ["claim_id"]
+            }),
+        ),
+        tool(
+            "documents_query",
+            "Run a read-only SPARQL SELECT or ASK over the knowledge base's graph.ttl. This is the capability a keyword index does not have: obligations per document, sections without claims, claims that conflict. Writes are refused (INSERT, DELETE, LOAD, CLEAR, DROP, CREATE, SERVICE, DESCRIBE) and the keyword is named in the error; answers are capped at 2000 rows and 2 s and the cap is named when it is hit. The vocabulary is `doc:` (https://ontoskills.sh/ontology/documents#).",
+            json!({
+                "type": "object",
+                "properties": {
+                    "sparql": { "type": "string", "description": "A SPARQL SELECT or ASK query over the `doc:` vocabulary" },
+                    "kb": { "type": "string", "description": "Knowledge-base directory. Defaults to ONTOSKILLS_KB_ROOT." }
+                },
+                "required": ["sparql"]
             }),
         ),
     ]
