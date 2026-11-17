@@ -145,7 +145,33 @@ def test_a_label_names_a_single_system_instead_of_its_file_stem(tmp_path):
     assert [row["system"] for row in rows] == ["graphrag"]
 
 
-def test_a_label_is_refused_when_two_systems_are_compared(tmp_path):
+def test_a_label_is_refused_when_it_does_not_match_the_scores(tmp_path):
     score = _score(tmp_path / "graphrag.score.json", [("q1", 1.0), ("q2", 0.0)])
     with pytest.raises(SystemExit):
         interval.main(["--score", str(score), "--score", str(score), "--label", "graphrag"])
+
+
+def test_two_labels_name_the_two_systems_and_their_difference(tmp_path):
+    left = _score(tmp_path / "graphrag.score.json", [("q1", 1.0), ("q2", 0.0)])
+    right = _score(tmp_path / "ontoskills.answer-mode.score.json", [("q1", 0.0), ("q2", 0.0)])
+    out = tmp_path / "paired.json"
+    code = interval.main(
+        [
+            "--score",
+            str(left),
+            "--score",
+            str(right),
+            "--label",
+            "graphrag",
+            "--label",
+            "ontoskills",
+            "--metric",
+            "answer_fact_coverage",
+            "--json",
+            str(out),
+        ]
+    )
+    assert code == 0
+    rows = json.loads(out.read_text(encoding="utf-8"))
+    assert [row["system"] for row in rows] == ["graphrag", "ontoskills", "graphrag - ontoskills"]
+    assert rows[2]["mean"] == 0.5
