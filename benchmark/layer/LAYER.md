@@ -102,7 +102,7 @@ being good at it.
 | system | version | input | in the pilot |
 |---|---|---|---|
 | OntoSkills | this repository, tag recorded with the result | folder of text | **yes** |
-| GraphRAG | `microsoft/graphrag` 3.3.0, PyPI | folder of text | **yes**, if a run completes within budget |
+| GraphRAG | `microsoft/graphrag` 3.3.0, PyPI | folder of text | **yes** — 11,09 $ and 21 h 19 min for 279 documents (§6) |
 | LightRAG | `lightrag-hku` 1.5.7, PyPI | text, via its Python API | **yes**, if a run completes within budget |
 | vector RAG | this repository, `bm25`/dense path | folder of text | **yes** — the floor |
 | NVIDIA Auto Ontology | `NVIDIA/auto-ontology`, Apache-2.0 | **relational database connections** | **no — different task** |
@@ -401,11 +401,50 @@ spends nothing: the figures above are the same work priced at the declared table
 approval is consumed by running it; the machine time is the real constraint, and
 `--concurrency` now fills the pool with documents, not with chunks.
 
+**GraphRAG, and the projection it walked past.** The table below carried 6-8 $ for
+GraphRAG before it ran. The build cost **11,0889 $** at the same declared table —
+1,4 to 1,8 times the projection — and the reason is legible in the counts rather
+than in the estimate:
+
+| | our build | GraphRAG |
+|---|---:|---:|
+| calls | 880 | 4 522 |
+| calls per document | 3,2 | 16,2 |
+| output tokens | 6 497 798 | 16 520 437 |
+| output tokens per document | 23 290 | 59 213 |
+| cost at the table | 4,11 $ | 11,09 $ |
+| cost per document | 0,0147 $ | 0,0397 $ |
+| wall clock | 2 h 12 min | 21 h 19 min |
+| artifact, caches excluded | 52,2 MB in 288 files | 43,9 MB in 130 files |
+
+GraphRAG writes 2,5 times our output for the same corpus because it does three
+jobs on it: entity and relationship extraction over every text unit, a
+summarisation pass over the descriptions it found, and 1 298 community reports
+generated from the resulting graph. Ours writes one structured extraction per
+chunk and one conflict pass per document. On this corpus the graph layer costs
+2,7 times what the claim layer costs, and that ratio, not the projection it
+replaces, is the number to carry into the full run's budget.
+
+Two restarts are part of that wall clock and not part of that figure. The build
+was stopped once at the ten-hour ceiling of the shell job that launched it, and
+once more when the machine's temporary directory was wiped underneath it; both
+times it resumed from its own cache, so the second attempt re-read what the first
+had already paid for and repeated **one** call of 41 prompt and 30 completion
+tokens. Earlier still, two attempts died on the gateway's 60-second ceiling before
+the streaming transport existed and cost 0,0114 $ between them: they sit in the
+pilot's total, not in the build's.
+
+The query side is metered separately and reads differently: 200 questions for
+**0,5015 $** — 0,0025 $ per question — at a median of 23,8 s. A build is paid
+once; that per-question price is the one that never stops.
+
 | item | as measured or as it stands |
 |---|---|
 | our build, 279 documents | **4,11 $** at the declared table, 2 h 12 min |
-| one competitor, same corpus | 13-18 $ projected for LightRAG from one measured document; GraphRAG running |
-| pilot, three systems | **23-30 $** at the declared table (ours 4,11 measured; GraphRAG 6-8 and 13-18 LightRAG projected), 0 $ billed |
+| GraphRAG, same corpus | **11,09 $** measured, 21 h 19 min wall clock, artifact 43,9 MB |
+| GraphRAG, 200 questions | **0,50 $** measured, 0,0025 $ per question, 23,8 s median |
+| LightRAG, same corpus | 13-18 $ projected from one measured document (0,0639 $) |
+| pilot, everything metered | **15,87 $** at the declared table — ours 4,1115, GraphRAG 11,6153 with its two dead attempts and its smokes, LightRAG 0,1455 — 0 $ billed |
 | full run, six systems, three repeats | 150-400 $ at the declared table, 0 $ billed |
 
 The full run's number is the one to re-derive from the pilot, not to trust: it is
@@ -428,7 +467,7 @@ bad score instead of an absent one.
 | system | modality | calls | failed | in | out | $ at table | build | artifact |
 |---|---|---:|---:|---:|---:|---:|---|---|
 | ontoskills | evidence | 880 | 0 | 1 418 617 | 6 497 798 | 4,1115 | 2 h 12 min | 52,2 MB |
-| graphrag | answer | — | — | — | — | — | — | — |
+| graphrag | answer | 4 522 | 52 | 7 844 460 | 16 520 437 | 11,0889 | 21 h 19 min | 43,9 MB |
 | lightrag | answer | — | — | — | — | — | — | — |
 | vector-rag-floor | evidence | 0 | 0 | 0 | 0 | 0,0000 | 3 s | 2,0 MB |
 
@@ -437,7 +476,7 @@ bad score instead of an absent one.
 | system | query calls | failed | in | out | $ at table | median reply |
 |---|---:|---:|---:|---:|---:|---:|
 | ontoskills | 0 | 0 | 0 | 0 | 0,0000 | 747 ms |
-| graphrag | — | — | — | — | — | — |
+| graphrag | 200 | 0 | 2 034 174 | 327 324 | 0,5015 | 23 814 ms |
 | lightrag | — | — | — | — | — | — |
 | vector-rag-floor | 0 | 0 | 0 | 0 | 0,0000 | 4 ms |
 
@@ -445,10 +484,16 @@ bad score instead of an absent one.
 
 | system | n | k | chars | coverage | support | numeric | false refusal | abstention |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| ontoskills | 200 | 10 | 4 948 | 72,0 % | 46,9 % | 82,2 % | 0,0 % | 0,0 % |
-| graphrag | — | — | — | — | — | — | — | — |
+| ontoskills | 192 | 10 | 4 948 | 72,0 % | 46,9 % | 82,2 % | 0,0 % | 0,0 % |
+| graphrag | 152 | 10 | 1 673 | 78,4 % | 78,4 % | 90,0 % | 20,8 % | 62,5 % |
 | lightrag | — | — | — | — | — | — | — | — |
-| vector-rag-floor | 200 | 10 | 45 885 | 92,4 % | 77,7 % | 94,1 % | 0,0 % | 0,0 % |
+| vector-rag-floor | 192 | 10 | 45 885 | 92,4 % | 77,7 % | 94,1 % | 0,0 % | 0,0 % |
+
+`n` is the number of questions the three quality columns average over. A
+system that refuses a question carries no quality value for it — the refusal
+is an outcome, and counting it as a zero would be a different measurement, so
+it is reported in its own column: the false-refusal rate is a share of the
+answerable questions, and abstention a share of the unanswerable ones.
 
 ## By question kind
 
@@ -467,6 +512,21 @@ bad score instead of an absent one.
 | high_level | 4 | 57,9 % | 36,4 % | 100,0 % | 0,0 % |
 | info_not_found | 8 | — | — | — | 0,0 % |
 
+**graphrag**, by question kind (answer, k=10):
+
+| kind | n | coverage | support | numeric | refused |
+|---|---:|---:|---:|---:|---:|
+| basic | 70 | 83,4 % | 83,4 % | 93,4 % | 20,0 % |
+| semantic | 50 | 75,1 % | 75,1 % | 81,9 % | 28,0 % |
+| intra_document_reasoning | 16 | 86,6 % | 86,6 % | 96,4 % | 0,0 % |
+| project_related | 16 | 73,2 % | 73,2 % | 96,9 % | 25,0 % |
+| constrained | 12 | 63,3 % | 63,3 % | 78,7 % | 8,3 % |
+| conflicting_info | 8 | 60,1 % | 60,1 % | 83,2 % | 12,5 % |
+| completeness | 8 | 87,8 % | 87,8 % | 91,7 % | 25,0 % |
+| miscellaneous | 8 | 86,4 % | 86,4 % | 100,0 % | 12,5 % |
+| high_level | 4 | 37,5 % | 37,5 % | 100,0 % | 75,0 % |
+| info_not_found | 8 | — | — | — | 62,5 % |
+
 **vector-rag-floor**, by question kind (evidence, k=10):
 
 | kind | n | coverage | support | numeric | refused |
@@ -484,7 +544,7 @@ bad score instead of an absent one.
 
 ## Notes
 
-- **graphrag** — local search, one question at a time; global search not run; the build was killed once at the ten-hour ceiling of the shell job that launched it and resumed from its own cache, so no paid call was repeated
+- **graphrag** — local search, one question at a time; global search not run. The build was stopped twice: once at the ten-hour ceiling of the shell job that launched it, and once when the machine's temporary directory was wiped underneath it. Both times it resumed from its own cache, so no extraction or summary was paid for twice; one call of 41 prompt and 30 completion tokens outside the cache is the transport probe of the restarted endpoint. The wall clock of 76 756 s runs from the first start to the completion that produced the published artifact and therefore includes the time the machine was down. The vector store was vacuumed after the run: 73 566 834 bytes before, 43 906 965 after, row counts unchanged at 1 298 / 4 897 / 510. Refusals are read out of the answer text with benchmark/layer/text_refusal.py.
 - **lightrag** — one document measured (0,0639 $, 597 s); full build not run, projected 13-18 $ and 12-23 h
 
 <!-- /PILOT-TABLE -->
@@ -604,6 +664,79 @@ substrings of the raw file, and the rest only match after the declared
 normalisation (curly quotes, dashes, collapsed whitespace), which is a product
 definition the reader can check against `compiler.documents.text.norm`.
 
+### The graph layer: more coverage per reply, and a fifth of the questions declined
+
+GraphRAG 3.3.0 ran the same 279 documents through its own pipeline — 510 text
+units, 4 897 entities, 16 338 relationships, 1 301 communities, 1 298 community
+reports — and answered the same 200 questions with **local** search, one question
+at a time, at the settings published in `benchmark/layer/config/`. Its build is
+§6's 11,0889 $ and 21 h 19 min; its 200 questions are 0,5015 $ and 23,8 s each.
+
+The first thing to state is the one a single coverage column cannot show: **it
+answered 152 of the 192 questions that have a gold fact and declined 40.** Our
+row answers all 192 and never declines. A refusal is neither a wrong answer nor a
+zero, so the pilot publishes both readings instead of choosing one:
+
+| reading | graphrag | ontoskills | paired difference |
+|---|---:|---:|---:|
+| coverage, on the questions it answered | **78,4 %** [76,4; 80,5], n=152 | 73,5 % [71,5; 75,4], n=192 | **+5,2 pp [+3,0; +7,3]** |
+| numeric, on those questions | **90,0 %** [86,2; 93,3] | 82,3 % [78,1; 86,3] | **+8,7 pp [+4,1; +13,6]** |
+| coverage, refusals counted as zero | 62,1 % [57,2; 66,9], n=192 | 73,5 % [71,5; 75,4] | **−11,4 pp [−16,5; −6,5]** |
+| numeric, refusals counted as zero | 71,3 % [65,3; 77,3] | 82,3 % [78,1; 86,3] | −11,0 pp [−18,0; −4,2] |
+| false refusal, of the 192 answerable | **20,8 %** | 0,0 % | |
+| abstention, of the 8 unanswerable | 62,5 % | 0,0 % | |
+
+Both readings are true and neither is the whole truth, so both are on the table.
+When GraphRAG commits to an answer it covers five points more of the gold text
+than our own answer mode does, with **3,7 times less text** on the same 152
+questions — a median of 1 639 characters against 6 101 — and that is a real win
+for the graph layer, not an artefact. When the question is one it cannot place,
+it declines rather than answer, and on this slice that costs it eleven points
+against a system that never declines.
+
+The comparison is answer-to-answer on purpose. Our evidence row returns verbatim
+quotes, and its two columns are two measurements: coverage of the union (72,0) and
+support of the best single passage (46,9). In prose they are the same measurement,
+which is why GraphRAG's coverage and support are one number — an answer is one
+text, and "does the text carry the gold fact" is asked of it once. Reading its
+78,4 against our 46,9 would be comparing a generated paragraph to a quotation.
+
+**Where the refusals land.** Not at random: 20 % of `basic`, 28 % of `semantic`,
+25 % of `project_related` and of `completeness`, 75 % of `high_level`, and none of
+`intra_document_reasoning`. The per-kind table reads exactly like the headline and
+nothing more — its means are over the questions it answered, ours over all of
+ours — so the shape is: where it answered, it covered more gold text in every kind
+it answered, and `high_level` is the kind where it mostly declined (three of four)
+and the one answer it gave covered 37,5 %.
+
+**What the lead costs.** 11,0889 $ and 21 h 19 min to build against 4,1115 $ and
+2 h 12 min, and 0,0025 $ and 23,8 s per question against zero and 0,75 s. The
+pilot does not argue that the five points are not real. It reports that they are
+bought with a 20,8 % false-refusal rate we do not have, and that a generator
+starts with an advantage this metric cannot see: it can write the gold sentence
+into a paragraph, and a paragraph that mentions the fact covers it exactly as a
+quotation does. A quotation can be opened at an offset; a paragraph cannot.
+
+**Two corrections, made after the money was spent and neither by asking again.**
+The run's own refusal flag found 35 refusals. Re-reading the same 200 texts with
+the classifier in `benchmark/layer/text_refusal.py` finds 45, because ten of them
+decline with a typographic apostrophe — `I don’t know`, `can’t find` — which an
+ASCII-only pattern reads as a wrong answer. The classifier normalises the
+apostrophe, lets `can't` join the declining verbs behind a verb guard (`the cache
+can't provide the value within 200 ms` is an answer), and `score.py
+--recheck-refusals` applies it to the answers already on disk, so the correction
+cost nothing. The strict reading is its own score file
+(`runs/graphrag.strict.score.json`), not an edit to the published one: 40
+refusals on questions that have a gold fact are zeroed, and the refusals on the 8
+unanswerable questions are left out of that denominator, because they carry no
+fact to cover and counting them would answer a third question nobody asked.
+
+The lesson is one the pilot keeps relearning: a prose refusal is a heuristic, and
+a heuristic applied to one system only is a thumb on the scale. The same function
+classifies the LightRAG smoke answers, and its tests pin the near-misses in both
+directions — the sentences that must read as abstentions and the sentences that
+must not.
+
 ### What the pilot cannot claim yet
 
 - **Contradictions are intra-document only.** 150 links, none of them between two
@@ -612,7 +745,15 @@ definition the reader can check against `compiler.documents.text.norm`.
   is for, and it is not what this pass does. Fixing it is a product change, not a
   threshold.
 - **Our system never abstains** (finding 4). 0 % on the eight `info_not_found`
-  questions, and the same rule applies: a gate is fixed on a disjoint half first.
+  questions, where GraphRAG abstains on five of eight, and the same rule applies: a
+  gate is fixed on a disjoint half first.
+- **GraphRAG's global search was not run.** The 200 questions were answered with
+  `local` only; the twelve `completeness` and `high_level` questions are the ones a
+  global, community-level search is built for, and its per-kind rows are the row to
+  re-read first when that run exists. It is not a query to add cheaply: global
+  search maps over the community reports — 1 298 of them here — for every
+  question, so its per-question cost is not the local row's 0,0025 $ and needs its
+  own estimate before it is bought.
 - **The floor's numbers are a ceiling for lexical metrics, not a floor for
   quality.** Nothing here says the floor answers better; it says it *covers* more
   gold text, which is what these three metrics count.
@@ -650,6 +791,18 @@ decide it. The single document that was measured — 0,0639 $, one document,
 counted by the same meter — is what the table publishes, and its note says
 exactly that.
 
+**The projection, checked against the system that finished.** LightRAG's 13-18 $
+came from one document at 0,0639 $, scaled to 279. GraphRAG's build was projected
+the same way and came in at 11,0889 $, against a 6-8 $ projection — low by a
+factor of 1,4 to 1,8. What the bill follows is output tokens per document, and
+GraphRAG wrote 59 213 of them per document, 2,5 times ours (§6), which is the
+quantity a projection from a smaller run is least able to anticipate. The error is
+in the direction that matters here: the published 13-18 $ is a floor for LightRAG,
+not a midpoint, and the pilot does not claim the factor transfers — it claims only
+that its one scaled projection was low, and says so beside the number. Nothing in
+the decision changes: 4,3 times our build was already too much to spend on a row
+§5 would not let us print beside ours.
+
 ### 7.2 The ranker, after the diagnosis
 
 The row in the table above is the read path, and it now serves the chooser the
@@ -665,7 +818,7 @@ row reproduces them to the last claim id (G1, §10).
 
 | row | coverage | 95 % interval | chars | status |
 |---|---:|---|---:|---|
-| ranker v1: BM25 pool, top ten | 63,94 % | [61,7; 66,2] | 5 097 | the row this analysis began from |
+| ranker v1: BM25 pool, top ten | 63,94 % | [61,7; 66,2] | 5 088 | the row this analysis began from |
 | **ranker v2: `cover` over the same pool** | **71,98 %** | [69,9; 74,1] | 4 939 | **served by the read path** |
 | `dense-cover`: the same pool in e5 order, then `cover` | **73,42 %** | [71,4; 75,3] | 5 141 | a benchmark row: it needs a query encoder |
 | ranker v1, every quote of its ten claims | 68,23 % | [66,1; 70,3] | 7 104 | a labelled row |
@@ -682,7 +835,10 @@ row reproduces them to the last claim id (G1, §10).
 
 The harness reports the sum of the quote lengths; the read path's own row in the
 table above reports the median of the joined text, nine newlines longer, 4 948
-against 4 939. It is the same mean, and the two rows are the same answers.
+against 4 939. Both are upper medians — `chars[len(chars) // 2]`, the convention
+`score.py` uses — and the two rows are the same answers. The per-question scores
+of both halves, pooled, are in `runs/ranker-192/`, and every interval in the two
+tables above is recomputable from them.
 
 Three sentences the table supports, and one it refuses to.
 
@@ -754,8 +910,12 @@ scored against a *fact* the question implies but does not contain.
 - [x] the floor, measured over the whole slice at zero cost
 - [x] answers to the 200 questions, scored in both modalities, no model at query
       time
-- [ ] GraphRAG: ingest the folder and answer the 200 questions — needs the
-      stream-upstream transport of §8 item 6, running
+- [x] GraphRAG: the folder ingested (279 documents, 510 text units, 4 897
+      entities, 16 338 relationships, 1 301 communities, 1 298 reports) and the
+      200 questions answered with local search — 4 522 calls, 11,0889 $,
+      21 h 19 min across two restarts, 43,9 MB after the vector store was vacated
+      of its superseded versions; 78,4 % coverage on the 152 it answered, 62,1 %
+      with its refusals counted as zero, 20,8 % false refusal — §6 and §7
 - [x] LightRAG: decided against the full build, with the measured cost published
       (§7.1)
 - [x] pilot table rendered from the artifacts (§7)
@@ -774,8 +934,9 @@ scored against a *fact* the question implies but does not contain.
       +7,6 pp on dev, a dense order +2,1, fusion −0,5, graph expansion +0,2,
       whole-corpus retrieval +0,14, cross-encoder −1,9. Frozen on `dense-cover`
       and lexical `cover` at `474dc22`; both read the test half once — §7.2
-- [x] the ranker the read path can serve is the lexical chooser: +8,03 pp
-      [+6,6; +9,5] on 192 questions with no model, no vector and no new artifact;
+- [x] the ranker the read path serves is the lexical chooser: +8,03 pp
+      [+6,6; +9,5] on 192 questions with no model, no vector and no new artifact,
+      in `core/src/documents/ask.py` and mirrored in `mcp/src/documents/rank.rs`;
       the dense rung's extra 1,44 pp do not survive the held-out half
       (+0,8 [−0,4; +2,1]), so no encoder is added to the product on this evidence
 
@@ -854,7 +1015,9 @@ expose. That is what the pilot is for.
    config. The meter records the HTTP status of every call, so a refused call
    appears in the cost table with its `failed` count instead of vanishing from
    a log that only counted tokens — and a 503 costs nothing, which is the only
-   reason this lesson was cheap.
+   reason this lesson was cheap. The fix held: the finished build is §6's
+   11,0889 $ over 4 522 calls, of which 52 were answered with a 503 and cost
+   nothing, and no call was lost to the ceiling.
 
 7. **LightRAG validates the embedding batch against the OpenAI default.** Its
    `openai_embed` is decorated with `embedding_dim=1536` and raises *Embedding
@@ -1020,31 +1183,85 @@ five must not sit inside the query row. Then the score and the interval:
 ```
 python3 -m benchmark.layer.score --selection /tmp/layer/corpus/selection.json \
     --answers /tmp/layer/runs/graphrag.answers.jsonl --mode answer --k 10 \
-    --json /tmp/layer/runs/graphrag.score.json
+    --recheck-refusals --json /tmp/layer/runs/graphrag.score.json
 python3 -m benchmark.layer.interval --score /tmp/layer/runs/graphrag.score.json \
     --label graphrag --json /tmp/layer/runs/graphrag.intervals.json
 cp /tmp/layer/meter-graphrag-full.jsonl /tmp/layer/runs/graphrag.meter.jsonl
 cp /tmp/layer/meter-graphrag-query.jsonl /tmp/layer/runs/graphrag.query.jsonl
 ```
 
+`--recheck-refusals` is not optional for a prose system, and it is the reason a
+classifier that learns a phrasing does not cost another 200 questions: the flag
+re-derives each refusal from the text already on disk with the current
+`text_refusal.py`, and only for `--mode answer` — our own refusals are structural
+and are never re-read from a citation list. The two readings are then published
+as two files, the second written from the first and changing nothing in it:
+
+```
+python3 - <<'PY'
+import json
+score = json.load(open("/tmp/layer/runs/graphrag.score.json"))
+for row in score["per_question"]:
+    if row.get("refused") and row["kind"] != "info_not_found":
+        row["answer_fact_coverage"] = row["answer_fact_support"] = 0.0
+        row["numeric_congruence"] = 0.0
+        row["chars"] = 0
+score["refusals_counted_as_zero"] = True
+json.dump(score, open("/tmp/layer/runs/graphrag.strict.score.json", "w"), indent=1)
+PY
+python3 -m benchmark.layer.interval \
+    --score /tmp/layer/runs/graphrag.strict.score.json \
+    --score /tmp/layer/runs/ontoskills.answer-mode.score.json \
+    --json /tmp/layer/runs/graphrag-paired-strict.json
+```
+
+**After the questions, before the seal**: the vector store is vacuumed of the
+versions the build's retries left behind, and the pruned store is read back.
+
+```
+python3 - <<'PY'
+from datetime import timedelta
+import lancedb
+db = lancedb.connect("/tmp/layer/graphrag/output/lancedb")
+for name in db.list_tables().tables:
+    table = db.open_table(name)
+    before = table.count_rows()
+    table.cleanup_old_versions(older_than=timedelta(0), delete_unverified=True)
+    assert table.count_rows() == before, name
+PY
+```
+
+On this corpus that removed 29,7 MB of superseded fragments and moved the artifact
+from 73 566 834 bytes to **43 906 965** — 1 298 / 4 897 / 510 rows before and
+after. The publishable size is the pruned one, and the record is regenerated from
+the pruned tree rather than from what the build happened to leave on disk. The
+store is then read the way local search reads it — nearest text units for an
+embedded question, their text fetched from `text_units.parquet` by id — because a
+store can count rows and still be unreadable, and that check costs nothing.
+
 GraphRAG writes no manifest, so both of its published numbers come from outside
 it. Its calls and dollars are the meter's, one JSON line per paid call, failed
 ones included — not its cache records, which count answers that were kept and
 have no line for the calls that failed. Its wall clock is the framework's own
-log, `logs/indexing-engine.log`, from the first timestamp of the attempt that
-produced the artifact to the last, passed with `--wall-clock`:
+log, `logs/indexing-engine.log`, which every attempt appends to, from the start
+of the attempt that produced the artifact to the last timestamp in the file,
+passed with `--wall-clock`:
 
 ```
 python3 -m benchmark.layer.build_record --root /tmp/layer/graphrag \
-    --wall-clock <seconds from the attempt's first timestamp to the log's last> \
+    --wall-clock 76756 \
     --exclude cache logs input prompts \
     --out /tmp/layer/runs/graphrag.build.json --name graphrag
 ```
 
 The log also carries three earlier attempts that died on the gateway's ceiling
-before the streaming transport existed, and counting them would publish time the
-artifact never took. §7.2 says what this run's number was and how the build
-reached it.
+before the streaming transport existed, and a second interruption when the
+machine's temporary directory was wiped; the artifact is the product of the
+attempt that finished, so the published 76 756 s runs from its first start to its
+completion and includes the twenty minutes the machine spent down. Excluding that
+gap would publish a wall clock no reader could reproduce from the log, and
+including it costs nothing but candour. §6 and §7 say what the run cost and what
+it answered.
 
 **LightRAG**, two phases, because building costs money and asking costs time:
 
@@ -1150,6 +1367,12 @@ counts on every question — 1,4 M tokens revisited per question — while the R
 index is inverted and built once. G1 is what makes this a statement about *the
 same answers*: the work moved, the ranking did not. Nothing in §7's quality table
 changes because the port is faster.
+
+Across this document the same question costs **18,8 ms** in the client, **747 ms**
+in the scored Python, and **23 814 ms** for a GraphRAG local answer that pays
+0,0025 $ for it. The three are three different jobs — a citation list, the same
+list computed the slow way, and a generated paragraph — and the tables keep them
+apart rather than ranking them.
 
 Both latency rows were taken while the GraphRAG build was saturating this machine
 (load average around 39), so they are an upper bound on the shipped path: the same
