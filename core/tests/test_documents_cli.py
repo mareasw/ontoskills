@@ -21,7 +21,10 @@ def test_ingest_dry_run_segments_without_calling_a_model(tmp_path):
         cli, ["ingest", str(corpus), "-o", str(tmp_path / "kb"), "--dry-run"]
     )
     assert result.exit_code == 0, result.output
-    assert "Estimate" in result.output
+    # It is a floor and it says so: the pilot corpus measured eight times the
+    # arithmetic, because the conflict pass and reasoning tokens are not in it.
+    assert "Lower bound" in result.output
+    assert "floor, not a forecast" in result.output
     assert "Dry run" in result.output
     assert not (tmp_path / "kb" / "claims.jsonl").exists()
 
@@ -145,7 +148,18 @@ def test_ingest_end_to_end_with_a_stub_model(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENAI_BASE_URL", "https://gateway.test/v1")
 
     result = CliRunner().invoke(
-        cli, ["ingest", str(corpus), "-o", str(tmp_path / "kb"), "--no-conflicts"]
+        cli,
+        [
+            "ingest",
+            str(corpus),
+            "-o",
+            str(tmp_path / "kb"),
+            "--no-conflicts",
+            "--concurrency",
+            "2",
+            "--max-tokens",
+            "4000",
+        ],
     )
     assert result.exit_code == 0, result.output
     assert calls
@@ -157,6 +171,13 @@ def test_ingest_end_to_end_with_a_stub_model(tmp_path, monkeypatch):
     assert "The Supplier shall notify" in claims[0]["evidence"][0]["quote"]
     assert kb.verifier()[0]["verdict"] == "ok"
     assert kb.manifest()["claims"] == 1
+    # A manifest that omits a knob leaves a build unreproducible by the letter:
+    # what decided the cut and the pool is written next to what the model was.
+    manifest = kb.manifest()
+    assert manifest["chunk_size"] == 15
+    assert manifest["overlap"] == 2
+    assert manifest["concurrency"] == 2
+    assert manifest["max_tokens"] == 4000
     assert (tmp_path / "kb" / "view.html").exists()
     assert (tmp_path / "kb" / "graph.ttl").exists()
     assert (tmp_path / "kb" / "evidence.csv").exists()
@@ -199,6 +220,90 @@ def test_a_resumed_run_reports_what_it_paid_and_what_it_replayed(tmp_path, monke
     assert manifest["tokens"] == {"input": 0, "output": 0}
     assert manifest["replayed_tokens"] == {"input": 1000, "output": 500}
     assert manifest["replayed_cost_usd"] > 0
+
+
+def test_ingest_compiles_documents_side_by_side(tmp_path, monkeypatch):
+    """`--concurrency N` fills the wire with documents, not with chunks.
+
+    A corpus of short documents is the case this exists for: one chunk each, so
+    parallelising chunks inside a document would leave every worker but one
+    idle. What is asserted is the overlap, not the wall clock.
+    """
+    import threading
+    import time
+
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    for index in range(6):
+        (corpus / f"d{index}.txt").write_text(
+            f"1. Clause\n\n1.1 Party {index} shall notify within 48 hours.\n", encoding="utf-8"
+        )
+    reply = (
+        '[{"span_ids": ["S0001"], '
+        '"statement": "Party shall notify within 48 hours.", '
+        '"modality": "obligation", "actor": "Party", "deadline": "48 hours", '
+        '"conditions": []}]'
+    )
+    state = {"now": 0, "peak": 0}
+    lock = threading.Lock()
+
+    def fake_chat(*args, **kwargs):
+        with lock:
+            state["now"] += 1
+            state["peak"] = max(state["peak"], state["now"])
+        time.sleep(0.05)
+        with lock:
+            state["now"] -= 1
+        return reply, {"input_tokens": 10, "output_tokens": 5}, "stop"
+
+    monkeypatch.setattr("compiler.documents.compile.chat", fake_chat)
+    monkeypatch.setenv("OPENAI_MODEL", "stub")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://gateway.test/v1")
+
+    result = CliRunner().invoke(
+        cli,
+        ["ingest", str(corpus), "-o", str(tmp_path / "kb"), "--concurrency", "3", "--no-conflicts"],
+    )
+    assert result.exit_code == 0, result.output
+    assert state["peak"] > 1, "no two documents were ever in flight together"
+    assert state["peak"] <= 3, "the pool exceeded --concurrency"
+    assert len(KnowledgeBase(tmp_path / "kb").claims()) == 6
+
+
+def test_parallel_ingest_writes_the_same_claims_as_a_serial_run(tmp_path, monkeypatch):
+    """Concurrency is a scheduling choice, not an input to the artifact."""
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    for index in range(5):
+        (corpus / f"d{index}.txt").write_text(
+            f"1. Clause\n\n1.1 Party {index} shall notify within 48 hours.\n", encoding="utf-8"
+        )
+    reply = (
+        '[{"span_ids": ["S0001"], '
+        '"statement": "Party shall notify within 48 hours.", '
+        '"modality": "obligation", "actor": "Party", "deadline": "48 hours", '
+        '"conditions": []}]'
+    )
+    monkeypatch.setattr(
+        "compiler.documents.compile.chat",
+        lambda *a, **k: (reply, {"input_tokens": 10, "output_tokens": 5}, "stop"),
+    )
+    monkeypatch.setenv("OPENAI_MODEL", "stub")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://gateway.test/v1")
+
+    serial = CliRunner().invoke(
+        cli, ["ingest", str(corpus), "-o", str(tmp_path / "serial"), "--no-conflicts"]
+    )
+    parallel = CliRunner().invoke(
+        cli,
+        ["ingest", str(corpus), "-o", str(tmp_path / "parallel"), "--concurrency", "4", "--no-conflicts"],
+    )
+    assert serial.exit_code == 0, serial.output
+    assert parallel.exit_code == 0, parallel.output
+    assert (
+        KnowledgeBase(tmp_path / "serial").claims()
+        == KnowledgeBase(tmp_path / "parallel").claims()
+    )
 
 
 def test_ingest_keeps_going_when_one_document_fails(tmp_path, monkeypatch):

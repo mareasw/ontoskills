@@ -78,6 +78,12 @@ class CompileStats:
     rejected_numbers: int = 0
     merged: int = 0
     truncated: int = 0
+    # Enrichment that ran out of room, kept apart from `truncated`: a cut
+    # conflict or language reply loses an optional link or rewrite, while the
+    # claims themselves arrived. Counting both together made a complete
+    # knowledge base exit as if it were missing claims.
+    conflict_truncated: int = 0
+    localise_truncated: int = 0
     retried: int = 0
     failed: int = 0
     errors: list[str] = field(default_factory=list)
@@ -420,7 +426,7 @@ def _cache_path(cache_dir: Path, doc_id: str, index: int, suffix: str = "") -> P
     return cache_dir / doc_id / f"{index:05d}{suffix}.json"
 
 
-def _read_cache(path: Path, fingerprint: str) -> dict | None:
+def _read_cache(path: Path, fingerprint: str, max_tokens: int) -> dict | None:
     if not path.exists():
         return None
     try:
@@ -429,14 +435,28 @@ def _read_cache(path: Path, fingerprint: str) -> dict | None:
         return None
     if data.get("fingerprint") != fingerprint:
         return None
+    # A reply cut at the ceiling is not the reply a larger ceiling would get.
+    # Raising --max-tokens used to change nothing, because the truncated answer
+    # was still a cache hit: the advice in the truncation error never worked.
+    # A truncated reply is therefore reused only when the ceiling has not grown.
+    if data.get("finish") == "length" and int(data.get("max_tokens") or 0) < max_tokens:
+        return None
     return data
 
 
-def _write_cache(path: Path, fingerprint: str, reply: str, usage: dict, finish: str) -> None:
+def _write_cache(
+    path: Path, fingerprint: str, reply: str, usage: dict, finish: str, max_tokens: int
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(
-            {"fingerprint": fingerprint, "reply": reply, "usage": usage, "finish": finish}
+            {
+                "fingerprint": fingerprint,
+                "reply": reply,
+                "usage": usage,
+                "finish": finish,
+                "max_tokens": max_tokens,
+            }
         ),
         encoding="utf-8",
     )
@@ -450,7 +470,7 @@ def _one_chunk(
     system: str = SYSTEM,
 ) -> tuple[str, dict, str, bool]:
     if cache_path is not None and options.resume:
-        cached = _read_cache(cache_path, fingerprint)
+        cached = _read_cache(cache_path, fingerprint, options.max_tokens)
         if cached is not None:
             # The reply was paid for when it was first generated. The caller
             # books it as replayed, not as spent, so a resumed build reports
@@ -476,7 +496,7 @@ def _one_chunk(
         options.max_tokens,
     )
     if cache_path is not None:
-        _write_cache(cache_path, fingerprint, reply, usage, finish)
+        _write_cache(cache_path, fingerprint, reply, usage, finish, options.max_tokens)
     return reply, usage, finish, False
 
 
@@ -807,7 +827,7 @@ def _localise_statements(
         stats.output_tokens += tokens_out
     if finish == "length":
         # A reply cut mid-JSON is not a set of rewrites: keep what was extracted.
-        stats.truncated += 1
+        stats.localise_truncated += 1
         return
     by_id = {claim["claim_id"]: claim for claim in targets}
     for claim_id, statement in _parse_localised(reply, set(by_id)).items():
@@ -859,7 +879,9 @@ def _link_conflicts(
         stats.input_tokens += tokens_in
         stats.output_tokens += tokens_out
     if finish == "length":
-        stats.truncated += 1
+        # The claims are complete; only the optional contradiction links are
+        # missing, so this must not fail the build.
+        stats.conflict_truncated += 1
     by_id = {claim["claim_id"]: claim for claim in claims}
     for left, right in _conflict_pairs(reply, set(by_id)):
         by_id[left].setdefault("conflicts_with", [])

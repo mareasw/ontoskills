@@ -23,8 +23,9 @@ docs/*
 # Market and product investigations are decisions, not scratch notes
 !docs/market/
 
-# ONNX test fixtures (large files)
-mcp/tests/fixtures/
+# ONNX test fixtures (large files, written by `ontoskills export-embeddings`)
+mcp/tests/fixtures/embeddings/
+*.onnx
 
 # Compiled ontology output (regenerate with: ontoskills compile)
 ontoskills/
@@ -62,3 +63,7 @@ benchmark/docbench/gold/claims.verified.jsonl
 examples/demo-corpus/documents/
 examples/demo-corpus/kb/
 examples/demo-corpus/cache/
+
+# Retrieval benchmark: run outputs are regenerable; the split and the Phase-0
+# evidence are committed, the numbers they produce are not.
+benchmark/retrieval/runs/

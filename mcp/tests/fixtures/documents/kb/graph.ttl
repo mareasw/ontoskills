@@ -1,0 +1,2003 @@
+@prefix doc: <https://ontoskills.sh/ontology/documents#> .
+@prefix ex: <https://ontoskills.sh/kb/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<https://ontoskills.sh/ontology/documents> a owl:Ontology ;
+    dcterms:created "2026-11-16" ;
+    dcterms:description "TBox for a compiled document knowledge base: documents, their sections, the claims extracted from them, and the evidence that supports each claim." ;
+    dcterms:title "OntoSkills Document Layer Ontology" ;
+    owl:versionIRI <https://ontoskills.sh/ontology/documents/1.0.0> ;
+    owl:versionInfo "1.0.0" ;
+    rdfs:seeAlso <https://ontoskills.sh/ontology/documents.ttl> ;
+    rdfs:comment "The vocabulary of the compiled layer, kept separate from the skill ontology (https://ontoskills.sh/ontology#) because the two describe different things. A skill is a procedure a system can execute; a claim is a sentence a company can check. Sharing one namespace made oc:hasVersion mean two things at once and made oc:Section ambiguous, so this file is the document side's own TBox, versioned on its own." ;
+    rdfs:seeAlso <https://ontoskills.sh/ontology> .
+
+# ============================================================================
+# Classes
+# ============================================================================
+
+doc:Context a owl:Class ;
+    rdfs:label "Context" ;
+    rdfs:comment "The provenance block of a document: where it came from, what kind of document it is, and under which jurisdiction and version it was read. Attached to the document and repeated on each claim, so a claim can be quoted without carrying its whole document." ;
+    skos:prefLabel "Context" .
+
+doc:Document a owl:Class ;
+    rdfs:isDefinedBy <https://ontoskills.sh/ontology/documents> ;
+    rdfs:label "Document" ;
+    rdfs:comment "One source document, addressed by its content hash. The unit a reader recognises as 'the contract', not the unit the compiler works on." ;
+    rdfs:subClassOf prov:Entity ;
+    skos:prefLabel "Document" .
+
+doc:Claim a owl:Class ;
+    rdfs:isDefinedBy <https://ontoskills.sh/ontology/documents> ;
+    rdfs:label "Claim" ;
+    rdfs:comment "One atomic statement a document makes, with its modality, its actor and the evidence that supports it. Atomic means a reader can agree with the claim and disagree with the next one: 'the supplier notifies within 48 hours' and 'notification is in writing' are two claims, not one paragraph." ;
+    rdfs:subClassOf prov:Entity ;
+    skos:prefLabel "Claim" .
+
+doc:Evidence a owl:Class ;
+    rdfs:isDefinedBy <https://ontoskills.sh/ontology/documents> ;
+    rdfs:label "Evidence" ;
+    rdfs:comment "A verbatim passage of the source that supports or contextualises a claim, plus the locator that finds it again. The quote is the document's own words; the layer contributes the selection, never the wording." ;
+    rdfs:subClassOf prov:Entity ;
+    skos:prefLabel "Evidence" .
+
+doc:Locator a owl:Class ;
+    rdfs:isDefinedBy <https://ontoskills.sh/ontology/documents> ;
+    rdfs:label "Locator" ;
+    rdfs:comment "A structured address for a passage: the section it sits in, the character offsets in the extracted text, the page where the format has pages, and the source URL. Structured rather than a formatted string, because a string cannot be followed." ;
+    skos:prefLabel "Locator" .
+
+doc:Section a owl:Class ;
+    rdfs:isDefinedBy <https://ontoskills.sh/ontology/documents> ;
+    rdfs:label "Section" ;
+    rdfs:comment "A heading-defined division of a document, nested by doc:hasSubsection. Present because the interesting question is often not 'which document' but 'which part of it': a schedule, an annex and a liability clause are different places in the same file." ;
+    skos:prefLabel "Section" .
+
+doc:EvidenceRole a owl:Class ;
+    rdfs:isDefinedBy <https://ontoskills.sh/ontology/documents> ;
+    rdfs:label "Evidence role" ;
+    rdfs:comment "What a passage is doing for a claim. An individual of this class, not free text, so a query can ask for claims whose support is only contextual." ;
+    skos:prefLabel "Evidence role" .
+
+doc:supportsRole a owl:NamedIndividual,
+        doc:EvidenceRole ;
+    rdfs:label "supports" ;
+    rdfs:comment "The passage states the claim. Without at least one of these a claim has no support and the compiler does not accept it." ;
+    skos:prefLabel "supports" .
+
+doc:contextRole a owl:NamedIndividual,
+        doc:EvidenceRole ;
+    rdfs:label "context" ;
+    rdfs:comment "The passage situates the claim — a lead-in, a definition, a scope sentence — without stating it." ;
+    skos:prefLabel "context" .
+
+doc:Modality a owl:Class ;
+    rdfs:isDefinedBy <https://ontoskills.sh/ontology/documents> ;
+    rdfs:label "Modality" ;
+    rdfs:comment "The force a claim carries. The seven subclasses are the ones the compiler's prompt asks for and the schema enforces; there is deliberately no 'other' bucket, because a claim whose force cannot be named is a claim the reader cannot act on." ;
+    skos:prefLabel "Modality" .
+
+doc:Condition a owl:Class ;
+    rdfs:label "Condition" ;
+    rdfs:comment "A claim that states when something else applies." ;
+    rdfs:subClassOf doc:Modality ;
+    skos:prefLabel "Condition" .
+
+doc:Definition a owl:Class ;
+    rdfs:label "Definition" ;
+    rdfs:comment "A claim that fixes the meaning of a term." ;
+    rdfs:subClassOf doc:Modality ;
+    skos:prefLabel "Definition" .
+
+doc:Obligation a owl:Class ;
+    rdfs:label "Obligation" ;
+    rdfs:comment "A claim that someone must do something." ;
+    rdfs:subClassOf doc:Modality ;
+    skos:prefLabel "Obligation" .
+
+doc:Permission a owl:Class ;
+    rdfs:label "Permission" ;
+    rdfs:comment "A claim that someone may do something." ;
+    rdfs:subClassOf doc:Modality ;
+    skos:prefLabel "Permission" .
+
+doc:ProcedureStep a owl:Class ;
+    rdfs:label "Procedure step" ;
+    rdfs:comment "A claim that is one ordered step of a process." ;
+    rdfs:subClassOf doc:Modality ;
+    skos:prefLabel "Procedure step" .
+
+doc:Prohibition a owl:Class ;
+    rdfs:label "Prohibition" ;
+    rdfs:comment "A claim that someone must not do something." ;
+    rdfs:subClassOf doc:Modality ;
+    skos:prefLabel "Prohibition" .
+
+doc:Recommendation a owl:Class ;
+    rdfs:label "Recommendation" ;
+    rdfs:comment "A claim that something is advised but not required." ;
+    rdfs:subClassOf doc:Modality ;
+    skos:prefLabel "Recommendation" .
+
+# The four structural kinds are mutually exclusive: a document is not a claim,
+# and a passage is evidence of exactly one role. Stated so a modelling mistake
+# shows up in a reasoner instead of in a customer's answer.
+doc:Document owl:disjointWith doc:Section .
+doc:Document owl:disjointWith doc:Claim .
+doc:Document owl:disjointWith doc:Evidence .
+doc:Claim owl:disjointWith doc:Evidence .
+doc:Claim owl:disjointWith doc:Section .
+doc:Evidence owl:disjointWith doc:Section .
+doc:Locator owl:disjointWith doc:Document .
+doc:Locator owl:disjointWith doc:Section .
+doc:Locator owl:disjointWith doc:Claim .
+doc:Locator owl:disjointWith doc:Evidence .
+
+# ============================================================================
+# Properties
+# ============================================================================
+
+doc:conflictsWith a owl:ObjectProperty,
+        owl:SymmetricProperty ;
+    rdfs:domain doc:Claim ;
+    rdfs:label "conflicts with" ;
+    rdfs:comment "Two claims that cannot both hold. Symmetric by definition: a contradiction does not have a direction, and asserting it one way only would make 'find the conflicts' depend on which claim was compiled first." ;
+    rdfs:range doc:Claim ;
+    skos:prefLabel "conflicts with" .
+
+doc:evidenceRole a owl:ObjectProperty ;
+    rdfs:domain doc:Evidence ;
+    rdfs:comment "Whether the passage states the claim or merely situates it. An object property over doc:EvidenceRole so the role is a resource a query can name, not a string each build spells differently." ;
+    rdfs:label "evidence role" ;
+    rdfs:range doc:EvidenceRole ;
+    skos:prefLabel "evidence role" .
+
+doc:hasActor a owl:DatatypeProperty ;
+    rdfs:domain doc:Claim ;
+    rdfs:label "has actor" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The party a claim is about, as the document names it. Not normalised to an entity identifier: the layer reports what the document says, and merging 'the Supplier' with a company record is a decision with its own error rate, not a compilation step." ;
+    skos:prefLabel "has actor" .
+
+doc:hasCharEnd a owl:DatatypeProperty ;
+    rdfs:domain doc:Locator ;
+    rdfs:label "has character end" ;
+    rdfs:range xsd:integer ;
+    rdfs:comment "Exclusive end offset, in Unicode code points, into the *normalised* text: the source with curly quotes and dashes folded to ASCII and whitespace runs collapsed (compiler.documents.text.norm). The basis is named because it is not the bytes on disk: a consumer holding the raw file must map the offset through compiler.documents.gaps.raw_offsets, and a consumer that slices the raw file at this offset will read the wrong sentence. With doc:hasCharStart it is what makes 'verbatim' checkable rather than asserted." ;
+    skos:prefLabel "has character end" .
+
+doc:hasCharStart a owl:DatatypeProperty ;
+    rdfs:domain doc:Locator ;
+    rdfs:label "has character start" ;
+    rdfs:range xsd:integer ;
+    skos:prefLabel "has character start" .
+
+doc:hasClaim a owl:ObjectProperty ;
+    rdfs:domain doc:Document ;
+    rdfs:label "has claim" ;
+    rdfs:range doc:Claim ;
+    rdfs:comment "From a document to everything extracted from it. Inverse of prov:wasDerivedFrom at the document level, stated explicitly because it is the direction readers navigate." ;
+    skos:prefLabel "has claim" .
+
+doc:hasCondition a owl:DatatypeProperty ;
+    rdfs:domain doc:Claim ;
+    rdfs:label "has condition" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "A condition attached to the claim, quoted from the document. Multi-valued: a claim can depend on several conditions." ;
+    skos:prefLabel "has condition" .
+
+doc:hasDeadline a owl:DatatypeProperty ;
+    rdfs:domain doc:Claim ;
+    rdfs:label "has deadline" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "A time limit as written — '48 hours', 'the tenth day'. Deliberately not a date: turning a deadline into a date needs the document's own point of reference." ;
+    skos:prefLabel "has deadline" .
+
+# No rdfs:domain on the properties below that are used on more than one class:
+# two rdfs:domain axioms on one property mean an intersection, not a union, and
+# a wrong domain is worse than an absent one. Where they are used is written
+# down instead, and the union could be spelled out later if a reasoner needs it.
+doc:hasDocType a owl:DatatypeProperty ;
+    rdfs:label "has document type" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Used on doc:Document and doc:Context." ;
+    skos:prefLabel "has document type" .
+
+doc:hasDocVersion a owl:DatatypeProperty ;
+    rdfs:label "has document version" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The version of the document, as the document states it. Used on doc:Document and doc:Context. Named hasDocVersion, not hasVersion, to keep it distinct from a skill's version in the skill ontology — the collision that motivated this namespace." ;
+    skos:prefLabel "has document version" .
+
+doc:hasEvidence a owl:ObjectProperty ;
+    rdfs:domain doc:Claim ;
+    rdfs:comment "From a claim to the passages that support or contextualise it. A claim without at least one doc:supportsRole evidence is not published: the quote is the product." ;
+    rdfs:label "has evidence" ;
+    rdfs:range doc:Evidence ;
+    skos:prefLabel "has evidence" .
+
+doc:hasJurisdiction a owl:DatatypeProperty ;
+    rdfs:domain doc:Context ;
+    rdfs:label "has jurisdiction" ;
+    rdfs:range xsd:string ;
+    skos:prefLabel "has jurisdiction" .
+
+doc:hasLicence a owl:DatatypeProperty ;
+    rdfs:domain doc:Document ;
+    rdfs:label "has licence" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The licence the source was published under, carried with the document so an answer can be redistributed only as far as its source allows." ;
+    skos:prefLabel "has licence" .
+
+doc:hasLocator a owl:ObjectProperty ;
+    rdfs:domain doc:Evidence ;
+    rdfs:label "has locator" ;
+    rdfs:range doc:Locator ;
+    rdfs:comment "A resource, not a formatted string. The earlier shape wrote 'Chapter 2 > 2.1 Notice' as a literal; a literal cannot be followed to the section, so the graph was flat even where the data had a hierarchy." ;
+    skos:prefLabel "has locator" .
+
+doc:hasModality a owl:ObjectProperty ;
+    rdfs:domain doc:Claim ;
+    rdfs:comment "The claim's force, as one of the seven doc:Modality subclasses. Always present: a claim whose force is unknown cannot be acted on." ;
+    rdfs:label "has modality" ;
+    rdfs:range doc:Modality ;
+    skos:prefLabel "has modality" .
+
+doc:hasPage a owl:DatatypeProperty ;
+    rdfs:domain doc:Locator ;
+    rdfs:label "has page" ;
+    rdfs:range xsd:integer ;
+    rdfs:comment "One-based page number where the source format has pages. Absent on plain text, which has offsets and no pages." ;
+    skos:prefLabel "has page" .
+
+doc:hasQuote a owl:DatatypeProperty ;
+    rdfs:domain doc:Evidence ;
+    rdfs:label "has quote" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The passage, byte for byte as it appears in the document. Verbatim is the layer's central promise, so a quote that does not occur in the source at the stated offsets is a defect, not a paraphrase." ;
+    skos:prefLabel "has quote" .
+
+doc:hasSection a owl:ObjectProperty ;
+    rdfs:domain doc:Document ;
+    rdfs:label "has section" ;
+    rdfs:range doc:Section ;
+    rdfs:comment "From a document to its top-level sections. Nested sections hang off their parent, so one hop from the document and a property path from there." ;
+    skos:prefLabel "has section" .
+
+doc:hasSectionPath a owl:DatatypeProperty ;
+    rdfs:domain doc:Section ;
+    rdfs:label "has section path" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The full heading path, joined with ' > ', denormalised for readers that want a printable address without walking doc:hasSubsection. Derived from the structure and never authoritative on its own." ;
+    skos:prefLabel "has section path" .
+
+doc:hasSectionTitle a owl:DatatypeProperty ;
+    rdfs:domain doc:Section ;
+    rdfs:label "has section title" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The heading text as the document writes it, numbering included." ;
+    skos:prefLabel "has section title" .
+
+doc:hasSha256 a owl:DatatypeProperty ;
+    rdfs:domain doc:Document ;
+    rdfs:label "has SHA-256" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Hex digest of the extracted text. What makes two builds comparable: same digest, same bytes read." ;
+    skos:prefLabel "has SHA-256" .
+
+doc:hasSourceUrl a owl:ObjectProperty ;
+    rdfs:label "has source URL" ;
+    rdfs:comment "An IRI, not a string, and therefore an object property: the point of an address is that it resolves. `xsd:anyURI` would have made it a datatype, so an IRI object would violate the declared range — which is what an earlier version of this file did. Used on doc:Context and doc:Locator; no declared range, because the object is an external resource this ontology does not own." ;
+    skos:prefLabel "has source URL" .
+
+doc:hasStatement a owl:DatatypeProperty ;
+    rdfs:domain doc:Claim ;
+    rdfs:label "has statement" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The claim itself, as one sentence. Written by the compiler from the quoted evidence; consistency with the quote is the verifier's job." ;
+    skos:prefLabel "has statement" .
+
+doc:hasSubsection a owl:ObjectProperty ;
+    rdfs:domain doc:Section ;
+    rdfs:comment "Nesting between sections, taken from the heading hierarchy of the source. This is what preserves the tree instead of flattening every heading into a label." ;
+    rdfs:label "has subsection" ;
+    rdfs:range doc:Section ;
+    skos:prefLabel "has subsection" .
+
+doc:hasTitle a owl:DatatypeProperty ;
+    rdfs:domain doc:Document ;
+    rdfs:label "has title" ;
+    rdfs:range xsd:string ;
+    skos:prefLabel "has title" .
+
+doc:inContext a owl:ObjectProperty ;
+    rdfs:label "in context" ;
+    rdfs:range doc:Context ;
+    rdfs:comment "Used on doc:Document and doc:Claim: a claim carries its own copy of the context so it can be quoted alone." ;
+    skos:prefLabel "in context" .
+
+doc:inSection a owl:ObjectProperty ;
+    rdfs:domain doc:Locator ;
+    rdfs:label "in section" ;
+    rdfs:range doc:Section ;
+    rdfs:comment "The section a passage sits in, as a resource. This is the link that turns a flat claim list into a tree a reader can walk." ;
+    skos:prefLabel "in section" .
+
+ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 a doc:Document ;
+    doc:hasTitle "dsid_020bac2fb6ac4de28d5afb63e39a0c10" ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasDocType "document" ;
+    doc:hasLicence "MIT" ;
+    doc:hasSha256 "89d900e44794795a74b32c99e80d94887836e813d25850b1cf3b5d97453fad0f" ;
+    doc:hasSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_000, ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_001, ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_002 ;
+    doc:hasClaim ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0001, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0002, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0003, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0004, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0005, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0006, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0007, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0008, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0009, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0010, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0011, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0012, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0013, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0014, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0015, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0016, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0017, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0018, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0019, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0020, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0021, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0022, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0023, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0024, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0025, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0026, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0027, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0028, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0029, ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0030 .
+
+ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 a doc:Context ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:hasDocType "document" .
+
+ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_000 a doc:Section ;
+    doc:hasSectionTitle "Redwood Inference" ;
+    doc:hasSectionPath "Redwood Inference" .
+ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_001 a doc:Section ;
+    doc:hasSectionTitle "Sean" ;
+    doc:hasSectionPath "Sean" .
+ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_002 a doc:Section ;
+    doc:hasSectionTitle "Vanessa" ;
+    doc:hasSectionPath "Vanessa" .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0001 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "Option A owns an incident by symptom, so anything involving fallback or admission control defaults to Routing." ;
+    doc:hasModality doc:Definition ;
+    doc:hasActor "Routing" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0001_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0001_0 a doc:Evidence ;
+    doc:hasQuote "Two proposed options: A) Own by symptom: anything involving fallback/admission control defaults to Routing. B) Own by controllable lever / root cause: capacity scarcity -> Fleet; policy/selection bugs -> Routing." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0001_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0001_0 a doc:Locator ;
+    doc:hasCharStart 1206 ;
+    doc:hasCharEnd 1418 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0002 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "Option B owns an incident by controllable lever or root cause: capacity scarcity -> Fleet; policy/selection bugs -> Routing." ;
+    doc:hasModality doc:Definition ;
+    doc:hasCondition "if option B is chosen" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0002_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0002_0 a doc:Evidence ;
+    doc:hasQuote "Two proposed options: A) Own by symptom: anything involving fallback/admission control defaults to Routing. B) Own by controllable lever / root cause: capacity scarcity -> Fleet; policy/selection bugs -> Routing." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0002_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0002_0 a doc:Locator ;
+    doc:hasCharStart 1206 ;
+    doc:hasCharEnd 1418 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0003 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "The SRE recommendation is option B." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasActor "SRE" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0003_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0003_0 a doc:Evidence ;
+    doc:hasQuote "SRE recommendation is B, but Routing is concerned about being paged for \"capacity incidents\" and losing fast mitigation loops." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0003_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0003_0 a doc:Locator ;
+    doc:hasCharStart 1419 ;
+    doc:hasCharEnd 1545 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0004 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "If we choose B, CAPACITY.* incidents have Primary: Fleet and Secondary/Consulted: Routing for traffic steering, safe-mode and policy constraints." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasActor "Fleet" ;
+    doc:hasCondition "if option B is chosen" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0004_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0004_0 a doc:Evidence ;
+    doc:hasQuote "Proposed owner mapping if we choose B: - CAPACITY.* => Primary: Fleet; Secondary/Consulted: Routing (for traffic steering, safe-mode, policy constraints) - ROUTING/FALLBACK.* => Primary: Routing; Consulted: Fleet (if capacity constraints are suspected)" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0004_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0004_0 a doc:Locator ;
+    doc:hasCharStart 1803 ;
+    doc:hasCharEnd 2055 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0005 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "If we choose B, ROUTING/FALLBACK.* incidents have Primary: Routing and Consulted: Fleet if capacity constraints are suspected." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasActor "Routing" ;
+    doc:hasCondition "if option B is chosen" ;
+    doc:hasCondition "if capacity constraints are suspected" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0005_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0005_0 a doc:Evidence ;
+    doc:hasQuote "Proposed owner mapping if we choose B: - CAPACITY.* => Primary: Fleet; Secondary/Consulted: Routing (for traffic steering, safe-mode, policy constraints) - ROUTING/FALLBACK.* => Primary: Routing; Consulted: Fleet (if capacity constraints are suspected)" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0005_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0005_0 a doc:Locator ;
+    doc:hasCharStart 1803 ;
+    doc:hasCharEnd 2055 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0006 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "Routing cannot end up as consulted on anything that is manifested as router-triggered 429/5xx." ;
+    doc:hasModality doc:Prohibition ;
+    doc:hasActor "Routing" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0006_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0006_0 a doc:Evidence ;
+    doc:hasQuote "+1 on needing a crisp rule, but Routing can't end up as \"consulted\" on anything that is manifested as router-triggered 429/5xx." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0006_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0006_0 a doc:Locator ;
+    doc:hasCharStart 3022 ;
+    doc:hasCharEnd 3149 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_000 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0007 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "Capacity-driven fallback storms are treated as a CAPACITY incident for primary ownership." ;
+    doc:hasModality doc:Definition ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0007_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0007_0 a doc:Evidence ;
+    doc:hasQuote "Decision: choose option B (own by controllable boundary / root cause). We'll treat \"capacity-driven fallback storms\" as a CAPACITY incident for primary ownership." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0007_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0007_0 a doc:Locator ;
+    doc:hasCharStart 5105 ;
+    doc:hasCharEnd 5267 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_002 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0008 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "Ownership is by controllable boundary / root cause." ;
+    doc:hasModality doc:Definition ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0008_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0008_0 a doc:Evidence ;
+    doc:hasQuote "Decision: choose option B (own by controllable boundary / root cause). We'll treat \"capacity-driven fallback storms\" as a CAPACITY incident for primary ownership." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0008_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0008_0 a doc:Locator ;
+    doc:hasCharStart 5105 ;
+    doc:hasCharEnd 5267 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_002 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0009 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "The primary owner must align to the team accountable for preventing recurrence (forecasting, provisioning, pool sizing, regional capacity posture)." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasActor "primary owner" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0009_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0009_0 a doc:Evidence ;
+    doc:hasQuote "Rationale: - Primary owner must align to the team accountable for preventing recurrence (forecasting, provisioning, pool sizing, regional capacity posture). - Routing absolutely remains critical for mitigation; we'll formalize it as required secondary/consulted for CAPACITY incidents." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0009_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0009_0 a doc:Locator ;
+    doc:hasCharStart 5268 ;
+    doc:hasCharEnd 5553 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_002 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0010 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "Routing is required secondary/consulted for CAPACITY incidents." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasActor "Routing" ;
+    doc:hasCondition "CAPACITY incidents" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0010_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0010_0 a doc:Evidence ;
+    doc:hasQuote "Rationale: - Primary owner must align to the team accountable for preventing recurrence (forecasting, provisioning, pool sizing, regional capacity posture). - Routing absolutely remains critical for mitigation; we'll formalize it as required secondary/consulted for CAPACITY incidents." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0010_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0010_0 a doc:Locator ;
+    doc:hasCharStart 5268 ;
+    doc:hasCharEnd 5553 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_002 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0011 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "CAPACITY incidents should page Fleet as primary." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasCondition "CAPACITY incidents" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0011_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0011_0 a doc:Evidence ;
+    doc:hasQuote "To address Mina's first-30-minutes concern: - Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved. - Classification rule for ICs (write this into the decision tree): 1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet). 2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing)." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0011_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0011_0 a doc:Locator ;
+    doc:hasCharStart 5554 ;
+    doc:hasCharEnd 6178 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_002 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0012 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "CAPACITY incidents should notify Routing immediately when fallback/admission control is involved." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasCondition "fallback/admission control is involved" ;
+    doc:hasCondition "CAPACITY incidents" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0012_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0012_0 a doc:Evidence ;
+    doc:hasQuote "To address Mina's first-30-minutes concern: - Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved. - Classification rule for ICs (write this into the decision tree): 1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet). 2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing)." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0012_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0012_0 a doc:Locator ;
+    doc:hasCharStart 5554 ;
+    doc:hasCharEnd 6178 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_002 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0013 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "ICs classify as CAPACITY.* (primary Fleet) if headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant." ;
+    doc:hasModality doc:ProcedureStep ;
+    doc:hasActor "ICs" ;
+    doc:hasCondition "headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0013_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0013_0 a doc:Evidence ;
+    doc:hasQuote "To address Mina's first-30-minutes concern: - Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved. - Classification rule for ICs (write this into the decision tree): 1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet). 2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing)." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0013_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0013_0 a doc:Locator ;
+    doc:hasCharStart 5554 ;
+    doc:hasCharEnd 6178 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_002 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0014 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "ICs classify as ROUTING/FALLBACK.* (primary Routing) if headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals." ;
+    doc:hasModality doc:ProcedureStep ;
+    doc:hasActor "ICs" ;
+    doc:hasCondition "headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0014_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0014_0 a doc:Evidence ;
+    doc:hasQuote "To address Mina's first-30-minutes concern: - Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved. - Classification rule for ICs (write this into the decision tree): 1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet). 2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing)." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0014_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0014_0 a doc:Locator ;
+    doc:hasCharStart 5554 ;
+    doc:hasCharEnd 6178 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_002 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0015 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "If unclear in first 15 minutes, CAPACITY.* is set with contributing_systems=Routing." ;
+    doc:hasModality doc:ProcedureStep ;
+    doc:hasCondition "unclear in first 15 minutes" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0015_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0015_0 a doc:Evidence ;
+    doc:hasQuote "3) If unclear in first 15 minutes -> set CAPACITY.* with \"contributing_systems=Routing\" and revisit once signals confirm." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0015_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0015_0 a doc:Locator ;
+    doc:hasCharStart 6179 ;
+    doc:hasCharEnd 6300 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_002 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0016 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "If unclear in first 15 minutes, ICs revisit once signals confirm." ;
+    doc:hasModality doc:ProcedureStep ;
+    doc:hasActor "ICs" ;
+    doc:hasCondition "unclear in first 15 minutes" ;
+    doc:hasCondition "signals confirm" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0016_0, ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0016_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0016_0 a doc:Evidence ;
+    doc:hasQuote "To address Mina's first-30-minutes concern: - Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved. - Classification rule for ICs (write this into the decision tree): 1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet). 2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing)." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0016_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0016_0 a doc:Locator ;
+    doc:hasCharStart 5554 ;
+    doc:hasCharEnd 6178 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_002 .
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0016_1 a doc:Evidence ;
+    doc:hasQuote "3) If unclear in first 15 minutes -> set CAPACITY.* with \"contributing_systems=Routing\" and revisit once signals confirm." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0016_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0016_1 a doc:Locator ;
+    doc:hasCharStart 6179 ;
+    doc:hasCharEnd 6300 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_002 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0017 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "The action item is to update the owner mapping table and control-plane config to reflect this (ENG-4825)." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0017_0, ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0017_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0017_0 a doc:Evidence ;
+    doc:hasQuote "Action items (please assign owners + dates): - Update the owner mapping table and control-plane config to reflect this (ENG-4825). - Ensure incident-bot can set a secondary/escalation target (Routing) when CAPACITY incident includes fallback/admission symptoms (ENG-4823)." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0017_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0017_0 a doc:Locator ;
+    doc:hasCharStart 6301 ;
+    doc:hasCharEnd 6573 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_002 .
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0017_1 a doc:Evidence ;
+    doc:hasQuote "3) If unclear in first 15 minutes -> set CAPACITY.* with \"contributing_systems=Routing\" and revisit once signals confirm." ;
+    doc:evidenceRole doc:contextRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0017_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0017_1 a doc:Locator ;
+    doc:hasCharStart 6179 ;
+    doc:hasCharEnd 6300 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_002 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0018 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "The action item ensures incident-bot can set a secondary/escalation target (Routing) when a CAPACITY incident includes fallback/admission symptoms (ENG-4823)." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasCondition "CAPACITY incident includes fallback/admission symptoms" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0018_0, ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0018_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0018_0 a doc:Evidence ;
+    doc:hasQuote "Action items (please assign owners + dates): - Update the owner mapping table and control-plane config to reflect this (ENG-4825). - Ensure incident-bot can set a secondary/escalation target (Routing) when CAPACITY incident includes fallback/admission symptoms (ENG-4823)." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0018_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0018_0 a doc:Locator ;
+    doc:hasCharStart 6301 ;
+    doc:hasCharEnd 6573 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_002 .
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0018_1 a doc:Evidence ;
+    doc:hasQuote "3) If unclear in first 15 minutes -> set CAPACITY.* with \"contributing_systems=Routing\" and revisit once signals confirm." ;
+    doc:evidenceRole doc:contextRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0018_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0018_1 a doc:Locator ;
+    doc:hasCharStart 6179 ;
+    doc:hasCharEnd 6300 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_002 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0019 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "For CAPACITY > Regional capacity exhaustion, Primary is Fleet, Secondary is Routing, and Consulted is SRE." ;
+    doc:hasModality doc:Definition ;
+    doc:hasCondition "CAPACITY > Regional capacity exhaustion" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0019_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0019_0 a doc:Evidence ;
+    doc:hasQuote "Final mapping (v1): - CAPACITY > Regional capacity exhaustion - Primary: Fleet; Secondary: Routing; Consulted: SRE - CAPACITY > Provisioning lag / scale-up stalled - Primary: Fleet; Secondary: SRE; Consulted: Routing - CAPACITY > Pool saturation (GPU/utilization) - Primary: Fleet; Secondary: Routing; Consulted: SRE - ROUTING/FALLBACK > Fallback misbehavior (policy/health/compat bugs) - Primary: Routing; Secondary: SRE; Consulted: Fleet" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0019_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0019_0 a doc:Locator ;
+    doc:hasCharStart 7137 ;
+    doc:hasCharEnd 7576 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_001 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0020 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "For CAPACITY > Provisioning lag / scale-up stalled, Primary is Fleet, Secondary is SRE, and Consulted is Routing." ;
+    doc:hasModality doc:Definition ;
+    doc:hasCondition "CAPACITY > Provisioning lag / scale-up stalled" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0020_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0020_0 a doc:Evidence ;
+    doc:hasQuote "Final mapping (v1): - CAPACITY > Regional capacity exhaustion - Primary: Fleet; Secondary: Routing; Consulted: SRE - CAPACITY > Provisioning lag / scale-up stalled - Primary: Fleet; Secondary: SRE; Consulted: Routing - CAPACITY > Pool saturation (GPU/utilization) - Primary: Fleet; Secondary: Routing; Consulted: SRE - ROUTING/FALLBACK > Fallback misbehavior (policy/health/compat bugs) - Primary: Routing; Secondary: SRE; Consulted: Fleet" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0020_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0020_0 a doc:Locator ;
+    doc:hasCharStart 7137 ;
+    doc:hasCharEnd 7576 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_001 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0021 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "For CAPACITY > Pool saturation (GPU/utilization), Primary is Fleet, Secondary is Routing, and Consulted is SRE." ;
+    doc:hasModality doc:Definition ;
+    doc:hasCondition "CAPACITY > Pool saturation (GPU/utilization)" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0021_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0021_0 a doc:Evidence ;
+    doc:hasQuote "Final mapping (v1): - CAPACITY > Regional capacity exhaustion - Primary: Fleet; Secondary: Routing; Consulted: SRE - CAPACITY > Provisioning lag / scale-up stalled - Primary: Fleet; Secondary: SRE; Consulted: Routing - CAPACITY > Pool saturation (GPU/utilization) - Primary: Fleet; Secondary: Routing; Consulted: SRE - ROUTING/FALLBACK > Fallback misbehavior (policy/health/compat bugs) - Primary: Routing; Secondary: SRE; Consulted: Fleet" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0021_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0021_0 a doc:Locator ;
+    doc:hasCharStart 7137 ;
+    doc:hasCharEnd 7576 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_001 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0022 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "For ROUTING/FALLBACK > Fallback misbehavior (policy/health/compat bugs), Primary is Routing, Secondary is SRE, and Consulted is Fleet." ;
+    doc:hasModality doc:Definition ;
+    doc:hasCondition "ROUTING/FALLBACK > Fallback misbehavior (policy/health/compat bugs)" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0022_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0022_0 a doc:Evidence ;
+    doc:hasQuote "Final mapping (v1): - CAPACITY > Regional capacity exhaustion - Primary: Fleet; Secondary: Routing; Consulted: SRE - CAPACITY > Provisioning lag / scale-up stalled - Primary: Fleet; Secondary: SRE; Consulted: Routing - CAPACITY > Pool saturation (GPU/utilization) - Primary: Fleet; Secondary: Routing; Consulted: SRE - ROUTING/FALLBACK > Fallback misbehavior (policy/health/compat bugs) - Primary: Routing; Secondary: SRE; Consulted: Fleet" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0022_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0022_0 a doc:Locator ;
+    doc:hasCharStart 7137 ;
+    doc:hasCharEnd 7576 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_001 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0023 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "Fleet owns CAPACITY if the constraint is headroom (saturation/backlog/exhaustion)." ;
+    doc:hasModality doc:Definition ;
+    doc:hasActor "Fleet" ;
+    doc:hasCondition "constraint is headroom (saturation/backlog/exhaustion)" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0023_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0023_0 a doc:Evidence ;
+    doc:hasQuote "IC decision rule (one-liner for the bot + policy page): - \"If the constraint is headroom (saturation/backlog/exhaustion) -> CAPACITY (Fleet owns). If headroom exists but fallbacks/shedding are incorrect -> ROUTING/FALLBACK (Routing owns). If unknown -> CAPACITY + tag Routing as contributing system, revisit within 30 minutes.\"" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0023_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0023_0 a doc:Locator ;
+    doc:hasCharStart 7577 ;
+    doc:hasCharEnd 7904 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_001 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0024 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "Routing owns ROUTING/FALLBACK if headroom exists but fallbacks/shedding are incorrect." ;
+    doc:hasModality doc:Definition ;
+    doc:hasActor "Routing" ;
+    doc:hasCondition "headroom exists but fallbacks/shedding are incorrect" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0024_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0024_0 a doc:Evidence ;
+    doc:hasQuote "IC decision rule (one-liner for the bot + policy page): - \"If the constraint is headroom (saturation/backlog/exhaustion) -> CAPACITY (Fleet owns). If headroom exists but fallbacks/shedding are incorrect -> ROUTING/FALLBACK (Routing owns). If unknown -> CAPACITY + tag Routing as contributing system, revisit within 30 minutes.\"" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0024_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0024_0 a doc:Locator ;
+    doc:hasCharStart 7577 ;
+    doc:hasCharEnd 7904 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_001 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0025 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "If unknown, ICs classify as CAPACITY and tag Routing as contributing system." ;
+    doc:hasModality doc:ProcedureStep ;
+    doc:hasActor "ICs" ;
+    doc:hasCondition "unknown" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0025_0, ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0025_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0025_0 a doc:Evidence ;
+    doc:hasQuote "To address Mina's first-30-minutes concern: - Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved. - Classification rule for ICs (write this into the decision tree): 1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet). 2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing)." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0025_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0025_0 a doc:Locator ;
+    doc:hasCharStart 5554 ;
+    doc:hasCharEnd 6178 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_002 .
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0025_1 a doc:Evidence ;
+    doc:hasQuote "IC decision rule (one-liner for the bot + policy page): - \"If the constraint is headroom (saturation/backlog/exhaustion) -> CAPACITY (Fleet owns). If headroom exists but fallbacks/shedding are incorrect -> ROUTING/FALLBACK (Routing owns). If unknown -> CAPACITY + tag Routing as contributing system, revisit within 30 minutes.\"" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0025_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0025_1 a doc:Locator ;
+    doc:hasCharStart 7577 ;
+    doc:hasCharEnd 7904 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_001 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0026 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "If unknown, ICs revisit within 30 minutes." ;
+    doc:hasModality doc:ProcedureStep ;
+    doc:hasActor "ICs" ;
+    doc:hasDeadline "30 minutes" ;
+    doc:hasCondition "unknown" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0026_0, ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0026_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0026_0 a doc:Evidence ;
+    doc:hasQuote "To address Mina's first-30-minutes concern: - Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved. - Classification rule for ICs (write this into the decision tree): 1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet). 2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing)." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0026_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0026_0 a doc:Locator ;
+    doc:hasCharStart 5554 ;
+    doc:hasCharEnd 6178 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_002 .
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0026_1 a doc:Evidence ;
+    doc:hasQuote "IC decision rule (one-liner for the bot + policy page): - \"If the constraint is headroom (saturation/backlog/exhaustion) -> CAPACITY (Fleet owns). If headroom exists but fallbacks/shedding are incorrect -> ROUTING/FALLBACK (Routing owns). If unknown -> CAPACITY + tag Routing as contributing system, revisit within 30 minutes.\"" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0026_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0026_1 a doc:Locator ;
+    doc:hasCharStart 7577 ;
+    doc:hasCharEnd 7904 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_001 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0027 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "Ava updates Confluence owner mapping and decision tree language and links it from the incident classification policy by Tue 1/13." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasActor "Ava" ;
+    doc:hasDeadline "Tue 1/13" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0027_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0027_0 a doc:Evidence ;
+    doc:hasQuote "Follow-ups (next week): 1) Ava: update Confluence owner mapping + decision tree language and link it from the incident classification policy. ETA Tue 1/13. 2) Rafael: confirm escalation rule wording for CAPACITY incidents (Fleet primary + Routing notified) and align with incident-bot closure gating. ETA Wed 1/14. 3) Mina/Vanessa: provide 2-3 concrete examples each for the taxonomy page (what to pick, what not to pick). ETA Wed 1/14. 4) Routing team: ensure fallback_reason enums land + are visible in the incident channel bot summary (ENG-4824). Tracking separately." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0027_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0027_0 a doc:Locator ;
+    doc:hasCharStart 7905 ;
+    doc:hasCharEnd 8475 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_001 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0028 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "Rafael confirms escalation rule wording for CAPACITY incidents (Fleet primary + Routing notified) and aligns with incident-bot closure gating by Wed 1/14." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasActor "Rafael" ;
+    doc:hasDeadline "Wed 1/14" ;
+    doc:hasCondition "CAPACITY incidents" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0028_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0028_0 a doc:Evidence ;
+    doc:hasQuote "Follow-ups (next week): 1) Ava: update Confluence owner mapping + decision tree language and link it from the incident classification policy. ETA Tue 1/13. 2) Rafael: confirm escalation rule wording for CAPACITY incidents (Fleet primary + Routing notified) and align with incident-bot closure gating. ETA Wed 1/14. 3) Mina/Vanessa: provide 2-3 concrete examples each for the taxonomy page (what to pick, what not to pick). ETA Wed 1/14. 4) Routing team: ensure fallback_reason enums land + are visible in the incident channel bot summary (ENG-4824). Tracking separately." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0028_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0028_0 a doc:Locator ;
+    doc:hasCharStart 7905 ;
+    doc:hasCharEnd 8475 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_001 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0029 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "Mina and Vanessa provide 2-3 concrete examples each for the taxonomy page (what to pick, what not to pick) by Wed 1/14." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasActor "Mina and Vanessa" ;
+    doc:hasDeadline "Wed 1/14" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0029_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0029_0 a doc:Evidence ;
+    doc:hasQuote "Follow-ups (next week): 1) Ava: update Confluence owner mapping + decision tree language and link it from the incident classification policy. ETA Tue 1/13. 2) Rafael: confirm escalation rule wording for CAPACITY incidents (Fleet primary + Routing notified) and align with incident-bot closure gating. ETA Wed 1/14. 3) Mina/Vanessa: provide 2-3 concrete examples each for the taxonomy page (what to pick, what not to pick). ETA Wed 1/14. 4) Routing team: ensure fallback_reason enums land + are visible in the incident channel bot summary (ENG-4824). Tracking separately." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0029_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0029_0 a doc:Locator ;
+    doc:hasCharStart 7905 ;
+    doc:hasCharEnd 8475 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_001 .
+
+ex:claim_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0030 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_020bac2fb6ac4de28d5afb63e39a0c10 ;
+    doc:hasStatement "The Routing team ensures fallback_reason enums land and are visible in the incident channel bot summary (ENG-4824) next week." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasActor "Routing team" ;
+    doc:hasDeadline "next week" ;
+    doc:hasEvidence ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0030_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+
+ex:ev_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0030_0 a doc:Evidence ;
+    doc:hasQuote "Follow-ups (next week): 1) Ava: update Confluence owner mapping + decision tree language and link it from the incident classification policy. ETA Tue 1/13. 2) Rafael: confirm escalation rule wording for CAPACITY incidents (Fleet primary + Routing notified) and align with incident-bot closure gating. ETA Wed 1/14. 3) Mina/Vanessa: provide 2-3 concrete examples each for the taxonomy page (what to pick, what not to pick). ETA Wed 1/14. 4) Routing team: ensure fallback_reason enums land + are visible in the incident channel bot summary (ENG-4824). Tracking separately." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0030_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_020bac2fb6ac4de28d5afb63e39a0c10 .
+ex:loc_dsid_020bac2fb6ac4de28d5afb63e39a0c10-0030_0 a doc:Locator ;
+    doc:hasCharStart 7905 ;
+    doc:hasCharEnd 8475 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_020bac2fb6ac4de28d5afb63e39a0c10_001 .
+
+
+ex:doc_dsid_02f0cd8c874b431cbdec5455721ce8c1 a doc:Document ;
+    doc:hasTitle "dsid_02f0cd8c874b431cbdec5455721ce8c1" ;
+    doc:inContext ex:ctx_dsid_02f0cd8c874b431cbdec5455721ce8c1 ;
+    doc:hasDocType "document" ;
+    doc:hasLicence "MIT" ;
+    doc:hasSha256 "11d9a51ec60a0992d715e37b56ae4ab2dc3af526959fd93c3afdca8e965ba0c4" ;
+    doc:hasClaim ex:claim_dsid_02f0cd8c874b431cbdec5455721ce8c1-0001, ex:claim_dsid_02f0cd8c874b431cbdec5455721ce8c1-0002, ex:claim_dsid_02f0cd8c874b431cbdec5455721ce8c1-0003 .
+
+ex:ctx_dsid_02f0cd8c874b431cbdec5455721ce8c1 a doc:Context ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:hasDocType "document" .
+
+ex:claim_dsid_02f0cd8c874b431cbdec5455721ce8c1-0001 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_02f0cd8c874b431cbdec5455721ce8c1 ;
+    doc:hasStatement "Eng Infra adds fragmentation metric \"sched_place_fail_rate\" + \"gpu_mem_slack\"." ;
+    doc:hasModality doc:ProcedureStep ;
+    doc:hasActor "Eng Infra" ;
+    doc:hasEvidence ex:ev_dsid_02f0cd8c874b431cbdec5455721ce8c1-0001_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_02f0cd8c874b431cbdec5455721ce8c1 .
+
+ex:ev_dsid_02f0cd8c874b431cbdec5455721ce8c1-0001_0 a doc:Evidence ;
+    doc:hasQuote "# Corrective actions 1. Add fragmentation metric: \"sched_place_fail_rate\" + \"gpu_mem_slack\" (owner: Eng Infra) 2. Publish runbook for defragmentation and safe evacuation in private clusters (owner: Eng Infra) 3. Add preflight capacity validation before maintenance rotations (owner: Eng SRE)" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_02f0cd8c874b431cbdec5455721ce8c1-0001_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_02f0cd8c874b431cbdec5455721ce8c1 .
+ex:loc_dsid_02f0cd8c874b431cbdec5455721ce8c1-0001_0 a doc:Locator ;
+    doc:hasCharStart 1157 ;
+    doc:hasCharEnd 1448 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> .
+
+ex:claim_dsid_02f0cd8c874b431cbdec5455721ce8c1-0002 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_02f0cd8c874b431cbdec5455721ce8c1 ;
+    doc:hasStatement "Eng Infra publishes runbook for defragmentation and safe evacuation in private clusters." ;
+    doc:hasModality doc:ProcedureStep ;
+    doc:hasActor "Eng Infra" ;
+    doc:hasEvidence ex:ev_dsid_02f0cd8c874b431cbdec5455721ce8c1-0002_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_02f0cd8c874b431cbdec5455721ce8c1 .
+
+ex:ev_dsid_02f0cd8c874b431cbdec5455721ce8c1-0002_0 a doc:Evidence ;
+    doc:hasQuote "# Corrective actions 1. Add fragmentation metric: \"sched_place_fail_rate\" + \"gpu_mem_slack\" (owner: Eng Infra) 2. Publish runbook for defragmentation and safe evacuation in private clusters (owner: Eng Infra) 3. Add preflight capacity validation before maintenance rotations (owner: Eng SRE)" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_02f0cd8c874b431cbdec5455721ce8c1-0002_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_02f0cd8c874b431cbdec5455721ce8c1 .
+ex:loc_dsid_02f0cd8c874b431cbdec5455721ce8c1-0002_0 a doc:Locator ;
+    doc:hasCharStart 1157 ;
+    doc:hasCharEnd 1448 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> .
+
+ex:claim_dsid_02f0cd8c874b431cbdec5455721ce8c1-0003 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_02f0cd8c874b431cbdec5455721ce8c1 ;
+    doc:hasStatement "Eng SRE adds preflight capacity validation before maintenance rotations." ;
+    doc:hasModality doc:ProcedureStep ;
+    doc:hasActor "Eng SRE" ;
+    doc:hasCondition "before maintenance rotations" ;
+    doc:hasEvidence ex:ev_dsid_02f0cd8c874b431cbdec5455721ce8c1-0003_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_02f0cd8c874b431cbdec5455721ce8c1 .
+
+ex:ev_dsid_02f0cd8c874b431cbdec5455721ce8c1-0003_0 a doc:Evidence ;
+    doc:hasQuote "# Corrective actions 1. Add fragmentation metric: \"sched_place_fail_rate\" + \"gpu_mem_slack\" (owner: Eng Infra) 2. Publish runbook for defragmentation and safe evacuation in private clusters (owner: Eng Infra) 3. Add preflight capacity validation before maintenance rotations (owner: Eng SRE)" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_02f0cd8c874b431cbdec5455721ce8c1-0003_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_02f0cd8c874b431cbdec5455721ce8c1 .
+ex:loc_dsid_02f0cd8c874b431cbdec5455721ce8c1-0003_0 a doc:Locator ;
+    doc:hasCharStart 1157 ;
+    doc:hasCharEnd 1448 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> .
+
+
+ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de a doc:Document ;
+    doc:hasTitle "dsid_03af1e44970d4d6db6e85bc2c5fce8de" ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasDocType "document" ;
+    doc:hasLicence "MIT" ;
+    doc:hasSha256 "9431a7f47baa322b80864d9e918bdf6f657c1a5e4b4a9957f44839ac5f2a3824" ;
+    doc:hasSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 ;
+    doc:hasClaim ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0001, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0002, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0003, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0004, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0005, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0006, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0007, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0008, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0009, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0010, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0011, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0012, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0013, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0014, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0015, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0016, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0017, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0018, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0019, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0020, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0021, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0022, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0023, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0024, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0025, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0026, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0027, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0028, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0029, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0030, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0031, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0032, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0033, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0034, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0035, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0036, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0037, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0038, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0039, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0040, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0041, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0042, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0043, ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0044 .
+
+ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de a doc:Context ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:hasDocType "document" .
+
+ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 a doc:Section ;
+    doc:hasSectionTitle "Horizon Quay AI Infrastructure" ;
+    doc:hasSectionPath "Horizon Quay AI Infrastructure" .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0001 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Capacity ask is a reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU)." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasActor "Horizon Quay" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0001_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0001_0 a doc:Evidence ;
+    doc:hasQuote "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0001_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0001_0 a doc:Locator ;
+    doc:hasCharStart 31 ;
+    doc:hasCharEnd 716 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0002 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Expected steady-state is ~350-600 RPS for short payload chat (avg token window 256)." ;
+    doc:hasModality doc:Definition ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0002_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0002_0 a doc:Evidence ;
+    doc:hasQuote "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0002_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0002_0 a doc:Locator ;
+    doc:hasCharStart 31 ;
+    doc:hasCharEnd 716 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0003 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Burst is to ~1k RPS during shift changes." ;
+    doc:hasModality doc:Definition ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0003_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0003_0 a doc:Evidence ;
+    doc:hasQuote "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0003_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0003_0 a doc:Locator ;
+    doc:hasCharStart 31 ;
+    doc:hasCharEnd 716 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0004 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "P95 text-gen latency is <= 80ms for chat on dedicated pool." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0004_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0004_0 a doc:Evidence ;
+    doc:hasQuote "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0004_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0004_0 a doc:Locator ;
+    doc:hasCharStart 31 ;
+    doc:hasCharEnd 716 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0005 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "P99 latency is <= 220ms for chat on dedicated pool." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0005_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0005_0 a doc:Evidence ;
+    doc:hasQuote "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0005_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0005_0 a doc:Locator ;
+    doc:hasCharStart 31 ;
+    doc:hasCharEnd 716 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0006 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Throughput guarantees are 500 RPS sustained per region." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0006_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0006_0 a doc:Evidence ;
+    doc:hasQuote "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0006_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0006_0 a doc:Locator ;
+    doc:hasCharStart 31 ;
+    doc:hasCharEnd 716 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0007 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Customer asks for 99.95% uptime across dedicated pools." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasActor "Customer" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0007_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0007_0 a doc:Evidence ;
+    doc:hasQuote "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0007_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0007_0 a doc:Locator ;
+    doc:hasCharStart 31 ;
+    doc:hasCharEnd 716 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0008 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Customer asks 30% credit at 99.9-99.95." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasActor "Customer" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0008_0, ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0008_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0008_0 a doc:Evidence ;
+    doc:hasQuote "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0008_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0008_0 a doc:Locator ;
+    doc:hasCharStart 31 ;
+    doc:hasCharEnd 716 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0008_1 a doc:Evidence ;
+    doc:hasQuote "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0008_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0008_1 a doc:Locator ;
+    doc:hasCharStart 717 ;
+    doc:hasCharEnd 1352 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0008 doc:conflictsWith ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0012 .
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0009 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Customer asks 50% credit below 99.9." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasActor "Customer" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0009_0, ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0009_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0009_0 a doc:Evidence ;
+    doc:hasQuote "notes: Account profile and negotiation notes: - Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions. - Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350-600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes. - Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region. - SLA position (customer asks): 99.95% uptime across dedicated pools;" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0009_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0009_0 a doc:Locator ;
+    doc:hasCharStart 31 ;
+    doc:hasCharEnd 716 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0009_1 a doc:Evidence ;
+    doc:hasQuote "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0009_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0009_1 a doc:Locator ;
+    doc:hasCharStart 717 ;
+    doc:hasCharEnd 1352 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0009 doc:conflictsWith ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0012 .
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0010 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Customer request is a monthly credit cap and cumulative measurement window." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasActor "Customer" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0010_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0010_0 a doc:Evidence ;
+    doc:hasQuote "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0010_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0010_0 a doc:Locator ;
+    doc:hasCharStart 717 ;
+    doc:hasCharEnd 1352 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0011 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Redwood counterproposals are a baseline 99.95 SLA with quarterly reconciliation." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasActor "Redwood" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0011_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0011_0 a doc:Evidence ;
+    doc:hasQuote "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0011_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0011_0 a doc:Locator ;
+    doc:hasCharStart 717 ;
+    doc:hasCharEnd 1352 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0012 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Redwood credit schedule is tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60%." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasActor "Redwood" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0012_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0012_0 a doc:Evidence ;
+    doc:hasQuote "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0012_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0012_0 a doc:Locator ;
+    doc:hasCharStart 717 ;
+    doc:hasCharEnd 1352 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0012 doc:conflictsWith ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0008 .
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0012 doc:conflictsWith ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0009 .
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0013 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Redwood wants max cap at 6 months' fee." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasActor "Redwood" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0013_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0013_0 a doc:Evidence ;
+    doc:hasQuote "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0013_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0013_0 a doc:Locator ;
+    doc:hasCharStart 717 ;
+    doc:hasCharEnd 1352 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0014 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC)." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasActor "Customer" ;
+    doc:hasCondition "not during shift-change windows (06:00-09:00 UTC)" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0014_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0014_0 a doc:Evidence ;
+    doc:hasQuote "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0014_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0014_0 a doc:Locator ;
+    doc:hasCharStart 717 ;
+    doc:hasCharEnd 1352 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0015 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Proposed weekly maintenance is 02:00-04:00 region-local with 72h advance notice." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasDeadline "72h" ;
+    doc:hasCondition "weekly" ;
+    doc:hasCondition "region-local" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0015_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0015_0 a doc:Evidence ;
+    doc:hasQuote "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0015_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0015_0 a doc:Locator ;
+    doc:hasCharStart 717 ;
+    doc:hasCharEnd 1352 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0016 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Emergency maintenance is with 48h notice and rolling failover." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasDeadline "48h" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0016_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0016_0 a doc:Evidence ;
+    doc:hasQuote "30% credit at 99.9-99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window. - Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9-99.95 = 10% service credit, 99.5-99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee. - Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00-09:00 UTC). Proposed weekly 02:00-04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover. - Support / escalation:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0016_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0016_0 a doc:Locator ;
+    doc:hasCharStart 717 ;
+    doc:hasCharEnd 1352 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0017 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Horizon Quay requires a 24/7 hotline for Sev1." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasActor "Horizon Quay" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0017_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0017_0 a doc:Evidence ;
+    doc:hasQuote "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0017_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0017_0 a doc:Locator ;
+    doc:hasCharStart 1353 ;
+    doc:hasCharEnd 1945 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0018 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Horizon Quay requires 15-minute acknowledgement for Sev1." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasActor "Horizon Quay" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0018_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0018_0 a doc:Evidence ;
+    doc:hasQuote "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0018_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0018_0 a doc:Locator ;
+    doc:hasCharStart 1353 ;
+    doc:hasCharEnd 1945 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0019 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Horizon Quay requires a 2-hour remediate SLA target for critical infrastructure." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasActor "Horizon Quay" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0019_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0019_0 a doc:Evidence ;
+    doc:hasQuote "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0019_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0019_0 a doc:Locator ;
+    doc:hasCharStart 1353 ;
+    doc:hasCharEnd 1945 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0020 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Horizon Quay requires 4-hour for Sev2." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasActor "Horizon Quay" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0020_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0020_0 a doc:Evidence ;
+    doc:hasQuote "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0020_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0020_0 a doc:Locator ;
+    doc:hasCharStart 1353 ;
+    doc:hasCharEnd 1945 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0021 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Redwood proposes 15min ack." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasActor "Redwood" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0021_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0021_0 a doc:Evidence ;
+    doc:hasQuote "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0021_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0021_0 a doc:Locator ;
+    doc:hasCharStart 1353 ;
+    doc:hasCharEnd 1945 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0022 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Redwood proposes 1h initial response." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasActor "Redwood" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0022_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0022_0 a doc:Evidence ;
+    doc:hasQuote "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0022_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0022_0 a doc:Locator ;
+    doc:hasCharStart 1353 ;
+    doc:hasCharEnd 1945 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0023 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Redwood proposes remediation time objective to be defined per incident severity in SOW." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasActor "Redwood" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0023_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0023_0 a doc:Evidence ;
+    doc:hasQuote "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0023_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0023_0 a doc:Locator ;
+    doc:hasCharStart 1353 ;
+    doc:hasCharEnd 1945 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0024 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Plan includes capacity buffer for 1.5x expected steady-state." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0024_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0024_0 a doc:Evidence ;
+    doc:hasQuote "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0024_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0024_0 a doc:Locator ;
+    doc:hasCharStart 1353 ;
+    doc:hasCharEnd 1945 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0025 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Autoscaling burst into shared pool is allowed with pre-authorized fallback." ;
+    doc:hasModality doc:Permission ;
+    doc:hasCondition "pre-authorized fallback" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0025_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0025_0 a doc:Evidence ;
+    doc:hasQuote "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0025_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0025_0 a doc:Locator ;
+    doc:hasCharStart 1353 ;
+    doc:hasCharEnd 1945 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0026 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Explicit routing policy for latency-first vs cost-first is a need." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0026_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0026_0 a doc:Evidence ;
+    doc:hasQuote "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0026_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0026_0 a doc:Locator ;
+    doc:hasCharStart 1353 ;
+    doc:hasCharEnd 1945 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0027 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Customer wants latency-first for ops-critical calls." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasActor "Customer" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0027_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0027_0 a doc:Evidence ;
+    doc:hasQuote "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0027_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0027_0 a doc:Locator ;
+    doc:hasCharStart 1353 ;
+    doc:hasCharEnd 1945 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0028 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Customer requires SOC2 Type II report." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasActor "Customer" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0028_0, ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0028_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0028_0 a doc:Evidence ;
+    doc:hasQuote "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0028_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0028_0 a doc:Locator ;
+    doc:hasCharStart 1946 ;
+    doc:hasCharEnd 2633 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0028_1 a doc:Evidence ;
+    doc:hasQuote "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:" ;
+    doc:evidenceRole doc:contextRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0028_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0028_1 a doc:Locator ;
+    doc:hasCharStart 1353 ;
+    doc:hasCharEnd 1945 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0029 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Customer requires KMS integration for customer-managed keys." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasActor "Customer" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0029_0, ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0029_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0029_0 a doc:Evidence ;
+    doc:hasQuote "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0029_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0029_0 a doc:Locator ;
+    doc:hasCharStart 1946 ;
+    doc:hasCharEnd 2633 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0029_1 a doc:Evidence ;
+    doc:hasQuote "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:" ;
+    doc:evidenceRole doc:contextRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0029_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0029_1 a doc:Locator ;
+    doc:hasCharStart 1353 ;
+    doc:hasCharEnd 1945 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0030 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Customer requires audit logs retained 12 months." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasActor "Customer" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0030_0, ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0030_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0030_0 a doc:Evidence ;
+    doc:hasQuote "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0030_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0030_0 a doc:Locator ;
+    doc:hasCharStart 1946 ;
+    doc:hasCharEnd 2633 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0030_1 a doc:Evidence ;
+    doc:hasQuote "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:" ;
+    doc:evidenceRole doc:contextRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0030_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0030_1 a doc:Locator ;
+    doc:hasCharStart 1353 ;
+    doc:hasCharEnd 1945 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0031 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Customer requires option for EU-only residency for EU traffic." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasActor "Customer" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0031_0, ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0031_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0031_0 a doc:Evidence ;
+    doc:hasQuote "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0031_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0031_0 a doc:Locator ;
+    doc:hasCharStart 1946 ;
+    doc:hasCharEnd 2633 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0031_1 a doc:Evidence ;
+    doc:hasQuote "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:" ;
+    doc:evidenceRole doc:contextRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0031_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0031_1 a doc:Locator ;
+    doc:hasCharStart 1353 ;
+    doc:hasCharEnd 1945 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0032 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "POC Week 0 is onboarding, network peering, SSO test (SAML)." ;
+    doc:hasModality doc:ProcedureStep ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0032_0, ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0032_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0032_0 a doc:Evidence ;
+    doc:hasQuote "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0032_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0032_0 a doc:Locator ;
+    doc:hasCharStart 1946 ;
+    doc:hasCharEnd 2633 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0032_1 a doc:Evidence ;
+    doc:hasQuote "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:" ;
+    doc:evidenceRole doc:contextRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0032_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0032_1 a doc:Locator ;
+    doc:hasCharStart 1353 ;
+    doc:hasCharEnd 1945 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0033 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "POC Week 1 is model import + inference validation, baseline latency/throughput profiling." ;
+    doc:hasModality doc:ProcedureStep ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0033_0, ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0033_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0033_0 a doc:Evidence ;
+    doc:hasQuote "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0033_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0033_0 a doc:Locator ;
+    doc:hasCharStart 1946 ;
+    doc:hasCharEnd 2633 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0033_1 a doc:Evidence ;
+    doc:hasQuote "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:" ;
+    doc:evidenceRole doc:contextRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0033_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0033_1 a doc:Locator ;
+    doc:hasCharStart 1353 ;
+    doc:hasCharEnd 1945 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0034 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "POC Week 2 is load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning." ;
+    doc:hasModality doc:ProcedureStep ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0034_0, ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0034_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0034_0 a doc:Evidence ;
+    doc:hasQuote "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0034_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0034_0 a doc:Locator ;
+    doc:hasCharStart 1946 ;
+    doc:hasCharEnd 2633 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0034_1 a doc:Evidence ;
+    doc:hasQuote "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:" ;
+    doc:evidenceRole doc:contextRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0034_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0034_1 a doc:Locator ;
+    doc:hasCharStart 1353 ;
+    doc:hasCharEnd 1945 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0035 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "POC Week 3 is SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing." ;
+    doc:hasModality doc:ProcedureStep ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0035_0, ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0035_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0035_0 a doc:Evidence ;
+    doc:hasQuote "customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic. - POC summary (3 weeks): * Week 0: onboarding, network peering, SSO test (SAML). * Week 1: model import + inference validation, baseline latency/throughput profiling. * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning. * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing. - POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending." ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0035_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0035_0 a doc:Locator ;
+    doc:hasCharStart 1946 ;
+    doc:hasCharEnd 2633 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0035_1 a doc:Evidence ;
+    doc:hasQuote "Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW. - Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls). - Security/compliance:" ;
+    doc:evidenceRole doc:contextRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0035_1 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0035_1 a doc:Locator ;
+    doc:hasCharStart 1353 ;
+    doc:hasCharEnd 1945 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0036 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Finance wants committed capacity discount tiers." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasActor "Finance" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0036_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0036_0 a doc:Evidence ;
+    doc:hasQuote "- Procurement notes: finance wants committed capacity discount tiers and an option to convert to Dedicated Reserved on annual renewal. Legal flagged service credit language and liability cap. - Quote history: pricing deck sent 2026-02-28 (drive link). Redwood gave two sizing options: 8x reserved (latency-priority) and 12x with burst (cost amortized). Horizon Quay prefers 8x + autoscale to shared. - Direct quotes from stakeholders: \"We cannot accept blackouts during port shift windows - any maintenance must be out of peak or have a clear failover plan.\" - Head of Ops. - Next steps (concrete): Redwood to produce SLA redline + SOW by 2026-03-17; schedule legal review call 2026-03-22;" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0036_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0036_0 a doc:Locator ;
+    doc:hasCharStart 2634 ;
+    doc:hasCharEnd 3323 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0037 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Finance wants an option to convert to Dedicated Reserved on annual renewal." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasActor "Finance" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0037_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0037_0 a doc:Evidence ;
+    doc:hasQuote "- Procurement notes: finance wants committed capacity discount tiers and an option to convert to Dedicated Reserved on annual renewal. Legal flagged service credit language and liability cap. - Quote history: pricing deck sent 2026-02-28 (drive link). Redwood gave two sizing options: 8x reserved (latency-priority) and 12x with burst (cost amortized). Horizon Quay prefers 8x + autoscale to shared. - Direct quotes from stakeholders: \"We cannot accept blackouts during port shift windows - any maintenance must be out of peak or have a clear failover plan.\" - Head of Ops. - Next steps (concrete): Redwood to produce SLA redline + SOW by 2026-03-17; schedule legal review call 2026-03-22;" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0037_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0037_0 a doc:Locator ;
+    doc:hasCharStart 2634 ;
+    doc:hasCharEnd 3323 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0038 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Redwood gave two sizing options: 8x reserved (latency-priority) and 12x with burst (cost amortized)." ;
+    doc:hasModality doc:Definition ;
+    doc:hasActor "Redwood" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0038_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0038_0 a doc:Evidence ;
+    doc:hasQuote "- Procurement notes: finance wants committed capacity discount tiers and an option to convert to Dedicated Reserved on annual renewal. Legal flagged service credit language and liability cap. - Quote history: pricing deck sent 2026-02-28 (drive link). Redwood gave two sizing options: 8x reserved (latency-priority) and 12x with burst (cost amortized). Horizon Quay prefers 8x + autoscale to shared. - Direct quotes from stakeholders: \"We cannot accept blackouts during port shift windows - any maintenance must be out of peak or have a clear failover plan.\" - Head of Ops. - Next steps (concrete): Redwood to produce SLA redline + SOW by 2026-03-17; schedule legal review call 2026-03-22;" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0038_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0038_0 a doc:Locator ;
+    doc:hasCharStart 2634 ;
+    doc:hasCharEnd 3323 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0039 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Horizon Quay prefers 8x + autoscale to shared." ;
+    doc:hasModality doc:Recommendation ;
+    doc:hasActor "Horizon Quay" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0039_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0039_0 a doc:Evidence ;
+    doc:hasQuote "- Procurement notes: finance wants committed capacity discount tiers and an option to convert to Dedicated Reserved on annual renewal. Legal flagged service credit language and liability cap. - Quote history: pricing deck sent 2026-02-28 (drive link). Redwood gave two sizing options: 8x reserved (latency-priority) and 12x with burst (cost amortized). Horizon Quay prefers 8x + autoscale to shared. - Direct quotes from stakeholders: \"We cannot accept blackouts during port shift windows - any maintenance must be out of peak or have a clear failover plan.\" - Head of Ops. - Next steps (concrete): Redwood to produce SLA redline + SOW by 2026-03-17; schedule legal review call 2026-03-22;" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0039_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0039_0 a doc:Locator ;
+    doc:hasCharStart 2634 ;
+    doc:hasCharEnd 3323 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0040 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Horizon Quay cannot accept blackouts during port shift windows." ;
+    doc:hasModality doc:Prohibition ;
+    doc:hasActor "Horizon Quay" ;
+    doc:hasCondition "during port shift windows" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0040_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0040_0 a doc:Evidence ;
+    doc:hasQuote "- Procurement notes: finance wants committed capacity discount tiers and an option to convert to Dedicated Reserved on annual renewal. Legal flagged service credit language and liability cap. - Quote history: pricing deck sent 2026-02-28 (drive link). Redwood gave two sizing options: 8x reserved (latency-priority) and 12x with burst (cost amortized). Horizon Quay prefers 8x + autoscale to shared. - Direct quotes from stakeholders: \"We cannot accept blackouts during port shift windows - any maintenance must be out of peak or have a clear failover plan.\" - Head of Ops. - Next steps (concrete): Redwood to produce SLA redline + SOW by 2026-03-17; schedule legal review call 2026-03-22;" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0040_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0040_0 a doc:Locator ;
+    doc:hasCharStart 2634 ;
+    doc:hasCharEnd 3323 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0041 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Any maintenance must be out of peak or have a clear failover plan." ;
+    doc:hasModality doc:Obligation ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0041_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0041_0 a doc:Evidence ;
+    doc:hasQuote "- Procurement notes: finance wants committed capacity discount tiers and an option to convert to Dedicated Reserved on annual renewal. Legal flagged service credit language and liability cap. - Quote history: pricing deck sent 2026-02-28 (drive link). Redwood gave two sizing options: 8x reserved (latency-priority) and 12x with burst (cost amortized). Horizon Quay prefers 8x + autoscale to shared. - Direct quotes from stakeholders: \"We cannot accept blackouts during port shift windows - any maintenance must be out of peak or have a clear failover plan.\" - Head of Ops. - Next steps (concrete): Redwood to produce SLA redline + SOW by 2026-03-17; schedule legal review call 2026-03-22;" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0041_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0041_0 a doc:Locator ;
+    doc:hasCharStart 2634 ;
+    doc:hasCharEnd 3323 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0042 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Redwood is to produce SLA redline + SOW by 2026-03-17." ;
+    doc:hasModality doc:ProcedureStep ;
+    doc:hasActor "Redwood" ;
+    doc:hasDeadline "2026-03-17" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0042_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0042_0 a doc:Evidence ;
+    doc:hasQuote "- Procurement notes: finance wants committed capacity discount tiers and an option to convert to Dedicated Reserved on annual renewal. Legal flagged service credit language and liability cap. - Quote history: pricing deck sent 2026-02-28 (drive link). Redwood gave two sizing options: 8x reserved (latency-priority) and 12x with burst (cost amortized). Horizon Quay prefers 8x + autoscale to shared. - Direct quotes from stakeholders: \"We cannot accept blackouts during port shift windows - any maintenance must be out of peak or have a clear failover plan.\" - Head of Ops. - Next steps (concrete): Redwood to produce SLA redline + SOW by 2026-03-17; schedule legal review call 2026-03-22;" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0042_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0042_0 a doc:Locator ;
+    doc:hasCharStart 2634 ;
+    doc:hasCharEnd 3323 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0043 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Scheduled load test is 2026-03-15." ;
+    doc:hasModality doc:ProcedureStep ;
+    doc:hasDeadline "2026-03-15" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0043_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0043_0 a doc:Evidence ;
+    doc:hasQuote "- Procurement notes: finance wants committed capacity discount tiers and an option to convert to Dedicated Reserved on annual renewal. Legal flagged service credit language and liability cap. - Quote history: pricing deck sent 2026-02-28 (drive link). Redwood gave two sizing options: 8x reserved (latency-priority) and 12x with burst (cost amortized). Horizon Quay prefers 8x + autoscale to shared. - Direct quotes from stakeholders: \"We cannot accept blackouts during port shift windows - any maintenance must be out of peak or have a clear failover plan.\" - Head of Ops. - Next steps (concrete): Redwood to produce SLA redline + SOW by 2026-03-17; schedule legal review call 2026-03-22;" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0043_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0043_0 a doc:Locator ;
+    doc:hasCharStart 2634 ;
+    doc:hasCharEnd 3323 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .
+
+ex:claim_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0044 a doc:Claim ;
+    doc:inContext ex:ctx_dsid_03af1e44970d4d6db6e85bc2c5fce8de ;
+    doc:hasStatement "Legal review call schedule is 2026-03-22." ;
+    doc:hasModality doc:ProcedureStep ;
+    doc:hasDeadline "2026-03-22" ;
+    doc:hasEvidence ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0044_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+
+ex:ev_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0044_0 a doc:Evidence ;
+    doc:hasQuote "- Procurement notes: finance wants committed capacity discount tiers and an option to convert to Dedicated Reserved on annual renewal. Legal flagged service credit language and liability cap. - Quote history: pricing deck sent 2026-02-28 (drive link). Redwood gave two sizing options: 8x reserved (latency-priority) and 12x with burst (cost amortized). Horizon Quay prefers 8x + autoscale to shared. - Direct quotes from stakeholders: \"We cannot accept blackouts during port shift windows - any maintenance must be out of peak or have a clear failover plan.\" - Head of Ops. - Next steps (concrete): Redwood to produce SLA redline + SOW by 2026-03-17; schedule legal review call 2026-03-22;" ;
+    doc:evidenceRole doc:supportsRole ;
+    doc:hasLocator ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0044_0 ;
+    prov:wasDerivedFrom ex:doc_dsid_03af1e44970d4d6db6e85bc2c5fce8de .
+ex:loc_dsid_03af1e44970d4d6db6e85bc2c5fce8de-0044_0 a doc:Locator ;
+    doc:hasCharStart 2634 ;
+    doc:hasCharEnd 3323 ;
+    doc:hasSourceUrl <https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench> ;
+    doc:inSection ex:sec_dsid_03af1e44970d4d6db6e85bc2c5fce8de_000 .

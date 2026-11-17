@@ -80,7 +80,7 @@ def test_language_of_reads_the_function_words():
 
 def test_language_of_refuses_to_guess():
     # An address, a number and a label have no grammar to read.
-    assert language_of("Via Esempio Is. G7 80143 - Napoli") is None
+    assert language_of("Via Esempio Is. G7 00100 - Roma") is None
     assert language_of("33") is None
     # "in" is Italian as well as English, so it decides nothing on its own.
     assert language_of("in in in in") is None
@@ -89,7 +89,7 @@ def test_language_of_refuses_to_guess():
 def test_document_language_skips_labels_and_reads_the_opening_prose():
     paragraphs = [
         "CERTIFICATO N. QMS00000001",
-        "Via Esempio Is. G7 80143 - Napoli",
+        "Via Esempio Is. G7 00100 - Roma",
         "Si certifica che il Sistema di Gestione per la Qualità dell'Organizzazione è conforme.",
         "We certify that the Quality Management System of the above Organization complies.",
     ]

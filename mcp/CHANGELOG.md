@@ -4,6 +4,13 @@ All notable changes to ontomcp (Rust MCP Server) will be documented in this file
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **Document knowledge-base tools: `documents_ask`, `documents_claim`, `documents_query`** — Served in-process over the artifact `ontocore documents ingest` writes. `documents_ask` ranks claims with the same BM25 as `compiler.documents.ask` (same fields, weights, stopwords and seven-character stem), returns each citation with its quote, locator, score and verifier verdict, and reports the durations the corpus disagrees about; `documents_claim` returns every evidence item with its locator, re-checked against the source at query time; `documents_query` runs read-only `SELECT`/`ASK` over `graph.ttl`, capped at 2 000 rows and 2 s, refusing mutations with the keyword named. No model call, no socket, no file written. `mcp/docs/documents-read-path.md` is the specification; `mcp/tests/fixtures/documents/` is the slice the Rust and Python answers are compared on.
+- **`documents_ask` selects, instead of cutting** — The answer is chosen from a pool of `max(limit * 10, 100)` citations: at each step the claim whose quote covers the most still-unclaimed question terms wins, with the corpus IDF as the weight. It is the lexical chooser the pilot measured at +8,03 pp on held-out questions (`benchmark/layer/RANKER.md`), ported with the same arithmetic so the Python and Rust orders agree claim for claim.
+
 ## [1.2.0] - 2026-05-07
 
 ### Changed

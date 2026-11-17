@@ -51,6 +51,14 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["compiler", "compiler.cli", "compiler.embeddings", "compiler.registry", "compiler.documents"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+# The specs are read at runtime — the SHACL shapes by `validator`, the document
+# TBox by `documents.store` — so a wheel without them installs a package whose
+# first compile fails with FileNotFoundError. They live inside the package
+# because data files outside it do not survive `python -m build`.
+compiler = ["specs/*.ttl"]
 
 [tool.setuptools.package-dir]
 compiler = "src"

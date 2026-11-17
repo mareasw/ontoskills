@@ -1,10 +1,15 @@
 """Tests for new ontology properties (OntoCore refactoring)."""
 
+from pathlib import Path
+
 import pytest
 from rdflib import Graph, Namespace, RDF, Literal, XSD
 
 OC = Namespace("https://ontoskills.sh/ontology#")
 CORE_TTL_PATH = "site/public/ontology/core.ttl"
+# The shapes ship inside the package, because a wheel without them installs a
+# validator that cannot open its own constitution.
+SHACL_TTL_PATH = Path(__file__).resolve().parents[1] / "src" / "specs" / "ontoskills.shacl.ttl"
 
 
 @pytest.fixture
@@ -70,7 +75,7 @@ class TestNewShaclShapes:
     @pytest.fixture
     def shacl_graph(self):
         g = Graph()
-        g.parse("core/specs/ontoskills.shacl.ttl", format="turtle")
+        g.parse(SHACL_TTL_PATH, format="turtle")
         return g
 
     NEW_PROPERTIES = [

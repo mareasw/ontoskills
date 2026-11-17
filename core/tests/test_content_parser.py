@@ -3,6 +3,20 @@ import pytest
 from compiler.content_parser import extract_structural_content
 
 
+@pytest.fixture(autouse=True)
+def _deterministic_parser(monkeypatch):
+    """Parse without asking a model, so this suite means one thing everywhere.
+
+    ``extract_structural_content`` takes an LLM-assisted path whenever an API
+    key happens to be in the environment. A developer with a key therefore got
+    a different parser from CI, and the local suite went red on an assertion
+    that only the deterministic path satisfies. These tests are about the
+    deterministic path.
+    """
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+
+
 class TestSectionTree:
     def test_single_section_with_paragraph(self):
         md = "## Overview\n\nThis is the overview text.\n"
