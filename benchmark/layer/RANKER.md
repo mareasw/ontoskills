@@ -37,10 +37,10 @@ facts (`oracle.py`, 0 $, no model call):
 
 | what | coverage | characters per question |
 |---|---|---|
-| what the product returned when this began: 10 claims, the first quote of each | **63,94 %** | 5 097 |
+| what the product returned when this began: 10 claims, the first quote of each | **63,94 %** | 5 088 |
 | those same 10 claims, every quote they carry | 68,23 % | 7 104 |
 | the best *single* claim per fact, over all 9 104 verified claims | 54,48 % | — |
-| **ten claims chosen at best, one quote each** | **90,97 %** | 5 097 |
+| **ten claims chosen at best, one quote each** | **90,97 %** | 5 088 |
 | ten claims chosen at best, every quote | 92,90 % | — |
 | the floor, at our volume (~5 000 characters) | 71,1 % | ~4 800 |
 | the floor, unconstrained | 92,4 % | 45 885 |
@@ -100,7 +100,7 @@ That is the number the plan is built on, and it changes the order of the repairs
 |---|---|---|
 | the claims are not in the knowledge base | oracle ceiling 90,97 % | **false** |
 | the representation is too coarse | ceiling at our volume beats the floor at our volume, 90,97 vs 71,1 | **false** |
-| volume alone explains the gap | the floor needs 45 885 characters to reach 92,4 %; we return 5 097 | **partial** — it explains the floor's number, not ours |
+| volume alone explains the gap | the floor needs 45 885 characters to reach 92,4 %; our row returned 5 097 before the chooser and 4 948 after | **partial** — it explains the floor's number, not ours |
 | the field weights are the whole story | product 63,94 vs naive BM25 on the same shape 59,06–63,53 (§3) | **false** — the product's ranker is already the best lexical variant tested |
 | candidate generation is the binding constraint | top 100 ceiling 87,63 at dev; we are at 63,59 | **false for the first 24 points** — it becomes true near 87,6 |
 | the port is the problem | Python 747 ms vs Rust 18,8 ms, same ids (G1) | **false** — latency, not selection |
@@ -465,7 +465,7 @@ saying the volume.
 | claim embeddings (E2) | 0 $, 856 s on the Quadro T2000 (10,86 claims/s), 39,8 MB | done |
 | reranker model (E5) | 0 $, model download only | done, rejected |
 | a held-out ERB slice to confirm the winner is not slice-specific | 2–4 $ projected, needs approval | after the test number is frozen |
-| GraphRAG `global` on the 12 corpus-level questions | already budgeted | when the main run finishes |
+| GraphRAG `global` on the 12 corpus-level questions | **not run**: maps over 1 298 community reports per question, so it needs its own estimate | after approval |
 | LightRAG full row | 13–18 $ projected, 12–23 h, needs approval | after the ladder |
 
 The ladder itself cannot spend money, which is the point: every rung is a
@@ -479,13 +479,26 @@ legitimate and what it would cost; no row is written before its run.
 
 | system | what it does | eligible on these terms | cost to a row |
 |---|---|---|---|
-| GraphRAG `local` | entity graph + community reports, answers by local search | yes, same corpus, same model, embeddings served on 8091 | build measured; 200 questions running |
+| GraphRAG `local` | entity graph + community reports, answers by local search | yes, same corpus, same model, embeddings served on 8091 | **measured**: 11,09 $ and 21 h 19 min to build, 0,50 $ and 23,8 s per question; 78,4 % on the 152 of 192 it answered, 62,1 % with its refusals at zero |
 | GraphRAG `global` | map-reduce over community reports | yes, but a different query shape (corpus-level) | same build, query cost only |
-| LightRAG `mix` | dual-level graph + vector retrieval | yes | 13–18 $ projected, needs approval |
+| LightRAG `mix` | dual-level graph + vector retrieval | yes | 13–18 $ projected (a floor, §7.1 of LAYER.md), needs approval |
 | Nano-GraphRAG | minimal GraphRAG, same idea at small scale | yes if it ingests a folder and takes the model | small, to be measured |
 | RAPTOR | recursive summary tree over chunks | yes, no graph | embedding + summary calls, to be measured |
 | HippoRAG | personalized PageRank over an entity graph | yes | extraction + embeddings, to be measured |
 | Cognee | graph + vector pipeline with its own ontology | yes | to be measured |
+
+**What the one finished competitor says about the ranking question.** At 2,7
+times our build cost and 32 times our per-question latency, GraphRAG covers 5,2
+points more of the gold facts than our answer mode *when it answers* — and it
+declines a fifth of the answerable questions to get there, which costs it 11,4
+points against us when refusals are counted as zero. Neither number touches the
+selection finding: the graph layer's advantage is a different unit of output (a
+paragraph that can restate the gold sentence) and a retrieval corpus that reaches
+past the lexical pool, not a better choice among ten items of the same kind. The
+one thing it does say about selection is that our ceiling is not the corpus's:
+with a graph over the same 279 documents, answers reach facts that our top 100
+citations do not contain, which is what §2's depth curve already implied at 87,6
+%.
 
 Our advantage, if the ladder works, is not "a better model" — it is that the
 compiled layer answers with **verified claims and locators**, at 0 $ per query,
