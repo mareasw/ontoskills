@@ -59,6 +59,6 @@ The same script writes `mcp/src/documents/stopwords.rs` from
 across a language boundary by hand is a list that drifts.
 
 Regenerating changes `golden.json` whenever the ranking changes, which is the
-point: `benchmark/tests/test_documents_fixture.py` recomputes those answers with
+point: `benchmark/tests/test_layer_documents_fixture.py` recomputes those answers with
 the current Python code, so a commit that changes the ranking without
 regenerating fails on the Python side before the Rust side is asked to match it.

@@ -106,7 +106,13 @@ jobs:
           python-version: "3.12"
 
       - name: Install
-        run: pip install pytest ruff numpy scipy snowballstemmer
+        # The layer is part of this harness and imports the compiler's document
+        # modules (`compiler.documents.text`, `.ask`), so the core package is
+        # installed here instead of being stubbed. Installing it is also what the
+        # `The harness imports` step below is checking.
+        run: |
+          pip install pytest ruff numpy scipy snowballstemmer
+          pip install -e ./core
 
       - name: Lint (syntax, undefined names, unused imports)
         # Scoped to the files this harness owns: the rest of benchmark/tests has
