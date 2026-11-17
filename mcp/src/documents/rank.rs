@@ -1,16 +1,19 @@
 //! The ranking, ported from `compiler.documents.ask`.
 //!
-//! BM25 over six weighted fields, de-duplicated by statement, with the rest of
-//! the answer built around each hit: the quote, the locator, the document, the
-//! verifier's verdict, and the contradiction links the corpus implies.
+//! BM25 over six weighted fields, de-duplicated by statement, then a greedy
+//! chooser (`cover_select`) over the wider pool, with the rest of the answer
+//! built around each hit: the quote, the locator, the document, the verifier's
+//! verdict, and the contradiction links the corpus implies.
 //!
-//! The port is literal on purpose. Two details that look like accidents are
+//! The port is literal on purpose. Three details that look like accidents are
 //! reproduced because the measured ranking depends on them:
 //!
 //! * a field is repeated `max(1, round(weight))` times instead of multiplying
 //!   the score — the statement becomes three tokens in the bag, not a weight;
 //! * de-duplication happens *after* the cut to `max(limit * 4, limit)`, so a
-//!   duplicate inside the window can shorten the answer.
+//!   duplicate inside the window can shorten the answer;
+//! * the chooser's weights are summed in question order and ties keep the
+//!   first index, because the pilot's number was measured with that arithmetic.
 //!
 //! `mcp/tests/fixtures/documents/golden.json` carries the Python answers for 25
 //! fixed questions, and the test at the bottom of this file requires the exact
@@ -249,6 +252,14 @@ impl Index {
         (1.0 + (total - df + 0.5) / (df + 0.5)).ln()
     }
 
+    /// `Corpus._idf(term)`: the weight the chooser gives one question term.
+    ///
+    /// Python reads a document-frequency map built over the same claims; here the
+    /// posting list *is* that map — one entry per claim that carries the term.
+    pub fn idf_of(&self, term: &str) -> f64 {
+        self.idf(self.postings.get(term).map_or(0, |list| list.len()) as f64)
+    }
+
     /// The claims the question ranks, best first, already filtered and cut.
     ///
     /// `question` is the caller's text; the tokenizer and the stopword list are
@@ -374,9 +385,15 @@ pub fn round4(value: f64) -> f64 {
 }
 
 /// `ask()`: the answer to one question.
+///
+/// The pool is ten times `limit` or a hundred citations, whichever is larger,
+/// exactly as `ask.py` builds it; `cover_select` then decides which of them come
+/// back. The search itself is unchanged, so a corpus whose quotes share no
+/// question term still answers with the ranker's own order.
 pub fn ask(kb: &Kb, question: &str, limit: usize, include_unverified: bool) -> Answer {
     let index = kb.index_with(include_unverified);
-    let citations = index.search(kb, question, limit);
+    let pool = index.search(kb, question, limit.saturating_mul(10).max(100));
+    let citations = cover_select(pool, index, question, limit);
     let tensions = find_tensions(&citations);
     Answer {
         question: question.to_string(),
@@ -384,6 +401,90 @@ pub fn ask(kb: &Kb, question: &str, limit: usize, include_unverified: bool) -> A
         tensions,
         searched: index.len(),
     }
+}
+
+/// `cover()` in `ask.py`: greedy over the question's own terms.
+///
+/// At each step the claim that adds the most uncovered question terms wins, with
+/// the corpus IDF as the weight; a chosen claim removes its terms, so the second
+/// claim covering the same word adds nothing. The remaining weights are kept in
+/// question order and summed in that order, which is the floating-point sum the
+/// Python chooser produces; a tie keeps the first index, as `>` does there.
+///
+/// The pool is never shortened below `k` when it has `k` claims: the fill at the
+/// end returns the ranker's order rather than let the chooser be rewarded for
+/// refusing.
+pub fn cover_select(
+    citations: Vec<Citation>,
+    index: &Index,
+    question: &str,
+    k: usize,
+) -> Vec<Citation> {
+    let mut terms = content(question);
+    for term in &mut terms {
+        key_in_place(term);
+    }
+    let mut weights: Vec<(String, f64)> = Vec::new();
+    for term in terms {
+        if !weights.iter().any(|(known, _)| *known == term) {
+            let weight = index.idf_of(&term);
+            weights.push((term, weight));
+        }
+    }
+
+    let present: Vec<HashSet<String>> = citations
+        .iter()
+        .map(|citation| {
+            let mut quote_terms = content(&citation.quote);
+            for term in &mut quote_terms {
+                key_in_place(term);
+            }
+            quote_terms.into_iter().collect()
+        })
+        .collect();
+
+    let mut picked: Vec<usize> = Vec::new();
+    let mut taken = vec![false; citations.len()];
+    let mut remaining = weights;
+    for _ in 0..k.min(citations.len()) {
+        let mut best: Option<usize> = None;
+        let mut best_gain = 0.0f64;
+        for (position, terms_here) in present.iter().enumerate() {
+            if taken[position] {
+                continue;
+            }
+            let mut gain = 0.0f64;
+            for (term, weight) in &remaining {
+                if terms_here.contains(term) {
+                    gain += *weight;
+                }
+            }
+            if gain > best_gain {
+                best = Some(position);
+                best_gain = gain;
+            }
+        }
+        let Some(best) = best else { break };
+        picked.push(best);
+        taken[best] = true;
+        remaining.retain(|(term, _)| !present[best].contains(term));
+    }
+
+    for position in 0..citations.len() {
+        if picked.len() >= k {
+            break;
+        }
+        if !taken[position] {
+            picked.push(position);
+            taken[position] = true;
+        }
+    }
+
+    let mut slots: Vec<Option<Citation>> = citations.into_iter().map(Some).collect();
+    picked
+        .into_iter()
+        .filter_map(|position| slots[position].take())
+        .collect()
 }
 
 /// Hours per unit, `UNIT_HOURS` in `ask.py`.
@@ -731,6 +832,60 @@ mod tests {
         assert_eq!(round4(12.345_678), 12.3457);
         assert_eq!(round4(0.000_05), 0.0001);
         assert_eq!(round4(0.000_15), 0.0001);
+    }
+
+    fn citation_with(claim_id: &str, quote: &str) -> Citation {
+        Citation {
+            claim_id: claim_id.to_string(),
+            doc_id: "doc".to_string(),
+            title: String::new(),
+            statement: String::new(),
+            quote: quote.to_string(),
+            page: None,
+            char_start: None,
+            char_end: None,
+            section_path: Vec::new(),
+            url: String::new(),
+            score: 0.0,
+            verdict: "ok".to_string(),
+        }
+    }
+
+    #[test]
+    fn the_chooser_takes_the_claim_that_adds_an_uncovered_question_term() {
+        let kb = fixture();
+        let index = kb.index_with(false);
+        let citations = vec![
+            citation_with("a", "breach notification duty"),
+            citation_with("b", "breach notification duty again"),
+            citation_with("c", "retention of records"),
+        ];
+        let chosen = cover_select(citations, index, "breach retention", 2);
+        let ids: Vec<&str> = chosen.iter().map(|c| c.claim_id.as_str()).collect();
+        assert_eq!(ids, vec!["a", "c"]);
+    }
+
+    #[test]
+    fn the_chooser_fills_to_k_with_the_rankers_own_order() {
+        let kb = fixture();
+        let index = kb.index_with(false);
+        let citations = vec![
+            citation_with("a", "zzz qqq"),
+            citation_with("b", "xxx yyy"),
+            citation_with("c", "www vvv"),
+        ];
+        let chosen = cover_select(citations, index, "breach", 2);
+        let ids: Vec<&str> = chosen.iter().map(|c| c.claim_id.as_str()).collect();
+        assert_eq!(ids, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn the_chooser_never_returns_more_than_the_pool_or_than_k() {
+        let kb = fixture();
+        let index = kb.index_with(false);
+        let citations = vec![citation_with("a", "breach"), citation_with("b", "breach")];
+        assert_eq!(cover_select(citations.clone(), index, "breach", 5).len(), 2);
+        assert_eq!(cover_select(citations, index, "breach", 1).len(), 1);
     }
 
     #[test]

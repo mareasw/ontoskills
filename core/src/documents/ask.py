@@ -13,8 +13,12 @@ stem, so a question phrased in the plural still finds the rule written in the
 singular. When the knowledge base carries local embeddings, the cosine ranking is
 fused with the lexical one by Reciprocal Rank Fusion — ranks only, so there is no
 weight to tune — and a claim the question's words cannot reach is still reachable.
-Claims are grouped by document, because the demo's acceptance criterion is
-*cross-document*: three questions, each answered from at least two documents.
+The pool the ranker returns is then *chosen from*, not cut: `cover` takes the
+claim that adds the most uncovered question terms at each step, because ten
+claims ranked one by one repeat each other and leave the answer half-said
+(`benchmark/layer/RANKER.md`, E1a). Claims are grouped by document, because the
+demo's acceptance criterion is *cross-document*: three questions, each answered
+from at least two documents.
 
 Tensions are the deterministic part of "this corpus does not speak with one
 voice". A number is attached to a topic by the words around it — a breach
@@ -232,6 +236,16 @@ class Corpus:
             for term in set(weighted):
                 self.df[term] = self.df.get(term, 0) + 1
         self.avg_length = (sum(self.lengths) / len(self.lengths)) if self.lengths else 0.0
+        # The first quote is the text a citation returns, and the chooser in
+        # ``ask`` compares the question against exactly that text. Tokenising it
+        # once per corpus instead of once per question is the only reason it is
+        # stored: the set is the same one ``_content`` produces on the fly.
+        self.quote_terms: dict[str, set[str]] = {}
+        for claim in self.claims:
+            first = (claim.get("evidence") or [{}])[0]
+            self.quote_terms[claim["claim_id"]] = {
+                _key(term) for term in _content(first.get("quote") or "")
+            }
 
     def _idf(self, term: str) -> float:
         total = len(self.claims)
@@ -431,11 +445,69 @@ def find_tensions(citations: list[Citation]) -> list[Tension]:
     return tensions
 
 
+def cover(
+    citations: list[Citation], corpus: Corpus, question: str, k: int
+) -> list[Citation]:
+    """Greedy: at each step, the claim that adds the most uncovered question terms.
+
+    This is the chooser the pilot measured (`benchmark/layer/RANKER.md`, E1a) and
+    then shipped: the claims are the product's own, in the product's own order,
+    and only *which* k of them come back changes. The weights are the corpus's
+    IDF, so a rare word in the question outweighs a common one, and a term leaves
+    the set as soon as a chosen claim carries it — the second claim covering the
+    same word adds nothing.
+
+    A pool whose quotes share no question term still answers with the ranker's
+    own order: the chooser must never return fewer than ``k`` claims when the
+    pool has them, or it would be rewarded for refusing.
+    """
+    terms = [_key(term) for term in _content(question)]
+    weights: dict[str, float] = {}
+    for term in terms:
+        weights.setdefault(term, corpus._idf(term))
+    present = [corpus.quote_terms.get(citation.claim_id, set()) for citation in citations]
+
+    picked: list[int] = []
+    taken: set[int] = set()
+    remaining = dict(weights)
+    for _ in range(min(k, len(citations))):
+        best, best_gain = None, 0.0
+        for index, terms_here in enumerate(present):
+            if index in taken:
+                continue
+            gain = sum(weight for term, weight in remaining.items() if term in terms_here)
+            if gain > best_gain:
+                best, best_gain = index, gain
+        if best is None:
+            break
+        picked.append(best)
+        taken.add(best)
+        for term in present[best]:
+            remaining.pop(term, None)
+
+    for index in range(len(citations)):
+        if len(picked) >= k:
+            break
+        if index not in taken:
+            picked.append(index)
+            taken.add(index)
+    return [citations[index] for index in picked]
+
+
 def ask(question: str, corpus: Corpus, limit: int = 12) -> Answer:
+    """The answer to one question: the pool, then the chooser, then the tensions.
+
+    The pool is ten times ``limit`` or a hundred citations, whichever is larger,
+    because the chooser can only choose among what the ranker returned; at the
+    pilot's ``limit`` of ten this is the top hundred the ranker was measured on.
+    """
+    if not tokens(question):
+        return Answer(question=question, citations=[], tensions=[])
     # The model, when one is enabled, runs once per question, here: ``search``
     # only ever sees the resulting ranks.
-    semantic = corpus.semantic_ranking(question) if tokens(question) else []
-    citations = corpus.search(question, limit=limit, semantic_ranking=semantic)
+    semantic = corpus.semantic_ranking(question)
+    pool = corpus.search(question, limit=max(limit * 10, 100), semantic_ranking=semantic)
+    citations = cover(pool, corpus, question, limit)
     return Answer(question=question, citations=citations, tensions=find_tensions(citations))
 
 
