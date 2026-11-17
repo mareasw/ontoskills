@@ -56,7 +56,7 @@ code is written.
 
 | tool | input | output |
 |---|---|---|
-| `documents_ask` | `q`, `kb`, `k` (default 10), `include_unverified` (default false) | citations in rank order: `claim_id`, `doc_id`, `statement`, `quote`, `locator`, `score`, `verdict`; `documents`; `refused` |
+| `documents_ask` | `q`, `kb`, `k` (default 10), `include_unverified` (default false) | citations in rank order: `claim_id`, `doc_id`, `title`, `statement`, `quote`, `locator`, `score`, `verdict`; `documents` |
 | `documents_claim` | `claim_id`, `kb` | the claim, **all** its evidence with roles and locators, the verifier verdict with reasons, `conflicts_with` |
 | `documents_query` | `sparql`, `kb` | bound rows of a read-only `SELECT`/`ASK` |
 
@@ -157,8 +157,21 @@ Contract:
 `documents_ask` cites only claims the verifier passed (`ok`), unless the caller
 asks for the rest, in which case each citation carries its verdict. The pilot's
 false-refusal rate is 0,0 % because the system never refuses; v1 preserves that
-behaviour exactly. Improving it is a product change with its own measurement, not
-something to slip in while wiring a transport.
+behaviour exactly.
+
+Two consequences, both deliberate, both visible in the output:
+
+- **No `refused` field.** An earlier draft of this table had one, and there is
+  nothing in the measured system to fill it with: `Answer` carries `question`,
+  `citations` and `tensions`, and an empty citation list *is* the answer. A
+  boolean invented here would be a field no number in LAYER.md describes, and
+  the first client to branch on it would branch on a promise.
+- **Missing verdict means `ok`.** A claim absent from a non-empty
+  `verifier.jsonl` passes the filter, as it does in Python, and an entirely empty
+  verifier file disables the filter instead of rejecting everything. `weak` and
+  `no` claims are hidden by default and shown, with their badge, when the caller
+  asks. `include_unverified` is therefore "audit surface", not "ok plus weak":
+  turning it on also exposes the claims the verifier refused.
 
 ### 5. Configuration and safety
 
@@ -197,6 +210,17 @@ The work is done when all of these are true and checkable in CI:
   character wider in one language than the other.
 - **G8 — no network.** The 200 asks run with the network namespace empty (or with
   an env-var guard that fails on egress) and produce the same answers.
+
+**Outcome (2026-11-17).** All eight gates are green on the pilot artifact, and
+the numbers are in `LAYER.md` §10 with the two reports beside the rest of the
+pilot's evidence. The measured figure is **3,5 ms median and 5,2 ms p95** per
+`ask` against the 300 ms gate, after a first call of 1,16 s that pays the artifact
+load and the index build. The Python path the pilot was scored on reports 418 ms
+per question, and the gap is not a faster implementation of the same loop:
+`Corpus.search` recounts every claim's terms on every question, while the port's
+index is inverted and built once. G1 is what makes the comparison about the same
+ranking rather than about speed — 200 of 200 questions, the same claim ids in the
+same order.
 
 ## Work breakdown
 
@@ -256,9 +280,10 @@ not make it better, and this ADR must not be cited as if it did.
   ties? Ties are the only place where two BM25 implementations can diverge
   without a defect, and the harness compares sets within a tie group.
 - Should the Python CLI eventually call the Rust crate (PyO3/maturin) so that
-  one implementation serves both? It would remove the duplicate, at the cost of
-  a native wheel on three platforms. Deferred until the port exists and the
-  parity harness can prove the move.
+  one implementation serves both? The duplicate now costs a Rust index build and
+  a parity harness, and both exist as of 2026-11-17 — but the move would put a
+  native wheel on three platforms, and it changes nothing a user can feel. Deferred
+  until a second consumer of the crate appears.
 - Should `documents_query` ship with saved queries (the "views" of ADR 0002) or
   bare SPARQL? Bare SPARQL first: a saved query is a product decision per
   customer.
