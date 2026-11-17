@@ -25,7 +25,8 @@ Entry points:
 |---|---|---|
 | index build | `Corpus(claims, documents, verdicts, include_unverified=False)` | `ask.py:189` |
 | lexical + fused search | `Corpus.search(question, limit=12, semantic_ranking=None) -> list[Citation]` | `ask.py:277` |
-| answer | `ask(question, corpus, limit=12) -> Answer` | `ask.py:434` |
+| answer | `ask(question, corpus, limit=12) -> Answer` | `ask.py` |
+| selection | `cover(citations, corpus, question, k) -> list[Citation]` | `ask.py` (`cover_select` in `mcp/src/documents/rank.rs`) |
 | tensions | `find_tensions(citations) -> list[Tension]` | `ask.py:391` |
 | text rendering | `render_text(answer) -> str` | `ask.py:442` |
 | CLI | `ontocore ask QUESTION [-k KB] [-n LIMIT] [--json] [--include-unverified] [--semantic/--no-semantic]` | `cli.py:597-630` |
@@ -35,6 +36,11 @@ claims by verdict; build the index; tokenize the question; score every claim; ke
 `score > 0`; sort; optionally fuse with a semantic ranking; take a window of
 `max(limit*4, limit)`; deduplicate by normalized statement; stop at `limit`; build citations;
 compute tensions from those citations only; render.
+
+That pipeline is `Corpus.search`. `ask` wraps it in one more step: it calls `search` with
+`limit = max(limit*10, 100)`, then `cover` (§3.8) chooses `limit` citations out of that pool.
+The window above is therefore the pool's own cut, not the answer's, and the tensions are
+computed from the chosen citations, never from the pool.
 
 The read path never opens `spans.jsonl`, `rejected.jsonl`, `graph.ttl`, `evidence.csv`,
 `view.html`, or `text/<doc_id>.txt`. Quotes come from `claims.jsonl`; a citation carries no
@@ -554,7 +560,45 @@ for index in ranked[: max(limit * 4, limit)]:
 * Default `limit` is 12 in `Corpus.search` (`ask.py:280`), in `ask` (`ask.py:434`) and in the
   CLI option `-n/--limit` (`cli.py:601`).
 
-### 3.8 Score-bearing order versus display order
+### 3.8 Selection — `cover()`, the chooser `ask()` runs after the pool
+
+`ask` does not return `search`'s list. It asks `search` for a **pool** and then
+chooses `limit` citations from it:
+
+```
+semantic = corpus.semantic_ranking(question)
+pool = corpus.search(question, limit=max(limit * 10, 100), semantic_ranking=semantic)
+citations = cover(pool, corpus, question, limit)      # ask.py
+```
+
+`cover(citations, corpus, question, k)` (`ask.py`, and `cover_select` in
+`mcp/src/documents/rank.rs`):
+
+* **Terms.** `_content(question)` — content words, no stopwords — each reduced by
+  `_key` (the 7-character stem rule of §3.6). Duplicates collapse; the order of
+  first appearance is kept, because the weights are summed in that order.
+* **Weights.** `corpus._idf(term) = ln(1 + (N − df + 0.5) / (df + 0.5))` over the
+  corpus the answer is filtered to (verified claims only unless
+  `include_unverified`). A term absent from the corpus has `df = 0` and therefore
+  the largest weight; it simply never matches a quote.
+* **Evidence.** The comparison is against `corpus.quote_terms[claim_id]`, the
+  content terms of the **first** quote — the text the citation returns — not the
+  whole claim. Tokenised once per corpus, not once per question.
+* **Greedy steps.** For `min(k, len(pool))` steps: pick the unused citation whose
+  quote covers the largest sum of still-unclaimed weights; ties keep the first
+  position in the pool order (`>` strict). A chosen citation removes the terms it
+  covered. A step that would add nothing (`best_gain == 0`) stops the greedy.
+* **Fill.** If the greedy stops early, the pool's own order fills the answer to
+  `k`, so the chooser never returns fewer citations than `k` when the pool has
+  them. It never refuses.
+* **Order of the result** is the order the chooser picked, not the pool's order.
+  `Citation.score` stays the pool's score: the chooser changes *which* claims, not
+  what they are worth.
+* `limit <= 0` → `search(limit=max(...,100))` still returns up to 100 and
+  `cover(..., k<=0)` returns `[]`; `tokens(question)` empty → `Answer` with no
+  citations, and `search` is not called.
+
+### 3.9 Score-bearing order versus display order
 
 `search` returns citations in ranking order. `Answer.documents` (`ask.py:158-164`) lists distinct
 `doc_id` in first-citation order; `Answer.by_document()` (`ask.py:166-170`) groups citations by

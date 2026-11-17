@@ -215,9 +215,12 @@ is scored by the same file on the same `selection.json`.
 
 Our own run file carries both the ranked quotes and the rendered answer, so our
 row can be scored in either modality; GraphRAG and LightRAG return prose only.
-The pilot therefore reports **our `evidence` row as the primary result** and, next
-to the prose systems, our `answer` row as well — labelled, from the same run, so
-the comparison between systems is always within one modality. A refusal from a
+The pilot therefore reports **our `evidence` row as the primary result** — 72,0 /
+46,9 / 82,2 at 4 948 characters — and, next to the prose systems, our `answer`
+row as well: **73,5 / 73,5 / 82,3** on the same 200 questions and 6 077
+characters, labelled, from the same run, so the comparison between systems is
+always within one modality. Support equals coverage there by construction, since
+the whole answer is one item. A refusal from a
 prose system is read out of the text by `benchmark/layer/text_refusal.py`, with
 the raw answer kept in the run file; the patterns are few and specific, and the
 same function is applied to both frameworks. That classification is a heuristic
@@ -433,7 +436,7 @@ bad score instead of an absent one.
 
 | system | query calls | failed | in | out | $ at table | median reply |
 |---|---:|---:|---:|---:|---:|---:|
-| ontoskills | 0 | 0 | 0 | 0 | 0,0000 | 418 ms |
+| ontoskills | 0 | 0 | 0 | 0 | 0,0000 | 747 ms |
 | graphrag | — | — | — | — | — | — |
 | lightrag | — | — | — | — | — | — |
 | vector-rag-floor | 0 | 0 | 0 | 0 | 0,0000 | 4 ms |
@@ -442,7 +445,7 @@ bad score instead of an absent one.
 
 | system | n | k | chars | coverage | support | numeric | false refusal | abstention |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| ontoskills | 200 | 10 | 5 097 | 63,9 % | 46,6 % | 79,7 % | 0,0 % | 0,0 % |
+| ontoskills | 200 | 10 | 4 948 | 72,0 % | 46,9 % | 82,2 % | 0,0 % | 0,0 % |
 | graphrag | — | — | — | — | — | — | — | — |
 | lightrag | — | — | — | — | — | — | — | — |
 | vector-rag-floor | 200 | 10 | 45 885 | 92,4 % | 77,7 % | 94,1 % | 0,0 % | 0,0 % |
@@ -453,15 +456,15 @@ bad score instead of an absent one.
 
 | kind | n | coverage | support | numeric | refused |
 |---|---:|---:|---:|---:|---:|
-| basic | 70 | 70,1 % | 53,5 % | 83,7 % | 0,0 % |
-| semantic | 50 | 59,7 % | 42,3 % | 70,1 % | 0,0 % |
-| intra_document_reasoning | 16 | 67,6 % | 51,5 % | 79,2 % | 0,0 % |
-| project_related | 16 | 60,0 % | 41,9 % | 88,2 % | 0,0 % |
-| constrained | 12 | 51,8 % | 33,0 % | 71,0 % | 0,0 % |
-| conflicting_info | 8 | 53,1 % | 41,0 % | 86,5 % | 0,0 % |
-| completeness | 8 | 68,7 % | 48,5 % | 70,8 % | 0,0 % |
-| miscellaneous | 8 | 66,4 % | 43,0 % | 93,8 % | 0,0 % |
-| high_level | 4 | 53,3 % | 35,2 % | 100,0 % | 0,0 % |
+| basic | 70 | 76,5 % | 53,4 % | 83,8 % | 0,0 % |
+| semantic | 50 | 69,2 % | 42,2 % | 76,9 % | 0,0 % |
+| intra_document_reasoning | 16 | 80,4 % | 52,7 % | 81,2 % | 0,0 % |
+| project_related | 16 | 70,1 % | 45,3 % | 90,8 % | 0,0 % |
+| constrained | 12 | 59,4 % | 33,4 % | 76,6 % | 0,0 % |
+| conflicting_info | 8 | 54,5 % | 39,4 % | 86,5 % | 0,0 % |
+| completeness | 8 | 75,0 % | 47,0 % | 70,8 % | 0,0 % |
+| miscellaneous | 8 | 77,2 % | 43,0 % | 93,8 % | 0,0 % |
+| high_level | 4 | 57,9 % | 36,4 % | 100,0 % | 0,0 % |
 | info_not_found | 8 | — | — | — | 0,0 % |
 
 **vector-rag-floor**, by question kind (evidence, k=10):
@@ -481,60 +484,63 @@ bad score instead of an absent one.
 
 ## Notes
 
-- **graphrag** — build running since 21:09; no row until it finishes and the questions are asked
+- **graphrag** — local search, one question at a time; global search not run; the build was killed once at the ten-hour ceiling of the shell job that launched it and resumed from its own cache, so no paid call was repeated
 - **lightrag** — one document measured (0,0639 $, 597 s); full build not run, projected 13-18 $ and 12-23 h
 
 <!-- /PILOT-TABLE -->
 
-The 418 ms on the `ontoskills` row is `ontocore ask`'s per-question cost with the
-corpus already in memory — the path the pilot was scored on. The same ranking,
-served by the MCP over the same 200 questions, costs **3,5 ms p50 and 5,2 ms p95**
-and returns the same claim ids in the same order; §10 is that measurement and the
-eight gates it had to pass first.
+The 747 ms on the `ontoskills` row is `ontocore ask`'s per-question cost with the
+corpus already in memory — the path the pilot was scored on, now that `ask`
+searches a hundred citations and chooses ten from them. The same ranking, served
+by the MCP over the same 200 questions, costs **18,8 ms p50 and 80,7 ms p95** and
+returns the same claim ids in the same order; §10 is that measurement and the
+eight gates it had to pass first. Both numbers were taken while the GraphRAG build
+was saturating this machine, so they are an upper bound on the shipped path.
 
 ### The floor is the strongest thing on this table, and that is the finding
 
 On EnterpriseRAG-Bench's lexical metrics, a chunk-and-BM25 floor — 2,55 seconds
 to build, zero model calls, zero dollars, 4 ms per question — covers **92,4 %**
-of the gold facts at k=10, and our compiled layer covers **63,9 %**. Its support
-(best single passage) is 77,7 % against our 46,6 %. The layer that costs 4,11 $
+of the gold facts at k=10, and our compiled layer covers **72,0 %**. Its support
+(best single passage) is 77,7 % against our 46,9 %. The layer that costs 4,11 $
 to build and 52,2 MB to keep is *behind* the free baseline on both numbers.
 
 This is not a bug in the measurement, and the pilot does not hide it. Two things
 explain it, and both are worth stating plainly:
 
 1. **Volume.** At k=10 the floor returns a median of **45,885 characters**; we
-   return **5,097**. Lexical coverage counts characters, so the floor starts the
+   return **4,948**. Lexical coverage counts characters, so the floor starts the
    comparison with nine times our text. Holding the volume constant as well as
-   `k` (`score.py --max-chars`) shrinks the gap but does not close it:
+   `k` (`score.py --max-chars`) closes the gap to half a point:
 
    | budget | ontoskills coverage | ontoskills support | floor coverage | floor support |
    |---:|---:|---:|---:|---:|
-   | 5 000 chars | 62,2 % | 45,9 % | 71,1 % | 70,9 % |
-   | 10 000 chars | 63,9 % | 46,6 % | 79,0 % | 74,5 % |
-   | 20 000 chars | 63,9 % | 46,6 % | 87,0 % | 76,6 % |
-   | 45 000 chars | 63,9 % | 46,6 % | 91,9 % | 77,6 % |
+   | 5 000 chars | 70,6 % | 46,3 % | 71,1 % | 70,9 % |
+   | 10 000 chars | 72,0 % | 46,9 % | 79,0 % | 74,5 % |
+   | 20 000 chars | 72,0 % | 46,9 % | 87,0 % | 76,6 % |
+   | 45 000 chars | 72,0 % | 46,9 % | 91,9 % | 77,6 % |
 
-   Our curve is flat because ten quotes are five thousand characters: above that
-   line the budget has nothing left to give us. The floor's curve keeps climbing
-   because every extra character is more source text.
+   At the pilot's own budget the two are level — 70,6 against 71,1, five tenths
+   of a point — and the floor pulls ahead only when the budget grows, because
+   every extra character is more source text for it and nothing more for us: our
+   curve is flat above ten thousand characters, the floor's keeps climbing. The
+   floor's headline lead is the nine times the text, not the unit.
 
    A diagnostic, not the protocol: asked for **30** quotes instead of ten — the
-   bound was fixed at ten before any run — our coverage rises from 63,9 % to
-   **77,0 %** at a median of 14,557 characters, while the floor at the same volume
-   reaches 83,9 % coverage and 76,0 % support against our 49,8 %. So the ranking
-   is not broken and the shortfall is not only volume: at equal characters the
-   floor still covers more gold text and supports it better.
+   bound was fixed at ten before any run — our coverage rises to **80,3 %** at a
+   median of 14,830 characters, while the floor at the same volume reaches 83,7 %
+   coverage and 76,0 % support against our 50,1 %. So the shortfall is not only
+   volume: at equal characters the floor still covers more gold text and supports
+   it far better.
 
-   **What the diagnosis says the gap is.** A later measurement, at zero cost,
-   separates the two explanations from the ranker's own behaviour. Ten claims,
-   chosen at best, carry **91,2 %** of the same facts at the same 5 097
-   characters, and an oracle choosing inside the lexical top 100 reaches **87,6 %**
-   on the dev half. So the floor's advantage is not that a chunk is a better unit
-   — at equal volume the claim ceiling (91,2 %) is above the floor's (71,1 %) — it
-   is that our chooser returns claims that carry 64 %. The representation is
-   sound; the selection is the defect. `benchmark/layer/RANKER.md` is the plan,
-   written and split before any ranker was changed.
+   **What the diagnosis says the gap is.** Ten claims chosen at best *for a
+   question* inside the lexical top 100 carry **87,6 %** on the dev half, one
+   quote each — the same shape as the row — where the floor at the pilot's
+   5 000-character budget carries **70,7 %** on the same 96 questions; the
+   looser per-fact oracle bound is **91,0 %**. So the unit is not the defect. The
+   row this pilot published when the analysis began was 63,9 %, and the gap was
+   in which ten claims came back. `benchmark/layer/RANKER.md` is the plan and the
+   ladder; §7.2 is the outcome.
 
 2. **The metric is lexical.** A gold fact is a fragment of the source, and any
    chunk that contains that sentence scores for it. A claim layer does something
@@ -555,7 +561,7 @@ the pilot supports is narrower and still worth having:
 | claims linked to a claim they contradict | 150 claims in 82 pairs; none across documents — see below |
 | predicates carrying a modality and an actor | 39,9 % (all 9,295 carry a modality; 3,676 carry an actor) |
 | graph agrees with its own vocabulary and its own text | 100 % — every `doc:` term declared, 254 of 254 sections titled, 12,327 of 12,327 locators with offsets reproduce their quote read back out of the graph (94 quotes carry none) |
-| model calls at query time | 0, at 0,42 s per question |
+| model calls at query time | 0, at 0,75 s per question |
 | build cost / artifact | 4,11 $ / 52,2 MB for 9,295 claims |
 
 **How sure is one run.** The table reports means over 192 questions, and a mean
@@ -568,16 +574,16 @@ question, which is what a paired design asks for:
 
 | | ontoskills | floor | difference |
 |---|---:|---:|---:|
-| coverage | 63,9 % [61,7; 66,1] | 92,4 % [91,5; 93,1] | **−28,4 pp [−30,4; −26,4]** |
-| support | 46,6 % [44,3; 48,8] | 77,7 % [76,3; 79,1] | **−31,1 pp [−33,0; −29,1]** |
-| numeric | 79,7 % [75,3; 84,1] | 94,1 % [91,1; 96,7] | −14,5 pp [−18,2; −10,9] |
+| coverage | 72,0 % [69,9; 74,0] | 92,4 % [91,5; 93,1] | **−20,4 pp [−22,2; −18,6]** |
+| support | 46,9 % [44,7; 49,0] | 77,7 % [76,3; 79,1] | **−30,9 pp [−32,8; −29,0]** |
+| numeric | 82,2 % [78,0; 86,3] | 94,1 % [91,1; 96,7] | −11,9 pp [−15,5; −8,5] |
 
 So the ordering on this slice is not a sampling artefact: the paired intervals do
-not cross zero, and the coverage gap is 28 points wide with a two-point margin on
-each side. What the interval does **not** cover is the build: one build exists per
-system, and a bootstrap over questions cannot invent the variance of a build that
-was never run. Repeat builds are in the budget of the full run (§6), not of this
-pilot.
+not cross zero, and the coverage gap is 20 points wide with a two-point margin on
+either side. What the interval does **not** cover is the build: one build exists
+per system, and a bootstrap over questions cannot invent the variance of a build
+that was never run. Repeat builds are in the budget of the full run (§6), not of
+this pilot.
 
 Two of those rows are the ones a lexical metric cannot see and a reader of an
 answer can: a quote you can open at a page and an offset, and a claim whose
@@ -646,45 +652,54 @@ exactly that.
 
 ### 7.2 The ranker, after the diagnosis
 
-The row above — 63,94 % — is the product's own ranker, and it does not move. The
-ranker ladder of `RANKER.md` is reported **as its own table**, because its rows
-run through the same corpus, the same quotes, the same scorer and the same k, but
-through `benchmark/layer/select.py` and not through the read path. G-R3 (§7 of
-`RANKER.md`) says a quality row the MCP cannot serve is a benchmark result; these
-are labelled as one rather than folded into the table above.
+The row in the table above is the read path, and it now serves the chooser the
+diagnosis pointed at: `ask()` retrieves a hundred citations (or ten times `k`,
+whichever is larger) and then chooses `k` of them by the question terms they
+cover, in `core/src/documents/ask.py` and, mirrored with the same arithmetic, in
+`mcp/src/documents/rank.rs`. The ladder that produced it ran through
+`benchmark/layer/select.py`, not through the read path, so its rows are reported
+as the benchmark rows they are, with the harness's own numbers; the read path's
+row reproduces them to the last claim id (G1, §10).
 
 192 questions with gold facts, k = 10, paired intervals on questions:
 
-| row | coverage | 95 % interval | chars | what it needs |
+| row | coverage | 95 % interval | chars | status |
 |---|---:|---|---:|---|
-| the product: BM25 pool, top ten | 63,94 % | [61,7; 66,2] | 5 088 | nothing, it is shipped |
-| `cover`, the product's pool, greedy over the question's terms | **71,98 %** | [69,9; 74,1] | 4 939 | no model, no vector, no new artifact |
-| `dense-cover`, the same pool in e5 order, then `cover` | **73,42 %** | [71,4; 75,3] | 5 141 | a query encoder in the read path |
-| the product, every quote of the same ten claims | 68,23 % | [66,1; 70,3] | 7 104 | nothing |
-| `cover`, every quote | 75,28 % | [73,3; 77,2] | 6 798 | no model |
-| `dense-cover`, every quote | **76,34 %** | [74,4; 78,1] | 7 118 | a query encoder |
+| ranker v1: BM25 pool, top ten | 63,94 % | [61,7; 66,2] | 5 097 | the row this analysis began from |
+| **ranker v2: `cover` over the same pool** | **71,98 %** | [69,9; 74,1] | 4 939 | **served by the read path** |
+| `dense-cover`: the same pool in e5 order, then `cover` | **73,42 %** | [71,4; 75,3] | 5 141 | a benchmark row: it needs a query encoder |
+| ranker v1, every quote of its ten claims | 68,23 % | [66,1; 70,3] | 7 104 | a labelled row |
+| ranker v2, every quote | 75,28 % | [73,3; 77,2] | 6 798 | a labelled row, not the default |
+| `dense-cover`, every quote | **76,34 %** | [74,4; 78,1] | 7 118 | a benchmark row |
+
 
 | comparison, paired on the same 192 questions | difference | 95 % interval |
 |---|---:|---|
-| `cover` − the product | **+8,03 pp** | [+6,6; +9,5] |
-| `dense-cover` − the product | **+9,48 pp** | [+8,0; +11,0] |
-| `dense-cover` − `cover` | +1,44 pp | [+0,5; +2,4] |
-| `dense-cover`, every quote − the product, every quote | +8,11 pp | [+6,6; +9,6] |
+| v2 − v1 | **+8,03 pp** | [+6,6; +9,5] |
+| `dense-cover` − v1 | **+9,48 pp** | [+8,0; +11,0] |
+| `dense-cover` − v2 | +1,44 pp | [+0,5; +2,4] |
+| v2, every quote − v1, every quote | +7,06 pp | [+5,7; +8,4] |
+
+The harness reports the sum of the quote lengths; the read path's own row in the
+table above reports the median of the joined text, nine newlines longer, 4 948
+against 4 939. It is the same mean, and the two rows are the same answers.
 
 Three sentences the table supports, and one it refuses to.
 
-1. **The selection was the defect, and the repair is worth 9,5 points** at the
+1. **The selection was the defect, and the repair is worth 8 points** at the
    same k and the same volume, on verified claims with locators, at 0 $ per query.
-   The product's row reproduced exactly — 63,94 % — which is the check that the
-   harness measures the product and not something adjacent to it.
+   The v1 row is the number the analysis began from, reproduced exactly — 63,94 %
+   — which is the check that the harness measures the product and not something
+   adjacent to it; v2 is now what `documents_ask` returns, claim id by claim id,
+   over 200 questions (G1) and 2 000 citations at their offsets (G2).
 2. **The shippable half is the lexical chooser.** It needs no model, no vector
-   and no new artifact, and it is worth +8,03 pp on its own.
-3. **Returning every quote is worth another 2,9 points** for 39 % more text. It is
-   a labelled row at 7 118 characters, never a silent substitution for the row at
-   5 088.
+   and no new artifact, and it is worth all 8,03 points on its own.
+3. **Returning every quote is worth another 3,3 points** over v2 (75,28 against
+   71,98) for 38 % more text — 6 798 characters against 4 939. It is a labelled
+   row, never a silent substitution for the default.
 4. **The dense order's extra 1,44 points are not established on held-out
    questions.** The split was fixed before the ladder; the test half was read once,
-   after the freeze committed at `474dc22`: product 64,29 %, `cover` 72,81 %,
+   after the freeze committed at `474dc22`: v1 64,29 %, `cover` 72,81 %,
    `dense-cover` 73,62 %, and `dense-cover` − `cover` = **+0,8 pp [−0,4; +2,1]**.
    So the encoder is not adopted, no ADR is opened for it, and the product ships
    the lexical chooser. The dense row stays in the table with its numbers and its
@@ -692,17 +707,16 @@ Three sentences the table supports, and one it refuses to.
    benchmark.
 
 **At one volume, nothing is won by volume.** Under the pilot's own 5 000-character
-budget — the `score.py --max-chars` mechanism behind the floor's 71,1 % — the
-product reaches 62,2 %, the lexical chooser 69,39 % and the dense one 70,62 %
-against the floor's 71,1 %. At equal text the two are level; at 10 000 characters
-the floor is ahead (79,0 against 73,21), because its curve climbs with every
-character and ours has ten quotes to give. The floor is not a competitor — it is
-the measurement of how easy this corpus is — and the honest reading is that our
-advantage is not coverage per character but what each returned item *is*: a
-verified claim with a quote, an offset and a verdict, at 0 $ per query. The
-chooser itself costs 43 ms per question in the Python harness, close to the 418 ms
-`ontocore ask` already spends over the corpus, and it is integer arithmetic over
-the pool that ports to the read path as it is.
+budget — the `score.py --max-chars` mechanism behind the floor's 71,1 % — the read
+path reaches **70,6 %** against the floor's 71,1 %, five tenths of a point. At
+10 000 characters the floor pulls ahead (79,0 against 72,0), because its curve
+climbs with every character and ours has ten quotes to give. The floor is not a
+competitor — it is the measurement of how easy this corpus is — and the honest
+reading is that our advantage is not coverage per character but what each returned
+item *is*: a verified claim with a quote, an offset and a verdict, at 0 $ per
+query. The read path spends 747 ms per question in Python (`ontocore ask`) and
+18,8 ms through the MCP (§10); the chooser is integer arithmetic over the pool,
+which is why the two implementations agree claim for claim.
 
 **What did not work** is in `RANKER.md` §5 with its intervals: reciprocal rank
 fusion (−0,5 pp), graph expansion into the section and `conflicts_with`
@@ -710,8 +724,9 @@ neighbourhood (+0,2 pp, under its own one-point gate), retrieval across all
 9 104 claims instead of the pool (+0,14 pp at 24× the cost) and the
 `ms-marco-MiniLM-L-6-v2` cross-encoder (−1,9 pp, 13,5 s per question on CPU
 against a 300 ms gate). Five mechanisms, one ceiling at 73: what every one of them
-scores is a claim against the *question*, and the fourteen points still missing
-need a claim scored against a *fact* the question implies but does not contain.
+scores is a claim against the *question*, and the gap that remains — **87,6 %** as
+a question-level bound on dev, **91,0 %** as a per-fact bound — needs a claim
+scored against a *fact* the question implies but does not contain.
 
 ## 8. Status
 
@@ -748,12 +763,13 @@ need a claim scored against a *fact* the question implies but does not contain.
       (`docs/adr/0003-documents-in-the-mcp-runtime.md`): 200 of 200 questions
       rank identically through the MCP, 279 of 279 documents tokenise
       identically, no quote outside its offsets, no knowledge-base file
-      modified, the same answers inside an empty network namespace, p95 5,5 ms
-      against a 300 ms gate — §10
+      modified, the same answers inside an empty network namespace, p95 80,7 ms
+      outside the namespace and 90,0 ms inside it against a 300 ms gate — §10
 - [x] the diagnosis of the gap, at zero cost: ten claims chosen at best carry
-      91,2 % at our volume, the lexical top 100 already contains enough for
-      87,6 %, and the published row is 63,9 % — the loss is selection, not
-      representation. Split fixed before any ranker changed, plan in `RANKER.md`
+      91,0 % at our volume, the lexical top 100 already contains enough for
+      87,6 %, and the row the analysis began from was 63,9 % — the loss is
+      selection, not representation. Split fixed before any ranker changed, plan
+      in `RANKER.md`
 - [x] the ranker ladder, all five rungs measured at zero model cost: selection
       +7,6 pp on dev, a dense order +2,1, fusion −0,5, graph expansion +0,2,
       whole-corpus retrieval +0,14, cross-encoder −1,9. Frozen on `dense-cover`
@@ -918,8 +934,8 @@ python3 -m benchmark.layer.score --selection /tmp/layer/corpus/selection.json \
     --json /tmp/layer/runs/ontoskills.score.json
 ```
 
-`--mode answer` runs on the same answers file and prints the 66,1 / 66,1 / 79,7
-row quoted in §7:
+`--mode answer` runs on the same answers file and prints the 73,5 / 73,5 / 82,3
+row §7 quotes:
 
 ```
 python3 -m benchmark.layer.score --selection /tmp/layer/corpus/selection.json \
@@ -1103,7 +1119,7 @@ only reads it — no model call, no network, no file written.
 A second implementation of the ranking is acceptable only if something proves it
 is not a different system, so eight gates are the price of the port. All eight
 are green on the pilot artifact, and the reports are
-`runs/mcp-parity-200.json` and `runs/mcp-parity-200-netns.json`:
+`runs/mcp-parity.json` and `runs/mcp-parity-netns.json`:
 
 | gate | what it checks | measured |
 |---|---|---|
@@ -1111,29 +1127,36 @@ are green on the pilot artifact, and the reports are
 | **G2** the quote is real | every citation's quote at the offsets it reports, normalised the way the compiler's verifier normalises | **0 of 2 000** citations off |
 | **G3** read-only by construction | `INSERT`, `DELETE`, `LOAD`, `CLEAR`, `DROP`, `CREATE`, `SERVICE`, `DESCRIBE` refused with the keyword named; a query whose *literal* or prefixed name contains `delete` still runs; both caps named when hit | 8 keywords refused, each naming itself; refusal **0 ms**; `2000 rows` and `2 s` named when hit |
 | **G4** vocabulary | a graph using a `doc:` term the binary does not know is refused, term named | test green; the pilot graph passes — 196 814 triples, 0 unknown terms |
-| **G5** latency, published | p95 per `ask` ≤ 300 ms on the pilot KB, release build | **p50 3,5 ms, p95 5,2 ms, max 8,6 ms** over 200 questions |
+| **G5** latency, published | p95 per `ask` ≤ 300 ms on the pilot KB, release build | **p50 18,8 ms, p95 80,7 ms, max 322,6 ms** over 200 questions |
 | **G6** read-only at runtime | no knowledge-base file modified by the run | sizes and mtimes identical before and after |
 | **G7** tokenizer parity | the Rust token stream equals the Python one for **every** text file, not a sample | **279 of 279** documents, byte for byte |
-| **G8** no network | the 200 asks inside an empty network namespace | same answers, same ids, same order; p50 3,4 ms, p95 5,8 ms |
+| **G8** no network | the 200 asks inside an empty network namespace | same answers, same ids, same order; p50 20,6 ms, p95 90,0 ms |
 
 ### What the port costs and what it bought
 
 | operation | cost (release build, pilot artifact) |
 |---|---|
-| first `documents_ask` of a process — artifact load plus the lexical index build, once | **1,16 s** |
-| `documents_ask`, steady state | **3,5 ms p50, 5,2 ms p95, 8,6 ms max** |
+| first `documents_ask` of a process — artifact load plus the lexical index build, once | **2,37 s** |
+| `documents_ask`, steady state | **18,8 ms p50, 80,7 ms p95, 322,6 ms max** |
 | first `documents_query` of a process — 16,7 MB of Turtle parsed and the vocabulary checked, once | **2,76 s** |
 | `documents_query`, steady state (SELECT, ASK, GROUP BY over 196 814 triples) | **1-17 ms** |
 | a refused mutation | **0 ms** — the guard runs before the graph is opened |
 | a query over the row cap | 19 ms, and the error says `2000 rows` |
 
-The 418 ms in §7's Query table is the same ranking computed by the Python
+The 747 ms in §7's Query table is the same ranking computed by the Python
 implementation the pilot was scored on, and the difference is worth stating
 precisely rather than as a speed-up. `Corpus.search` rebuilds every claim's term
 counts on every question — 1,4 M tokens revisited per question — while the Rust
 index is inverted and built once. G1 is what makes this a statement about *the
 same answers*: the work moved, the ranking did not. Nothing in §7's quality table
 changes because the port is faster.
+
+Both latency rows were taken while the GraphRAG build was saturating this machine
+(load average around 39), so they are an upper bound on the shipped path: the same
+harness on an idle machine can only come out lower, and the gate has 220 ms of
+margin. The first call grew from 1,16 s to 2,37 s because `ask()` now searches a
+hundred citations instead of ten — the same index, a wider scan — and it is paid
+once per process.
 
 Three of the Python behaviours the port reproduces are the kind that look like
 defects and are deliberately kept, because they are what was measured: the
@@ -1149,11 +1172,10 @@ location of each in the Python source.
 - They describe **this artifact on this machine**. The gate is a command, not a
   promise: another corpus is checked by running the same harness, `--tokenizer`
   included, and a corpus that fails G7 fails loudly with the document named.
-- They are a **parity** result, not a quality result. Coverage is still 63,9 %
-  against the floor's 92,4 % with non-overlapping intervals (§7), and serving the
-  layer in 3,5 ms instead of 418 ms does not move it by a character. The ADR says
-  this in its own words and §5's rule is what stops the port from being cited as
-  an improvement in quality.
+- They are a **parity** result, not a quality result. Coverage is 72,0 % against
+  the floor's 92,4 % (§7), and serving the layer in 18,8 ms instead of 747 ms does
+  not move it by a character. The ADR says this in its own words and §5's rule is
+  what stops the port from being cited as an improvement in quality.
 - `documents_query` speaks `SELECT` and `ASK`, capped at 2 000 rows and 2 s, and
   refuses `CONSTRUCT` and `DESCRIBE` because they return a graph rather than
   bound rows. No SPARQL conformance suite was run: nine tests and the pilot's own

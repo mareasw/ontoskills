@@ -1,21 +1,28 @@
-# The ranker: why we lose 27 points, and the ladder that closes them
+# The ranker: why the row lost 27 points, and the ladder that closed 8
 
-The pilot's row is 63,94 % coverage. Two free measurements say that the facts are
-in the knowledge base and that the claims carrying them are already retrieved —
-and that we choose badly among them:
+The pilot's row was 63,94 % coverage when this analysis began, and it is 71,98 %
+now — same corpus, same quotes, same k, and the change is only *which* ten claims
+come back. Two free measurements said the facts were in the knowledge base and
+that the claims carrying them were already retrieved:
 
 | measurement | value | what it means |
 |---|---|---|
-| ten claims chosen at best, each fact's candidates drawn from its 100 best lexical carriers (`oracle.py`) | **91,16 %** | the representation is not the bottleneck |
+| ten claims chosen at best, each fact's candidates drawn from its 100 best lexical carriers (`oracle.py`) | **90,97 %** | the representation is not the bottleneck |
 | ten claims chosen at best, no candidate restriction (E0, depth all) | 97,88 % | same, as a loose bound |
 | ten chosen at best among the lexical **top 100**, chosen without a candidate restriction beyond the pool (E0, dev) | **87,63 %** | the pool the ranker already has is sufficient for most of the gap |
-| what we return today (dev half) | 63,59 % | selection is worth ~24 points at fixed volume and pool |
+| what the product returned then (dev half) | 63,59 % | selection is worth ~24 points at fixed volume and pool |
 | the floor, at our volume (~5 000 characters) | 71,1 % | a chunk layer with more text is not the target |
 
 That is the diagnosis in one line: **the loss is selection, not representation,
 and not primarily candidate generation.** The claims are in the top 100 of a
 lexical ranking; a chooser that knew the facts would reach 87,6 % from that same
 pool, at the same k and the same volume.
+
+The ladder below turned that diagnosis into one shipped rung: the lexical
+chooser, **+8,03 pp [+6,6; +9,5]** on the 192 questions with gold facts, now what
+`documents_ask` returns — in Python and in the Rust read path, claim for claim
+(§7.2 of `LAYER.md`). The best rung the ladder produced is dense and is *not*
+shipped, because its advantage does not survive the held-out half.
 
 Everything here is scored by `benchmark.retrieval.metrics`, through the same
 `returned_text` path `score.py` uses: one quote per claim, joined, cut at
@@ -30,22 +37,23 @@ facts (`oracle.py`, 0 $, no model call):
 
 | what | coverage | characters per question |
 |---|---|---|
-| what we return today: 10 claims, the first quote of each | **63,94 %** | 5 097 |
-| those same 10 claims, every quote they carry | 68,40 % | 7 114 |
-| the best *single* claim per fact, over all 9 104 verified claims | 54,79 % | — |
-| **ten claims chosen at best, one quote each** | **91,16 %** | 5 097 |
-| ten claims chosen at best, every quote | 92,97 % | 7 114 |
+| what the product returned when this began: 10 claims, the first quote of each | **63,94 %** | 5 097 |
+| those same 10 claims, every quote they carry | 68,23 % | 7 104 |
+| the best *single* claim per fact, over all 9 104 verified claims | 54,48 % | — |
+| **ten claims chosen at best, one quote each** | **90,97 %** | 5 097 |
+| ten claims chosen at best, every quote | 92,90 % | — |
 | the floor, at our volume (~5 000 characters) | 71,1 % | ~4 800 |
 | the floor, unconstrained | 92,4 % | 45 885 |
 
 Read the first and fourth rows together: the pool contains claims that carry
-91 % of the facts, we return claims that carry 64 %. No tokeniser change, no
-verifier change, no rebuild is needed for those 27,22 points to exist.
+91 % of the facts, and the row returned claims that carried 64 %. No tokeniser
+change, no verifier change, no rebuild was needed for those 27,03 points to
+exist — the ladder then took 8 of them.
 
-Two bounds deserve a note, because they differ by 6,7 points and the difference
+Two bounds deserve a note, because they differ by 6,9 points and the difference
 is a choice:
 
-- **91,16 %** is the tight bound: each fact's ten candidates are drawn from its
+- **90,97 %** is the tight bound: each fact's ten candidates are drawn from its
   100 best lexical carriers. It is the number a ranker whose pool is a lexical
   ranking can be compared with.
 - **97,88 %** is the unconstrained greedy ten over all 9 104 claims. It is
@@ -54,13 +62,16 @@ is a choice:
 The pilot uses the tight one as its headline, because the read path's pool *is* a
 lexical ranking.
 
-**The representation is better than the floor's, at equal volume.** 91,16 %
-against 71,1 % on ~5 000 characters is the claim the pilot can make about the
-claim layer independent of any ranker — and it is the reason to fix the ranker
-rather than abandon the layer.
+**The representation is better than the floor's, at equal volume.** On dev — the
+only half where both numbers were measured at the same budget — ten claims chosen
+at best for a question carry **87,63 %** where the floor at the pilot's
+5 000-character budget carries **70,7 %** on the same 96 questions; the per-fact
+oracle bound is 90,97 %. That is the claim the pilot can make about the claim
+layer independent of any ranker, and it is the reason to fix the ranker rather
+than abandon the layer.
 
-**Returning every quote of the claims we already choose is worth 4,46 points**
-for 2 017 more characters. That is a real but small lever, and it changes the
+**Returning every quote of the claims we already choose is worth 4,29 points**
+for 2 007 more characters. That is a real but small lever, and it changes the
 row's shape, so it is a labelled extra row, never a silent substitution (§7).
 
 ## 2. The depth curve, and what it rules out
@@ -87,12 +98,12 @@ That is the number the plan is built on, and it changes the order of the repairs
 
 | hypothesis | measurement | verdict |
 |---|---|---|
-| the claims are not in the knowledge base | oracle ceiling 91,16 % | **false** |
-| the representation is too coarse | ceiling at our volume beats the floor at our volume, 91,16 vs 71,1 | **false** |
+| the claims are not in the knowledge base | oracle ceiling 90,97 % | **false** |
+| the representation is too coarse | ceiling at our volume beats the floor at our volume, 90,97 vs 71,1 | **false** |
 | volume alone explains the gap | the floor needs 45 885 characters to reach 92,4 %; we return 5 097 | **partial** — it explains the floor's number, not ours |
 | the field weights are the whole story | product 63,94 vs naive BM25 on the same shape 59,06–63,53 (§3) | **false** — the product's ranker is already the best lexical variant tested |
 | candidate generation is the binding constraint | top 100 ceiling 87,63 at dev; we are at 63,59 | **false for the first 24 points** — it becomes true near 87,6 |
-| the port is the problem | Python 418 ms vs Rust 3,5 ms, same ids (G1) | **false** — latency, not selection |
+| the port is the problem | Python 747 ms vs Rust 18,8 ms, same ids (G1) | **false** — latency, not selection |
 | the verifier is dropping the good claims | the oracle's pool *is* the verifier's `ok` set, 9 104 claims | **false** |
 | the pool spends its slots on too few documents | 28 documents in the top 100, largest share 16,2 %, the gold document present for 85,4 % of questions; capping the pool at 2 claims per document raises its ceiling by 1,55 points, to 89,18 % | **false** — the documents are the right ones |
 
@@ -145,11 +156,11 @@ not beaten by any naive variant:
 | BM25, statement + first quote | 63,53 % |
 | BM25, statement + the first quote twice | 61,28 % |
 
-And when every quote is returned, the product is 68,40 % against 66,75–69,25 %
-for the same naive variants. So field re-weighting is not the 27-point lever: it
-is worth at most a point, and the product already has it.
+And when every quote is returned, the same three rows are 68,23 %, 75,28 % and
+76,34 % (§5, the all-quotes rows). So field re-weighting is not the 27-point
+lever: it is worth at most a point, and the product already has it.
 
-The lesson is in the shape, not in the ranking: 63,94 → 68,40 comes from
+The lesson is in the shape, not in the ranking: 63,94 → 68,23 comes from
 returning more text, and 63,59 → 87,63 comes from choosing better.
 
 ## 4. Hypotheses, each stated so it can fail
@@ -235,11 +246,12 @@ Four things in that table are the result.
 **1. Every mechanism plateaus at 73.** Better selection (+7,6), a dense order
 (+2,1), fusion (−0,5), graph expansion (+0,2), whole-corpus retrieval (+0,14),
 a cross-encoder (−1,9): five different signals, one ceiling. The pool's ceiling
-is 87,63 % and the artifact's is 91,16 %, so the last fourteen points are not a
-matter of trying one more order. What every rung shares is that it scores a
-claim against the *question*; what the ceiling requires is scoring a claim
-against a *fact* the question implies but does not contain. That is a generator's
-job, not a ranker's, and it is outside this ladder and its zero-dollar budget.
+is 87,63 % and the artifact's is 90,97 %, so the last fourteen points to the
+pool's bound — seventeen to the artifact's — are not a matter of trying one more
+order. What every rung shares is that it scores a claim against the *question*;
+what the ceiling requires is scoring a claim against a *fact* the question implies
+but does not contain. That is a generator's job, not a ranker's, and it is outside
+this ladder and its zero-dollar budget.
 
 **2. The cross-encoder is worse, not merely expensive.** `ms-marco-MiniLM-L-6-v2`
 is trained to prefer a fluent passage that answers a web question; this corpus is
@@ -264,20 +276,22 @@ bi-encoder does not already have.
 the cost. Everything the pilot needs is inside the pool the product already
 builds; the defect was always which ten of it came back.
 
-**At one volume, the floor and the new ranker are level.** Under the pilot's own
+**At one volume, the floor and the shipped row are level.** Under the pilot's own
 5 000-character budget — the `score.py --max-chars` mechanism that produced the
-floor's 71,1 % — the frozen ranker reaches **70,62 %** and the lexical rung 69,39 %
-against the product's 62,2 %. At 10 000 characters the floor pulls ahead again
-(79,0 against 73,2): its curve keeps climbing because every extra character is
-more source text, ours is flat because ten quotes are what it has to say. So the
-floor's lead in the headline row is volume, as §7 of `LAYER.md` says — and the
-pilot still does not claim to beat it, because at the same budget it does not.
+floor's 71,1 % — the read path reaches **70,6 %**, five tenths of a point, and at
+10 000 characters it reaches 72,0 % against the floor's 79,0. The floor's curve
+keeps climbing because every extra character is more source text; ours is flat
+because ten quotes are what it has to say. So the floor's lead in the headline row
+is volume, as §7 of `LAYER.md` says — and the pilot still does not claim to beat
+it, because at the same budget it does not.
 
-**What is left, honestly.** 73,21 % on dev is inside neither the 75–80 band nor
-the "below 70, publish the negative" rule. The band is reached by the labelled
-row only, at 39 % more volume (76,18 at 7 115 characters), and the pilot will
-report both: the primary row keeps one quote per claim, the extra row says what
-the quotes are worth, and neither is presented as the other.
+**What is left, honestly.** The shipped row is 71,98 % on the 192 questions —
+72,81 % on the test half — which is neither inside the 75–80 band nor below the
+"publish the negative" line, and it is reported as exactly that: a real gain, not
+a target reached. The band is reached by the labelled rows only, `cover` with
+every quote at 75,28 % (6 798 characters) and `dense-cover` with every quote at
+76,34 % (7 118). The pilot reports both, labels them, and never presents one as
+the other.
 
 ### E2's declared encoding, fixed before it is measured
 
@@ -331,9 +345,9 @@ Two rows read the test half once, and neither choice depends on what it says:
    encoder at read time, which the Rust path does not have, so it is published as
    a benchmark row and labelled as one (§7, G-R3).
 2. **`cover` over the product's lexical pool** — 71,14 % on dev, no model, no
-   vector, no new artifact. It is the rung the read path can serve tomorrow, and
-   it exists so the pilot does not have to choose between "the best number we can
-   measure" and "the best number we can ship".
+   vector, no new artifact. It is what the read path serves now, in Python and in
+   Rust (§7.2 of `LAYER.md`), and it exists so the pilot did not have to choose
+   between "the best number we can measure" and "the best number we can ship".
 
 The test numbers are computed by the code committed at the freeze and are not
 re-tuned afterwards. If they disagree with dev, they are published as they are.
@@ -423,21 +437,22 @@ So the ladder splits in two at that boundary:
 
 Nothing here is allowed to become "we publish a number the MCP cannot answer".
 
-## 8. What the published table will look like
+## 8. What the published table says
 
 One primary row per system, unchanged in shape: evidence, k = 10, one quote per
-claim, 192 questions with gold facts, paired intervals against the current
-ranker. Additions, each labelled:
+claim, 192 questions with gold facts, paired intervals against the ranker that
+was there before. Additions, each labelled:
 
 | row | why it exists |
 |---|---|
-| `ontoskills` (ranker v2, `dense-cover`) | the primary row: the frozen ranker, dev and test numbers, the split's digest, labelled a benchmark row because the read path has no encoder yet |
-| `ontoskills` (ranker v2, `cover` lexical) | the shippable rung: +7,6 pp on dev over the product's own ranker, no model, no vector, no new artifact |
-| `ontoskills`, every quote | the +2,97-point lever of §5, at 7 115 characters, as its own row |
+| `ontoskills` (ranker v2, `cover`) | the primary row: 72,0 % [69,9; 74,0], 4 948 characters, served by the read path and checked claim by claim against the harness (G1), no model, no vector |
+| `ontoskills` (ranker v1, BM25 top ten) | 63,94 % [61,7; 66,1], kept as the regression reference: it is the number this analysis began from |
+| `ontoskills`, every quote (v2) | the +3,3-point lever of §5, 75,28 % at 6 798 characters, as its own row |
+| `ontoskills` (ranker v2, `dense-cover`) | 73,42 %, a benchmark row: it needs a query encoder, and its +1,44 pp over `cover` do not survive the held-out half |
 | `vector-rag-floor` | unchanged, still the measurement of how easy the corpus is |
 
 The claim that may be written in public: *the same knowledge base, the same
-quotes, a different selection, +X points with an interval that excludes zero on
+quotes, a different selection, +8,03 points with an interval that excludes zero on
 held-out questions.* The claim that may not be written: SOTA, "beats BM25", "non
 inferiority", or any comparison of coverage across different volumes without
 saying the volume.
@@ -499,12 +514,14 @@ separately.
    cross-encoder −1,9 with a 13,5 s CPU latency. Every mechanism plateaus at 73.
 5. **Freeze — done** (§5): `dense-cover` and lexical `cover`, both read the test
    half once.
-6. **Write the rows** — dev, test, both intervals, the labelled all-quotes row,
-   the footnote on the `query:` prefix, and the statement that the dense row is
-   not yet served by the read path.
-7. **ADR 0004 — only if the dense row is to become a product row.** An ONNX
-   encoder on disk, no network, CPU only, model size in the artifact, G1 parity
-   and G-R5 latency re-measured. Until then the product keeps the lexical ranker
-   and the row says which is which.
+6. **The rows — done** (§8, §7.2 of `LAYER.md`): dev, test, the intervals, the
+   labelled all-quotes rows, the footnote on the `query:` prefix, and the
+   statement that the dense row is a benchmark row.
+7. **ADR 0004 — not opened, and closed on the evidence.** The dense row's +1,44 pp
+   over the lexical chooser become +0,8 [−0,4; +2,1] on the questions that did not
+   choose it. An ONNX encoder in the read path, its parity gate and its latency
+   budget are not bought with an interval that admits zero. The product keeps the
+   lexical chooser; the decision and its number are in §5 and in §7.2 of
+   `LAYER.md`, so reopening it needs new evidence, not a preference.
 8. **Then** the PR merge, the final report, and any public comment — with the
    link to `main` and the numbers above.
