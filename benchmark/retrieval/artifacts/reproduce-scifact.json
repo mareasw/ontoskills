@@ -1,0 +1,11 @@
+{
+ "dataset": "scifact",
+ "documents": 5183,
+ "queries": 300,
+ "config": "fields=['text', 'title'] stemmer=porter stopwords=lucene k1=0.9 b=0.4",
+ "ndcg@10": 0.661423455816597,
+ "published": 0.665,
+ "difference": -0.00357654418340303,
+ "within_tolerance": true,
+ "seconds": 89.0
+}

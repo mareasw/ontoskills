@@ -24,8 +24,10 @@ import csv
 import hashlib
 import json
 import os
+import re
 import tempfile
 from collections import defaultdict
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -44,60 +46,71 @@ TEXT_DIR = "text"
 VIEW = "view.html"
 
 PREFIXES = """\
-@prefix oc: <https://ontoskills.sh/ontology#> .
+@prefix doc: <https://ontoskills.sh/ontology/documents#> .
 @prefix ex: <https://ontoskills.sh/kb/> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 """
 
-TBOX = """\
-oc:Document a owl:Class .
-oc:Section a owl:Class .
-oc:Claim a owl:Class .
-oc:Evidence a owl:Class .
-oc:Context a owl:Class .
+# The TBox is a file, not a string literal: `core/src/specs/documents.ttl` is the
+# normative definition, versioned on its own and published at
+# https://ontoskills.sh/ontology/documents. It is read once and inlined into
+# every graph so the artifact parses offline, without a network fetch and
+# without asking the reader to trust that two copies agree.
+ONTOLOGY_PATH = Path(__file__).resolve().parent.parent / "specs" / "documents.ttl"
 
-oc:hasTitle a owl:DatatypeProperty .
-oc:hasVersion a owl:DatatypeProperty .
-oc:hasDocType a owl:DatatypeProperty .
-oc:hasJurisdiction a owl:DatatypeProperty .
-oc:hasLicence a owl:DatatypeProperty .
-oc:hasSha256 a owl:DatatypeProperty .
-oc:inContext a owl:ObjectProperty .
-oc:hasClaim a owl:ObjectProperty .
-oc:hasEvidence a owl:ObjectProperty .
-oc:hasStatement a owl:DatatypeProperty .
-oc:hasQuote a owl:DatatypeProperty .
-oc:hasModality a owl:ObjectProperty .
-oc:hasActor a owl:DatatypeProperty .
-oc:hasDeadline a owl:DatatypeProperty .
-oc:hasCondition a owl:DatatypeProperty .
-oc:hasLocator a owl:DatatypeProperty .
-oc:hasSourceUrl a owl:DatatypeProperty .
-oc:hasPage a owl:DatatypeProperty .
-oc:hasConfidence a owl:DatatypeProperty .
-oc:conflictsWith a owl:ObjectProperty .
 
-oc:Obligation a owl:Class .
-oc:Permission a owl:Class .
-oc:Prohibition a owl:Class .
-oc:Recommendation a owl:Class .
-oc:Definition a owl:Class .
-oc:ProcedureStep a owl:Class .
-oc:Condition a owl:Class .
-"""
+@lru_cache(maxsize=1)
+def documents_ontology() -> str:
+    """The document layer's TBox, with its prefix declarations removed.
+
+    The graph declares its prefixes in one block at the top; repeating them
+    mid-file is legal Turtle that reads like an accident, so they are stripped
+    here and the tests assert the inlined copy declares no prefix of its own.
+    """
+    if not ONTOLOGY_PATH.exists():
+        raise FileNotFoundError(f"document ontology not found: {ONTOLOGY_PATH}")
+    lines = [
+        line
+        for line in ONTOLOGY_PATH.read_text(encoding="utf-8").splitlines()
+        if not line.lstrip().startswith("@prefix")
+    ]
+    return "\n".join(lines).strip() + "\n"
+
 
 MODALITY = {
-    "obligation": "oc:Obligation",
-    "permission": "oc:Permission",
-    "prohibition": "oc:Prohibition",
-    "recommendation": "oc:Recommendation",
-    "definition": "oc:Definition",
-    "procedure_step": "oc:ProcedureStep",
-    "condition": "oc:Condition",
+    "obligation": "doc:Obligation",
+    "permission": "doc:Permission",
+    "prohibition": "doc:Prohibition",
+    "recommendation": "doc:Recommendation",
+    "definition": "doc:Definition",
+    "procedure_step": "doc:ProcedureStep",
+    "condition": "doc:Condition",
 }
+
+ROLE = {"supports": "doc:supportsRole", "context": "doc:contextRole"}
+
+# An IRIREF may not contain these. A URL that is not an address this writer can
+# publish is an error, not something to drop: dropping it would produce a graph
+# that looks complete and quietly lacks a link the claim file still carries.
+_IRIREF_UNSAFE = re.compile(r'[\s<>"{}|^`\\]')
+
+
+def _url_iri(value: Any, where: str) -> str | None:
+    url = str(value or "").strip()
+    if not url:
+        return None
+    if not url.startswith(("http://", "https://")) or _IRIREF_UNSAFE.search(url):
+        raise ValueError(
+            f"{where}: {url!r} is not an IRI this writer can publish; correct the "
+            "source URL instead of letting the graph lose it"
+        )
+    return f"<{url}>"
+
 
 CSV_FIELDS = [
     "claim_id",
@@ -166,71 +179,166 @@ def _iri(value: str) -> str:
     return cleaned or "x"
 
 
+def _sections(doc_id: str, claims: list[dict]) -> dict[tuple[str, ...], str]:
+    """Every heading path a document's locators mention, and its IRI.
+
+    Built from the locators the claims already carry, so nothing is invented and
+    no model call is needed: the section tree was in the data and the old writer
+    flattened it into a string. Every prefix of a path is registered too, so a
+    section that holds no claim of its own still exists as a parent.
+    """
+    paths: set[tuple[str, ...]] = set()
+    for claim in claims:
+        for item in claim.get("evidence") or []:
+            path = (item.get("locator") or {}).get("section_path") or []
+            for depth in range(1, len(path) + 1):
+                paths.add(tuple(path[:depth]))
+    return {
+        path: f"ex:sec_{_iri(doc_id)}_{index:03d}"
+        for index, path in enumerate(sorted(paths))
+    }
+
+
+def _entity(subject: str, kind: str, pairs: list[tuple[str, str]]) -> str:
+    """One subject, its type, and its predicate-object pairs, joined safely.
+
+    Written as a list rather than as appended lines with trailing semicolons:
+    almost every predicate is conditional, and the previous shape ended in a
+    period only because the last line happened to be unconditional.
+    """
+    parts = [f"a {kind}", *(f"{predicate} {obj}" for predicate, obj in pairs)]
+    return f"{subject} " + " ;\n    ".join(parts) + " ."
+
+
 def build_graph(documents: list[dict], claims: list[dict]) -> str:
     """Render documents and claims as Turtle, without inventing triples."""
-    out = [PREFIXES, TBOX]
+    out = [PREFIXES, documents_ontology()]
     by_doc: dict[str, list[dict]] = defaultdict(list)
     for claim in claims:
         by_doc[claim["doc_id"]].append(claim)
     doc_by_id = {doc["doc_id"]: doc for doc in documents}
     for doc_id, items in sorted(by_doc.items()):
         doc = doc_by_id.get(doc_id, {})
-        ctx = f"ex:ctx_{_iri(doc_id)}"
         doc_iri = f"ex:doc_{_iri(doc_id)}"
-        out.append(f"{doc_iri} a oc:Document ;")
-        out.append(f"    oc:hasTitle {_lit(doc.get('title', doc_id))} ;")
+        ctx = f"ex:ctx_{_iri(doc_id)}"
+        sections = _sections(doc_id, items)
+        children: dict[tuple[str, ...], list[str]] = defaultdict(list)
+        for path in sections:
+            if len(path) > 1:
+                children[path[:-1]].append(sections[path])
+
+        pairs = [
+            ("doc:hasTitle", _lit(doc.get("title", doc_id))),
+            ("doc:inContext", ctx),
+        ]
         if doc.get("version"):
-            out.append(f"    oc:hasVersion {_lit(doc['version'])} ;")
+            pairs.insert(1, ("doc:hasDocVersion", _lit(doc["version"])))
         if doc.get("doc_type"):
-            out.append(f"    oc:hasDocType {_lit(doc['doc_type'])} ;")
+            pairs.append(("doc:hasDocType", _lit(doc["doc_type"])))
         if doc.get("licence"):
-            out.append(f"    oc:hasLicence {_lit(doc['licence'])} ;")
+            pairs.append(("doc:hasLicence", _lit(doc["licence"])))
         if doc.get("sha256"):
-            out.append(f"    oc:hasSha256 {_lit(doc['sha256'])} ;")
-        out.append(f"    oc:hasClaim {', '.join('ex:claim_' + _iri(c['claim_id']) for c in items)} ;")
-        out.append(f"    oc:inContext {ctx} .")
+            pairs.append(("doc:hasSha256", _lit(doc["sha256"])))
+        top_level = [iri for path, iri in sorted(sections.items()) if len(path) == 1]
+        if top_level:
+            pairs.append(("doc:hasSection", ", ".join(top_level)))
+        pairs.append(
+            ("doc:hasClaim", ", ".join(f"ex:claim_{_iri(c['claim_id'])}" for c in items))
+        )
+        out.append(_entity(doc_iri, "doc:Document", pairs))
         out.append("")
-        out.append(f"{ctx} a oc:Context ;")
-        out.append(f"    oc:hasSourceUrl {_lit(doc.get('url', ''))} ;")
+
+        ctx_pairs: list[tuple[str, str]] = []
+        ctx_url = _url_iri(doc.get("url"), f"{doc_id}: document url")
+        if ctx_url:
+            ctx_pairs.append(("doc:hasSourceUrl", ctx_url))
         if doc.get("jurisdiction"):
-            out.append(f"    oc:hasJurisdiction {_lit(doc['jurisdiction'])} ;")
+            ctx_pairs.append(("doc:hasJurisdiction", _lit(doc["jurisdiction"])))
         if doc.get("version"):
-            out.append(f"    oc:hasVersion {_lit(doc['version'])} ;")
-        out.append(f"    oc:hasDocType {_lit(doc.get('doc_type', ''))} .")
+            ctx_pairs.append(("doc:hasDocVersion", _lit(doc["version"])))
+        ctx_pairs.append(("doc:hasDocType", _lit(doc.get("doc_type", ""))))
+        out.append(_entity(ctx, "doc:Context", ctx_pairs))
         out.append("")
+
+        for path, iri in sorted(sections.items()):
+            section_pairs = [
+                ("doc:hasSectionTitle", _lit(path[-1])),
+                ("doc:hasSectionPath", _lit(" > ".join(path))),
+            ]
+            if children.get(path):
+                section_pairs.append(
+                    ("doc:hasSubsection", ", ".join(sorted(children[path])))
+                )
+            out.append(_entity(iri, "doc:Section", section_pairs))
+        if sections:
+            out.append("")
+
         for claim in items:
             cid = _iri(claim["claim_id"])
-            out.append(f"ex:claim_{cid} a oc:Claim ;")
-            out.append(f"    oc:inContext {ctx} ;")
-            out.append(f"    oc:hasStatement {_lit(claim['statement'])} ;")
-            out.append(f"    oc:hasModality {MODALITY.get(claim['modality'], 'oc:Definition')} ;")
+            if claim["modality"] not in MODALITY:
+                raise ValueError(
+                    f"{claim['claim_id']}: modality {claim['modality']!r} is not one of "
+                    f"{sorted(MODALITY)}; the document ontology has no bucket for it"
+                )
+            claim_pairs = [
+                ("doc:inContext", ctx),
+                ("doc:hasStatement", _lit(claim["statement"])),
+                ("doc:hasModality", MODALITY[claim["modality"]]),
+            ]
             if claim.get("actor"):
-                out.append(f"    oc:hasActor {_lit(claim['actor'])} ;")
+                claim_pairs.append(("doc:hasActor", _lit(claim["actor"])))
             if claim.get("deadline"):
-                out.append(f"    oc:hasDeadline {_lit(claim['deadline'])} ;")
+                claim_pairs.append(("doc:hasDeadline", _lit(claim["deadline"])))
             for condition in claim.get("conditions") or []:
-                out.append(f"    oc:hasCondition {_lit(condition)} ;")
+                claim_pairs.append(("doc:hasCondition", _lit(condition)))
             evidence = claim.get("evidence") or []
-            links = " ,\n        ".join(f"ex:ev_{cid}_{i}" for i in range(len(evidence)))
-            if links:
-                out.append(f"    oc:hasEvidence {links} ;")
-            out.append(f"    prov:wasDerivedFrom {doc_iri} .")
+            if evidence:
+                claim_pairs.append(
+                    ("doc:hasEvidence", ", ".join(f"ex:ev_{cid}_{i}" for i in range(len(evidence))))
+                )
+            claim_pairs.append(("prov:wasDerivedFrom", doc_iri))
+            out.append(_entity(f"ex:claim_{cid}", "doc:Claim", claim_pairs))
             out.append("")
+
             for index, item in enumerate(evidence):
                 locator = item.get("locator") or {}
-                out.append(f"ex:ev_{cid}_{index} a oc:Evidence ;")
-                out.append(f"    oc:hasQuote {_lit(item.get('quote', ''))} ;")
-                out.append(f"    oc:evidenceRole {_lit(item.get('role', 'supports'))} ;")
-                if locator.get("section_path"):
-                    out.append(f"    oc:hasLocator {_lit(' > '.join(locator['section_path']))} ;")
-                if locator.get("url"):
-                    out.append(f"    oc:hasSourceUrl {_lit(locator['url'])} ;")
-                if locator.get("page"):
-                    out.append(f"    oc:hasPage {int(locator['page'])} ;")
-                out.append(f"    prov:wasDerivedFrom {doc_iri} .")
-                out.append("")
+                loc_iri = f"ex:loc_{cid}_{index}"
+                role_name = str(item.get("role", "supports"))
+                if role_name not in ROLE:
+                    raise ValueError(
+                        f"{claim['claim_id']}: evidence role {role_name!r} is not one of "
+                        f"{sorted(ROLE)}; asserting 'supports' for it would be a claim "
+                        "the document does not make"
+                    )
+                role = ROLE[role_name]
+                ev_pairs = [
+                    ("doc:hasQuote", _lit(item.get("quote", ""))),
+                    ("doc:evidenceRole", role),
+                    ("doc:hasLocator", loc_iri),
+                    ("prov:wasDerivedFrom", doc_iri),
+                ]
+                out.append(_entity(f"ex:ev_{cid}_{index}", "doc:Evidence", ev_pairs))
+
+                loc_pairs: list[tuple[str, str]] = []
+                for key, predicate in (
+                    ("char_start", "doc:hasCharStart"),
+                    ("char_end", "doc:hasCharEnd"),
+                ):
+                    if locator.get(key) is not None:
+                        loc_pairs.append((predicate, str(int(locator[key]))))
+                if locator.get("page") is not None:
+                    loc_pairs.append(("doc:hasPage", str(int(locator["page"]))))
+                loc_url = _url_iri(locator.get("url"), f"{claim['claim_id']} locator {index}")
+                if loc_url:
+                    loc_pairs.append(("doc:hasSourceUrl", loc_url))
+                path = tuple(locator.get("section_path") or [])
+                if path in sections:
+                    loc_pairs.append(("doc:inSection", sections[path]))
+                out.append(_entity(loc_iri, "doc:Locator", loc_pairs))
+            out.append("")
+
             for other in claim.get("conflicts_with") or []:
-                out.append(f"ex:claim_{cid} oc:conflictsWith ex:claim_{_iri(other)} .")
+                out.append(f"ex:claim_{cid} doc:conflictsWith ex:claim_{_iri(other)} .")
         out.append("")
     return "\n".join(out).rstrip() + "\n"
 

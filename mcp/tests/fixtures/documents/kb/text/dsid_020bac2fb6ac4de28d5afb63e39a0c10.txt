@@ -1,0 +1,150 @@
+Owner mapping dispute: capacity-related incident subtypes (Routing vs Fleet) — decision needed for v1
+
+From: Ava Chen <ava.chen@redwoodinference.com>
+To: Sean Gallagher <sean.gallagher@redwoodinference.com>
+Cc: Rafael Mendes <rafael.mendes@redwoodinference.com>, Mina Haddad <mina.haddad@redwoodinference.com>, Vanessa Ortiz <vanessa.ortiz@redwoodinference.com>, Ravi Menon <ravi.menon@redwoodinference.com>
+Date: Fri, Jan 9, 2026 at 9:12 AM PST
+Subject: Owner mapping dispute: capacity-related incident subtypes (Routing vs Fleet) — decision needed for v1
+
+Sean,
+
+We need a tiebreak decision today to unblock the v1 “incident type -> primary owner” mapping and the control-plane config (ENG-4825).
+
+Dispute: several capacity-adjacent subtypes currently oscillate between Routing (Smart Routing) and Fleet (Infra/Fleet) as the primary owner, depending on who is on-call and what the symptom looked like.
+
+Where it’s showing up:
+- Incidents that start as “fallback storms” / elevated 5xx/429 but underlying cause is GPU pool saturation or regional capacity exhaustion.
+- Incidents where router admission control sheds load (429) because the local pool is full, but routing is “doing the right thing” per policy.
+
+Two proposed options:
+A) Own by symptom: anything involving fallback/admission control defaults to Routing.
+B) Own by controllable lever / root cause: capacity scarcity -> Fleet; policy/selection bugs -> Routing.
+
+SRE recommendation is B, but Routing is concerned about being paged for “capacity incidents” and losing fast mitigation loops.
+
+Concrete subtypes in question (from the draft sheet):
+- CAPACITY > Regional capacity exhaustion
+- CAPACITY > Provisioning lag / scale-up stalled
+- CAPACITY > Pool saturation (GPU/utilization)
+- ROUTING/FALLBACK > Excessive fallbacks due to capacity signals
+
+Proposed owner mapping if we choose B:
+- CAPACITY.* => Primary: Fleet; Secondary/Consulted: Routing (for traffic steering, safe-mode, policy constraints)
+- ROUTING/FALLBACK.* => Primary: Routing; Consulted: Fleet (if capacity constraints are suspected)
+
+Decision we need:
+1) Which team is primary owner for the “capacity-driven fallback storm” subtype?
+2) Can we document a single decision rule for incident commanders to pick the right primary type during an incident?
+
+Attaching the disputed rows + the current draft mapping.
+
+Attachment(s):
+- Ownership-Mapping-v1_Disputed-Capacity-Subtypes_2026-01-09.xlsx (spreadsheet)
+- incident-taxonomy-v1-owner-mapping-snippet.png (image)
+
+Thanks,
+Ava
+—
+Ava Chen
+Platform Operations (Reliability Program)
+Redwood Inference
+
+
+From: Mina Haddad <mina.haddad@redwoodinference.com>
+To: Ava Chen <ava.chen@redwoodinference.com>, Sean Gallagher <sean.gallagher@redwoodinference.com>
+Cc: Rafael Mendes <rafael.mendes@redwoodinference.com>, Vanessa Ortiz <vanessa.ortiz@redwoodinference.com>, Ravi Menon <ravi.menon@redwoodinference.com>
+Date: Fri, Jan 9, 2026 at 9:41 AM PST
+Subject: Re: Owner mapping dispute: capacity-related incident subtypes (Routing vs Fleet) — decision needed for v1
+
++1 on needing a crisp rule, but Routing can’t end up as “consulted” on anything that is manifested as router-triggered 429/5xx.
+
+In the last two incidents, the fastest mitigation was:
+- tighten routing policy / safe-mode to reduce thrash
+- force regional steering
+Fleet changes (adding capacity) were slower.
+
+If we go with B, I’d like:
+- a dedicated subtype under ROUTING/FALLBACK that captures “capacity-driven fallback storms” and keeps Routing as primary
+OR
+- a hard rule that when fallback_reason=capacity AND traffic steering / safe-mode is required, Routing is primary.
+
+Otherwise we’ll lose the first 30 minutes.
+
+Mina
+
+
+From: Vanessa Ortiz <vanessa.ortiz@redwoodinference.com>
+To: Ava Chen <ava.chen@redwoodinference.com>, Sean Gallagher <sean.gallagher@redwoodinference.com>
+Cc: Rafael Mendes <rafael.mendes@redwoodinference.com>, Mina Haddad <mina.haddad@redwoodinference.com>, Ravi Menon <ravi.menon@redwoodinference.com>
+Date: Fri, Jan 9, 2026 at 10:05 AM PST
+Subject: Re: Owner mapping dispute: capacity-related incident subtypes (Routing vs Fleet) — decision needed for v1
+
+Fleet POV: primary ownership should map to who can remove the constraint.
+
+If the router is falling back because the region/pool is out of headroom, that’s capacity. Routing mitigations can reduce blast radius, but they don’t fix the underlying shortage.
+
+If the router is falling back incorrectly (bad health signal, bad policy rollout, wrong compatibility matrix), that’s Routing.
+
+I’m fine with Routing being auto-paged/consulted for CAPACITY incidents (because steering matters), but the primary owner should be Fleet for CAPACITY.*
+
+Vanessa
+
+
+From: Sean Gallagher <sean.gallagher@redwoodinference.com>
+To: Ava Chen <ava.chen@redwoodinference.com>
+Cc: Rafael Mendes <rafael.mendes@redwoodinference.com>, Mina Haddad <mina.haddad@redwoodinference.com>, Vanessa Ortiz <vanessa.ortiz@redwoodinference.com>, Ravi Menon <ravi.menon@redwoodinference.com>
+Date: Fri, Jan 9, 2026 at 11:02 AM PST
+Subject: Re: Owner mapping dispute: capacity-related incident subtypes (Routing vs Fleet) — decision needed for v1
+
+Decision: choose option B (own by controllable boundary / root cause). We’ll treat “capacity-driven fallback storms” as a CAPACITY incident for primary ownership.
+
+Rationale:
+- Primary owner must align to the team accountable for preventing recurrence (forecasting, provisioning, pool sizing, regional capacity posture).
+- Routing absolutely remains critical for mitigation; we’ll formalize it as required secondary/consulted for CAPACITY incidents.
+
+To address Mina’s first-30-minutes concern:
+- Paging/escalation rules: CAPACITY incidents should page Fleet as primary AND also notify Routing immediately when fallback/admission control is involved.
+- Classification rule for ICs (write this into the decision tree):
+  1) If headroom is constrained (pool saturation, provisioning backlog, regional exhaustion) OR fallback_reason=capacity is dominant -> classify as CAPACITY.* (primary Fleet).
+  2) If headroom exists but router is falling back / shedding due to misconfig, bad rollout, policy bug, or incorrect health signals -> classify as ROUTING/FALLBACK.* (primary Routing).
+  3) If unclear in first 15 minutes -> set CAPACITY.* with “contributing_systems=Routing” and revisit once signals confirm.
+
+Action items (please assign owners + dates):
+- Update the owner mapping table and control-plane config to reflect this (ENG-4825).
+- Ensure incident-bot can set a secondary/escalation target (Routing) when CAPACITY incident includes fallback/admission symptoms (ENG-4823).
+
+Sean
+
+
+From: Ava Chen <ava.chen@redwoodinference.com>
+To: Sean Gallagher <sean.gallagher@redwoodinference.com>
+Cc: Rafael Mendes <rafael.mendes@redwoodinference.com>, Mina Haddad <mina.haddad@redwoodinference.com>, Vanessa Ortiz <vanessa.ortiz@redwoodinference.com>, Ravi Menon <ravi.menon@redwoodinference.com>
+Date: Sat, Jan 10, 2026 at 11:28 AM PST
+Subject: Re: Owner mapping dispute: capacity-related incident subtypes (Routing vs Fleet) — decision needed for v1
+
+Thanks Sean — captured.
+
+I’ll implement the decision in the v1 mapping + decision tree as follows:
+
+Final mapping (v1):
+- CAPACITY > Regional capacity exhaustion — Primary: Fleet; Secondary: Routing; Consulted: SRE
+- CAPACITY > Provisioning lag / scale-up stalled — Primary: Fleet; Secondary: SRE; Consulted: Routing
+- CAPACITY > Pool saturation (GPU/utilization) — Primary: Fleet; Secondary: Routing; Consulted: SRE
+- ROUTING/FALLBACK > Fallback misbehavior (policy/health/compat bugs) — Primary: Routing; Secondary: SRE; Consulted: Fleet
+
+IC decision rule (one-liner for the bot + policy page):
+- “If the constraint is headroom (saturation/backlog/exhaustion) -> CAPACITY (Fleet owns). If headroom exists but fallbacks/shedding are incorrect -> ROUTING/FALLBACK (Routing owns). If unknown -> CAPACITY + tag Routing as contributing system, revisit within 30 minutes.”
+
+Follow-ups (next week):
+1) Ava: update Confluence owner mapping + decision tree language and link it from the incident classification policy. ETA Tue 1/13.
+2) Rafael: confirm escalation rule wording for CAPACITY incidents (Fleet primary + Routing notified) and align with incident-bot closure gating. ETA Wed 1/14.
+3) Mina/Vanessa: provide 2–3 concrete examples each for the taxonomy page (what to pick, what not to pick). ETA Wed 1/14.
+4) Routing team: ensure fallback_reason enums land + are visible in the incident channel bot summary (ENG-4824). Tracking separately.
+
+If anyone thinks we need a dedicated “Capacity-driven fallback storm” subtype name for readability, we can add it as an alias in the UI copy while keeping the underlying type low-cardinality (CAPACITY > saturation/exhaustion) for metrics.
+
+Ava
+—
+Ava Chen
+Platform Operations (Reliability Program)
+Redwood Inference

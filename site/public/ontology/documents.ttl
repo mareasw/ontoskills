@@ -1,0 +1,330 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix doc: <https://ontoskills.sh/ontology/documents#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://ontoskills.sh/ontology/documents> a owl:Ontology ;
+    dcterms:created "2026-11-16" ;
+    dcterms:description "TBox for a compiled document knowledge base: documents, their sections, the claims extracted from them, and the evidence that supports each claim." ;
+    dcterms:title "OntoSkills Document Layer Ontology" ;
+    owl:versionIRI <https://ontoskills.sh/ontology/documents/1.0.0> ;
+    owl:versionInfo "1.0.0" ;
+    rdfs:seeAlso <https://ontoskills.sh/ontology/documents.ttl> ;
+    rdfs:comment "The vocabulary of the compiled layer, kept separate from the skill ontology (https://ontoskills.sh/ontology#) because the two describe different things. A skill is a procedure a system can execute; a claim is a sentence a company can check. Sharing one namespace made oc:hasVersion mean two things at once and made oc:Section ambiguous, so this file is the document side's own TBox, versioned on its own." ;
+    rdfs:seeAlso <https://ontoskills.sh/ontology> .
+
+# ============================================================================
+# Classes
+# ============================================================================
+
+doc:Context a owl:Class ;
+    rdfs:label "Context" ;
+    rdfs:comment "The provenance block of a document: where it came from, what kind of document it is, and under which jurisdiction and version it was read. Attached to the document and repeated on each claim, so a claim can be quoted without carrying its whole document." ;
+    skos:prefLabel "Context" .
+
+doc:Document a owl:Class ;
+    rdfs:isDefinedBy <https://ontoskills.sh/ontology/documents> ;
+    rdfs:label "Document" ;
+    rdfs:comment "One source document, addressed by its content hash. The unit a reader recognises as 'the contract', not the unit the compiler works on." ;
+    rdfs:subClassOf prov:Entity ;
+    skos:prefLabel "Document" .
+
+doc:Claim a owl:Class ;
+    rdfs:isDefinedBy <https://ontoskills.sh/ontology/documents> ;
+    rdfs:label "Claim" ;
+    rdfs:comment "One atomic statement a document makes, with its modality, its actor and the evidence that supports it. Atomic means a reader can agree with the claim and disagree with the next one: 'the supplier notifies within 48 hours' and 'notification is in writing' are two claims, not one paragraph." ;
+    rdfs:subClassOf prov:Entity ;
+    skos:prefLabel "Claim" .
+
+doc:Evidence a owl:Class ;
+    rdfs:isDefinedBy <https://ontoskills.sh/ontology/documents> ;
+    rdfs:label "Evidence" ;
+    rdfs:comment "A verbatim passage of the source that supports or contextualises a claim, plus the locator that finds it again. The quote is the document's own words; the layer contributes the selection, never the wording." ;
+    rdfs:subClassOf prov:Entity ;
+    skos:prefLabel "Evidence" .
+
+doc:Locator a owl:Class ;
+    rdfs:isDefinedBy <https://ontoskills.sh/ontology/documents> ;
+    rdfs:label "Locator" ;
+    rdfs:comment "A structured address for a passage: the section it sits in, the character offsets in the extracted text, the page where the format has pages, and the source URL. Structured rather than a formatted string, because a string cannot be followed." ;
+    skos:prefLabel "Locator" .
+
+doc:Section a owl:Class ;
+    rdfs:isDefinedBy <https://ontoskills.sh/ontology/documents> ;
+    rdfs:label "Section" ;
+    rdfs:comment "A heading-defined division of a document, nested by doc:hasSubsection. Present because the interesting question is often not 'which document' but 'which part of it': a schedule, an annex and a liability clause are different places in the same file." ;
+    skos:prefLabel "Section" .
+
+doc:EvidenceRole a owl:Class ;
+    rdfs:isDefinedBy <https://ontoskills.sh/ontology/documents> ;
+    rdfs:label "Evidence role" ;
+    rdfs:comment "What a passage is doing for a claim. An individual of this class, not free text, so a query can ask for claims whose support is only contextual." ;
+    skos:prefLabel "Evidence role" .
+
+doc:supportsRole a owl:NamedIndividual,
+        doc:EvidenceRole ;
+    rdfs:label "supports" ;
+    rdfs:comment "The passage states the claim. Without at least one of these a claim has no support and the compiler does not accept it." ;
+    skos:prefLabel "supports" .
+
+doc:contextRole a owl:NamedIndividual,
+        doc:EvidenceRole ;
+    rdfs:label "context" ;
+    rdfs:comment "The passage situates the claim — a lead-in, a definition, a scope sentence — without stating it." ;
+    skos:prefLabel "context" .
+
+doc:Modality a owl:Class ;
+    rdfs:isDefinedBy <https://ontoskills.sh/ontology/documents> ;
+    rdfs:label "Modality" ;
+    rdfs:comment "The force a claim carries. The seven subclasses are the ones the compiler's prompt asks for and the schema enforces; there is deliberately no 'other' bucket, because a claim whose force cannot be named is a claim the reader cannot act on." ;
+    skos:prefLabel "Modality" .
+
+doc:Condition a owl:Class ;
+    rdfs:label "Condition" ;
+    rdfs:comment "A claim that states when something else applies." ;
+    rdfs:subClassOf doc:Modality ;
+    skos:prefLabel "Condition" .
+
+doc:Definition a owl:Class ;
+    rdfs:label "Definition" ;
+    rdfs:comment "A claim that fixes the meaning of a term." ;
+    rdfs:subClassOf doc:Modality ;
+    skos:prefLabel "Definition" .
+
+doc:Obligation a owl:Class ;
+    rdfs:label "Obligation" ;
+    rdfs:comment "A claim that someone must do something." ;
+    rdfs:subClassOf doc:Modality ;
+    skos:prefLabel "Obligation" .
+
+doc:Permission a owl:Class ;
+    rdfs:label "Permission" ;
+    rdfs:comment "A claim that someone may do something." ;
+    rdfs:subClassOf doc:Modality ;
+    skos:prefLabel "Permission" .
+
+doc:ProcedureStep a owl:Class ;
+    rdfs:label "Procedure step" ;
+    rdfs:comment "A claim that is one ordered step of a process." ;
+    rdfs:subClassOf doc:Modality ;
+    skos:prefLabel "Procedure step" .
+
+doc:Prohibition a owl:Class ;
+    rdfs:label "Prohibition" ;
+    rdfs:comment "A claim that someone must not do something." ;
+    rdfs:subClassOf doc:Modality ;
+    skos:prefLabel "Prohibition" .
+
+doc:Recommendation a owl:Class ;
+    rdfs:label "Recommendation" ;
+    rdfs:comment "A claim that something is advised but not required." ;
+    rdfs:subClassOf doc:Modality ;
+    skos:prefLabel "Recommendation" .
+
+# The four structural kinds are mutually exclusive: a document is not a claim,
+# and a passage is evidence of exactly one role. Stated so a modelling mistake
+# shows up in a reasoner instead of in a customer's answer.
+doc:Document owl:disjointWith doc:Section .
+doc:Document owl:disjointWith doc:Claim .
+doc:Document owl:disjointWith doc:Evidence .
+doc:Claim owl:disjointWith doc:Evidence .
+doc:Claim owl:disjointWith doc:Section .
+doc:Evidence owl:disjointWith doc:Section .
+doc:Locator owl:disjointWith doc:Document .
+doc:Locator owl:disjointWith doc:Section .
+doc:Locator owl:disjointWith doc:Claim .
+doc:Locator owl:disjointWith doc:Evidence .
+
+# ============================================================================
+# Properties
+# ============================================================================
+
+doc:conflictsWith a owl:ObjectProperty,
+        owl:SymmetricProperty ;
+    rdfs:domain doc:Claim ;
+    rdfs:label "conflicts with" ;
+    rdfs:comment "Two claims that cannot both hold. Symmetric by definition: a contradiction does not have a direction, and asserting it one way only would make 'find the conflicts' depend on which claim was compiled first." ;
+    rdfs:range doc:Claim ;
+    skos:prefLabel "conflicts with" .
+
+doc:evidenceRole a owl:ObjectProperty ;
+    rdfs:domain doc:Evidence ;
+    rdfs:comment "Whether the passage states the claim or merely situates it. An object property over doc:EvidenceRole so the role is a resource a query can name, not a string each build spells differently." ;
+    rdfs:label "evidence role" ;
+    rdfs:range doc:EvidenceRole ;
+    skos:prefLabel "evidence role" .
+
+doc:hasActor a owl:DatatypeProperty ;
+    rdfs:domain doc:Claim ;
+    rdfs:label "has actor" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The party a claim is about, as the document names it. Not normalised to an entity identifier: the layer reports what the document says, and merging 'the Supplier' with a company record is a decision with its own error rate, not a compilation step." ;
+    skos:prefLabel "has actor" .
+
+doc:hasCharEnd a owl:DatatypeProperty ;
+    rdfs:domain doc:Locator ;
+    rdfs:label "has character end" ;
+    rdfs:range xsd:integer ;
+    rdfs:comment "Exclusive end offset, in Unicode code points, into the *normalised* text: the source with curly quotes and dashes folded to ASCII and whitespace runs collapsed (compiler.documents.text.norm). The basis is named because it is not the bytes on disk: a consumer holding the raw file must map the offset through compiler.documents.gaps.raw_offsets, and a consumer that slices the raw file at this offset will read the wrong sentence. With doc:hasCharStart it is what makes 'verbatim' checkable rather than asserted." ;
+    skos:prefLabel "has character end" .
+
+doc:hasCharStart a owl:DatatypeProperty ;
+    rdfs:domain doc:Locator ;
+    rdfs:label "has character start" ;
+    rdfs:range xsd:integer ;
+    skos:prefLabel "has character start" .
+
+doc:hasClaim a owl:ObjectProperty ;
+    rdfs:domain doc:Document ;
+    rdfs:label "has claim" ;
+    rdfs:range doc:Claim ;
+    rdfs:comment "From a document to everything extracted from it. Inverse of prov:wasDerivedFrom at the document level, stated explicitly because it is the direction readers navigate." ;
+    skos:prefLabel "has claim" .
+
+doc:hasCondition a owl:DatatypeProperty ;
+    rdfs:domain doc:Claim ;
+    rdfs:label "has condition" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "A condition attached to the claim, quoted from the document. Multi-valued: a claim can depend on several conditions." ;
+    skos:prefLabel "has condition" .
+
+doc:hasDeadline a owl:DatatypeProperty ;
+    rdfs:domain doc:Claim ;
+    rdfs:label "has deadline" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "A time limit as written — '48 hours', 'the tenth day'. Deliberately not a date: turning a deadline into a date needs the document's own point of reference." ;
+    skos:prefLabel "has deadline" .
+
+# No rdfs:domain on the properties below that are used on more than one class:
+# two rdfs:domain axioms on one property mean an intersection, not a union, and
+# a wrong domain is worse than an absent one. Where they are used is written
+# down instead, and the union could be spelled out later if a reasoner needs it.
+doc:hasDocType a owl:DatatypeProperty ;
+    rdfs:label "has document type" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Used on doc:Document and doc:Context." ;
+    skos:prefLabel "has document type" .
+
+doc:hasDocVersion a owl:DatatypeProperty ;
+    rdfs:label "has document version" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The version of the document, as the document states it. Used on doc:Document and doc:Context. Named hasDocVersion, not hasVersion, to keep it distinct from a skill's version in the skill ontology — the collision that motivated this namespace." ;
+    skos:prefLabel "has document version" .
+
+doc:hasEvidence a owl:ObjectProperty ;
+    rdfs:domain doc:Claim ;
+    rdfs:comment "From a claim to the passages that support or contextualise it. A claim without at least one doc:supportsRole evidence is not published: the quote is the product." ;
+    rdfs:label "has evidence" ;
+    rdfs:range doc:Evidence ;
+    skos:prefLabel "has evidence" .
+
+doc:hasJurisdiction a owl:DatatypeProperty ;
+    rdfs:domain doc:Context ;
+    rdfs:label "has jurisdiction" ;
+    rdfs:range xsd:string ;
+    skos:prefLabel "has jurisdiction" .
+
+doc:hasLicence a owl:DatatypeProperty ;
+    rdfs:domain doc:Document ;
+    rdfs:label "has licence" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The licence the source was published under, carried with the document so an answer can be redistributed only as far as its source allows." ;
+    skos:prefLabel "has licence" .
+
+doc:hasLocator a owl:ObjectProperty ;
+    rdfs:domain doc:Evidence ;
+    rdfs:label "has locator" ;
+    rdfs:range doc:Locator ;
+    rdfs:comment "A resource, not a formatted string. The earlier shape wrote 'Chapter 2 > 2.1 Notice' as a literal; a literal cannot be followed to the section, so the graph was flat even where the data had a hierarchy." ;
+    skos:prefLabel "has locator" .
+
+doc:hasModality a owl:ObjectProperty ;
+    rdfs:domain doc:Claim ;
+    rdfs:comment "The claim's force, as one of the seven doc:Modality subclasses. Always present: a claim whose force is unknown cannot be acted on." ;
+    rdfs:label "has modality" ;
+    rdfs:range doc:Modality ;
+    skos:prefLabel "has modality" .
+
+doc:hasPage a owl:DatatypeProperty ;
+    rdfs:domain doc:Locator ;
+    rdfs:label "has page" ;
+    rdfs:range xsd:integer ;
+    rdfs:comment "One-based page number where the source format has pages. Absent on plain text, which has offsets and no pages." ;
+    skos:prefLabel "has page" .
+
+doc:hasQuote a owl:DatatypeProperty ;
+    rdfs:domain doc:Evidence ;
+    rdfs:label "has quote" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The passage, byte for byte as it appears in the document. Verbatim is the layer's central promise, so a quote that does not occur in the source at the stated offsets is a defect, not a paraphrase." ;
+    skos:prefLabel "has quote" .
+
+doc:hasSection a owl:ObjectProperty ;
+    rdfs:domain doc:Document ;
+    rdfs:label "has section" ;
+    rdfs:range doc:Section ;
+    rdfs:comment "From a document to its top-level sections. Nested sections hang off their parent, so one hop from the document and a property path from there." ;
+    skos:prefLabel "has section" .
+
+doc:hasSectionPath a owl:DatatypeProperty ;
+    rdfs:domain doc:Section ;
+    rdfs:label "has section path" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The full heading path, joined with ' > ', denormalised for readers that want a printable address without walking doc:hasSubsection. Derived from the structure and never authoritative on its own." ;
+    skos:prefLabel "has section path" .
+
+doc:hasSectionTitle a owl:DatatypeProperty ;
+    rdfs:domain doc:Section ;
+    rdfs:label "has section title" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The heading text as the document writes it, numbering included." ;
+    skos:prefLabel "has section title" .
+
+doc:hasSha256 a owl:DatatypeProperty ;
+    rdfs:domain doc:Document ;
+    rdfs:label "has SHA-256" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Hex digest of the extracted text. What makes two builds comparable: same digest, same bytes read." ;
+    skos:prefLabel "has SHA-256" .
+
+doc:hasSourceUrl a owl:ObjectProperty ;
+    rdfs:label "has source URL" ;
+    rdfs:comment "An IRI, not a string, and therefore an object property: the point of an address is that it resolves. `xsd:anyURI` would have made it a datatype, so an IRI object would violate the declared range — which is what an earlier version of this file did. Used on doc:Context and doc:Locator; no declared range, because the object is an external resource this ontology does not own." ;
+    skos:prefLabel "has source URL" .
+
+doc:hasStatement a owl:DatatypeProperty ;
+    rdfs:domain doc:Claim ;
+    rdfs:label "has statement" ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The claim itself, as one sentence. Written by the compiler from the quoted evidence; consistency with the quote is the verifier's job." ;
+    skos:prefLabel "has statement" .
+
+doc:hasSubsection a owl:ObjectProperty ;
+    rdfs:domain doc:Section ;
+    rdfs:comment "Nesting between sections, taken from the heading hierarchy of the source. This is what preserves the tree instead of flattening every heading into a label." ;
+    rdfs:label "has subsection" ;
+    rdfs:range doc:Section ;
+    skos:prefLabel "has subsection" .
+
+doc:hasTitle a owl:DatatypeProperty ;
+    rdfs:domain doc:Document ;
+    rdfs:label "has title" ;
+    rdfs:range xsd:string ;
+    skos:prefLabel "has title" .
+
+doc:inContext a owl:ObjectProperty ;
+    rdfs:label "in context" ;
+    rdfs:range doc:Context ;
+    rdfs:comment "Used on doc:Document and doc:Claim: a claim carries its own copy of the context so it can be quoted alone." ;
+    skos:prefLabel "in context" .
+
+doc:inSection a owl:ObjectProperty ;
+    rdfs:domain doc:Locator ;
+    rdfs:label "in section" ;
+    rdfs:range doc:Section ;
+    rdfs:comment "The section a passage sits in, as a resource. This is the link that turns a flat claim list into a tree a reader can walk." ;
+    skos:prefLabel "in section" .

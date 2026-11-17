@@ -184,11 +184,11 @@ ontoskills/
 │   │   ├── security.py         # 深度防御安全
 │   │   ├── serialization.py    # 带 SHACL 守门员的 RDF 序列化
 │   │   ├── snapshot.py         # 本体快照
+│   │   ├── specs/              # SHACL 形状与文档 TBox（随 wheel 一起发布）
 │   │   ├── sparql.py           # SPARQL 查询引擎
 │   │   ├── storage.py          # 文件 I/O、合并、孤立清理
 │   │   ├── transformer.py      # LLM 工具使用提取
 │   │   └── validator.py        # SHACL 验证守门员
-│   ├── specs/                  # SHACL 形状宪法
 │   └── tests/                  # 测试套件
 ├── mcp/                        # OntoMCP — Rust MCP 服务器
 │   ├── Cargo.toml              # Rust 包清单

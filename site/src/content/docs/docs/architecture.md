@@ -192,11 +192,11 @@ ontoskills/
 │   │   ├── security.py         # Defense-in-depth security
 │   │   ├── serialization.py    # RDF serialization with SHACL gatekeeper
 │   │   ├── snapshot.py         # Ontology snapshots
+│   │   ├── specs/              # SHACL shapes and the document TBox, shipped in the wheel
 │   │   ├── sparql.py           # SPARQL query engine
 │   │   ├── storage.py          # File I/O, merging, orphan cleanup
 │   │   ├── transformer.py      # LLM tool-use extraction
 │   │   └── validator.py        # SHACL validation gatekeeper
-│   ├── specs/                  # SHACL shapes constitution
 │   └── tests/                  # Test suite
 ├── mcp/                        # OntoMCP — Rust MCP server
 │   ├── Cargo.toml              # Rust package manifest

@@ -10,9 +10,15 @@ default = []
 embeddings = ["ort", "tokenizers", "ndarray"]
 
 [dependencies]
-oxigraph = "0.5"
+# `default-features = false` drops the RocksDB backend: every store this server
+# opens is in memory (`Store::new` + `load_from_reader`), so the C++ build it
+# would otherwise add to every clean CI job buys nothing a caller can observe.
+oxigraph = { version = "0.5", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Python's `\w` is "category L* or N*"; this crate reports the exact category so
+# the tokenizer can reproduce it instead of approximating with is_alphanumeric.
+unicode-general-category = "1"
 walkdir = "2"
 anyhow = "1.0"
 # BM25 keyword search (default engine)

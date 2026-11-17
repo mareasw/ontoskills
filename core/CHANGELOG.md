@@ -42,6 +42,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **`ask` chooses its citations instead of cutting the ranking** — the answer is
+  no longer the top `k` of the lexical ranking. `ask` searches a pool of
+  `max(k * 10, 100)` citations with the same BM25, then chooses `k` of them
+  greedy: at each step the claim whose quote covers the most still-unclaimed
+  question terms, weighted by the corpus IDF, with the pool's own order as the
+  fill so a degenerate question still gets `k` citations. On the pilot's 192
+  questions with gold facts, at the same `k` and the same returned volume, this
+  is +8,03 pp coverage (63,94 % → 71,98 %) with a paired interval of
+  [+6,6; +9,5], at no model call and no extra artifact
+  (`benchmark/layer/RANKER.md`).
 - **Semantic fusion is applied only to the languages the model knows** —
   MiniLM is trained on English; on the Italian pilot its ranking was worse than
   the words themselves (MRR 0.339 → 0.240). `enable_semantic`
@@ -107,8 +117,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   a page break is dropped with its lead-in, and the earlier repair could name the
   heading but no claim could quote the sentence under it. `recover_lead_ins`
   (`documents/gaps.py`) gives the heading and the lead-in one span, in document
-  order, before the prompt is built, so the model can state the rule; on the
-  pilot `POLICY-0001` is supported by the recovered block and by the
+  order, before the prompt is built, so the model can state the rule; on a
+  pilot policy document it is supported by the recovered block and by the
   list item under it. This is the one repair that changes the span set, and
   therefore the prompt: the chunks that contain the block are asked again.
 - **A heading the segmenter dropped is read from the source** — a block read as

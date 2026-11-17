@@ -12,15 +12,18 @@ from __future__ import annotations
 import json
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import Lock
 
 import click
 from rich.console import Console
 from rich.table import Table
 
 from compiler.documents.ask import Corpus, ask as answer, render_text
-from compiler.documents.compile import CompileOptions, compile_document
+from compiler.documents.compile import CompiledDocument, CompileOptions, compile_document
 from compiler.documents.extract import ExtractionError, extract, strip_pages
 from compiler.documents.gaps import recover_lead_ins
 from compiler.documents.model import load_corpus
@@ -67,7 +70,7 @@ def _manifest_path(source: Path, explicit: Path | None) -> Path | None:
 
 
 def _print_estimate(rows: list[dict], price_in: float, price_out: float) -> dict:
-    table = Table(title="Estimate (no API calls)")
+    table = Table(title="Lower bound (no API calls)")
     table.add_column("doc")
     table.add_column("spans", justify="right")
     table.add_column("chunks", justify="right")
@@ -95,12 +98,14 @@ def _print_estimate(rows: list[dict], price_in: float, price_out: float) -> dict
     out_tokens = int(total_in * OUTPUT_RATIO)
     cost = total_in / 1_000_000 * price_in + out_tokens / 1_000_000 * price_out
     console.print(
-        f"Total: ~{total_in:,} input tokens, ~{out_tokens:,} output tokens, "
+        f"At least ~{total_in:,} input tokens, ~{out_tokens:,} output tokens, "
         f"{total_pages} PDF pages → ~${cost:.2f} at ${price_in}/M in, ${price_out}/M out."
     )
     console.print(
-        "[dim]Estimate assumes 3.8 chars/token and the Phase 1 output ratio; "
-        "the real number is only known after the run.[/dim]"
+        "[dim]A floor, not a forecast: it counts the chunk prompts at 3.8 chars/token "
+        "and leaves out the per-document conflict pass and the model's reasoning "
+        "tokens. Measured on the pilot corpus the real build came out about 8x "
+        "higher (benchmark/layer/LAYER.md §6).[/dim]"
     )
     return {
         "input_tokens": total_in,
@@ -108,6 +113,81 @@ def _print_estimate(rows: list[dict], price_in: float, price_out: float) -> dict
         "pages": total_pages,
         "cost": round(cost, 2),
     }
+
+
+def _compile_one(
+    doc,
+    row: dict,
+    options: CompileOptions,
+    progress,
+) -> CompiledDocument:
+    """Compile one document and repair its sections, ready for the artifact.
+
+    The prompt shows the model the raw headings, and the cache fingerprint covers
+    the text and the span ids, so the repair happens only after the reply is
+    cached: the claims are built, and from here on the artifact and the verifier
+    see the section a reader would name.
+    """
+    breaks: Breaks = {}
+    cleaned = clean_sections(row["spans_list"], row["text"], breaks)
+    lead_map = lead_ins(cleaned)
+    compiled = compile_document(
+        doc, row["text"], row["spans_list"], options, progress, lead_map=lead_map
+    )
+    apply_sections(compiled.claims, cleaned, breaks, row["text"])
+    compiled.spans = cleaned
+    return compiled
+
+
+def _compile_all(docs, rows: list[dict], options: CompileOptions):
+    """Yield ``(index, compiled)`` as each document finishes.
+
+    With more than one document the pool is filled with *documents*. Compiling
+    them in a queue and parallelising the chunks inside each one is the wrong
+    shape for a corpus of short documents: a document that segments into one
+    chunk leaves every worker but one idle, and the wall clock stays the serial
+    one. A single document has no such pool to draw from, so it keeps the
+    intra-document concurrency instead.
+
+    Documents finish out of order, so the caller must key the results by their
+    index rather than trust the arrival order: two runs of the same corpus have
+    to produce the same artifact, whatever order the network answered in.
+    """
+    if options.concurrency <= 1 or len(docs) < 2:
+        for index, (doc, row) in enumerate(zip(docs, rows)):
+            with console.status(
+                f"compiling {doc.doc_id} ({len(row['spans_list'])} spans)"
+            ) as status:
+
+                def progress(message: str, _status=status) -> None:
+                    _status.update(f"[yellow]{message}[/yellow]")
+
+                compiled = _compile_one(doc, row, options, progress)
+            # Yielded after the spinner closes: the caller prints that
+            # document's summary line, and a live display would swallow it.
+            yield index, compiled
+        return
+
+    # One call in flight per worker, never concurrency squared: each document
+    # runs its own chunks in order, and the pool is what fills the wire.
+    per_document = replace(options, concurrency=1)
+    lock = Lock()
+
+    def progress(message: str) -> None:
+        with lock:
+            console.print(f"  [yellow]{message}[/yellow]")
+
+    with ThreadPoolExecutor(max_workers=min(options.concurrency, len(docs))) as pool:
+        futures = {
+            pool.submit(_compile_one, doc, row, per_document, progress): index
+            for index, (doc, row) in enumerate(zip(docs, rows))
+        }
+        finished = 0
+        for future in as_completed(futures):
+            finished += 1
+            with lock:
+                console.print(f"  [dim]{finished}/{len(docs)} documents compiled[/dim]")
+            yield futures[future], future.result()
 
 
 @click.command("ingest")
@@ -236,27 +316,15 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
     replayed_in = replayed_out = 0
     total_rejected_numbers = 0
     total_truncated = 0
+    total_conflict_truncated = 0
+    total_localise_truncated = 0
     total_retried = 0
     total_localised = 0
     languages: dict[str, str] = {}
     failed: list[str] = []
-    for doc, row in zip(docs, rows):
-        with console.status(f"compiling {doc.doc_id} ({len(row['spans_list'])} spans)") as status:
-            def progress(message: str, _status=status) -> None:
-                _status.update(f"[yellow]{message}[/yellow]")
-
-            breaks: Breaks = {}
-            cleaned = clean_sections(row["spans_list"], row["text"], breaks)
-            lead_map = lead_ins(cleaned)
-            compiled = compile_document(
-                doc, row["text"], row["spans_list"], options, progress, lead_map=lead_map
-            )
-        # The prompt above showed the model the raw headings, and the cache
-        # fingerprint covers the text and the span ids, so the repair happens
-        # only now: the reply is cached, the claims are built, and from here on
-        # the artifact and the verifier see the section a reader would name.
-        apply_sections(compiled.claims, cleaned, breaks, row["text"])
-        compiled.spans = cleaned
+    compiled_by_index: dict[int, CompiledDocument] = {}
+    for index, compiled in _compile_all(docs, rows, options):
+        doc = docs[index]
         if compiled.stats.failed:
             # One unservable chunk must not block the rest of the corpus: the
             # cache keeps every reply that did arrive, so the next --resume
@@ -273,11 +341,14 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
                     f"    [red]first failure: {compiled.stats.errors[0][:300]}[/red]"
                 )
             continue
-        all_claims.extend(compiled.claims)
-        all_spans.extend(compiled.spans)
-        all_rejected.extend(compiled.rejected)
+        # Documents finish in whatever order the network answered. The counters
+        # below do not care; the artifact does, so the claims wait in the
+        # corpus order and are concatenated after the loop.
+        compiled_by_index[index] = compiled
         total_rejected_numbers += compiled.stats.rejected_numbers
         total_truncated += compiled.stats.truncated
+        total_conflict_truncated += compiled.stats.conflict_truncated
+        total_localise_truncated += compiled.stats.localise_truncated
         total_retried += compiled.stats.retried
         total_localised += compiled.stats.localised
         if compiled.stats.language:
@@ -309,6 +380,18 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
             f"{detail}, ${cost:.3f}"
         )
 
+    # The artifact is written in corpus order, not in completion order: two runs
+    # of the same corpus must write the same file even if the network answered
+    # in a different sequence.
+    for index in range(len(docs)):
+        compiled = compiled_by_index.get(index)
+        if compiled is None:
+            continue
+        all_claims.extend(compiled.claims)
+        all_spans.extend(compiled.spans)
+        all_rejected.extend(compiled.rejected)
+    failed.sort()
+
     rows_verdicts = verify_all(all_claims, all_spans, texts)
     report = summarise(rows_verdicts)
     kb = KnowledgeBase(out_dir)
@@ -323,6 +406,11 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         "prompt_hash": PROMPT_HASH,
         "chunk_size": chunk_size,
         "overlap": overlap,
+        # The knobs that decide how the corpus is cut and how hard the pool is
+        # pushed. Concurrency changes the wall clock rather than the requests,
+        # but a reader comparing two builds should not have to guess it.
+        "concurrency": concurrency,
+        "max_tokens": max_tokens,
         "documents": len(docs),
         "pages": sum(
             _page_count(texts[doc.doc_id]) for doc in docs if doc.kind == "pdf"
@@ -330,6 +418,13 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         "claims": len(all_claims),
         "verifier": report["by_verdict"],
         "truncated_calls": total_truncated,
+        # Cuts in the enrichment passes. Kept apart from `truncated_calls` so a
+        # reader of the manifest cannot mistake a missing contradiction link for
+        # a missing claim.
+        "truncated_enrichment": {
+            "conflicts": total_conflict_truncated,
+            "localisation": total_localise_truncated,
+        },
         "retried_chunks": total_retried,
         # The language each document opens in, and how many statements were
         # rewritten to match it. A document that opens in an undecided paragraph
@@ -416,6 +511,19 @@ def ingest_cmd(source, out_dir, manifest_file, model, base_url, estimate, dry_ru
         console.print(
             "  the replies that stopped cleanly are cached; rerun with --resume "
             "--chunk-size <smaller>, or raise --max-tokens"
+        )
+    enrichment = []
+    if total_conflict_truncated:
+        enrichment.append(f"{total_conflict_truncated} conflict pass(es)")
+    if total_localise_truncated:
+        enrichment.append(f"{total_localise_truncated} language pass(es)")
+    if enrichment:
+        # The claims are there. What is missing is the optional layer on top of
+        # them, so this is a warning and not an incomplete build.
+        console.print(
+            f"[yellow]{' and '.join(enrichment)} hit --max-tokens: the claims are "
+            "complete; the contradiction links or rewrites they would have carried "
+            "are not[/yellow]"
         )
     if report["failures"]:
         console.print(
