@@ -526,6 +526,16 @@ explain it, and both are worth stating plainly:
    is not broken and the shortfall is not only volume: at equal characters the
    floor still covers more gold text and supports it better.
 
+   **What the diagnosis says the gap is.** A later measurement, at zero cost,
+   separates the two explanations from the ranker's own behaviour. Ten claims,
+   chosen at best, carry **91,2 %** of the same facts at the same 5 097
+   characters, and an oracle choosing inside the lexical top 100 reaches **87,6 %**
+   on the dev half. So the floor's advantage is not that a chunk is a better unit
+   — at equal volume the claim ceiling (91,2 %) is above the floor's (71,1 %) — it
+   is that our chooser returns claims that carry 64 %. The representation is
+   sound; the selection is the defect. `benchmark/layer/RANKER.md` is the plan,
+   written and split before any ranker was changed.
+
 2. **The metric is lexical.** A gold fact is a fragment of the source, and any
    chunk that contains that sentence scores for it. A claim layer does something
    different and, on this metric, worse: it ranks claims, returns the one span
@@ -671,6 +681,10 @@ exactly that.
       identically, no quote outside its offsets, no knowledge-base file
       modified, the same answers inside an empty network namespace, p95 5,5 ms
       against a 300 ms gate — §10
+- [x] the diagnosis of the gap, at zero cost: ten claims chosen at best carry
+      91,2 % at our volume, the lexical top 100 already contains enough for
+      87,6 %, and the published row is 63,9 % — the loss is selection, not
+      representation. Split fixed before any ranker changed, plan in `RANKER.md`
 
 ### What the smoke run found, and what it cost to find
 
