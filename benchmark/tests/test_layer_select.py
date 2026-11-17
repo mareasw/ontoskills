@@ -114,6 +114,79 @@ def test_a_cap_limits_claims_per_document_until_the_pool_runs_out(tmp_path):
     assert len(select.mmr(citations, corpus, "alpha delta epsilon", k=5, lam=0.5, cap=1)) == 5
 
 
+def test_section_neighbours_link_a_section_and_a_conflict_but_nothing_else(tmp_path):
+    claims = [
+        claim("c1", "a", "alpha beta"),
+        claim("c2", "a", "alpha gamma"),
+        claim("c3", "b", "delta epsilon"),
+    ]
+    claims[1]["conflicts_with"] = ["c3", "missing"]
+    corpus = corpus_of(tmp_path, claims)
+    neighbours = select.section_neighbours(corpus)
+    assert neighbours["c1"] == {"c2"}
+    assert neighbours["c2"] == {"c1", "c3"}
+    assert neighbours["c3"] == {"c2"}
+
+
+def test_expand_appends_neighbours_after_the_order_and_never_duplicates(tmp_path):
+    claims = [
+        claim("c1", "a", "alpha beta"),
+        claim("c2", "a", "alpha gamma delta"),
+        claim("c3", "b", "epsilon zeta"),
+    ]
+    corpus = corpus_of(tmp_path, claims)
+    citations = corpus.search("alpha", limit=100)
+    neighbours = select.section_neighbours(corpus)
+    ids = [item["claim_id"] for item in claims]
+    order = select.expand_order(
+        citations, corpus, neighbours, {cid: n for n, cid in enumerate(ids)},
+        np.eye(len(ids), dtype=np.float32), np.ones(len(ids), dtype=np.float32), head=1,
+    )
+    assert len({item.claim_id for item in order}) == len(order)
+    assert [item.claim_id for item in order[: len(citations)]] == [
+        item.claim_id for item in citations
+    ]
+    assert len(order) >= len(citations)
+
+
+def test_expand_with_no_neighbours_is_the_order_itself(tmp_path):
+    corpus = corpus_of(tmp_path, [claim("c1", "a", "alpha beta")])
+    citations = corpus.search("alpha", limit=100)
+    order = select.expand_order(
+        citations, corpus, {}, {"c1": 0}, np.eye(1, dtype=np.float32),
+        np.ones(1, dtype=np.float32), head=10,
+    )
+    assert [item.claim_id for item in order] == [item.claim_id for item in citations]
+
+
+def test_global_order_ranks_every_claim_in_the_corpus_and_honours_the_depth(tmp_path):
+    corpus = corpus_of(tmp_path, CLAIMS)
+    ids = [item["claim_id"] for item in CLAIMS]
+    matrix = np.zeros((len(ids), 2), dtype=np.float32)
+    matrix[:, 0] = np.arange(len(ids))
+    ordered = select.global_order(corpus, ids, matrix, np.array([1.0, 0.0]), depth=3)
+    assert [item.claim_id for item in ordered] == ids[::-1][:3]
+
+
+def test_global_order_skips_an_id_the_corpus_filtered_out(tmp_path):
+    corpus = corpus_of(tmp_path, CLAIMS)
+    ids = [item["claim_id"] for item in CLAIMS] + ["c9"]
+    matrix = np.zeros((len(ids), 2), dtype=np.float32)
+    matrix[:, 0] = np.arange(len(ids))
+    ordered = select.global_order(corpus, ids, matrix, np.array([1.0, 0.0]), depth=10)
+    assert "c9" not in {item.claim_id for item in ordered}
+    assert len(ordered) == len(CLAIMS)
+
+
+def test_every_quote_returns_every_evidence_item_in_order(tmp_path):
+    claims = [claim("c1", "a", "alpha beta"), claim("c2", "a", "gamma")]
+    claims[0]["evidence"].append({"quote": "second quote"})
+    corpus = corpus_of(tmp_path, claims)
+    citations = corpus.search("alpha", limit=100)
+    quotes = select.every_quote(corpus, citations)
+    assert quotes[:2] == ["alpha beta", "second quote"]
+
+
 def test_the_declared_grid_is_stable_and_named():
     names = list(select.variants())
     assert names[:2] == ["plain", "cover"]
@@ -220,6 +293,86 @@ def test_measure_with_vectors_orders_the_same_pool_three_ways(tmp_path):
     }
     assert report["variants"]["dense-plain"]["order"] == "dense"
     assert "qst_0001" in {row["qid"] for row in scores["dense-plain"]["per_question"]}
+
+
+def test_rerank_reorders_only_the_head_it_read(tmp_path):
+    corpus = corpus_of(tmp_path, CLAIMS)
+    citations = corpus.search("alpha delta epsilon", limit=100)
+
+    def scorer(question, texts):
+        # Prefer the shortest quote: a deterministic, order-independent rule.
+        return [-len(text) for text in texts]
+
+    ordered = select.rerank_order(citations, "alpha", scorer, depth=2)
+    head = ordered[:2]
+    assert [len(item.quote) for item in head] == sorted(
+        [len(item.quote) for item in citations[:2]]
+    )
+    assert [item.claim_id for item in ordered[2:]] == [
+        item.claim_id for item in citations[2:]
+    ]
+
+
+def test_rerank_without_vectors_is_refused(tmp_path):
+    corpus_of(tmp_path, CLAIMS)
+    selection = tmp_path / "selection.json"
+    selection.write_text(json.dumps({"items": []}), encoding="utf-8")
+    answers = tmp_path / "answers.jsonl"
+    answers.write_text("", encoding="utf-8")
+    with pytest.raises(SystemExit, match="needs claim vectors"):
+        select.measure(
+            selection, tmp_path / "kb", answers, half="all",
+            reranker=lambda question, texts: [0.0 for _ in texts],
+        )
+
+
+def test_measure_with_a_reranker_adds_its_own_order(tmp_path):
+    corpus_of(tmp_path, CLAIMS)
+    kb = tmp_path / "kb"
+    selection = tmp_path / "selection.json"
+    selection.write_text(
+        json.dumps(
+            {"items": [{"qid": "qst_0001", "kind": "basic", "text": "alpha", "gold_facts": ["alpha"]}]}
+        ),
+        encoding="utf-8",
+    )
+    answers = tmp_path / "answers.jsonl"
+    answers.write_text(json.dumps({"qid": "qst_0001", "evidence": ["alpha"]}) + "\n")
+    ids = [item["claim_id"] for item in CLAIMS]
+    report, _scores = select.measure(
+        selection, kb, answers, half="all", k=2,
+        vectors=(ids, np.eye(len(ids), dtype=np.float32)),
+        query_encoder=FakeEncoder(np.eye(len(ids), dtype=np.float32)[1]),
+        reranker=lambda question, texts: [float(len(text)) for text in texts],
+    )
+    assert report["variants"]["rerank-plain"]["order"] == "rerank"
+    assert report["variants"]["rerank-plain"]["claims_median"] == 2
+
+
+def test_all_quotes_adds_one_variant_per_selection_with_more_text(tmp_path):
+    corpus_of(tmp_path, CLAIMS)
+    kb = tmp_path / "kb"
+    selection = tmp_path / "selection.json"
+    selection.write_text(
+        json.dumps(
+            {"items": [{"qid": "qst_0001", "kind": "basic", "text": "alpha", "gold_facts": ["alpha"]}]}
+        ),
+        encoding="utf-8",
+    )
+    answers = tmp_path / "answers.jsonl"
+    answers.write_text(json.dumps({"qid": "qst_0001", "evidence": ["alpha"]}) + "\n")
+    ids = [item["claim_id"] for item in CLAIMS]
+    report, _scores = select.measure(
+        selection, kb, answers, half="all", k=2, all_quotes=True,
+    )
+    assert report["all_quotes"] is True
+    assert "plain-allquotes" in report["variants"]
+    assert report["variants"]["plain-allquotes"]["order"] == "bm25"
+    assert (
+        report["variants"]["plain-allquotes"]["characters_median"]
+        >= report["variants"]["plain"]["characters_median"]
+    )
+    assert len(ids) == len(CLAIMS)
 
 
 def test_the_query_prefix_is_a_declared_choice_not_an_accident(tmp_path):
