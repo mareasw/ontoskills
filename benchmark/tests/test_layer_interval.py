@@ -108,3 +108,44 @@ def test_the_command_writes_what_it_printed(tmp_path):
     rows = json.loads(out.read_text(encoding="utf-8"))
     assert [row["kind"] for row in rows] == ["mean", "mean", "paired"]
     assert rows[2]["mean"] == 0.5
+
+
+def _score(path, coverage):
+    path.write_text(
+        json.dumps(
+            {
+                "per_question": [
+                    {"qid": qid, "answer_fact_coverage": value}
+                    for qid, value in coverage
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_a_label_names_a_single_system_instead_of_its_file_stem(tmp_path):
+    score = _score(tmp_path / "graphrag.score.json", [("q1", 1.0), ("q2", 0.0)])
+    out = tmp_path / "intervals.json"
+    code = interval.main(
+        [
+            "--score",
+            str(score),
+            "--label",
+            "graphrag",
+            "--metric",
+            "answer_fact_coverage",
+            "--json",
+            str(out),
+        ]
+    )
+    assert code == 0
+    rows = json.loads(out.read_text(encoding="utf-8"))
+    assert [row["system"] for row in rows] == ["graphrag"]
+
+
+def test_a_label_is_refused_when_two_systems_are_compared(tmp_path):
+    score = _score(tmp_path / "graphrag.score.json", [("q1", 1.0), ("q2", 0.0)])
+    with pytest.raises(SystemExit):
+        interval.main(["--score", str(score), "--score", str(score), "--label", "graphrag"])

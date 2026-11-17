@@ -120,33 +120,42 @@ def main(argv: list[str] | None = None) -> int:
         help="A score file; two of them turn the report into a paired comparison",
     )
     parser.add_argument("--metric", default=None, help="One metric, or every one")
+    parser.add_argument(
+        "--label",
+        default=None,
+        help="The system's name, when the file's stem is not it (`graphrag.score` "
+        "would otherwise be published as the system); a single --score only",
+    )
     parser.add_argument("--json", type=Path, default=None, help="Write the numbers")
     args = parser.parse_args(argv)
+    if args.label and len(args.score) != 1:
+        parser.error("--label names the one system of a single --score; two scores keep both stems")
+    names = [args.label or path.stem for path in args.score]
 
     metrics = [(args.metric, args.metric)] if args.metric else QUALITY
     tables = [scores_by_question(path) for path in args.score]
     out: list[dict] = []
 
-    for metric, label in metrics:
-        for index, (path, table) in enumerate(zip(args.score, tables)):
+    for metric, metric_label in metrics:
+        for path, name, table in zip(args.score, names, tables):
             values = [row[metric] for row in table.values() if row.get(metric) is not None]
-            row = {"kind": "mean", "system": path.stem, "metric": label, **mean_ci(values)}
+            row = {"kind": "mean", "system": name, "metric": metric_label, **mean_ci(values)}
             out.append(row)
             print(
-                f"{path.stem:28s} {label:9s} {_percent_plain(row['mean']):>6s} % "
+                f"{name:28s} {metric_label:9s} {_percent_plain(row['mean']):>6s} % "
                 f"[{_percent_plain(row['low'])}, {_percent_plain(row['high'])}] "
                 f"n={row['n']}"
             )
         if len(tables) == 2:
             row = {
                 "kind": "paired",
-                "system": f"{args.score[0].stem} - {args.score[1].stem}",
-                "metric": label,
+                "system": f"{names[0]} - {names[1]}",
+                "metric": metric_label,
                 **paired_metric(tables[0], tables[1], metric),
             }
             out.append(row)
             print(
-                f"{'  difference':28s} {label:9s} {_percent(row['mean']):>6s} pp "
+                f"{'  difference':28s} {metric_label:9s} {_percent(row['mean']):>6s} pp "
                 f"[{_percent(row['low'])}, {_percent(row['high'])}] n={row['n']}"
             )
 
