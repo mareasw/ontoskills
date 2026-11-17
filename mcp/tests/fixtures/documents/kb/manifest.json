@@ -1,0 +1,25 @@
+{
+ "name": "documents-fixture",
+ "description": "A deterministic slice of a compiled knowledge base, committed so the Rust read path can be compared with the Python one question by question.",
+ "model": "deepseek-v4.1-flash",
+ "prompt_hash": "b4a1d4af70e4604939f201b276db24bedfc1975f8ef03e1e2104b055a77e6bbb",
+ "chunk_size": 15,
+ "overlap": 2,
+ "licences": [
+  "MIT"
+ ],
+ "documents": 3,
+ "claims": 77,
+ "verifier": {
+  "ok": 75,
+  "weak": 2
+ },
+ "fixture": {
+  "documents": [
+   "dsid_020bac2fb6ac4de28d5afb63e39a0c10",
+   "dsid_02f0cd8c874b431cbdec5455721ce8c1",
+   "dsid_03af1e44970d4d6db6e85bc2c5fce8de"
+  ],
+  "note": "Regenerate with benchmark/layer/make_documents_fixture.py; the source documents are public and MIT-licensed, and the verbatim text under kb/text/ is theirs, not this repository's."
+ }
+}

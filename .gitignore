@@ -23,8 +23,9 @@ docs/*
 # Market and product investigations are decisions, not scratch notes
 !docs/market/
 
-# ONNX test fixtures (large files)
-mcp/tests/fixtures/
+# ONNX test fixtures (large files, written by `ontoskills export-embeddings`)
+mcp/tests/fixtures/embeddings/
+*.onnx
 
 # Compiled ontology output (regenerate with: ontoskills compile)
 ontoskills/

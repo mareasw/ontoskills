@@ -1,0 +1,34 @@
+Horizon Quay AI Infrastructure
+
+notes:
+Account profile and negotiation notes:
+- Profile: Horizon Quay is a global maritime logistics SaaS (port ops + scheduling). Heavy real-time chat+assistant for ops centers; embeddings for manifest search; reranking for ETA predictions.
+- Capacity ask: Reserved pool sized for 8 sustained A100-equivalent GPUs per primary region (NA + EU). Expected steady-state: ~350–600 RPS for short payload chat (avg token window 256). Burst to ~1k RPS during shift changes.
+- Performance targets: P95 text-gen latency <= 80ms, P99 <= 220ms for chat on dedicated pool; throughput guarantees of 500 RPS sustained per region.
+- SLA position (customer asks): 99.95% uptime across dedicated pools; 30% credit at 99.9–99.95; 50% credit below 99.9; request for monthly credit cap and cumulative measurement window.
+- Redwood counterproposals discussed: baseline 99.95 SLA with quarterly reconciliation; credit schedule tiered: 99.9–99.95 = 10% service credit, 99.5–99.9 = 30%, <99.5 = 60% (proposal to legal). Redwood wants max cap at 6 months' fee.
+- Maintenance windows: customer requires predictable maintenance windows not during shift-change windows (06:00–09:00 UTC). Proposed weekly 02:00–04:00 region-local maintenance with 72h advance notice; emergency maintenance with 48h notice and rolling failover.
+- Support / escalation: Horizon Quay requires 24/7 hotline for Sev1 with 15-minute acknowledgement, 2-hour remediate SLA target for critical infrastructure, 4-hour for Sev2. Redwood proposes 15min ack, 1h initial response, remediation time objective to be defined per incident severity in SOW.
+- Throughput guarantees & reserved GPU planning: plan includes capacity buffer for 1.5x expected steady-state; autoscaling burst into shared pool allowed with pre-authorized fallback; need explicit routing policy for latency-first vs cost-first (customer wants latency-first for ops-critical calls).
+- Security/compliance: customer requires SOC2 Type II report, KMS integration for customer-managed keys, audit logs retained 12 months, option for EU-only residency for EU traffic.
+- POC summary (3 weeks):
+  * Week 0: onboarding, network peering, SSO test (SAML).
+  * Week 1: model import + inference validation, baseline latency/throughput profiling.
+  * Week 2: load testing to 1.2x forecast, KV/prefix cache tuning, batch tuning.
+  * Week 3: SLA stress scenarios, failover drill, cost/perf report and recommended reserved sizing.
+- POC status: onboarding complete; peering and SSO in staging done; load tests scheduled 2026-03-15. Initial latency targets met on small-scale tests; sustained throughput test pending.
+- Procurement notes: finance wants committed capacity discount tiers and an option to convert to Dedicated Reserved on annual renewal. Legal flagged service credit language and liability cap.
+- Quote history: pricing deck sent 2026-02-28 (drive link). Redwood gave two sizing options: 8x reserved (latency-priority) and 12x with burst (cost amortized). Horizon Quay prefers 8x + autoscale to shared.
+- Direct quotes from stakeholders: "We cannot accept blackouts during port shift windows — any maintenance must be out of peak or have a clear failover plan." — Head of Ops.
+- Next steps (concrete): Redwood to produce SLA redline + SOW by 2026-03-17; schedule legal review call 2026-03-22; run scheduled load test 2026-03-15; finalize forecasted ARR and draft PO template after pricing revision.
+- Internal AE reminders: capture agreed uptime measurement buckets, document monthly reporting cadence, confirm escrow/backup plan for on-prem fallbacks.
+
+
+activity_timeline:
+2025-10-03: Lead created via conference intro (Maritime Tech Expo)
+2025-11-12: Intro demo - hosted API overview; interest in dedicated capacity
+2025-12-08: Architecture deep-dive with infra team (SE present)
+2026-01-12: SLA scoping meeting (recorded ff_20260112_8342)
+2026-02-28: Pricing deck shared (drive link)
+2026-03-01: Security questionnaire submitted; SOC2 request noted
+2026-03-08: Commercial sync - Redwood proposed SLA tiers; legal flagged credit cap
