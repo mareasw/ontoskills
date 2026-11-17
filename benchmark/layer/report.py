@@ -240,11 +240,11 @@ def quality_table(rows: list[dict]) -> str:
                 f"{DASH} | {DASH} | {DASH} |"
             )
             continue
-        overall = _overall(score)
+        overall, scored = _overall(score)
         lines.append(
             "| {name} | {n} | {k} | {chars} | {cov} | {sup} | {num} | {fr} | {ab} |".format(
                 name=row["name"],
-                n=number(score.get("questions")),
+                n=number(scored),
                 k=number(score.get("k")),
                 chars=number(score.get("median_chars")),
                 cov=percent(overall.get("answer_fact_coverage")),
@@ -257,27 +257,42 @@ def quality_table(rows: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def _overall(score: dict) -> dict:
-    """Mean over the answerable questions, weighted by kind size.
+def _overall(score: dict) -> tuple[dict, int | None]:
+    """Mean over the questions each kind's mean was computed on, and that count.
 
-    The score file keeps the means per kind; weighting them by the number of
-    questions is the same figure as pooling the questions, and it keeps one
-    question kind from speaking for the whole pilot.
+    The score file keeps the means per kind, and the weight has to be the number
+    of questions behind each mean — the metric's own `n`. Weighting by the kind's
+    question count instead is right only when every question carries the metric,
+    and a prose system's refusals do not: they are outcomes, excluded from the
+    mean on purpose. Dividing them back in as zeros is the one thing this pilot
+    does not do, so the count comes from the metric and the returned `n` is the
+    number of questions the three columns average over.
+
+    A score file written before the metric carried its count falls back to the
+    kind's question count, and only where the kind refused nothing — there the two
+    counts are equal by construction, so the fallback cannot flatter or punish.
     """
-    totals: dict[str, list[float]] = {}
+    totals: dict[str, list[tuple[float, int]]] = {}
     for kind, bucket in score.get("by_kind", {}).items():
         if kind == "info_not_found":
             continue
-        n = bucket.get("questions", 0)
+        refused = bucket.get("refused", 0)
         for name, _label in QUALITY:
-            value = bucket.get("metrics", {}).get(name, {}).get("mean")
-            if value is not None and n:
-                totals.setdefault(name, []).append((value, n))
-    pooled = {}
+            entry = bucket.get("metrics", {}).get(name) or {}
+            value = entry.get("mean")
+            weight = entry.get("n")
+            if weight is None and value is not None and not refused:
+                weight = bucket.get("questions", 0)
+            if value is not None and weight:
+                totals.setdefault(name, []).append((value, weight))
+    pooled: dict[str, float | None] = {}
+    scored: int | None = None
     for name, pairs in totals.items():
-        questions = sum(n for _value, n in pairs)
-        pooled[name] = sum(value * n for value, n in pairs) / questions if questions else None
-    return pooled
+        weight = sum(n for _value, n in pairs)
+        pooled[name] = sum(value * n for value, n in pairs) / weight if weight else None
+        if name == "answer_fact_coverage":
+            scored = weight
+    return pooled, scored
 
 
 def kind_table(rows: list[dict]) -> str:
@@ -325,6 +340,12 @@ def render(manifest: dict, root: Path) -> str:
         "## Quality on the pilot slice",
         "",
         quality_table(rows),
+        "",
+        "`n` is the number of questions the three quality columns average over. A",
+        "system that refuses a question carries no quality value for it — the refusal",
+        "is an outcome, and counting it as a zero would be a different measurement, so",
+        "it is reported in its own column: the false-refusal rate is a share of the",
+        "answerable questions, and abstention a share of the unanswerable ones.",
     ]
     kinds = kind_table(rows)
     if kinds:

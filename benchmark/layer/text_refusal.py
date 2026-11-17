@@ -18,7 +18,7 @@ import re
 
 PATTERNS = (
     r"\bi (?:do not|don't) know\b",
-    r"\b(?:cannot|can ?not|unable to) (?:answer|determine|find|say|provide)\b",
+    r"\b(?:cannot|can ?not|can't|unable to) (?:answer|determine|find|say|tell|confirm)\b",
     r"\bcould not (?:answer|determine)\b",
     r"\bcould not find (?:any |the |an? )?(?:information|relevant|mention|details?)\b",
     r"\bno (?:relevant |specific |such )?information\b",
@@ -33,10 +33,16 @@ PATTERNS = (
 
 _COMPILED = tuple(re.compile(pattern, re.IGNORECASE) for pattern in PATTERNS)
 
+# A model that writes `don’t` with U+2019 has declined exactly as much as one that
+# writes `don't`. The 200 GraphRAG answers of the pilot use the curly form, and
+# reading them as ASCII only would have counted every one of those refusals as a
+# wrong answer instead of as an abstention — a fairness defect in one direction.
+_APOSTROPHES = str.maketrans({"\u2019": "'", "\u2018": "'", "\u02bc": "'"})
+
 
 def looks_like_refusal(text: str) -> bool:
     """True when the text says, in so many words, that it cannot answer."""
-    cleaned = (text or "").strip()
+    cleaned = (text or "").strip().translate(_APOSTROPHES)
     if not cleaned:
         return True
     return any(pattern.search(cleaned) for pattern in _COMPILED)

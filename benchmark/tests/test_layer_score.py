@@ -60,6 +60,35 @@ def test_a_missing_answer_is_recorded_as_missing():
     assert "answer_fact_coverage" not in outcome
 
 
+def test_refusals_can_be_reread_from_the_text_without_asking_again():
+    """A prose run's `refused` flag is derived, so a better reader must be able to replace it.
+
+    A run is paid for once. When the classifier learns a phrasing the model
+    actually uses, re-scoring has to apply it to the text already on disk — and it
+    must never turn our own structural refusals inside out, which is why the flag
+    is honoured for `evidence` and for rows without an `answer`.
+    """
+    data = selection([item("q1", "basic", ("The limit is 10 MiB.",))])
+    answers = {"q1": {"qid": "q1", "answer": "I don\u2019t know \u2014 the data does not state it.", "refused": False}}
+
+    trusted = summarise(data, answers, "answer", k=10, resamples=200)
+    rechecked = summarise(data, answers, "answer", k=10, resamples=200, recheck_refusals=True)
+
+    assert trusted["false_refusal_rate"] == 0.0
+    assert rechecked["false_refusal_rate"] == 1.0
+    assert rechecked["by_kind"]["basic"]["refused"] == 1
+    assert "answer_fact_coverage" not in rechecked["per_question"][0]
+
+
+def test_rechecking_refusals_does_not_touch_the_evidence_modality():
+    """Our own row records a refusal structurally, and a citation list is not prose."""
+    data = selection([item("q1", "basic", ("The limit is 10 MiB.",))])
+    answers = {"q1": {"qid": "q1", "evidence": ["The limit is 10 MiB."], "refused": False}}
+    result = summarise(data, answers, "evidence", k=10, resamples=200, recheck_refusals=True)
+    assert result["false_refusal_rate"] == 0.0
+    assert result["by_kind"]["basic"]["metrics"]["answer_fact_coverage"]["mean"] == 1.0
+
+
 def test_k_caps_the_evidence_a_system_can_be_credited_for():
     row = {"qid": "q1", "evidence": ["irrelevant words here", "The limit is 10 MiB."]}
     generous = score_question(item("q1", "basic", ("The limit is 10 MiB.",)), row, "evidence", k=10)
