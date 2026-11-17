@@ -122,15 +122,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--metric", default=None, help="One metric, or every one")
     parser.add_argument(
         "--label",
+        action="append",
         default=None,
-        help="The system's name, when the file's stem is not it (`graphrag.score` "
-        "would otherwise be published as the system); a single --score only",
+        help="A system's name, one per --score in order; the file stem otherwise "
+        "(`graphrag.score` and `ontoskills.answer-mode.score` would otherwise be "
+        "published as the systems)",
     )
     parser.add_argument("--json", type=Path, default=None, help="Write the numbers")
     args = parser.parse_args(argv)
-    if args.label and len(args.score) != 1:
-        parser.error("--label names the one system of a single --score; two scores keep both stems")
-    names = [args.label or path.stem for path in args.score]
+    labels = args.label or []
+    if labels and len(labels) != len(args.score):
+        parser.error(
+            f"{len(labels)} labels for {len(args.score)} scores: one per score, or none"
+        )
+    names = labels or [path.stem for path in args.score]
 
     metrics = [(args.metric, args.metric)] if args.metric else QUALITY
     tables = [scores_by_question(path) for path in args.score]
