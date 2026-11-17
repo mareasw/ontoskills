@@ -16,8 +16,19 @@ Two things are declared rather than tuned:
   is read out of the text by `benchmark/layer/text_refusal.py`, the same
   function used for every prose system, and the raw text is kept.
 
+Questions are asked one at a time and every answer is flushed as soon as it is
+paid for, so `--resume` can continue a killed run without buying the same answer
+twice. The file is the state: a line that does not parse is the last write of a
+killed run and is dropped, never trusted or left inside a published answers
+file.
+
     python3 -m benchmark.layer.run_graphrag --root /tmp/layer/graphrag \\
         --selection /tmp/layer/corpus/selection.json --out /tmp/layer/runs/graphrag.jsonl
+
+    # after a reboot: keep what was paid for, ask only what is missing
+    python3 -m benchmark.layer.run_graphrag --root /tmp/layer/graphrag \\
+        --selection /tmp/layer/corpus/selection.json --out /tmp/layer/runs/graphrag.jsonl \\
+        --resume
 """
 
 from __future__ import annotations
@@ -93,6 +104,34 @@ async def ask_global(config, tables, question: str) -> str:
     return response if isinstance(response, str) else json.dumps(response)
 
 
+def read_answers(path: Path) -> tuple[list[dict], int]:
+    """The rows already paid for, and how many lines could not be read.
+
+    A run is killed between one question and the next — a reboot, a closed
+    terminal — and the questions it answered were paid for. The file is
+    therefore appended one row at a time and read back on `--resume`; a line
+    that does not parse is the last write of a killed run, and it is dropped
+    rather than trusted, because the question it belonged to cannot be read out
+    of it. Whether that question is asked again depends on the readable rows
+    alone: at most one answer is bought twice, never a truncated one published.
+    """
+    rows: list[dict] = []
+    broken = 0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            broken += 1
+            continue
+        if isinstance(row, dict) and row.get("qid"):
+            rows.append(row)
+        else:
+            broken += 1
+    return rows, broken
+
+
 async def run(args) -> int:
     selection = json.loads(args.selection.read_text(encoding="utf-8"))
     items = selection["items"]
@@ -102,19 +141,39 @@ async def run(args) -> int:
     if args.limit:
         items = items[: args.limit]
 
+    done: list[dict] = []
+    broken = 0
+    if args.resume and args.out.exists():
+        done, broken = read_answers(args.out)
+        answered = {row["qid"] for row in done}
+        items = [item for item in items if item["qid"] not in answered]
+
     config, tables = load_index(args.root)
     ask = ask_global if args.method == "global" else ask_local
 
-    rows = []
-    for item in items:
-        started = time.time()
-        try:
-            text = await ask(config, tables, item["text"])
-        except Exception as exc:  # noqa: BLE001 - a failed question is data
-            text = f"ERROR: {type(exc).__name__}: {exc}"
-            print(text, flush=True)
-        rows.append(
-            {
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    if done:
+        # Rewrite the readable rows before appending. A killed run can leave a
+        # half-written last line, and appending behind it would keep a corrupt
+        # record inside a published answers file.
+        args.out.write_text(
+            "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in done),
+            encoding="utf-8",
+        )
+
+    fresh: list[dict] = []
+    # A resumed run continues its file; a fresh run replaces it, so a second
+    # measurement can never be read as one long run of six answers to three
+    # questions.
+    with args.out.open("a" if done else "w", encoding="utf-8") as handle:
+        for item in items:
+            started = time.time()
+            try:
+                text = await ask(config, tables, item["text"])
+            except Exception as exc:  # noqa: BLE001 - a failed question is data
+                text = f"ERROR: {type(exc).__name__}: {exc}"
+                print(text, flush=True)
+            row = {
                 "qid": item["qid"],
                 "system": SYSTEM,
                 "method": args.method,
@@ -122,22 +181,27 @@ async def run(args) -> int:
                 "refused": looks_like_refusal(text),
                 "seconds": round(time.time() - started, 3),
             }
-        )
+            # Written and flushed per question: a run killed after this line has
+            # already paid for it, and `--resume` will not ask it again.
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+            handle.flush()
+            fresh.append(row)
 
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(
-        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows),
-        encoding="utf-8",
-    )
+    rows = done + fresh
     print(
         json.dumps(
             {
                 "system": SYSTEM,
                 "method": args.method,
                 "questions": len(rows),
+                "asked": len(fresh),
+                "resumed": len(done),
+                "unreadable_lines": broken,
                 "refused": sum(1 for row in rows if row["refused"]),
                 "errors": sum(1 for row in rows if row["answer"].startswith("ERROR:")),
-                "median_seconds": sorted(row["seconds"] for row in rows)[len(rows) // 2],
+                "median_seconds": (
+                    sorted(row["seconds"] for row in rows)[len(rows) // 2] if rows else None
+                ),
                 "out": str(args.out),
             },
             indent=1,
@@ -154,6 +218,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--method", choices=("local", "global"), default="local")
     parser.add_argument("--kinds", default="", help="Comma-separated question kinds to ask")
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Keep the answers already in --out and ask only the missing questions",
+    )
     args = parser.parse_args(argv)
     return asyncio.run(run(args))
 
