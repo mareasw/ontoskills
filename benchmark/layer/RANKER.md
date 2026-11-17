@@ -94,6 +94,41 @@ That is the number the plan is built on, and it changes the order of the repairs
 | candidate generation is the binding constraint | top 100 ceiling 87,63 at dev; we are at 63,59 | **false for the first 24 points** — it becomes true near 87,6 |
 | the port is the problem | Python 418 ms vs Rust 3,5 ms, same ids (G1) | **false** — latency, not selection |
 | the verifier is dropping the good claims | the oracle's pool *is* the verifier's `ok` set, 9 104 claims | **false** |
+| the pool spends its slots on too few documents | 28 documents in the top 100, largest share 16,2 %, the gold document present for 85,4 % of questions; capping the pool at 2 claims per document raises its ceiling by 1,55 points, to 89,18 % | **false** — the documents are the right ones |
+
+## 2.1 The first rung: +7,6 points, and where it stops
+
+E1 (`select.py`) keeps the product's own pool — top 100 by the product's ranker —
+the same k = 10 and the same one-quote shape, and changes only *which* ten of the
+hundred are returned. Dev half, 0 $:
+
+| selector | coverage | characters (median) | reference |
+|---|---|---|---|
+| `plain` — the pool cut at ten, what the product returns | 63,59 % | 5 088 | the baseline |
+| `cover` — greedy over the question's own terms, IDF-weighted | 71,14 % | 4 912 | +7,55 pp |
+| `mmr-l0.5` — relevance minus redundancy, no cap | 71,20 % | 4 343 | +7,61 pp |
+| `mmr-l0.3` | 71,00 % | 4 236 | |
+| `mmr-l0.5-c4` | 70,91 % | 4 343 | |
+| `section_best` — best claim per section | 67,07 % | 4 418 | rejected |
+| `doc_rr` — round-robin over documents | 66,97 % | 4 475 | rejected |
+
+The paired interval on dev, questions resampled together (`interval.py`):
+
+| comparison | difference | 95 % interval |
+|---|---|---|
+| `cover` − `plain` | **+7,6 pp** | [+5,6; +9,6] |
+| `mmr-l0.5` − `plain` | **+7,6 pp** | [+6,2; +9,1] |
+
+Two things in the table matter as much as the gain. **It is not volume**: `cover`
+returns *fewer* characters than `plain` (4 912 against 5 088) and still covers
+more facts. And **it stops at 71**, sixteen points under the pool's ceiling: two
+different definitions of redundancy agree, and structure-based diversity
+(section, document) is worse. So the ten claims are no longer paraphrases of each
+other, but the pool's *order* is still BM25's, and the claim that carries the
+fact is often not in the part of the order the chooser can reach.
+
+That is H2, and it is what E2 is for: the same pool, the same selectors, a
+different order.
 
 ## 3. The lexical numbers, in the shape the pilot scores
 
@@ -147,9 +182,9 @@ keeps k = 10 and one quote per claim, so the row's shape does not move.
 | # | change | what it tests | cost | acceptance |
 |---|---|---|---|---|
 | **E0** | none — the depth curve above | pool depth (done) | 0 $ | done: selection is binding for the first 24 points |
-| **E1a** | greedy set cover over the query's terms inside the top 100: pick the claim that adds the most uncovered query tokens (idf-weighted), ten times | H1 | 0 $ | ≥ 2 points over 63,59 on dev |
-| **E1b** | MMR over the same list with λ swept on dev; per-document cap | H1 | 0 $ | kept only if it beats E1a |
-| **E2** | dense rerank of the top 100 (`e5-large-v2`, `passage:` statement + first quote, `query:` question), then E1a's selection on the fused order | H2 | 0 $, CPU | ≥ 2 points over E1a on dev |
+| **E1a** | greedy set cover over the query's terms inside the top 100: pick the claim that adds the most uncovered query tokens (idf-weighted), ten times | H1 | 0 $ | **done: 71,14 %, +7,6 pp [+5,6; +9,6]** |
+| **E1b** | MMR over the same list with λ swept on dev; per-document cap | H1 | 0 $ | **done: 71,20 % at λ 0,5, +7,6 pp; no gain over E1a** |
+| **E2** | dense rerank of the top 100 (`e5-large-v2`, `passage:` statement + first quote, `query:` question), then E1a's selection on the fused order | H2 | 0 $, CPU/GPU, measured | ≥ 2 points over E1a on dev |
 | **E3** | fusion: RRF of the BM25 and dense orders before selection, weight swept on dev | whether the two disagree usefully | 0 $ | kept only if it beats E2 |
 | **E4** | graph expansion: same-section and `conflicts_with` neighbours of the top claims added to the pool, then E2's scoring | H3 | 0 $ | ≥ 1 point over E2 on dev |
 | **E5** | cross-encoder rerank of the top 50 (`bge-reranker-base`, ONNX, CPU) | whether a pairwise scorer beats a bi-encoder | 0 $, CPU, measured | only if E1–E4 plateau below 75 |
@@ -160,10 +195,10 @@ quote per claim, which is what a real chooser can reach against a ceiling that
 knows the facts. A rung that lands below 70 is reported as a negative result, not
 tuned until it passes.
 
-**E1a is first because it is the cheapest and the most Rust-portable**: it is a
+**E1a was first because it is the cheapest and the most Rust-portable**: it is a
 deterministic greedy over integers, it needs no model, no vector and no new
-artifact, and it can be ported to the read path without an ADR. If E1a alone
-moves the number by a large part of the 24 points, the dense path waits.
+artifact, and it can be ported to the read path without an ADR. It moved a third
+of the 24 points and then stopped, which is why E2 exists.
 
 ### E2's declared encoding, fixed before it is measured
 
@@ -173,6 +208,11 @@ moves the number by a large part of the 24 points, the dense path waits.
 - Claim text embedded: `passage: ` + statement + the first quote. One text per
   claim, no per-field vectors, so scoring one candidate is one dot product.
 - Query: `query: ` + the question, no expansion before E2.
+- Prefix control: `query: ` is how e5 was trained, and a library that cannot send
+  a query prefix is stuck with `passage: `. The same rung is run both ways on dev,
+  because the difference is a real capability gap between us and GraphRAG's or
+  LightRAG's use of the same model, and it belongs in the row rather than in a
+  footnote. If it moves the number, both are published.
 - Scope: the top 100 of the lexical ranking are reranked, not the whole corpus.
   If E2 wins, the same vectors also allow a global dense retrieval, which is a
   separate rung (H4) and a separate cost.

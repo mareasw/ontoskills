@@ -104,6 +104,15 @@ def test_an_empty_pool_is_zero_not_an_exception(tmp_path):
     assert rank.pool_ceiling(matrix, vectors, []) == (0.0, 0.0)
 
 
+def test_a_document_cap_keeps_the_pool_size_and_skips_the_crowded_document():
+    pool = [0, 1, 2, 3]
+    doc_of = ["a", "a", "b", "b"]
+    assert rank.doc_capped(pool, doc_of, 1, 4) == [0, 2]
+    assert rank.doc_capped(pool, doc_of, 1, 1) == [0]
+    assert rank.doc_capped(pool, doc_of, 2, 4) == [0, 1, 2, 3]
+    assert rank.doc_capped(pool, doc_of, 1, 10) == [0, 2]
+
+
 def test_read_split_all_means_no_filter_and_a_missing_half_is_refused(tmp_path):
     path = tmp_path / "split.json"
     path.write_text(json.dumps({"dev": ["qst_0001"], "test": ["qst_0002"]}), encoding="utf-8")
@@ -165,7 +174,10 @@ def test_the_cli_writes_the_curve_it_printed(tmp_path, capsys):
     assert code == 0
     report = json.loads(out.read_text())
     assert report["questions"] == 1
-    assert set(report["curve"]) == {str(depth) for depth in rank.DEPTHS} | {"all"}
+    assert set(report["curve"]) == {str(depth) for depth in rank.DEPTHS} | {"all"} | {
+        f"div-{cap}" for cap in rank.DIVERSE
+    }
+    assert 0.0 <= report["pool"]["gold_document_present"] <= 1.0
     assert report["curve"]["all"]["ceiling"] >= report["baseline"]
     printed = capsys.readouterr().out
     assert "published baseline" in printed
