@@ -644,6 +644,75 @@ decide it. The single document that was measured — 0,0639 $, one document,
 counted by the same meter — is what the table publishes, and its note says
 exactly that.
 
+### 7.2 The ranker, after the diagnosis
+
+The row above — 63,94 % — is the product's own ranker, and it does not move. The
+ranker ladder of `RANKER.md` is reported **as its own table**, because its rows
+run through the same corpus, the same quotes, the same scorer and the same k, but
+through `benchmark/layer/select.py` and not through the read path. G-R3 (§7 of
+`RANKER.md`) says a quality row the MCP cannot serve is a benchmark result; these
+are labelled as one rather than folded into the table above.
+
+192 questions with gold facts, k = 10, paired intervals on questions:
+
+| row | coverage | 95 % interval | chars | what it needs |
+|---|---:|---|---:|---|
+| the product: BM25 pool, top ten | 63,94 % | [61,7; 66,2] | 5 088 | nothing, it is shipped |
+| `cover`, the product's pool, greedy over the question's terms | **71,98 %** | [69,9; 74,1] | 4 939 | no model, no vector, no new artifact |
+| `dense-cover`, the same pool in e5 order, then `cover` | **73,42 %** | [71,4; 75,3] | 5 141 | a query encoder in the read path |
+| the product, every quote of the same ten claims | 68,23 % | [66,1; 70,3] | 7 104 | nothing |
+| `cover`, every quote | 75,28 % | [73,3; 77,2] | 6 798 | no model |
+| `dense-cover`, every quote | **76,34 %** | [74,4; 78,1] | 7 118 | a query encoder |
+
+| comparison, paired on the same 192 questions | difference | 95 % interval |
+|---|---:|---|
+| `cover` − the product | **+8,03 pp** | [+6,6; +9,5] |
+| `dense-cover` − the product | **+9,48 pp** | [+8,0; +11,0] |
+| `dense-cover` − `cover` | +1,44 pp | [+0,5; +2,4] |
+| `dense-cover`, every quote − the product, every quote | +8,11 pp | [+6,6; +9,6] |
+
+Three sentences the table supports, and one it refuses to.
+
+1. **The selection was the defect, and the repair is worth 9,5 points** at the
+   same k and the same volume, on verified claims with locators, at 0 $ per query.
+   The product's row reproduced exactly — 63,94 % — which is the check that the
+   harness measures the product and not something adjacent to it.
+2. **The shippable half is the lexical chooser.** It needs no model, no vector
+   and no new artifact, and it is worth +8,03 pp on its own.
+3. **Returning every quote is worth another 2,9 points** for 39 % more text. It is
+   a labelled row at 7 118 characters, never a silent substitution for the row at
+   5 088.
+4. **The dense order's extra 1,44 points are not established on held-out
+   questions.** The split was fixed before the ladder; the test half was read once,
+   after the freeze committed at `474dc22`: product 64,29 %, `cover` 72,81 %,
+   `dense-cover` 73,62 %, and `dense-cover` − `cover` = **+0,8 pp [−0,4; +2,1]**.
+   So the encoder is not adopted, no ADR is opened for it, and the product ships
+   the lexical chooser. The dense row stays in the table with its numbers and its
+   label, because a benchmark that keeps only the rungs that passed is not a
+   benchmark.
+
+**At one volume, nothing is won by volume.** Under the pilot's own 5 000-character
+budget — the `score.py --max-chars` mechanism behind the floor's 71,1 % — the
+product reaches 62,2 %, the lexical chooser 69,39 % and the dense one 70,62 %
+against the floor's 71,1 %. At equal text the two are level; at 10 000 characters
+the floor is ahead (79,0 against 73,21), because its curve climbs with every
+character and ours has ten quotes to give. The floor is not a competitor — it is
+the measurement of how easy this corpus is — and the honest reading is that our
+advantage is not coverage per character but what each returned item *is*: a
+verified claim with a quote, an offset and a verdict, at 0 $ per query. The
+chooser itself costs 43 ms per question in the Python harness, close to the 418 ms
+`ontocore ask` already spends over the corpus, and it is integer arithmetic over
+the pool that ports to the read path as it is.
+
+**What did not work** is in `RANKER.md` §5 with its intervals: reciprocal rank
+fusion (−0,5 pp), graph expansion into the section and `conflicts_with`
+neighbourhood (+0,2 pp, under its own one-point gate), retrieval across all
+9 104 claims instead of the pool (+0,14 pp at 24× the cost) and the
+`ms-marco-MiniLM-L-6-v2` cross-encoder (−1,9 pp, 13,5 s per question on CPU
+against a 300 ms gate). Five mechanisms, one ceiling at 73: what every one of them
+scores is a claim against the *question*, and the fourteen points still missing
+need a claim scored against a *fact* the question implies but does not contain.
+
 ## 8. Status
 
 - [x] corpus builder, deterministic and tested
@@ -685,6 +754,14 @@ exactly that.
       91,2 % at our volume, the lexical top 100 already contains enough for
       87,6 %, and the published row is 63,9 % — the loss is selection, not
       representation. Split fixed before any ranker changed, plan in `RANKER.md`
+- [x] the ranker ladder, all five rungs measured at zero model cost: selection
+      +7,6 pp on dev, a dense order +2,1, fusion −0,5, graph expansion +0,2,
+      whole-corpus retrieval +0,14, cross-encoder −1,9. Frozen on `dense-cover`
+      and lexical `cover` at `474dc22`; both read the test half once — §7.2
+- [x] the ranker the read path can serve is the lexical chooser: +8,03 pp
+      [+6,6; +9,5] on 192 questions with no model, no vector and no new artifact;
+      the dense rung's extra 1,44 pp do not survive the held-out half
+      (+0,8 [−0,4; +2,1]), so no encoder is added to the product on this evidence
 
 ### What the smoke run found, and what it cost to find
 

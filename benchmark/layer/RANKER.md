@@ -338,6 +338,33 @@ Two rows read the test half once, and neither choice depends on what it says:
 The test numbers are computed by the code committed at the freeze and are not
 re-tuned afterwards. If they disagree with dev, they are published as they are.
 
+### What the test half said, read once
+
+Committed at `474dc22`, then run on the 96 test questions that carry gold facts:
+
+| ranker | dev | test | 192 questions | interval over the product |
+|---|---:|---:|---:|---|
+| the product (BM25 top ten) | 63,59 % | 64,29 % | 63,94 % | — |
+| `cover`, lexical | 71,14 % | 72,81 % | 71,98 % | +8,03 pp [+6,6; +9,5] |
+| `dense-cover` | 73,21 % | 73,62 % | 73,42 % | +9,48 pp [+8,0; +11,0] |
+| the product, every quote | 68,19 % | 68,26 % | 68,23 % | — |
+| `dense-cover`, every quote | 76,18 % | 76,50 % | 76,34 % | +8,11 pp [+6,6; +9,6] |
+
+Both halves agree, and the product's own row reproduces the published 63,94 %
+exactly. `dense-cover` holds its dev number on questions it never saw, so the
+ladder did not overfit the split.
+
+**But the dense order does not hold its advantage over the lexical chooser**:
+`dense-cover` − `cover` is +2,1 pp [+0,6; +3,6] on dev, +0,8 pp [−0,4; +2,1] on
+test, +1,44 pp [+0,5; +2,4] over all 192. On the questions that were not used to
+choose it, half a point and an interval that admits zero.
+
+That decides the product question in §7 G-R3 without an opinion being involved:
+**the read path ships the lexical chooser, and no ADR 0004 is opened for an ONNX
+encoder.** A model file, a parity gate and a latency budget are not bought with
+half a point that the held-out half cannot distinguish from noise. The dense row
+stays in the table, labelled, with the test number that made the decision.
+
 ### What is deliberately not in the ladder
 
 - **No query-time model call.** Every rung is local and 0 $ at query time. A
