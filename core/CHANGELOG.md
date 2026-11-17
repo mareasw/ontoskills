@@ -42,6 +42,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **`ask` chooses its citations instead of cutting the ranking** — the answer is
+  no longer the top `k` of the lexical ranking. `ask` searches a pool of
+  `max(k * 10, 100)` citations with the same BM25, then chooses `k` of them
+  greedy: at each step the claim whose quote covers the most still-unclaimed
+  question terms, weighted by the corpus IDF, with the pool's own order as the
+  fill so a degenerate question still gets `k` citations. On the pilot's 192
+  questions with gold facts, at the same `k` and the same returned volume, this
+  is +8,03 pp coverage (63,94 % → 71,98 %) with a paired interval of
+  [+6,6; +9,5], at no model call and no extra artifact
+  (`benchmark/layer/RANKER.md`).
 - **Semantic fusion is applied only to the languages the model knows** —
   MiniLM is trained on English; on the Italian pilot its ranking was worse than
   the words themselves (MRR 0.339 → 0.240). `enable_semantic`
