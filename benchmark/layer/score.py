@@ -34,6 +34,7 @@ from typing import Sequence
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from benchmark.retrieval import metrics  # noqa: E402
+from benchmark.layer.text_refusal import looks_like_refusal  # noqa: E402
 
 QUALITY = ("answer_fact_coverage", "answer_fact_support", "numeric_congruence")
 
@@ -87,14 +88,28 @@ def returned_text(
 
 
 def score_question(
-    item: dict, row: dict | None, mode: str, k: int, max_chars: int | None = None
+    item: dict,
+    row: dict | None,
+    mode: str,
+    k: int,
+    max_chars: int | None = None,
+    recheck_refusals: bool = False,
 ) -> dict:
-    """Every metric this question supports, and the refusal as its own outcome."""
+    """Every metric this question supports, and the refusal as its own outcome.
+
+    ``recheck_refusals`` re-derives a prose system's refusal from the text it
+    returned instead of trusting the flag the run wrote. A run is scored later
+    than it is produced, and a refusal classifier that learns a phrasing must not
+    require re-asking the questions — or charging for them twice — to apply.
+    """
     outcome: dict = {"kind": item["kind"], "ans": row is not None}
     if row is None:
         outcome["missing"] = True
         return outcome
-    refused = bool(row.get("refused"))
+    if recheck_refusals and mode == "answer":
+        refused = looks_like_refusal(str(row.get("answer") or ""))
+    else:
+        refused = bool(row.get("refused"))
     outcome["refused"] = refused
     if refused:
         return outcome
@@ -122,12 +137,20 @@ def summarise(
     k: int,
     resamples: int = 10_000,
     max_chars: int | None = None,
+    recheck_refusals: bool = False,
 ) -> dict:
     items = selection["items"]
     per_question = [
         {
             "qid": item["qid"],
-            **score_question(item, answers.get(item["qid"]), mode, k, max_chars),
+            **score_question(
+                item,
+                answers.get(item["qid"]),
+                mode,
+                k,
+                max_chars,
+                recheck_refusals=recheck_refusals,
+            ),
         }
         for item in items
     ]
@@ -154,6 +177,7 @@ def summarise(
         "mode": mode,
         "k": k,
         "max_chars": max_chars,
+        "refusals_rechecked_from_text": bool(recheck_refusals and mode == "answer"),
         "median_chars": chars[len(chars) // 2] if chars else None,
         "questions": len(items),
         "answered": sum(1 for o in per_question if not o.get("missing")),
@@ -217,6 +241,13 @@ def main(argv: list[str] | None = None) -> int:
         "so two systems are compared at the same volume as well as the same k",
     )
     parser.add_argument("--json", type=Path, default=None)
+    parser.add_argument(
+        "--recheck-refusals",
+        action="store_true",
+        help="Read a prose system's refusal out of its answer text with the "
+        "current classifier instead of trusting the flag the run wrote; for "
+        "`--mode answer` only, and it changes no other field",
+    )
     args = parser.parse_args(argv)
 
     selection = json.loads(args.selection.read_text(encoding="utf-8"))
@@ -228,6 +259,7 @@ def main(argv: list[str] | None = None) -> int:
         args.k,
         resamples=args.resamples,
         max_chars=args.max_chars,
+        recheck_refusals=args.recheck_refusals,
     )
     print(format_score(result))
     if args.json:

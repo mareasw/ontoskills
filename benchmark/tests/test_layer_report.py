@@ -90,19 +90,59 @@ def test_the_overall_figure_pools_questions_not_kinds():
         "by_kind": {
             "basic": {
                 "questions": 70,
-                "metrics": {"answer_fact_coverage": {"mean": 0.9}},
+                "metrics": {"answer_fact_coverage": {"mean": 0.9, "n": 70}},
             },
             "high_level": {
                 "questions": 4,
-                "metrics": {"answer_fact_coverage": {"mean": 0.1}},
+                "metrics": {"answer_fact_coverage": {"mean": 0.1, "n": 4}},
             },
             "info_not_found": {"questions": 8, "metrics": {}},
         }
     }
-    pooled = report._overall(score)
+    pooled, scored = report._overall(score)
     # (0.9*70 + 0.1*4) / 74, not (0.9+0.1)/2 and not a mean that includes the
     # unanswerable kind.
     assert abs(pooled["answer_fact_coverage"] - (0.9 * 70 + 0.1 * 4) / 74) < 1e-12
+    assert scored == 74
+
+
+def test_a_refusal_is_weighted_out_of_the_mean_not_counted_as_a_zero():
+    """The count behind a mean is the metric's, not the kind's question count.
+
+    GraphRAG answered 56 of its 70 `basic` questions: weighting that kind's mean
+    by 70 would divide fourteen refusals back in as zeros and publish a number
+    that is neither the coverage of what it answered nor the coverage with
+    refusals counted — the table would show a figure no reading produces.
+    """
+    score = {
+        "by_kind": {
+            "basic": {
+                "questions": 70,
+                "refused": 14,
+                "metrics": {"answer_fact_coverage": {"mean": 1.0, "n": 56}},
+            },
+            "info_not_found": {"questions": 8, "refused": 5, "metrics": {}},
+        }
+    }
+    pooled, scored = report._overall(score)
+    assert pooled["answer_fact_coverage"] == 1.0
+    assert scored == 56
+
+
+def test_the_fallback_weight_is_refused_where_the_kind_did_refuse():
+    """A score file without counts cannot be pooled when the kind abstained."""
+    score = {
+        "by_kind": {
+            "basic": {
+                "questions": 70,
+                "refused": 14,
+                "metrics": {"answer_fact_coverage": {"mean": 0.8}},
+            },
+        }
+    }
+    pooled, scored = report._overall(score)
+    assert pooled.get("answer_fact_coverage") is None
+    assert scored is None
 
 
 def test_the_manifest_is_read_relative_to_itself(tmp_path):
