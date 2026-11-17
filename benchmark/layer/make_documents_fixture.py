@@ -68,7 +68,7 @@ def write_stopwords() -> int:
     """Regenerate the Rust copy of `STOPWORDS`, sorted, from the Python one.
 
     The list cannot be imported across the language boundary, so it is written
-    as a Rust `static` and compared by `benchmark/tests/test_documents_fixture.py`.
+    as a Rust `static` and compared by `benchmark/tests/test_layer_documents_fixture.py`.
     A test that reads the file and the Python set is the only thing that keeps a
     fix applied on one side from silently diverging.
     """
