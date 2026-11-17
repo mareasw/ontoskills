@@ -272,6 +272,10 @@ asserted here.
 8. **Requests in flight are declared per system before its run, never more than
    eight, and only one build runs at a time.** The declared numbers are
    OntoSkills 8, the floor 0, GraphRAG 4, and the run records the number it used.
+   GraphRAG's four are the build's, where the pool holds extraction and summary
+   calls; the two hundred questions are asked one at a time, because local
+   search is one question's latency and a pool of four would publish a
+   throughput no user waits for.
    Concurrency is transport, not a quality knob, so no system is ever *rewarded*
    for asking fewer questions at once. What five attempts at GraphRAG established
    is that the ceiling was not concurrency at all: our gateway answers
@@ -839,29 +843,86 @@ python3 -m benchmark.layer.score --selection /tmp/layer/corpus/selection.json \
     --json /tmp/layer/runs/floor.score.json
 ```
 
-**GraphRAG**, at the settings published in `benchmark/layer/config/`:
+**GraphRAG**, at the settings published in `benchmark/layer/config/`, behind a
+meter from the first call:
 
 ```
 graphrag init --root /tmp/layer/graphrag --model deepseek-v4.1-flash \
     --embedding e5-large-v2
 cp benchmark/layer/config/graphrag.settings.yaml /tmp/layer/graphrag/settings.yaml
 cp /tmp/layer/corpus/*.txt /tmp/layer/graphrag/input/
+python3 -m benchmark.layer.meter_proxy --port 8094 \
+    --upstream "$OPENAI_BASE_URL" --label graphrag-build \
+    --log /tmp/layer/meter-graphrag-full.jsonl --stream-upstream &
 GRAPHRAG_API_KEY="$OPENAI_API_KEY" graphrag index --root /tmp/layer/graphrag
-python3 -m benchmark.layer.run_graphrag --root /tmp/layer/graphrag \
-    --selection /tmp/layer/corpus/selection.json \
-    --out /tmp/layer/runs/graphrag.jsonl --method local
 ```
 
-GraphRAG writes no manifest. Its wall clock is read from
-`logs/indexing-engine.log` and its call count from the number of cache records,
-which is one record per paid call:
+The questions are a second meter in front of a second root: the build's tables
+by symlink, the build's settings with one address changed. Editing the build's
+own `api_base` after the fact would put a query cost inside a build cost.
+
+```
+mkdir -p /tmp/layer/graphrag-query
+ln -s ../graphrag/input /tmp/layer/graphrag-query/input
+ln -s ../graphrag/output /tmp/layer/graphrag-query/output
+sed 's|127.0.0.1:8094|127.0.0.1:8095|' /tmp/layer/graphrag/settings.yaml \
+    > /tmp/layer/graphrag-query/settings.yaml
+python3 -m benchmark.layer.meter_proxy --port 8095 \
+    --upstream "$OPENAI_BASE_URL" --label graphrag-query \
+    --log /tmp/layer/meter-graphrag-query.jsonl --stream-upstream &
+python3 -m benchmark.layer.run_graphrag --root /tmp/layer/graphrag-query \
+    --selection /tmp/layer/corpus/selection.json --method local \
+    --out /tmp/layer/runs/graphrag.answers.jsonl
+```
+
+Every answer is flushed as it is paid for, and `--resume` continues a run that
+died — a reboot, a closed terminal — from the rows already on disk, asking only
+the questions whose `qid` is missing. A half-written last line is dropped rather
+than trusted: it names no question, so at most one answer is bought twice and no
+truncated one is published.
+
+Five questions first, on a third meter and the same root shape:
+
+```
+python3 -m benchmark.layer.meter_proxy --port 8096 \
+    --upstream "$OPENAI_BASE_URL" --label graphrag-smoke-query \
+    --log /tmp/layer/meter-graphrag-smoke-query.jsonl --stream-upstream &
+python3 -m benchmark.layer.run_graphrag --root /tmp/layer/graphrag-smoke-query \
+    --selection /tmp/layer/corpus/selection.json --limit 5 \
+    --out /tmp/layer/runs/graphrag.smoke.jsonl
+```
+
+A local search that cannot answer five is not ready for two hundred, and the
+five must not sit inside the query row. Then the score and the interval:
+
+```
+python3 -m benchmark.layer.score --selection /tmp/layer/corpus/selection.json \
+    --answers /tmp/layer/runs/graphrag.answers.jsonl --mode answer --k 10 \
+    --json /tmp/layer/runs/graphrag.score.json
+python3 -m benchmark.layer.interval --score /tmp/layer/runs/graphrag.score.json \
+    --label graphrag --json /tmp/layer/runs/graphrag.intervals.json
+cp /tmp/layer/meter-graphrag-full.jsonl /tmp/layer/runs/graphrag.meter.jsonl
+cp /tmp/layer/meter-graphrag-query.jsonl /tmp/layer/runs/graphrag.query.jsonl
+```
+
+GraphRAG writes no manifest, so both of its published numbers come from outside
+it. Its calls and dollars are the meter's, one JSON line per paid call, failed
+ones included — not its cache records, which count answers that were kept and
+have no line for the calls that failed. Its wall clock is the framework's own
+log, `logs/indexing-engine.log`, from the first timestamp of the attempt that
+produced the artifact to the last, passed with `--wall-clock`:
 
 ```
 python3 -m benchmark.layer.build_record --root /tmp/layer/graphrag \
-    --log /tmp/layer/graphrag/logs/indexing-engine.log \
+    --wall-clock <seconds from the attempt's first timestamp to the log's last> \
     --exclude cache logs input prompts \
     --out /tmp/layer/runs/graphrag.build.json --name graphrag
 ```
+
+The log also carries three earlier attempts that died on the gateway's ceiling
+before the streaming transport existed, and counting them would publish time the
+artifact never took. §7.2 says what this run's number was and how the build
+reached it.
 
 **LightRAG**, two phases, because building costs money and asking costs time:
 
