@@ -12,7 +12,7 @@ port without an ADR.
   diagnosis: the ten claims are individually relevant but collectively redundant,
   and the facts are carried by the terms the question already names.
 * **`mmr`** — maximal marginal relevance over the same pool: relevance is the
-  product's BM25 score, redundancy is the Jaccard overlap of the quotes' token
+  position in the order, redundancy is the Jaccard overlap of the quotes' token
   sets, with an optional cap on claims per document. It is the conventional
   answer to the same problem, and it is here so E1 is not one idea measured
   against nothing.
@@ -24,6 +24,16 @@ BM25, and the same two selectors applied to it. The pool, the k and the volume d
 not move; only the order does. The `query:` prefix is how e5 was trained, and a
 `passage:` run is kept as a control because a library with no query prefix cannot
 do better than that.
+
+E2 is the last rung that moved the number, and it is the frozen ranker
+(`dense-cover`, depth 100, k 10). The three rungs after it are here because the
+pilot publishes negative results too: `--expand-head` adds the section and
+`conflicts_with` neighbours of the dense head (E4, +0,2 pp, under its gate),
+`--global-depth` retrieves across the whole corpus instead of the lexical pool
+(H4, +0,14 pp at 24× the cost), `--rerank` puts a cross-encoder over the head
+(E5, −1,9 pp and 13,5 s per question on CPU). `--all-quotes` scores every quote
+of the chosen claims instead of the first: the labelled extra row, never the
+primary one.
 
     python3 -m benchmark.layer.select --selection /tmp/layer/corpus/selection.json \\
         --kb /tmp/layer/kb --answers /tmp/layer/runs/ontoskills.answers.jsonl \\
@@ -38,6 +48,8 @@ import sys
 import time
 from collections import Counter
 from pathlib import Path
+
+import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
@@ -113,14 +125,17 @@ def _jaccard(left: set[str], right: set[str]) -> float:
 
 
 def mmr(citations, corpus, question, k=K, lam=0.7, cap=None, **_):
-    """Maximal marginal relevance, with an optional per-document cap."""
+    """Maximal marginal relevance, with an optional per-document cap.
+
+    Relevance is the position in the order the ranker produced, not the BM25
+    score: the rung's question is what a *different order* is worth, and a
+    selector that re-reads the lexical score would ignore the dense order by
+    construction.
+    """
     if not citations:
         return []
-    scores = [citation.score for citation in citations]
-    low, high = min(scores), max(scores)
-    relevance = [
-        (score - low) / (high - low) if high > low else 0.0 for score in scores
-    ]
+    n = len(citations)
+    relevance = [1.0 - position / (n - 1) for position in range(n)] if n > 1 else [1.0]
     sets = [_quote_terms(citation.quote) for citation in citations]
     picked: list[int] = []
     taken: set[int] = set()
@@ -206,10 +221,129 @@ def rrf_order(lexical, dense, rrf_k: int = 60):
     return [by_id[cid] for cid in ordered]
 
 
+def global_order(corpus, ids, matrix, query_vector, depth: int):
+    """The first ``depth`` claims of the whole corpus by dense score, not by BM25.
+
+    E2 reranks the lexical pool, so it inherits the pool's coverage. This order
+    drops that inheritance: it asks whether the lexical candidate generator was
+    ever the constraint, by retrieving across every verified claim the artifact
+    has a vector for.
+    """
+    hits = matrix @ np.asarray(query_vector, dtype=np.float32)
+    order = np.argsort(-hits, kind="stable")
+    out = []
+    for row in order:
+        claim = corpus._by_id.get(ids[int(row)])
+        if claim is None:
+            continue
+        out.append(corpus._citation(claim, float(hits[int(row)])))
+        if len(out) >= depth:
+            break
+    return out
+
+
+def section_neighbours(corpus) -> dict[str, set[str]]:
+    """claim id -> the claims that share its document section, plus its conflicts.
+
+    This is the claim graph the artifact already carries: a section, an offset
+    and a `conflicts_with` edge. A rung that expands along it asks whether the
+    facts live next to what we found, which is the one thing a chunk layer cannot
+    copy.
+
+    A contradiction is not a direction, so conflicts are read as undirected: the
+    artifact happens to store every pair both ways (82 pairs, 164 links, all
+    reciprocated), and the ranker must not depend on that.
+    """
+    sections: dict[tuple, list[str]] = {}
+    for claim in corpus.claims:
+        evidence = claim.get("evidence") or [{}]
+        key = (
+            claim["doc_id"],
+            tuple((evidence[0].get("locator") or {}).get("section_path") or []),
+        )
+        sections.setdefault(key, []).append(claim["claim_id"])
+    out: dict[str, set[str]] = {claim["claim_id"]: set() for claim in corpus.claims}
+    for ids in sections.values():
+        for claim_id in ids:
+            out[claim_id] |= set(ids) - {claim_id}
+    for claim in corpus.claims:
+        for other in claim.get("conflicts_with") or ():
+            if other in out and other != claim["claim_id"]:
+                out[claim["claim_id"]].add(other)
+                out[other].add(claim["claim_id"])
+    return out
+
+
+def expand_order(citations, corpus, neighbours, row_of, matrix, query_vector, head: int):
+    """The order plus the graph neighbourhood of its first ``head`` claims.
+
+    The added claims are scored by the same dense order and appended, so a
+    neighbour never outranks a claim the retriever actually reached: this is an
+    expansion of the candidate set, not a promotion.
+    """
+    known = {citation.claim_id for citation in citations}
+    added: dict[str, dict] = {}
+    for citation in citations[:head]:
+        for claim_id in neighbours.get(citation.claim_id, ()):
+            if claim_id in known or claim_id in added:
+                continue
+            claim = corpus._by_id.get(claim_id)
+            if claim is not None:
+                added[claim_id] = claim
+    if not added:
+        return list(citations)
+    extra = [corpus._citation(claim, 0.0) for claim in added.values()]
+    return list(citations) + dense_order(extra, row_of, matrix, query_vector)
+
+
+def every_quote(corpus, chosen) -> list[str]:
+    """Every evidence item of the chosen claims, in order: the labelled extra row."""
+    out: list[str] = []
+    for citation in chosen:
+        claim = corpus._by_id.get(citation.claim_id) or {}
+        out.extend(item.get("quote") or "" for item in (claim.get("evidence") or []))
+    return [quote for quote in out if quote]
+
+
 def _encode_question(encoder, question: str, prefix: str):
     if prefix == "query":
         return encoder.encode_query(question)
     return encoder.encode_passages([question])[0]
+
+
+def rerank_order(citations, question: str, scorer, depth: int = 50, **_):
+    """The first ``depth`` claims re-scored pairwise; everything below keeps its order.
+
+    The reranker may reorder what it read, never promote something it did not
+    read over something it did: the tail stays where the base order put it.
+    """
+    head = list(citations[:depth])
+    tail = list(citations[depth:])
+    if not head:
+        return []
+    scores = scorer(question, [citation.quote for citation in head])
+    order = sorted(range(len(head)), key=lambda index: (-scores[index], index))
+    return [head[index] for index in order] + tail
+
+
+def _default_reranker(device: str | None = None):
+    from benchmark.retrieval.dense import CROSS_ENCODER
+
+    from sentence_transformers import CrossEncoder
+
+    model = CrossEncoder(
+        CROSS_ENCODER.model_id,
+        revision=CROSS_ENCODER.revision,
+        max_length=CROSS_ENCODER.max_length,
+        device=device,
+    )
+
+    def score(question: str, texts):
+        pairs = [(question, text) for text in texts]
+        logits = model.predict(pairs, batch_size=32, show_progress_bar=False)
+        return np.asarray(logits, dtype=np.float32).tolist()
+
+    return score
 
 
 def _default_encoder(device: str | None = None):
@@ -229,8 +363,19 @@ def measure(
     vectors: tuple[list[str], object] | None = None,
     query_encoder=None,
     query_prefix: str = "query",
+    reranker=None,
+    rerank_depth: int = 50,
+    expand_head: int = 0,
+    global_depth: int = 0,
+    all_quotes: bool = False,
+    selectors: tuple[str, ...] | None = None,
+    progress=None,
 ) -> tuple[dict, dict[str, dict]]:
     corpus = _corpus(kb_dir, False)
+    if reranker is not None and vectors is None:
+        raise SystemExit("a reranker needs claim vectors: its base order is the RRF fusion")
+    if (expand_head or global_depth) and vectors is None:
+        raise SystemExit("graph expansion and global retrieval need claim vectors")
     items = json.loads(selection.read_text(encoding="utf-8"))["items"]
     wanted = rank.read_split(split_path, half) if split_path else None
     items = [item for item in items if wanted is None or item["qid"] in wanted]
@@ -253,13 +398,22 @@ def measure(
         dense = (row_of, matrix, query_encoder or _default_encoder())
         plan = {}
         for name, selector in SELECTORS.items():
+            if selectors is not None and name not in selectors:
+                continue
             plan[name] = ("bm25", selector)
             plan[f"dense-{name}"] = ("dense", selector)
             plan[f"rrf-{name}"] = ("rrf", selector)
+            if reranker is not None:
+                plan[f"rerank-{name}"] = ("rerank", selector)
+            if expand_head:
+                plan[f"expand-{name}"] = ("expand", selector)
+            if global_depth:
+                plan[f"global-{name}"] = ("global", selector)
 
     orders: dict[str, dict[str, list]] = {}
     if dense is not None:
         row_of, matrix, encoder = dense
+        neighbours = section_neighbours(corpus) if expand_head else {}
         for item in questions:
             pool = pools[item["qid"]]
             query_vector = _encode_question(encoder, item["text"], query_prefix)
@@ -269,6 +423,18 @@ def measure(
                 "dense": by_dense,
                 "rrf": rrf_order(pool, by_dense),
             }
+            if reranker is not None:
+                orders[item["qid"]]["rerank"] = rerank_order(
+                    orders[item["qid"]]["rrf"], item["text"], reranker, rerank_depth
+                )
+            if expand_head:
+                orders[item["qid"]]["expand"] = expand_order(
+                    by_dense, corpus, neighbours, row_of, matrix, query_vector, expand_head
+                )
+            if global_depth:
+                orders[item["qid"]]["global"] = global_order(
+                    corpus, ids, matrix, query_vector, global_depth
+                )
 
     report: dict = {
         "questions": len(questions),
@@ -286,14 +452,27 @@ def measure(
             "dim": int(vectors[1].shape[1]),
             "query_prefix": query_prefix,
         }
+        if expand_head:
+            report["expand_head"] = expand_head
+        if global_depth:
+            report["global_depth"] = global_depth
+    if all_quotes:
+        report["all_quotes"] = True
     scores: dict[str, dict] = {}
 
-    for name, (order_name, selector) in plan.items():
+    scoring = list(plan.items())
+    if all_quotes:
+        scoring += [(f"{name}-allquotes", entry) for name, entry in plan.items()]
+
+    for name, (order_name, selector) in scoring:
         rows, started = [], time.perf_counter()
         for item in questions:
             pool = orders[item["qid"]][order_name] if dense is not None else pools[item["qid"]]
             chosen = selector(pool, corpus, item["text"], k)
-            quotes = [citation.quote for citation in chosen if citation.quote]
+            if all_quotes and name.endswith("-allquotes"):
+                quotes = every_quote(corpus, chosen)
+            else:
+                quotes = [citation.quote for citation in chosen if citation.quote]
             rows.append(
                 {
                     "qid": item["qid"],
@@ -311,6 +490,8 @@ def measure(
             "select_ms_per_question": round(seconds / len(rows) * 1000, 2),
         }
         scores[name] = {"per_question": rows}
+        if progress is not None:
+            progress(name, report["variants"][name])
     return report, scores
 
 
@@ -337,7 +518,36 @@ def main(argv: list[str] | None = None) -> int:
         "no query prefix is stuck with",
     )
     parser.add_argument("--device", default=None, help="cpu or cuda for the query encoder")
+    parser.add_argument(
+        "--rerank",
+        action="store_true",
+        help="Add the cross-encoder order: the RRF head re-scored pairwise (E5)",
+    )
+    parser.add_argument("--rerank-depth", type=int, default=50)
+    parser.add_argument(
+        "--expand-head",
+        type=int,
+        default=0,
+        help="Add the section and conflict neighbours of the first N claims (E4)",
+    )
+    parser.add_argument(
+        "--global-depth",
+        type=int,
+        default=0,
+        help="Also retrieve across the whole corpus by dense score, cut at N",
+    )
+    parser.add_argument(
+        "--all-quotes",
+        action="store_true",
+        help="Also score every quote of the chosen claims: the labelled extra row",
+    )
     parser.add_argument("--json", type=Path, default=None)
+    parser.add_argument(
+        "--selectors",
+        default=None,
+        help="Comma-separated subset of plain,cover,mmr-l0.5 (default: all three); "
+        "a long order is only worth running the chooser you care about",
+    )
     parser.add_argument(
         "--scores-dir",
         type=Path,
@@ -366,7 +576,21 @@ def main(argv: list[str] | None = None) -> int:
         vectors=vectors,
         query_encoder=_default_encoder(args.device) if vectors is not None else None,
         query_prefix=args.query_prefix,
+        reranker=_default_reranker(args.device) if args.rerank else None,
+        rerank_depth=args.rerank_depth,
+        expand_head=args.expand_head,
+        global_depth=args.global_depth,
+        all_quotes=args.all_quotes,
+        selectors=tuple(args.selectors.split(",")) if args.selectors else None,
+        progress=lambda name, row: print(
+            f"  ... {name:26s} {row['coverage'] * 100:6.2f} %", file=sys.stderr, flush=True
+        ),
     )
+    if args.rerank:
+        report["rerank"] = {
+            "depth": args.rerank_depth,
+            "model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+        }
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(json.dumps(report, indent=1), encoding="utf-8")
