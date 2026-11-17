@@ -828,9 +828,21 @@ python3 -m benchmark.layer.score --selection /tmp/layer/corpus/selection.json \
 ```
 
 `--mode answer` runs on the same answers file and prints the 66,1 / 66,1 / 79,7
-row quoted in §7: the file carries both an `answer` and its `evidence`, so the
-same paid run can be read in the modality a competitor answers in without
-another call. The two modalities are never compared to each other.
+row quoted in §7:
+
+```
+python3 -m benchmark.layer.score --selection /tmp/layer/corpus/selection.json \
+    --answers /tmp/layer/runs/ontoskills.answers.jsonl --mode answer --k 10 \
+    --json /tmp/layer/runs/ontoskills.answer-mode.score.json
+```
+
+The file carries both an `answer` and its `evidence`, so the same paid run can be
+read in the modality a competitor answers in without another call. Two properties
+of that reading are stated rather than discovered later: the "prose" is the
+artifact's own restatement of each claim next to the quote it cites, not a model's
+paragraph; and `support` is measured over a single item — the whole answer — so it
+equals `coverage` by construction in `answer` mode, for every system. The two
+modalities are never compared to each other.
 
 **The floor**, which costs nothing:
 
