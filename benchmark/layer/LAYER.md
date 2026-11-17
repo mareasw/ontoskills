@@ -891,7 +891,10 @@ Every answer is flushed as it is paid for, and `--resume` continues a run that
 died — a reboot, a closed terminal — from the rows already on disk, asking only
 the questions whose `qid` is missing. A half-written last line is dropped rather
 than trusted: it names no question, so at most one answer is bought twice and no
-truncated one is published.
+truncated one is published. A question whose row says `ERROR:` is asked again —
+the meter keeps what the failed call cost, but a failure is not an answer — and
+the finished file is rewritten in the selection's order through a temporary file,
+so a resumed run and an uninterrupted one publish the same shape.
 
 Five questions first, on a third meter and the same root shape:
 

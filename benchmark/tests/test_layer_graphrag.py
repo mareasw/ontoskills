@@ -145,6 +145,36 @@ def test_a_run_killed_mid_line_keeps_its_readable_rows_and_rewrites_the_file(
     assert all("refused" in json.loads(line) for line in out.read_text().splitlines())
 
 
+def test_a_failed_question_is_asked_again_on_resume_and_the_file_keeps_one_row(
+    tmp_path, monkeypatch, capsys
+):
+    out = tmp_path / "runs" / "graphrag.jsonl"
+    broken_row = answered("q2")
+    broken_row["answer"] = "ERROR: RuntimeError: gateway fell over"
+    write_rows(out, [answered("q1"), broken_row, answered("q3")])
+    asked = []
+
+    async def ask(config, tables, question):
+        asked.append(question)
+        return f"answer to {question}"
+
+    fake_index(monkeypatch)
+    monkeypatch.setattr(run_graphrag, "ask_local", ask)
+
+    asyncio.run(run_graphrag.run(make_args(tmp_path, make_selection(tmp_path), resume=True)))
+
+    # A failed call is paid for but it is not an answer: only that question is
+    # asked again, and the file ends with one row per question and no error.
+    assert asked == ["question q2"]
+    rows = [json.loads(line) for line in out.read_text().splitlines() if line.strip()]
+    assert [row["qid"] for row in rows] == QUESTIONS
+    assert not any(row["answer"].startswith("ERROR:") for row in rows)
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["retried"] == 1
+    assert summary["resumed"] == 2
+    assert summary["asked"] == 1
+
+
 def test_resume_without_a_file_asks_everything(tmp_path, monkeypatch):
     out = tmp_path / "runs" / "graphrag.jsonl"
     asked = []

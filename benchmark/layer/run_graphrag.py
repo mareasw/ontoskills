@@ -20,7 +20,8 @@ Questions are asked one at a time and every answer is flushed as soon as it is
 paid for, so `--resume` can continue a killed run without buying the same answer
 twice. The file is the state: a line that does not parse is the last write of a
 killed run and is dropped, never trusted or left inside a published answers
-file.
+file, and a question whose row says `ERROR:` is asked again — its cost stays in
+the meter, but a failed call is not an answer.
 
     python3 -m benchmark.layer.run_graphrag --root /tmp/layer/graphrag \\
         --selection /tmp/layer/corpus/selection.json --out /tmp/layer/runs/graphrag.jsonl
@@ -132,21 +133,54 @@ def read_answers(path: Path) -> tuple[list[dict], int]:
     return rows, broken
 
 
+def rewrite_in_selection_order(path: Path, rows: list[dict], items: list[dict]) -> list[dict]:
+    """Write the finished file in the selection's order, whatever order it was asked.
+
+    A resumed run answers the missing questions last, and the published file should
+    not depend on whether the machine rebooted half-way. The write goes through a
+    temporary file and a rename: a kill during the final write cannot leave a
+    half-written file where a complete answers file was. Rows whose qid is not in
+    the selection are kept, at the end, rather than dropped — `score.py` and the
+    run's own check are what refuse them.
+    """
+    position = {item["qid"]: index for index, item in enumerate(items)}
+    ordered = sorted(rows, key=lambda row: position.get(row["qid"], len(position)))
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(
+        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in ordered),
+        encoding="utf-8",
+    )
+    temporary.replace(path)
+    return ordered
+
+
 async def run(args) -> int:
     selection = json.loads(args.selection.read_text(encoding="utf-8"))
-    items = selection["items"]
+    ordered = selection["items"]
     if args.kinds:
         wanted = set(args.kinds.split(","))
-        items = [item for item in items if item["kind"] in wanted]
+        ordered = [item for item in ordered if item["kind"] in wanted]
     if args.limit:
-        items = items[: args.limit]
+        ordered = ordered[: args.limit]
 
     done: list[dict] = []
     broken = 0
+    retried = 0
     if args.resume and args.out.exists():
-        done, broken = read_answers(args.out)
+        rows, broken = read_answers(args.out)
+        # A failed question is not an answer: the call was paid for and the meter
+        # keeps the spend, but the row says nothing about the system. It is asked
+        # again, and its old row is dropped from the file so a question can only
+        # appear once.
+        for row in rows:
+            if str(row.get("answer", "")).startswith("ERROR:"):
+                retried += 1
+            else:
+                done.append(row)
         answered = {row["qid"] for row in done}
-        items = [item for item in items if item["qid"] not in answered]
+        items = [item for item in ordered if item["qid"] not in answered]
+    else:
+        items = list(ordered)
 
     config, tables = load_index(args.root)
     ask = ask_global if args.method == "global" else ask_local
@@ -187,7 +221,7 @@ async def run(args) -> int:
             handle.flush()
             fresh.append(row)
 
-    rows = done + fresh
+    rows = rewrite_in_selection_order(args.out, done + fresh, ordered)
     print(
         json.dumps(
             {
@@ -196,6 +230,7 @@ async def run(args) -> int:
                 "questions": len(rows),
                 "asked": len(fresh),
                 "resumed": len(done),
+                "retried": retried,
                 "unreadable_lines": broken,
                 "refused": sum(1 for row in rows if row["refused"]),
                 "errors": sum(1 for row in rows if row["answer"].startswith("ERROR:")),
