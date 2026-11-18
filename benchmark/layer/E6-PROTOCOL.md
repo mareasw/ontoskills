@@ -747,3 +747,123 @@ every unit this layer returns resolves to a document, a quotation and a claim
 identifier, and RAPTOR's summary resolves to a cluster. That is a product
 property, not a benchmark result, and the pilot does not get to call it a win it
 did not measure.
+
+---
+
+## E17 — where the four dollars go, and what a context ever reads
+
+Not a pre-registered test: this is an **accounting measurement on the frozen
+configuration** (statement, depth 400, max-pick 200, `prefix_cut`), run after E16.
+It has no degree of freedom that could move a quality number — the answers it
+reads are the ones E14 already produced — so there is nothing here to choose after
+seeing an outcome. It exists because E16 left one question open and the answer
+decides what the next rung should be:
+
+> RAPTOR ties us at five thousand characters for 0,105 $. We spend 4,11 $. Which
+> part of that 4,11 bought text that no context ever holds?
+
+Every claim is sorted by what the frozen pipeline does with it across all 192
+questions:
+
+* **unreachable** — never in any question's 400-candidate pool;
+* **reachable, never chosen** — in a pool, never selected;
+* **used** — selected and kept at some budget up to 14 830 characters.
+
+Cost per claim is its document's metered bill divided by that document's verified
+claims: the compiler bills per document, and within a document there is no better
+attribution than "these claims came out of this bill".
+
+### The answer: very little. 18 % of the bill goes unread, and it is spread thin.
+
+| | claims | share | $ attributed |
+|---|---:|---:|---:|
+| used at 14 830 | 7 279 | **79,95 %** | 3,3336 |
+| reachable, never chosen | 1 665 | 18,29 % | 0,6977 |
+| never in any pool | 160 | 1,76 % | 0,0626 |
+| documents that produced no verified claim | 14 docs | — | 0,0176 |
+
+At the budget the published claim uses, two thousand characters, the picture is
+different and this is the number that matters:
+
+| budget | claims a context ever holds | share of the index | share of the build |
+|---|---:|---:|---:|
+| 2 000 | 2 754 | 30,25 % | **32,90 %** |
+| 5 000 | 4 770 | 52,39 % | 55,25 % |
+| 10 000 | 6 386 | 70,14 % | 72,06 % |
+| 14 830 | 7 279 | 79,95 % | 81,08 % |
+
+The hypothesis this measurement was built to test — *a large share of the index is
+never read, so the build pays for text nobody uses* — is **false at the wide
+budget and half-true at the tight one**. At fourteen thousand characters the
+corpus is almost fully exercised: the median document has 93,1 % of its claims
+shown at least once (p10 61,4 %). At two thousand characters only a third of the
+index is ever reached, and that is a property of the budget, not of the build: a
+smaller context cannot hold a larger index.
+
+**The waste is not concentrated, so there is no document to cut.** Five documents
+are never used at all and they cost 0,0032 $ together. The 18 % unread is the tail
+of every document's claim set, not a set of bad documents: pruning by source
+cannot recover it.
+
+### The bill, split
+
+| | $ | share |
+|---|---:|---:|
+| extraction and verification (880 calls) | 3,1292 | 76,1 % |
+| conflict enrichment, one call per document | 0,9823 | 23,9 % |
+| **total** | **4,1115** | |
+
+Of that, 3,9023 $ is the first pass and 0,2092 $ a replay of chunks whose first
+answer failed verification — money that bought the claims now on disk but no new
+claims.
+
+The conflict pass buys something the retrieval path never reads: it populates
+`conflicts_with` edges between claims. A comparison against an extractive rival
+on *retrieval cost* should therefore use **3,13 $**, not 4,11 $. It is still 30×
+RAPTOR's 0,105 $, and this document says 30× where E16 said 39×, with the
+difference named rather than absorbed.
+
+### What a dollar of build produces
+
+| | compressed text | chars per $ | compression |
+|---|---:|---:|---:|
+| RAPTOR | 122 221 chars in 66 summaries | **1 167 344** | 15,0× |
+| ours | 823 697 chars in 9 104 statements | 200 339 | 2,23× |
+
+RAPTOR buys **5,8× more compressed text per dollar**. What it does not buy is
+resolution: 15× compression leaves 66 units for 279 documents, and at a two
+thousand character budget that is one and a half units. The claim layer compresses
+2,2×, which is barely compression at all — it is *displacement*: the text is
+rewritten to be answer-shaped and each unit is small enough that a tight budget
+can still pick ten of them.
+
+### Amortised, which is how an index is actually paid for
+
+Build cost is paid once and query cost is paid per question, so the honest
+per-question figure depends on the workload. Arithmetic on measured components,
+not a measurement of its own:
+
+| questions served | ours | RAPTOR | GraphRAG |
+|---|---:|---:|---:|
+| 192 (this pilot) | 0,02141 $ | **0,00055 $** | 0,06025 $ |
+| 10 000 | 0,00041 $ | **0,00001 $** | 0,00361 $ |
+
+RAPTOR is cheaper per question at every workload, because its build is cheaper
+and its query path is the same zero. GraphRAG is the only system whose per-question
+price does not amortise — 11 807 paid tokens every time, against a 0,0025 $ floor
+that no volume removes.
+
+### The reading
+
+The four dollars are not wasted on an index nobody reads: at the budget the
+document claims, a third of the index is used, and at a wide budget almost all of
+it. They are wasted **on granularity that RAPTOR does not need to buy**, and the
+pilot cannot say the granularity is worth 30× without a workload that rewards it.
+The 2 000-character win is the only place that argument currently has evidence.
+
+So the next honest rung is not a cheaper build — there is no document to prune and
+the conflict pass is a product feature, not retrieval overhead. It is a
+**workload** where a tight context is the constraint: an agent with a small window,
+or many claims packed into a fixed budget. If that workload exists, the 5,8 points
+at two thousand characters are worth 30×; if it does not, the claim layer is a
+more expensive way to reach the same answer, and this document has said so.
