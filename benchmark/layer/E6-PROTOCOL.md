@@ -936,3 +936,30 @@ incomplete, with what was spent and what was built.
 Whatever the result, the row is published beside the others with its own price and
 its own refusals, and the sentence in `LAYER.md` is rewritten to name the member
 of the family it is actually about.
+
+### Amendment 1 to E18 — the ceiling was set from a bad estimate
+
+The 2,50 $ ceiling in E18 came from a per-document estimate that left out two
+things, and the first forty-three calls measured both:
+
+* **the gleaning pass.** Nano extracts entities, then runs a second pass over the
+  same chunk to catch what the first missed. That is 1 050 calls for 525 chunks,
+  not 525, and the protocol keeps it because it is the setting a user gets.
+* **the query cost.** `local` costs two calls per question and `naive` one, and
+  neither was in the per-document figure.
+
+Measured over 43 calls: **0,00164 $ per call**, so 1,72 $ of extraction, 0,30–0,50 $
+of entity and community summaries, 0,70–0,90 $ of queries — **2,9–3,1 $ in total**
+for a build and a question set that the protocol had capped at 2,50 $.
+
+The ceiling is raised to **3,20 $**. The configuration does not change: gleaning
+stays, the chunk size stays, the modes stay. Only the number that was wrong is
+corrected, and no quality number existed when it was corrected — the build had
+produced 43 extraction calls and nothing else.
+
+One throughput setting does change, and it changes nothing a system can see:
+concurrency from 4 to 12 in-flight model calls. At `temperature=0` a chunk's
+extraction does not depend on how many other chunks are in flight, and the calls
+are independent by construction, so the run is the same run in less wall clock.
+The paused build had spent 0,0704 $ in 43 calls; that spend stays in the meter and
+in the report.
