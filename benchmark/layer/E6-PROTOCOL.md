@@ -101,3 +101,42 @@ could plausibly use, then the claim layer is coverage-neutral, and the only
 remaining argument for it is latency, cost per query and the refusal behaviour —
 not answer quality. That would be said in the same words, in `LAYER.md`, before
 anyone else says it.
+
+## Amendments, recorded before the full run
+
+The design above did not change. Two things about *running* it did, both found
+by the smoke and both recorded here before the ninety-six questions were asked.
+
+### Amendment 1 — the token budget (harness defect)
+
+At `max_tokens = 120` the three smoke questions returned **empty content** with
+`finish_reason = length`. Inspection of the raw response object shows why: this
+model emits `reasoning_content` before the answer, and the budget was spent on
+the reasoning. The three rows were padded from the dense order, which is
+indistinguishable from the baseline in the log — a silent failure dressed as a
+measurement. `max_tokens` is therefore 1500, and an empty content is now recorded
+as an error (`error = "empty content (finish_reason=…)"`) rather than counted as
+an answer. Padding stays, because a failed call must not leave the denominator.
+
+### Amendment 2 — the reasoning level
+
+With the budget fixed, one smoke question still spent all 1500 tokens reasoning
+and returned nothing. `reasoning_effort = "none"` answers the same question with
+31 completion tokens instead of 1500 (5,8 s instead of 24 s), and the ten
+indices it names differ from the `low` effort by two positions. Listwise ranking
+needs no chain of thought; the setting is fixed at `"none"` and applied to every
+question. It is recorded in the summary of the run.
+
+### The measured projection
+
+Five questions at the final configuration (60 candidates, `effort = none`,
+`max_tokens = 1500`): 38 793 prompt tokens, 155 completion tokens, **0,00591 $**,
+zero errors, zero padding. Extrapolated to 96 questions: **0,1135 $**, inside the
+authorised 0,13 $.
+
+Those five read 78,18 % against `cover` on the same sixty candidates at 84,15 %
+and the exact oracle at 90,94 %. Five questions are not a result, they are the
+first five in the selection's own order and not a sample, and the decision rule
+above is not touched by them. They are recorded here so that nobody can say the
+number surprised us later.
+
