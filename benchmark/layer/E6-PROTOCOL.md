@@ -538,3 +538,55 @@ statement only adds overhead.
 At five thousand characters the published configuration covers **74,75 %** of the
 gold answer facts on the test half in 4 952 characters, against the floor's
 71,44 % in 4 800.
+
+### The whole slice, all 192 questions, every system in the same table
+
+Dev and test merged, paired on the question, strict (a refusal is a zero, never a
+missing row). Tokens are the median over questions the system answered.
+
+| system | tokens | refusal | strict recall | precision | strict F1 |
+|---|---:|---:|---:|---:|---:|
+| GraphRAG (generated answer) | 420 | 15,62 % | 65,20 | **11,25** | **17,99** |
+| ours, statement, 2 000 ch | 493 | 0 % | 63,78 | 7,66 | 12,38 |
+| ours, statement, 5 000 ch | 1 250 | 0 % | **74,81** | 4,95 | 8,68 |
+| ours, statement, 10 000 ch | 2 515 | 0 % | 81,23 | 3,42 | 6,25 |
+| ours, statement, 14 830 ch | 3 735 | 0 % | 84,30 | 2,69 | 5,02 |
+| sentences, 2 000 ch | 446 | 0 % | 57,49 | 8,53 | 13,24 |
+| sentences, 5 000 ch | 1 188 | 0 % | 74,45 | 5,10 | 8,92 |
+| sentences, 10 000 ch | 2 446 | 0 % | 82,43 | 3,28 | 6,03 |
+| sentences, 14 830 ch | 3 654 | 0 % | **86,37** | 2,60 | 4,88 |
+| passages (floor), 5 000 ch | 1 200 | 0 % | 71,07 | 5,85 | 10,09 |
+| passages (floor), 14 830 ch | 3 308 | 0 % | 83,74 | 3,40 | 6,27 |
+
+Paired against GraphRAG on the same 192 questions:
+
+| config | strict recall | difference from GraphRAG |
+|---|---:|---|
+| statement, 2 000 ch | 63,78 % | −1,41 [−6,5; +3,6] |
+| statement, 5 000 ch | 74,81 % | **+9,62 [+4,9; +14,7]** |
+| statement, 10 000 ch | 81,23 % | **+16,04 [+11,4; +20,9]** |
+| statement, 14 830 ch | 84,30 % | **+19,11 [+14,6; +23,8]** |
+
+Paired against the sentence floor, which is the bar that matters:
+
+| config | statement | sentences | difference |
+|---|---:|---:|---|
+| 2 000 ch | 63,78 % | 57,49 % | **+6,29 [+3,7; +9,0]** |
+| 5 000 ch | 74,81 % | 74,45 % | +0,36 [−1,4; +2,0] |
+| 10 000 ch | 81,23 % | 82,43 % | −1,20 [−2,8; +0,3] |
+| 14 830 ch | 84,30 % | 86,37 % | −2,07 [−3,4; −0,8] |
+
+That is the whole result in two rows of a table. **The layer is better than a
+sentence index only where the budget is tight** — six points at two thousand
+characters, a tie at five, and it loses from ten thousand upward. And it is ahead
+of GraphRAG by nine to nineteen points from five thousand characters upward, on a
+comparison where GraphRAG declines one question in seven and this layer declares
+nothing.
+
+Neither of those is the claim the pilot publishes. The published claim is the
+cost one, because it is the only one where the margin is not a matter of degree:
+
+**at 74,81 % strict coverage this layer spends zero API tokens per query and
+1 250 context tokens; GraphRAG spends 11 807 API tokens per query and never
+reaches that coverage at all — its ceiling is 65,20 % and its refusal rate is
+15,62 %.**
