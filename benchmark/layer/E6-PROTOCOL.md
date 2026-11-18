@@ -647,6 +647,20 @@ can be decided on quality and build cost alone.
 **Ceiling: 2 $.** The build is stopped and reported as incomplete if the meter
 passes it. Nothing about the query phase can cost money.
 
+### Amendment 4 to E16 — the first build truncated, and was thrown away
+
+The implementation capped a summariser's input at 24 000 characters so a cluster
+could not run away with the bill. The first build then recorded **37 of the 60
+level-one clusters at the cap**, which means the majority of the tree summarised
+the head of a cluster rather than the cluster. That is a different algorithm, not
+a cheaper one: the paper does not truncate.
+
+The cap was removed, the truncated tree moved to `raptor-capped/`, and the build
+was run again with no effective ceiling. Both builds are paid for and both costs
+are reported; the capped one is superseded and is not scored. This is recorded
+before any quality number exists for either tree, so the choice cannot be read as
+picking the better run.
+
 ### What each outcome means, written before the run
 
 - **RAPTOR ahead at 5 000 characters with an interval excluding zero** — the
