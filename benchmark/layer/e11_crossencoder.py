@@ -39,7 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from benchmark.layer import claim_vectors, select  # noqa: E402
 from benchmark.layer.budget import prefix_cut  # noqa: E402
 from benchmark.retrieval.dense import E5_LARGE_V2, SentenceEncoder  # noqa: E402
-from benchmark.retrieval.metrics import answer_fact_coverage  # noqa: E402
+from benchmark.retrieval.metrics import answer_fact_coverage, answer_fact_support  # noqa: E402
 
 MODEL_ID = "BAAI/bge-reranker-v2-m3"
 BUDGETS = (2000, 5000, 10000, 14830)
@@ -105,40 +105,54 @@ def tables(rows: list[dict], items: list[dict], rng) -> list[dict]:
         for budget in BUDGETS:
             per_order = {}
             for name in ("cover", "ce"):
-                values, chars, counts = {}, [], []
+                values, supports, chars, counts = {}, {}, [], []
                 for item in items:
                     order = rows[item["qid"]][name][unit]
                     kept = prefix_cut(order, budget)
                     values[item["qid"]] = answer_fact_coverage(item["gold_facts"], kept)
+                    supports[item["qid"]] = answer_fact_support(item["gold_facts"], kept)
                     chars.append(sum(len(k) for k in kept))
                     counts.append(len(kept))
                 per_order[name] = {
                     "coverage": round(statistics.mean(values.values()) * 100, 2),
+                    "support": round(statistics.mean(supports.values()) * 100, 2),
                     "characters_median": int(statistics.median(chars)),
                     "units_median": int(statistics.median(counts)),
                     "values": values,
+                    "supports": supports,
                 }
             base = per_order["cover"]["values"]
+            base_support = per_order["cover"]["supports"]
             diff = [per_order["ce"]["values"][q] - base[q] for q in base]
             lo, hi = paired(diff, rng)
             per_order["ce"]["delta"] = round(statistics.mean(diff) * 100, 2)
             per_order["ce"]["ci_low"] = round(float(lo) * 100, 2)
             per_order["ce"]["ci_high"] = round(float(hi) * 100, 2)
+            sdiff = [per_order["ce"]["supports"][q] - base_support[q] for q in base_support]
+            slo, shi = paired(sdiff, rng)
+            per_order["ce"]["support_delta"] = round(statistics.mean(sdiff) * 100, 2)
+            per_order["ce"]["support_ci_low"] = round(float(slo) * 100, 2)
+            per_order["ce"]["support_ci_high"] = round(float(shi) * 100, 2)
             print(f"--- {unit} @ {budget} ---")
             for name, row in per_order.items():
                 extra = (
                     f"  d {row['delta']:+6.2f} [{row['ci_low']:+.1f}; {row['ci_high']:+.1f}]"
                     if "delta" in row else ""
                 )
+                support = (
+                    f"  support {row['support']:6.2f}%  ds {row['support_delta']:+6.2f}"
+                    f" [{row['support_ci_low']:+.1f}; {row['support_ci_high']:+.1f}]"
+                    if "support_delta" in row else f"  support {row['support']:6.2f}%"
+                )
                 print(
                     f"  {name:6s} {row['coverage']:6.2f}%  chars {row['characters_median']:5d}"
-                    f"  units {row['units_median']:3d}{extra}"
+                    f"  units {row['units_median']:3d}{support}{extra}"
                 )
             table.append({
                 "unit": unit,
                 "budget": budget,
                 "orders": {
-                    name: {k: v for k, v in row.items() if k != "values"}
+                    name: {k: v for k, v in row.items() if k not in ("values", "supports")}
                     for name, row in per_order.items()
                 },
             })
@@ -177,8 +191,8 @@ def main(argv: list[str] | None = None) -> int:
     orders_path = layer / f"runs/e11-orders.{args.half}.jsonl"
     if args.fresh and orders_path.exists():
         orders_path.unlink()
-    done = {} if args.score_only else read_rows(orders_path)
-    todo = [item for item in items if item["qid"] not in done]
+    done = read_rows(orders_path)
+    todo = [] if args.score_only else [item for item in items if item["qid"] not in done]
     if done:
         print(f"{len(done)} questions already scored, {len(todo)} to go", file=sys.stderr)
 
