@@ -314,3 +314,47 @@ read, and the family was chosen on dev.
 
 
 
+
+### E11 — a real cross-encoder: negative
+
+`BAAI/bge-reranker-v2-m3`, revision `953dc6f6f85a`, **fp32**, `max_length = 256`,
+reranking the frozen pool of one hundred, one pair per candidate, on a 4 GB
+laptop GPU. Local: **0 $**. Ninety-six dev questions, two units, four budgets.
+
+| budget | quote: cover → CE | statement: cover → CE |
+|---|---|---|
+| 2 000 | 55,62 → 47,90 (−7,71 [−11,1; −4,2]) | 65,31 → 63,68 (−1,62 [−3,2; −0,0]) |
+| 5 000 | 70,83 → 59,47 (−11,36 [−13,8; −8,8]) | 74,73 → 74,43 (−0,30 [−1,3; +0,7]) |
+| 10 000 | 77,96 → 69,10 (−8,86 [−10,5; −7,2]) | 79,72 → 79,80 (+0,08 [−0,0; +0,2]) |
+| 14 830 | 80,31 → 74,59 (−5,71 [−7,1; −4,4]) | 79,83 → 79,83 (0,00) |
+
+The last two rows of the statement column are the whole pool fitting in the
+budget: when the cut keeps everything, order cannot matter and the two columns
+are the same number by construction. The only rows where a reranker could change
+anything are the first two, and it loses both.
+
+That is now **two** independent rerankers losing on this corpus: the generic
+`ms-marco-MiniLM-L-6` in E5 (−1,9 pp) and a modern 0,6 B multilingual reranker
+here. The conclusion is not "rerankers are bad". It is narrower and more useful:
+the greedy selector optimises the quantity the metric measures — coverage of the
+tokens the question and the gold facts share — while a relevance scorer optimises
+something else, and demotes claims that carry answer tokens the question does not
+name. When the metric is token coverage, a reranker trained on relevance is a
+different objective, not a better one.
+
+### The configuration this selects
+
+The rule in Amendment 3 asks for the highest dev coverage at 5 000 characters,
+with the simpler component on a tie. The candidates measured on dev:
+
+| at 5 000 characters | dev coverage | verdict |
+|---|---|---|
+| quote, frozen `cover` | 70,83 % | loses to the statement |
+| **statement, frozen `cover`** | **74,73 %** | **chosen** |
+| statement, cross-encoder | 74,43 % (−0,30 [−1,3; +0,7]) | tie, more machinery |
+| quote, cross-encoder | 59,47 % | loses badly |
+
+The configuration published on test is therefore the **frozen ranker, rendered as
+statements, cut by the character budget**. No new selector was chosen, so by the
+E8 section's own rule the fresh slice is not run: the test read is E9's rendering
+curve on the existing half, declared as such.
