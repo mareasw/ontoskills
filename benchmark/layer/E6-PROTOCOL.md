@@ -687,6 +687,10 @@ the table:
 | 10 000 | **82,14 %** | 81,23 % | +0,91 [−0,5; +2,4] | −0,29 [−1,5; +1,0] | +3,10 |
 | 14 830 | **85,51 %** | 84,30 % | +1,21 [−0,1; +2,6] | −0,86 [−1,9; +0,2] | +1,77 |
 
+The two-thousand-character win is not a pooling artefact: measured separately the
+two halves give dev +6,52 [+2,8; +10,3] and test +5,12 [+1,7; +8,6], both
+excluding zero.
+
 The pre-registered rule fires on the second branch: **the interval at five
 thousand characters contains zero, so this is published as a tie, not a win.**
 Two entirely different ways of compressing a corpus — clustering and
@@ -772,6 +776,10 @@ questions:
 Cost per claim is its document's metered bill divided by that document's verified
 claims: the compiler bills per document, and within a document there is no better
 attribution than "these claims came out of this bill".
+
+The run is deterministic and was executed twice, giving identical counts at every
+budget (2 754 / 4 770 / 6 386 / 7 279 claims); the second run added only the
+per-document profile.
 
 ### The answer: very little. 18 % of the bill goes unread, and it is spread thin.
 
