@@ -605,3 +605,58 @@ It is a claim about cost at a given accuracy. It is not a claim about accuracy a
 a given size of context, where GraphRAG's generated answer is denser, and it is
 not a claim of state of the art: it is four systems on one corpus, measured
 honestly, with the row that beats us in the same table.
+
+---
+
+## E16 — RAPTOR: the competitor that shares our premise
+
+Declared **before** the build, in this commit, with no number from the run known.
+
+RAPTOR (Sarthi et al., ICLR 2024) is the only competitor in reach that does what
+this layer does: it spends a model at build time to produce compressed,
+question-independent text units, and then answers at query time without a model.
+Comparing against it is therefore the only comparison that tests the *claim*
+rather than the category. GraphRAG writes an answer; a sentence index does not
+compress; RAPTOR compresses, and it decides how to compress with clustering
+instead of with claims.
+
+If RAPTOR beats the claim layer at equal characters, then "the claims are the
+better compression" is false and this document will say so in the same place it
+says everything else.
+
+### The configuration, fixed here
+
+| choice | value | why |
+|---|---|---|
+| chunk | 400 characters, 80 overlap | the paper's 100 tokens / 20 overlap at four characters per token |
+| embedding | `intfloat/e5-large-v2`, revision `f169b11e`, fp32, 1 024 dims | the encoder this layer already uses, so the embedding is not a variable |
+| prefixes | `passage: ` for nodes, `query: ` for questions | E5 is trained this way; the competitor sidecar cannot do it, RAPTOR here can |
+| reduction | UMAP, 10 components, `metric="cosine"`, `random_state=42` | the paper's setting |
+| clustering | `GaussianMixture`, `covariance_type="spherical"`, components chosen by BIC over `2..min(60, n//10)` | the paper's setting, with a declared grid |
+| summarisation | the pilot's own model, `temperature=0`, `max_tokens=512`, 4 in flight | same model as our claims, so the comparison isolates the method |
+| levels | at most 3, stop when fewer than 8 nodes remain | the paper's tree is 2-3 levels on this corpus size |
+| retrieval | collapsed tree: cosine over **all** nodes, chunks and summaries together | the paper's default, and the only mode with no query-time model call |
+| cut | `prefix_cut` at 2 000 / 5 000 / 10 000 / 14 830 characters | the same cut as every other row in this document |
+| scoring | the same metric, the same 200 questions, the same gold facts | one instrument |
+
+Not run, and declared so no reader expects it: tree traversal, query-time
+summarisation, the "Q&A" mode, and any per-question adaptation. RAPTOR's query
+path here costs zero API tokens, exactly like ours, which is why this comparison
+can be decided on quality and build cost alone.
+
+**Ceiling: 2 $.** The build is stopped and reported as incomplete if the meter
+passes it. Nothing about the query phase can cost money.
+
+### What each outcome means, written before the run
+
+- **RAPTOR ahead at 5 000 characters with an interval excluding zero** — the
+  claim layer is not the better compression, its advantage over raw sentences is
+  a property of compression in general, and the published claim narrows to cost
+  and provenance. That is the outcome this document would have to carry.
+- **Interval containing zero** — both compress equally well at the operating
+  point, and the claim layer's advantage is that it costs 3-4× less to build and
+  emits provenance with every unit. Published as a tie, not a win.
+- **The claim layer ahead with an interval excluding zero** — the first
+  comparison in this pilot where a semantic method beats an implemented
+  alternative on quality at equal budget, and the only one that would license a
+  sentence about the method rather than about the price.
