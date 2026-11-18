@@ -674,3 +674,76 @@ picking the better run.
   comparison in this pilot where a semantic method beats an implemented
   alternative on quality at equal budget, and the only one that would license a
   sentence about the method rather than about the price.
+
+### E16 — the result: a tie at the operating point, and the prediction was wrong
+
+All 192 questions, paired, RAPTOR's collapsed tree against the rows already on
+the table:
+
+| budget | RAPTOR | ours, statement | difference | vs sentences | vs floor |
+|---|---:|---:|---|---|---|
+| 2 000 | 57,97 % | **63,78 %** | **−5,82 [−8,3; −3,3]** | +0,48 [−2,2; +3,1] | −12,98 |
+| 5 000 | 73,91 % | 74,81 % | −0,91 [−2,6; +0,8] | −0,55 [−2,2; +1,1] | +2,83 |
+| 10 000 | **82,14 %** | 81,23 % | +0,91 [−0,5; +2,4] | −0,29 [−1,5; +1,0] | +3,10 |
+| 14 830 | **85,51 %** | 84,30 % | +1,21 [−0,1; +2,6] | −0,86 [−1,9; +0,2] | +1,77 |
+
+The pre-registered rule fires on the second branch: **the interval at five
+thousand characters contains zero, so this is published as a tie, not a win.**
+Two entirely different ways of compressing a corpus — clustering and
+summarising, against extracting and verifying claims — land within one point of
+each other at the budget the pilot uses.
+
+**The prediction attached to that branch was wrong, and it was wrong in the
+opposite direction.** This document said a tie would mean the claim layer's
+advantage is that it "costs 3-4× less to build". It costs **39× more**:
+
+| | build tokens | build $ | metered build | compressed units |
+|---|---:|---:|---:|---:|
+| RAPTOR | 608 915 | **0,1047** | 2 min 25 s | 66 summaries |
+| ours | 7 916 415 | 4,1115 | 2 h 12 min | 9 295 statements |
+| GraphRAG | 24 364 897 | 11,0889 | 21 h 19 min | — |
+
+Per document RAPTOR costs 0,000375 $ and this layer 0,01474 $. That is not a
+rounding difference: the claim build runs 880 calls to extract, verify and
+reconcile; RAPTOR runs 66 calls to summarise clusters. On this metric the 880
+calls buy **no coverage above five thousand characters**.
+
+### What RAPTOR actually returns, and why it matters for reading the table
+
+The collapsed tree ranks every node together, and on this corpus the leaves win:
+the units kept at each budget are **89-92 % raw 400-character chunks** and only
+8-11 % summaries. RAPTOR's row is therefore mostly dense retrieval over chunks
+with a seasoning of summarisation, not the compressed artifact alone. Scoring the
+compressed nodes by themselves gives the other half of the picture:
+
+| budget | summaries only | collapsed tree | ours, statement |
+|---|---:|---:|---:|
+| 2 000 | 42,24 % | 57,97 % | **63,78 %** |
+| 5 000 | 52,47 % | 73,91 % | **74,81 %** |
+| 10 000 | 63,34 % | 82,14 % | 81,23 % |
+| 14 830 | 67,90 % | 85,51 % | 84,30 % |
+
+Sixty-six summaries cannot cover 279 documents at a five-thousand-character
+budget: they are too few and too coarse. The claim layer's compression is about
+two orders of magnitude finer — 9 295 units averaging eighty characters — and
+that is exactly what wins at two thousand characters, where the budget is tight
+enough for granularity to be the binding constraint, and what stops mattering
+once there is room to return whole passages.
+
+### The reading
+
+Three extractive methods — a sentence index, dense chunk retrieval with a summary
+tree, and a verified claim layer — converge at **74-75 %** at five thousand
+characters and **81-86 %** at fourteen thousand. The differences between them
+there are within noise. Above that budget the method is not what decides the
+number; the volume of text returned is.
+
+The claim layer is the best of the three at **two thousand characters**, by 5,8
+points over RAPTOR and 6,3 over sentences, and that is the only place where the
+extra build money shows up in coverage at all.
+
+What the coverage metric cannot see is the thing the extra money actually buys:
+every unit this layer returns resolves to a document, a quotation and a claim
+identifier, and RAPTOR's summary resolves to a cluster. That is a product
+property, not a benchmark result, and the pilot does not get to call it a win it
+did not measure.
