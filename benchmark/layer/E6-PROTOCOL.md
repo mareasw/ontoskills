@@ -700,7 +700,7 @@ advantage is that it "costs 3-4× less to build". It costs **39× more**:
 | | build tokens | build $ | metered build | compressed units |
 |---|---:|---:|---:|---:|
 | RAPTOR | 608 915 | **0,1047** | 2 min 25 s | 66 summaries |
-| ours | 7 916 415 | 4,1115 | 2 h 12 min | 9 295 statements |
+| ours | 7 916 415 | 4,1115 | 2 h 12 min | 9 295 statements (9 104 verified, the ones the ranker reads) |
 | GraphRAG | 24 364 897 | 11,0889 | 21 h 19 min | — |
 
 Per document RAPTOR costs 0,000375 $ and this layer 0,01474 $. That is not a
@@ -725,7 +725,7 @@ compressed nodes by themselves gives the other half of the picture:
 
 Sixty-six summaries cannot cover 279 documents at a five-thousand-character
 budget: they are too few and too coarse. The claim layer's compression is about
-two orders of magnitude finer — 9 295 units averaging eighty characters — and
+two orders of magnitude finer — 9 104 verified units averaging eighty-eight characters — and
 that is exactly what wins at two thousand characters, where the budget is tight
 enough for granularity to be the binding constraint, and what stops mattering
 once there is room to return whole passages.
