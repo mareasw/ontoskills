@@ -587,6 +587,21 @@ Neither of those is the claim the pilot publishes. The published claim is the
 cost one, because it is the only one where the margin is not a matter of degree:
 
 At **74,81 %** strict coverage this layer spends **zero** API tokens per query and
-1 250 context tokens. GraphRAG spends **11 807** API tokens per query and never
-reaches that coverage at all: its ceiling is 65,20 %, and it declines 15,62 % of
-the questions.
+1 250 context tokens. GraphRAG spends **11 807** API tokens per query and does not
+reach that number strictly at all: its strict ceiling is 65,20 %, because it
+declines 15,62 % of the questions.
+
+The strict view is not the only fair one, so here is the same question with the
+refusals removed from both sides. On the 162 questions GraphRAG answers, its
+coverage is **77,27 %**. The sentence above that point costs this layer about
+**1 700 context tokens** and **zero** API tokens; the same coverage costs GraphRAG
+**11 807** API tokens and 420 context tokens. That is the claim in the form the
+pilot can defend:
+
+> **at equal accuracy, this layer consumes about seven times fewer tokens per
+> question — 1 700 against 12 227 — and 2,8 times fewer dollars to build.**
+
+It is a claim about cost at a given accuracy. It is not a claim about accuracy at
+a given size of context, where GraphRAG's generated answer is denser, and it is
+not a claim of state of the art: it is four systems on one corpus, measured
+honestly, with the row that beats us in the same table.
