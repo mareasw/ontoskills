@@ -1,7 +1,8 @@
 """E6: the same ranker and the floor at an identical character cap.
 
-The budget is a rendering, not a selector: the frozen ranker orders the same ten
-claims and this cuts the prefix that fits. The floor's rows are the already
+The budget is a rendering, not a selector: the frozen ranker orders the same
+claim path and this cuts the prefix that fits, exactly as `score.py` cuts the
+floor's passages. The floor's rows are the already
 measured `floor.budget-*.score.json`, restricted to the same half. Differences
 are paired per question, with a percentile bootstrap over questions.
 
@@ -23,26 +24,12 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from benchmark.layer import claim_vectors, select  # noqa: E402
+from benchmark.layer.budget import prefix_cut  # noqa: E402
 from benchmark.retrieval.dense import E5_LARGE_V2, SentenceEncoder  # noqa: E402
 from benchmark.retrieval.metrics import answer_fact_coverage  # noqa: E402
 
 BUDGETS = (5000, 10000, 14830, 20000, 45000)
 SEED = 20261118
-
-
-def fill(quotes, budget):
-    """The longest prefix of the ordered quotes that fits the cap."""
-    total, kept = 0, []
-    for quote in quotes:
-        if not quote:
-            continue
-        if total + len(quote) > budget and kept:
-            continue
-        if total + len(quote) > budget and not kept:
-            return [quote]
-        kept.append(quote)
-        total += len(quote)
-    return kept
 
 
 def floor_rows(score, half_set):
@@ -85,16 +72,22 @@ def main(argv: list[str] | None = None) -> int:
         for budget in BUDGETS
     }
 
+    # The path is computed once per question: a curve over five budgets is one
+    # ordering cut five times, not five rankers.
+    paths: dict[str, list[str]] = {}
+    for item in items:
+        query = encoder.encode_query(item["text"])
+        pool = corpus.search(item["text"], limit=select.DEPTH)
+        dense = select.dense_order(pool, row_of, matrix, query)
+        chosen = select.cover(dense, corpus, item["text"], 100)
+        paths[item["qid"]] = [c.quote or "" for c in chosen]
+
     rng = np.random.default_rng(SEED)
     table = []
     for budget in BUDGETS:
         values, chars = {}, []
         for item in items:
-            query = encoder.encode_query(item["text"])
-            pool = corpus.search(item["text"], limit=select.DEPTH)
-            dense = select.dense_order(pool, row_of, matrix, query)
-            chosen = select.cover(dense, corpus, item["text"], 100)
-            quotes = fill([c.quote for c in chosen], budget)
+            quotes = prefix_cut(paths[item["qid"]], budget)
             values[item["qid"]] = answer_fact_coverage(item["gold_facts"], quotes)
             chars.append(sum(len(q) for q in quotes))
         floor = floors[budget]

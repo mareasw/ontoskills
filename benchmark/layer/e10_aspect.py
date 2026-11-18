@@ -39,6 +39,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from benchmark.layer import claim_vectors, select  # noqa: E402
+from benchmark.layer.budget import prefix_cut  # noqa: E402
 from benchmark.retrieval.dense import E5_LARGE_V2, SentenceEncoder  # noqa: E402
 from benchmark.retrieval.metrics import answer_fact_coverage  # noqa: E402
 
@@ -57,21 +58,6 @@ def render(claim, unit: str) -> str:
     if unit == "statement":
         return statement
     raise ValueError(unit)
-
-
-def fill(units, budget):
-    """The longest prefix of rendered units that fits the cap."""
-    total, kept = 0, []
-    for text in units:
-        if not text:
-            continue
-        if total + len(text) > budget:
-            if kept:
-                continue
-            return [text]
-        kept.append(text)
-        total += len(text)
-    return kept
 
 
 def spherical_kmeans(matrix: np.ndarray, n_clusters: int, rng) -> np.ndarray:
@@ -141,14 +127,14 @@ def order_aspect(citations, matrix, row_of, clusters, head=HEAD, cover_first=Fal
     if cover_first and corpus is not None:
         ordered = []
         for group in groups:
-            picked = select.cover([citations[i] for i in group], corpus, question, k=len(group))
-            by_index = {id(c): i for c, i in zip([citations[i] for i in group], group)}
-            ordered.append([by_index[id(c)] for c in picked])
+            position_of = {citations[index].claim_id: index for index in group}
+            picked = select.cover(
+                [citations[index] for index in group], corpus, question, k=len(group)
+            )
+            ordered.append([position_of[citation.claim_id] for citation in picked])
         groups = ordered
-    head_order = round_robin(groups)
-    seen = set(head_order)
-    return [citations[i] for i in head_order] + [
-        citations[i] for i in range(n, len(citations)) if i not in seen
+    return [citations[i] for i in round_robin(groups)] + [
+        citations[i] for i in range(n, len(citations))
     ]
 
 
@@ -159,10 +145,8 @@ def order_doc(citations, head=HEAD):
     for index in range(n):
         grouped.setdefault(citations[index].doc_id, []).append(index)
     groups = sorted(grouped.values(), key=lambda group: group[0])
-    head_order = round_robin(groups)
-    seen = set(head_order)
-    return [citations[i] for i in head_order] + [
-        citations[i] for i in range(n, len(citations)) if i not in seen
+    return [citations[i] for i in round_robin(groups)] + [
+        citations[i] for i in range(n, len(citations))
     ]
 
 
@@ -174,7 +158,7 @@ def paired(diff, rng):
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--layer", type=Path, default=Path("/tmp/opencode/layer"))
+    parser.add_argument("--layer", type=Path, required=True)
     parser.add_argument("--half", default="dev", choices=("dev", "test", "all"))
     parser.add_argument("--json", type=Path, default=None)
     parser.add_argument("--device", default=None)
@@ -221,7 +205,7 @@ def main(argv: list[str] | None = None) -> int:
                 for item in items:
                     rendered = [render(by_id.get(c.claim_id), unit)
                                 for c in orders[item["qid"]][name] if by_id.get(c.claim_id)]
-                    kept = fill(rendered, budget)
+                    kept = prefix_cut(rendered, budget)
                     values[item["qid"]] = answer_fact_coverage(item["gold_facts"], kept)
                     chars.append(sum(len(k) for k in kept))
                     counts.append(len(kept))

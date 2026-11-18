@@ -205,4 +205,65 @@ That is the claim the pilot can defend: **in the small-context regime the
 compressed layer is not just cheaper and faster, it is better; outside it, volume
 wins.** Not superior overall, and not a state of the art.
 
+## Amendment 3 — the cut was not the floor's cut
+
+Found by auditing the harness after the first E6 table was written, and it
+invalidates that table rather than the conclusion being assumed to survive.
+
+`score.py::returned_text` cuts a system at the **first** item that does not fit
+the budget, keeping the first item whole. The scripts that produced the curves
+above did something different: when a unit did not fit, they skipped it and
+continued with the next, smaller one. That is packing, not truncation. It buys
+text the floor is not allowed to buy, and the difference lands in the coverage
+column as if it were quality.
+
+The cut now lives in one place, `budget.py::prefix_cut`, mirrors `returned_text`
+line by line, and is pinned by `test_layer_budget.py`. Every curve in this
+document is regenerated with it. The superseded numbers are kept in
+`pilot-artifacts/e6-e7/` and are identified as superseded there; the tables in
+this document are the corrected ones.
+
+The same audit found three smaller defects, all fixed before the numbers below
+were produced: E9 called a packing loop "the longest prefix"; E11 wrote its rows
+only at the end of a thirty-minute run and could lose all of them to a restart
+(the same defect E7 had); and E11 reported a model id without the commit its
+weights came from.
+
+## E9, E10, E11 — declared before the dev run
+
+Three rungs, all local, no API spend. The first two change what is *returned*,
+the third changes the *order*. The family and the metrics were fixed in the
+scripts' docstrings at commit `b1d8eef`, before any of them ran.
+
+* **E9 — rendering at an identical budget.** The frozen order, cut by
+  `prefix_cut`, with each chosen claim rendered four ways: `quote` (the product's
+  current unit), `statement`, `statement+quote`, `all-quotes`. Budgets 2 000,
+  5 000, 10 000 and 14 830 characters.
+* **E10 — one slot per aspect.** Four orders over the same pool: the frozen
+  `cover`, `aspectN` (the top sixty clustered by claim vector, then read
+  round-robin so every aspect gets a slot before any gets two, N in 8/10/20),
+  `aspectN-cover` (the same clusters, greedily ordered inside each), and
+  `doc-round` (the document as the aspect).
+* **E11 — a real cross-encoder.** `BAAI/bge-reranker-v2-m3` at a pinned revision,
+  fp32, `max_length = 256`, reranking the frozen pool of one hundred. The pair
+  scored is the question and the text that would be returned, so the statement
+  and the quote each get their own order. The tail beyond the reranked pool keeps
+  the frozen order.
+
+### The rule that picks the configuration for the test read
+
+Fixed here, before E11's dev run finished:
+
+> The configuration published on the test half is the one with the highest dev
+> coverage at **5 000 characters** among the declared family — rendering
+> (`quote`, `statement`) crossed with order (`cover`, cross-encoder) — with a
+> preference for the simpler component on a difference whose paired interval
+> contains zero. The whole budget curve of the chosen configuration is published
+> on test, not only the winning cell, and the losing cells are published on dev.
+
+The test half has already been read once for the frozen ranker's ten-claim
+operating point and once for the E6 budget curve; this is its third and last
+read, and the family was chosen on dev.
+
+
 
