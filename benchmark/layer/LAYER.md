@@ -495,6 +495,37 @@ is an outcome, and counting it as a zero would be a different measurement, so
 it is reported in its own column: the false-refusal rate is a share of the
 answerable questions, and abstention a share of the unanswerable ones.
 
+### 7.0 The table above is not the comparison you want, and the replacement is
+
+Two things in it are misleading, and both were found after publication.
+
+**The volumes are not equal.** This layer returns 4 948 characters, the floor
+returns 45 885. At equal volume the floor's advantage is much smaller and the
+"volume wins" sentence in §7 is the correct reading only of the 45 885-character
+column. `E6-PROTOCOL.md` carries the corrected curve, cut the way the floor cuts:
+parity at five and ten thousand characters, a loss from fourteen thousand upward.
+
+**The unit is not optimised.** Every row above renders each chosen claim as its
+first quotation. Rendering it as the claim's own one-sentence statement, at the
+same character budget, is worth +5,33 points on the test half at two thousand
+characters and +2,22 at five thousand, both with intervals that exclude zero.
+
+With those two corrections, over all 192 questions and all systems on the same
+questions, the defensible claim is a cost claim:
+
+> at equal accuracy — 77,3 % of the gold answer facts — this layer consumes about
+> 1 700 context tokens and **zero** API tokens per question, against 12 227 tokens
+> for GraphRAG, of which 11 807 are paid; and it costs 4,11 $ to build the corpus
+> against 11,09 $, in 2 h 12 against 21 h 19.
+
+The row that beats us is printed with it: on the 162 questions GraphRAG answers,
+its generated answer reaches the same coverage while occupying a fifth of the
+context, and it is denser on precision. A generated answer is a denser artifact;
+an evidence layer that never refuses and costs nothing per query is a different
+one. `E6-PROTOCOL.md` §"The token account" has every number and the sentence floor
+— BM25 over raw sentences, no model, no dollars — that matches this layer at five
+thousand characters and beats it above.
+
 ## By question kind
 
 **ontoskills**, by question kind (evidence, k=10):
