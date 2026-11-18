@@ -413,7 +413,9 @@ def background_types(layer: Path, share: float = 0.5) -> set[str]:
     return {token for token, count in counts.items() if count > limit}
 
 
-def score(layer: Path, half: str, source: str | None = None) -> int:
+def score(
+    layer: Path, half: str, source: str | None = None, only_summaries: bool = False
+) -> int:
     selection = json.loads((layer / "corpus/selection.json").read_text(encoding="utf-8"))
     split = json.loads((layer / "runs/split.json").read_text(encoding="utf-8"))
     wanted = None if half == "all" else set(split[half])
@@ -427,7 +429,15 @@ def score(layer: Path, half: str, source: str | None = None) -> int:
     for line in path.read_text(encoding="utf-8").splitlines():
         if line.strip():
             row = json.loads(line)
-            rows[row["qid"]] = row["evidence"]
+            if only_summaries:
+                # The compressed artifact alone, in the order the tree ranked it.
+                rows[row["qid"]] = [
+                    text
+                    for text, level in zip(row["evidence"], row["levels"])
+                    if int(level) >= 1
+                ]
+            else:
+                rows[row["qid"]] = row["evidence"]
 
     background = background_types(layer)
     table = []
@@ -477,11 +487,12 @@ def score(layer: Path, half: str, source: str | None = None) -> int:
             flush=True,
         )
 
-    out = layer / "runs" / f"raptor-score-{half}.json"
+    suffix = "-summaries" if only_summaries else ""
+    out = layer / "runs" / f"raptor-score-{half}{suffix}.json"
     out.write_text(
         json.dumps(
             {
-                "system": SYSTEM,
+                "system": SYSTEM + ("-summaries" if only_summaries else ""),
                 "half": half,
                 "questions": len(items),
                 "seed": SEED,
@@ -502,6 +513,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--phase", required=True, choices=("build", "ask", "score"))
     parser.add_argument("--half", default="all", choices=("dev", "test", "all"))
     parser.add_argument("--device", default=None)
+    parser.add_argument("--only-summaries", action="store_true",
+                        help="score the compressed nodes alone, no leaf chunks")
     parser.add_argument(
         "--source", default=None,
         help="which evidence file to score; defaults to the half being scored",
@@ -512,7 +525,7 @@ def main(argv: list[str] | None = None) -> int:
         return build(args.layer, args.device)
     if args.phase == "ask":
         return ask(args.layer, args.half, args.device)
-    return score(args.layer, args.half, args.source)
+    return score(args.layer, args.half, args.source, args.only_summaries)
 
 
 if __name__ == "__main__":
