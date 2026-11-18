@@ -963,3 +963,21 @@ extraction does not depend on how many other chunks are in flight, and the calls
 are independent by construction, so the run is the same run in less wall clock.
 The paused build had spent 0,0704 $ in 43 calls; that spend stays in the meter and
 in the report.
+
+### Amendment 2 to E18 — a hardcoded model name stopped the first complete build
+
+The first full attempt ran extraction to the end (525 chunks, 1 036 calls,
+1,4432 $) and then died at the entity-summary stage with
+`422 invalid_model: unknown alias`. The cause is a default, not a choice: nano has
+two model hooks, `best_model_func` and `cheap_model_func`, and the second one
+defaults to a hardcoded `gpt-4o-mini`. The adapter had wired only the first, so
+the summaries asked the pilot's gateway for a model it does not serve.
+
+The 13 rejected calls generated no tokens — the meter records 0 input and 0 output
+for each — so the failure cost nothing beyond the wall clock.
+
+Every extracted chunk is in the adapter's disk cache, keyed on the exact request,
+so the rerun pays for the entity summaries and the community reports and not for
+the extraction again. Both hooks now point at the pilot's model, which is what
+E18 declared ("the pilot's own model") in the first place. The 1,4432 $ already
+spent stays in the report.
