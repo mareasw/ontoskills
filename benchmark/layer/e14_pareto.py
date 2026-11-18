@@ -62,9 +62,17 @@ def render(claim, unit: str) -> str:
     raise ValueError(unit)
 
 
-def type_precision(gold_types: set[str], returned: str) -> float:
-    """Of the distinct words returned, the share that the gold facts also use."""
-    seen = set(tokens(returned))
+def type_precision(gold_types: set[str], question_types: set[str], returned: str) -> float:
+    """Of the returned types the question does not already carry, the share the gold uses.
+
+    A word the question itself contains cannot be evidence of its answer, and
+    function words are in every text and in every gold fact. Counting both, as the
+    first version of this function did, measures English rather than retrieval: the
+    twenty most "precise" types came out as ``the, to, and, for, is``. Removing the
+    question's own vocabulary and the words the whole corpus shares leaves the
+    types that actually discriminate one answer from another.
+    """
+    seen = set(tokens(returned)) - question_types
     if not seen:
         return 0.0
     return len(seen & gold_types) / len(seen)
@@ -124,12 +132,15 @@ def sentence_rows(layer: Path, items: list[dict]) -> dict[str, list[str]]:
     }
 
 
-def score_row(item: dict, text: str, refused: bool) -> dict:
+def score_row(item: dict, text: str, refused: bool, stop: set[str] | None = None) -> dict:
     gold_types: set[str] = set()
     for fact in item["gold_facts"]:
         gold_types |= set(tokens(fact))
+    question_types = set(tokens(item["text"]))
+    if stop:
+        question_types |= stop
     recall = answer_fact_coverage(item["gold_facts"], text) if text else 0.0
-    precision = type_precision(gold_types, text) if text else 0.0
+    precision = type_precision(gold_types, question_types, text) if text else 0.0
     return {
         "qid": item["qid"],
         "chars": len(text),
@@ -141,6 +152,22 @@ def score_row(item: dict, text: str, refused: bool) -> dict:
         "support": answer_fact_support(item["gold_facts"], [text]) if text else 0.0,
         "refused": refused,
     }
+
+
+def common_types(layer: Path, share: float = 0.5) -> set[str]:
+    """Types that appear in more than `share` of the corpus documents.
+
+    A word in half the corpus cannot discriminate one answer from another, and
+    counting it as precision is counting English. The threshold is declared, not
+    tuned: half the documents, the point at which a type is background.
+    """
+    paths = sorted((layer / "corpus").glob("*.txt"))
+    counts: dict[str, int] = {}
+    for path in paths:
+        for token in set(tokens(path.read_text(encoding="utf-8"))):
+            counts[token] = counts.get(token, 0) + 1
+    limit = share * len(paths)
+    return {token for token, count in counts.items() if count > limit}
 
 
 def summarise(name: str, rows: list[dict]) -> dict:
@@ -155,8 +182,15 @@ def summarise(name: str, rows: list[dict]) -> dict:
         "questions": len(rows),
         "answered": len(answered),
         "refusal_rate": round((len(rows) - len(answered)) / len(rows) * 100, 2) if rows else 0.0,
-        "tokens_median": int(statistics.median(row["tokens"] for row in rows)) if rows else 0,
-        "words_median": int(statistics.median(row["words"] for row in rows)) if rows else 0,
+        # Volume is measured on the answers a system actually gives. Averaging the
+        # refusals in as zero-token rows would make abstaining look cheap, which is
+        # the one thing a Pareto reading must not reward.
+        "tokens_median": int(statistics.median(row["tokens"] for row in answered))
+        if answered
+        else 0,
+        "words_median": int(statistics.median(row["words"] for row in answered))
+        if answered
+        else 0,
         "recall_answered": round(mean(answered, "recall"), 2),
         "recall_strict": round(mean(strict, "recall"), 2),
         "precision_answered": round(mean(answered, "precision"), 2),
@@ -185,6 +219,7 @@ def main(argv: list[str] | None = None) -> int:
         if (wanted is None or i["qid"] in wanted) and i.get("gold_facts")
     ]
 
+    stop = common_types(layer)
     ours = ours_rows(layer, items, args.device, args.depth)
     sentence = sentence_rows(layer, items)
 
@@ -209,6 +244,7 @@ def main(argv: list[str] | None = None) -> int:
                     item,
                     "\n".join(prefix_cut(ours[item["qid"]][unit], budget)),
                     False,
+                    stop,
                 )
                 for item in items
             ]
@@ -218,7 +254,7 @@ def main(argv: list[str] | None = None) -> int:
 
     for budget in BUDGETS:
         rows = [
-            score_row(item, "\n".join(prefix_cut(floor[item["qid"]], budget)), False)
+            score_row(item, "\n".join(prefix_cut(floor[item["qid"]], budget)), False, stop)
             for item in items
         ]
         name = f"floor@{budget}"
@@ -227,7 +263,7 @@ def main(argv: list[str] | None = None) -> int:
 
     for budget in BUDGETS:
         rows = [
-            score_row(item, "\n".join(prefix_cut(sentence[item["qid"]], budget)), False)
+            score_row(item, "\n".join(prefix_cut(sentence[item["qid"]], budget)), False, stop)
             for item in items
         ]
         name = f"sentences@{budget}"
@@ -239,7 +275,7 @@ def main(argv: list[str] | None = None) -> int:
         row = graphrag.get(item["qid"])
         refused = bool(row and row.get("refused"))
         text = "" if refused or row is None else str(row.get("answer") or "")
-        rows.append(score_row(item, text, refused))
+        rows.append(score_row(item, text, refused, stop))
     table.append(summarise("graphrag", rows))
     detail["graphrag"] = rows
 
@@ -265,6 +301,8 @@ def main(argv: list[str] | None = None) -> int:
                 "seed": SEED,
                 "chars_per_token": CHARS_PER_TOKEN,
                 "depth": args.depth,
+                "background_types": len(stop),
+                "precision": "types not in the question and not in over half the corpus",
                 "rows": table,
                 "per_question": detail,
             },

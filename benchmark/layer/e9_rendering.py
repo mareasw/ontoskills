@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from benchmark.layer import claim_vectors, select  # noqa: E402
 from benchmark.layer.budget import prefix_cut  # noqa: E402
 from benchmark.retrieval.dense import E5_LARGE_V2, SentenceEncoder  # noqa: E402
-from benchmark.retrieval.metrics import answer_fact_coverage  # noqa: E402
+from benchmark.retrieval.metrics import answer_fact_coverage, answer_fact_support  # noqa: E402
 
 BUDGETS = (2000, 5000, 10000, 14830)
 SEED = 20261118
@@ -66,6 +66,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--half", default="dev", choices=("dev", "test", "all"))
     parser.add_argument("--json", type=Path, default=None)
     parser.add_argument("--device", default=None)
+    parser.add_argument("--depth", type=int, default=select.DEPTH, help="claim pool depth")
+    parser.add_argument(
+        "--max-pick", type=int, default=200,
+        help="how many claims the greedy may choose; 200 fills 16k of statements",
+    )
     args = parser.parse_args(argv)
 
     layer = args.layer
@@ -86,30 +91,35 @@ def main(argv: list[str] | None = None) -> int:
     paths = {}
     for item in items:
         query = encoder.encode_query(item["text"])
-        pool = corpus.search(item["text"], limit=select.DEPTH)
+        pool = corpus.search(item["text"], limit=args.depth)
         dense = select.dense_order(pool, row_of, matrix, query)
-        chosen = select.cover(dense, corpus, item["text"], 100)
+        chosen = select.cover(dense, corpus, item["text"], min(args.max_pick, len(dense)))
         paths[item["qid"]] = [by_id.get(c.claim_id) for c in chosen]
 
     rng = np.random.default_rng(SEED)
     table = []
+    raw: dict[str, dict[str, dict[str, dict[str, float]]]] = {}
     for budget in BUDGETS:
         per_unit = {}
         for unit in UNITS:
-            values, chars, counts = {}, [], []
+            values, supports, chars, counts = {}, {}, [], []
             for item in items:
                 rendered = [render(claim, unit) for claim in paths[item["qid"]] if claim]
                 kept = prefix_cut(rendered, budget)
                 values[item["qid"]] = answer_fact_coverage(item["gold_facts"], kept)
+                supports[item["qid"]] = answer_fact_support(item["gold_facts"], kept)
                 chars.append(sum(len(k) for k in kept))
                 counts.append(len(kept))
             per_unit[unit] = {
                 "coverage": round(statistics.mean(values.values()) * 100, 2),
+                "support": round(statistics.mean(supports.values()) * 100, 2),
                 "characters_median": int(statistics.median(chars)),
                 "units_median": int(statistics.median(counts)),
                 "values": values,
+                "supports": supports,
             }
         base = per_unit["quote"]["values"]
+        base_support = per_unit["quote"]["supports"]
         for unit in UNITS:
             if unit == "quote":
                 continue
@@ -118,6 +128,11 @@ def main(argv: list[str] | None = None) -> int:
             per_unit[unit]["delta"] = round(statistics.mean(diff) * 100, 2)
             per_unit[unit]["ci_low"] = round(float(lo) * 100, 2)
             per_unit[unit]["ci_high"] = round(float(hi) * 100, 2)
+            sdiff = [per_unit[unit]["supports"][q] - base_support[q] for q in base_support]
+            slo, shi = paired(sdiff, rng)
+            per_unit[unit]["support_delta"] = round(statistics.mean(sdiff) * 100, 2)
+            per_unit[unit]["support_ci_low"] = round(float(slo) * 100, 2)
+            per_unit[unit]["support_ci_high"] = round(float(shi) * 100, 2)
 
         print(f"--- budget {budget} ---")
         for unit in UNITS:
@@ -126,16 +141,37 @@ def main(argv: list[str] | None = None) -> int:
                 f"  d {row['delta']:+6.2f} [{row['ci_low']:+.1f}; {row['ci_high']:+.1f}]"
                 if "delta" in row else ""
             )
+            support = (
+                f"  support {row['support']:6.2f}%  ds {row['support_delta']:+6.2f}"
+                f" [{row['support_ci_low']:+.1f}; {row['support_ci_high']:+.1f}]"
+                if "support_delta" in row else f"  support {row['support']:6.2f}%"
+            )
             print(
                 f"  {unit:16s} {row['coverage']:6.2f}%  "
-                f"chars {row['characters_median']:5d}  units {row['units_median']:3d}{extra}"
+                f"chars {row['characters_median']:5d}  units {row['units_median']:3d}"
+                f"{support}{extra}"
             )
+        for unit in UNITS:
+            raw.setdefault(unit, {})[str(budget)] = {
+                "coverage": per_unit[unit]["values"],
+                "support": per_unit[unit]["supports"],
+            }
         table.append({
-            budget: {unit: {k: v for k, v in per_unit[unit].items() if k != "values"}
-                     for unit in UNITS}
+            budget: {
+                unit: {
+                    k: v for k, v in per_unit[unit].items()
+                    if k not in ("values", "supports")
+                }
+                for unit in UNITS
+            }
         })
 
     out = args.json or layer / f"runs/e9-rendering-{args.half}.json"
+    out.with_suffix(".values.json").write_text(
+        json.dumps({"half": args.half, "seed": SEED, "questions": len(items), "values": raw},
+                   indent=1),
+        encoding="utf-8",
+    )
     out.write_text(json.dumps({"half": args.half, "questions": len(items), "seed": SEED,
                                "rows": table}, indent=1), encoding="utf-8")
     print(f"written {out}")
