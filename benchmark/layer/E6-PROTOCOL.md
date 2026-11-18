@@ -416,3 +416,96 @@ because on this corpus it does not. What it may claim is measured in E14: the
 tokens it takes to reach a given coverage, the price of a query, the price of a
 build, and the refusal rate — and every one of those is published beside the row
 that beats it.
+
+## The token account — what the comparison is actually about
+
+Every table above holds *characters* constant, which is a proxy. An agent pays
+context tokens, a buyer pays API tokens, and the two accounts point in opposite
+directions. Both are published here with the conversion declared, never tuned.
+
+**Characters per token: 4.0**, the usual English estimate. Word counts are in the
+run record so a reader can redo the division with their own tokenizer.
+
+### Tokens consumed — the account where the layer is not competing
+
+| | build tokens | query tokens | build $ | query $ | build wall clock | query median |
+|---|---:|---:|---:|---:|---:|---:|
+| **this layer** | 7 916 415 | **0** | **4,11** | **0,0000** | **2 h 12** | **19 ms** |
+| GraphRAG local | 24 364 897 | 11 807 per query | 11,09 | 0,0025 | 21 h 19 | 23 814 ms |
+| sentences (BM25) | 0 | 0 | 0 | 0 | 4 min | 4 ms |
+| passages (BM25 floor) | 0 | 0 | 0 | 0 | 3 s | 4 ms |
+
+For the 200 pilot questions, everything included: **7,92 M tokens and 4,11 $
+against 26,73 M and 11,59 $** — 3,4× the tokens, 2,8× the price, 9,7× the build
+time. Per document: 28 374 tokens and 0,0147 $ against 87 329 and 0,0397 $.
+
+LightRAG has no finished row and cannot be given one at this budget: one measured
+document cost 0,0639 $, which projects to 13–18 $ for 279 documents.
+
+### Tokens returned — the account where a generated answer wins
+
+Coverage alone rewards dumping, so precision is measured here for the first time.
+It is **type-level**: a repeated word counts once. Two exclusions make it mean
+something — the question's own vocabulary, because a word the question contains
+cannot be evidence of its answer, and any type present in more than half the
+corpus, because it is background. Without them the twenty most "precise" types
+are `the, to, and, for, is` and the metric measures English.
+
+Dev, 96 questions, strict (a refusal counts as zero, never as an unanswered row):
+
+| system | tokens | refusal | strict recall | precision | strict F1 |
+|---|---:|---:|---:|---:|---:|
+| GraphRAG (generated answer) | 383 | 17,71 % | 63,77 | **13,57** | **17,81** |
+| **ours, statement, 2 000 ch** | 493 | 0 % | **65,29** | 7,06 | 11,73 |
+| ours, statement, 5 000 ch | 1 250 | 0 % | 74,88 | 4,30 | 7,73 |
+| ours, statement, 10 000 ch | 2 518 | 0 % | 81,12 | 2,95 | 5,49 |
+| ours, statement, 14 830 ch | 3 736 | 0 % | 84,19 | 2,36 | 4,46 |
+| sentences, 2 000 ch | 440 | 0 % | 57,50 | 8,28 | 12,92 |
+| sentences, 5 000 ch | 1 195 | 0 % | 75,30 | 4,80 | 8,53 |
+| sentences, 10 000 ch | 2 447 | 0 % | 83,28 | 3,00 | 5,57 |
+| sentences, 14 830 ch | 3 636 | 0 % | **87,23** | 2,35 | 4,46 |
+| floor, 2 000 ch | 1 200 | 0 % | 70,45 | 5,57 | 9,64 |
+| floor, 14 830 ch | 3 252 | 0 % | 83,41 | 3,09 | 5,74 |
+
+Volume is the median over answered questions. A first version of this table
+averaged refusals in as zero-token rows, which made abstaining look cheap; that
+was wrong and is corrected here.
+
+**At equal tokens returned**, interpolated between each system's own measured
+points: at 500 tokens ours 65,38 / sentences 58,91 / quote 56,53; at 1 000 ours
+71,71 / sentences 70,70 / quote 67,40; at 2 500 sentences 83,46 / ours 81,03 /
+floor 80,27. **At equal strict recall**: 60 % costs GraphRAG 383 tokens and us
+493; 70 % costs us 865 and sentences 970, and GraphRAG cannot reach it at all
+because its refusals cap it at 63,77; 75 % costs sentences 1 182 and us 1 274;
+80 % costs sentences 1 932 and us 2 290.
+
+The sentence floor's 1 200-token row is an artefact worth naming: the floor
+returns 4 800-character passages, so 2 000 characters and 5 000 characters are
+both the same single passage. It has no operating point below 1 200 tokens.
+
+### What this licenses, and what it does not
+
+Two sentences survive the numbers, and one does not.
+
+* **True, and large: at equal accuracy we consume no query tokens at all.** At
+  74,88 % strict recall on dev this layer spends 0 API tokens per query against
+  11 807 for GraphRAG, which never reaches that accuracy on this slice. At 65,29 %
+  it spends 0 against 11 807, and GraphRAG's own ceiling is 63,77 % because it
+  refuses 17,71 % of the questions. On the account a buyer pays, the comparison is
+  not close: 3,4× the tokens and 2,8× the price to build, then 11 807 tokens per
+  question forever.
+* **True, and narrow: at equal tokens returned we win only while the budget is
+  tight.** Below about a thousand tokens the claim layer has the highest strict
+  recall of every extractive system, because compression is what a tight budget
+  buys. Above roughly 1 200 tokens raw sentences win, and the reason is arithmetic
+  — a sentence costs 370 characters and a statement 95, so once there is room the
+  compression only throws text away.
+* **False: that we are the most token-efficient way to return an answer.**
+  GraphRAG's generated answer is denser per token than any evidence we can
+  return, and it is denser on precision too. That is what an LLM at query time
+  does: it compresses, for 0,0025 $ and 23,8 seconds, and it refuses one question
+  in six. A pilot that hid this row would be selling something.
+
+The honest one-line claim is therefore about **cost at a given accuracy**, not
+about accuracy at a given size of context, and it is stated with the row that
+beats us printed beside it.
