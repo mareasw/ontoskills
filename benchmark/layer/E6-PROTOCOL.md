@@ -358,3 +358,61 @@ The configuration published on test is therefore the **frozen ranker, rendered a
 statements, cut by the character budget**. No new selector was chosen, so by the
 E8 section's own rule the fresh slice is not run: the test read is E9's rendering
 curve on the existing half, declared as such.
+
+### E13 — how deep the pool has to be: the ceiling, not the operating point
+
+The statement row runs out at 9 524 characters — one hundred claims of about
+eighty — so the losses at ten and fourteen thousand were measured against a pool
+that had already ended. This rung rebuilds the order at four depths through the
+same pipeline, dev only.
+
+| budget | depth 100 | depth 200 | depth 400 | depth 800 | 400 vs 100, paired |
+|---|---|---|---|---|---|
+| 2 000 | 65,31 % | 64,77 % | 65,29 % | 64,21 % | ~0 |
+| 5 000 | 74,73 % | 74,02 % | **74,88 %** | 74,31 % | +0,15 [−1,1; +1,4] |
+| 10 000 | 79,72 % | 80,90 % | **81,12 %** | 80,38 % | +1,40 [+0,3; +2,6] |
+| 14 830 | 79,83 % | 83,61 % | **84,19 %** | 83,62 % | +4,36 [+3,1; +5,7] |
+
+At the operating point the depth is indistinguishable from a hundred: the pool
+was not the constraint there, because fifty-two of the hundred claims already
+fill five thousand characters. Above it, the depth was the constraint, and four
+hundred claims recover five points at fourteen thousand. Eight hundred buys
+nothing over four hundred and doubles the retrieval cost.
+
+**The configuration published is depth 400.** The pre-registered tie-break
+prefers the simpler component when the interval contains zero, and at five
+thousand characters that applies: +0,15 [−1,1; +1,4]. Depth is not a model and
+not a selector — it is a retrieval parameter that costs local CPU, not money —
+and reporting the curve at depth 100 would present a pool ceiling as a property
+of the layer. The operating point is unchanged; the ceiling is removed. Both
+columns are published so the choice can be audited.
+
+### The sentence floor — the control that decides what the layer is worth
+
+A reviewer will ask whether the statement gain is the claim layer or merely the
+granularity, because proposition-level retrieval beating passage-level retrieval
+at a fixed budget is already published (Dense X Retrieval, EMNLP 2024). E12
+answers it with the dumbest possible system at the same granularity: the
+documents cut into sentences, BM25 over the sentences, the same character cut.
+
+| budget | sentences (BM25) | statement, depth 400 | difference |
+|---|---|---|---|
+| 2 000 | 57,50 % | **65,29 %** | **+7,79** |
+| 5 000 | **75,30 %** | 74,88 % | −0,42 |
+| 10 000 | **83,28 %** | 81,12 % | −2,16 |
+| 14 830 | **87,23 %** | 84,19 % | −3,04 |
+
+**A sentence splitter with BM25 matches the claim layer at five thousand
+characters and beats it above.** The layer wins only where the budget is tight
+enough for compression to pay — two thousand characters, +7,8 points — and the
+reason is arithmetic: a sentence costs about 370 characters, a statement about
+95, so at a tight budget twenty claims fit where five sentences do. Distillation
+is a compression, and compression is worth its losses only when the budget is the
+constraint.
+
+This is the result that decides what the pilot may claim. It is not allowed to
+claim that the semantic layer retrieves better than a lexical sentence index,
+because on this corpus it does not. What it may claim is measured in E14: the
+tokens it takes to reach a given coverage, the price of a query, the price of a
+build, and the refusal rate — and every one of those is published beside the row
+that beats it.
