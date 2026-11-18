@@ -176,9 +176,14 @@ def build_graph(root: Path, meter: Path, device: str | None, stats: dict):
     from nano_graphrag import GraphRAG
 
     embed, phase = make_embedding_func(device)
+    # Both hooks, not one. Nano's `cheap_model_func` defaults to a hardcoded
+    # `gpt-4o-mini`; leaving it unset asked the gateway for a model it does not
+    # serve and killed the first build at the summary stage (E18 amendment 2).
+    model_func = make_model_func(root, meter, stats)
     return GraphRAG(
         working_dir=str(root),
-        best_model_func=make_model_func(root, meter, stats),
+        best_model_func=model_func,
+        cheap_model_func=model_func,
         embedding_func=embed,
         enable_naive_rag=True,
         # Twelve in flight, not four: E18 amendment 1. Throughput only — the calls
