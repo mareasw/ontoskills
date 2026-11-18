@@ -518,13 +518,28 @@ questions, the defensible claim is a cost claim:
 > for GraphRAG, of which 11 807 are paid; and it costs 4,11 $ to build the corpus
 > against 11,09 $, in 2 h 12 against 21 h 19.
 
-The row that beats us is printed with it: on the 162 questions GraphRAG answers,
-its generated answer reaches the same coverage while occupying a fifth of the
-context, and it is denser on precision. A generated answer is a denser artifact;
-an evidence layer that never refuses and costs nothing per query is a different
-one. `E6-PROTOCOL.md` §"The token account" has every number and the sentence floor
-— BM25 over raw sentences, no model, no dollars — that matches this layer at five
-thousand characters and beats it above.
+That claim is **against GraphRAG**, and it is the only system it holds against.
+Three rows beat it, and all three are printed here:
+
+* **GraphRAG, per token returned.** On the 162 questions it answers, its generated
+  answer reaches the same coverage while occupying a fifth of the context, and it
+  is denser on precision. A generated answer is a denser artifact; an evidence
+  layer that never refuses and costs nothing per query is a different one.
+* **The sentence floor**, above five thousand characters: BM25 over raw sentences,
+  no model, no dollars, and it wins by 1,2 points at ten thousand and 2,1 at
+  fourteen thousand.
+* **RAPTOR**, everywhere above two thousand characters, and it builds for **39
+  times less money** — 0,1047 $ against 4,1115 $ — with 66 cluster summaries
+  against 9 295 claims. At five thousand characters the two are tied (−0,91
+  [−2,6; +0,8]); the claim layer wins only at two thousand, by 5,8 points
+  ([−8,3; −3,3]), which is where a tight budget makes granularity decide the
+  number.
+
+So the honest one-line answer to "why pay 4,11 $ instead of 0,10 $" is **not**
+coverage above five thousand characters. It is coverage at a tight budget, plus
+the thing the metric cannot see: every unit this layer returns resolves to a
+document, a quotation and a claim identifier. `E6-PROTOCOL.md` §E16 carries the
+whole comparison, including the prediction the run falsified.
 
 ## By question kind
 
