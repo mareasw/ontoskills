@@ -875,3 +875,64 @@ the conflict pass is a product feature, not retrieval overhead. It is a
 or many claims packed into a fixed budget. If that workload exists, the 5,8 points
 at two thousand characters are worth 30×; if it does not, the claim layer is a
 more expensive way to reach the same answer, and this document has said so.
+
+---
+
+## E18 — Nano-GraphRAG: the cheap member of the family
+
+Declared **before** the build, in this commit, with no number from the run known.
+
+The published claim is a cost claim against GraphRAG, and a cost claim against one
+member of a family is only as strong as the choice of member. Nano-GraphRAG
+(`gusye1234/nano-graphrag`) is the lightweight reimplementation of the same
+architecture — LLM-extracted entities and relations, community reports, graph
+traversal at query time — and it is what people actually run when GraphRAG's
+indexing bill is too high. If it reaches GraphRAG's accuracy for a tenth of the
+price, then the 11,09 $ row is a strawman and the claim has to be restated against
+the cheapest member of the family, not the most expensive.
+
+So this is a **falsification attempt aimed at this pilot's own published claim**,
+and it is written down before the run for exactly that reason.
+
+### The configuration, fixed here
+
+| choice | value | why |
+|---|---|---|
+| version | `nano-graphrag==0.0.8.2`, pinned | the current release; no source edits |
+| chunking | its default, 1 200 tokens with 100 of overlap | its architecture, not a knob of ours |
+| gleaning | its default, 1 extra extraction pass | the setting a user gets |
+| clustering | its default, Leiden, `max_graph_cluster_size=10` | the setting a user gets |
+| graph embeddings | its default, node2vec | the setting a user gets |
+| local retrieval | its defaults: `top_k=20`, 4 000 tokens of text units, 4 800 of local context, 3 200 of community report | the settings a user gets |
+| model | the pilot's own, `temperature=0`, `reasoning_effort="none"` | the same model as every other row |
+| embedding | `intfloat/e5-large-v2`, revision `f169b11e`, fp32, 1 024 dims | the encoder this layer uses |
+| embedding prefixes | `passage: ` for stored text, `query: ` during a query | E5 is trained this way; the phase is declared to the sidecar, which is the only liberty taken and it favours the competitor |
+| input | the same 279 documents, one insertion each, text unchanged | the corpus every other row reads |
+| modes | `local` primary; `naive` as a declared second row | `local` mirrors GraphRAG's primary row |
+| scoring | the same 192 questions, gold facts, metric and refusal reader as the GraphRAG row | one instrument |
+
+`global` mode is run **only if** the meter is still under 1,60 $ after the build,
+`local` and `naive`. That threshold is declared now so the decision cannot be made
+by looking at a result.
+
+**Ceiling 2,50 $.** The adapter reads the meter log before every paid call and
+aborts the run above the ceiling; a build that stops there is reported as
+incomplete, with what was spent and what was built.
+
+### What each outcome means, written before the run
+
+- **Nano ties or beats GraphRAG on accuracy for under 3 $** — the family's price
+  is a tuning property, this pilot compared against the wrong member, and the
+  published claim is restated against Nano. That is the outcome that would do the
+  most damage to this document, which is why the run happens.
+- **Nano is materially worse than GraphRAG** — the family is not uniformly strong,
+  the 11,09 $ row stands as the family's quality ceiling, and the claim keeps its
+  reference while gaining a second data point.
+- **Nano is worse than this layer at a *higher* price than this layer** — the
+  first competitor our four dollars clearly beat, and it would move the claim from
+  "cost at equal accuracy" toward "cost and accuracy", which is where this pilot
+  has never been able to stand.
+
+Whatever the result, the row is published beside the others with its own price and
+its own refusals, and the sentence in `LAYER.md` is rewritten to name the member
+of the family it is actually about.
