@@ -176,34 +176,81 @@ run killed by a restart (63 calls paid, rows lost to a script that wrote only at
 the end; the harness now writes each row before the next call and resumes), and
 0,1144 $ for the complete run.
 
-### E6 — the budget curve on the test half
+### E6 — the budget curve on the test half, corrected
 
-One family: the frozen ranker's ordering, with the cut determined by the
-character budget instead of fixed at ten claims. The greedy path is
-prefix-consistent, so every budget is the same deterministic ordering stopped
-earlier or later. The family was designed on dev and read on test **once**; the
-whole curve is published and no budget was chosen afterwards. The test half had
-already been read once before, for the ten-claim operating point of the same
-ranker.
+One family: the frozen ranker's ordering, cut by the character budget instead of
+fixed at ten claims. The greedy path is prefix-consistent, so every budget is the
+same deterministic ordering stopped earlier or later. The family was designed on
+dev and the whole curve is published; the test half had already been read once
+before, for the ten-claim operating point of the same ranker.
+
+These numbers supersede the first published table, which was cut with packing.
+The cut is now `prefix_cut`, the floor's cut.
 
 | budget | this layer | floor BM25 | difference, paired |
 |---|---|---|---|
-| 5 000 | **74,21 %** (4 977 ch) | 71,44 % (4 800 ch) | **+2,77 [+0,3; +5,3]** |
-| 10 000 | 79,54 % (9 960 ch) | 79,35 % (8 900 ch) | +0,19 [−2,0; +2,3] |
-| 14 830 | 81,88 % (14 804 ch) | 84,08 % (13 286 ch) | −2,20 [−4,0; −0,4] |
-| 20 000 | 83,80 % (19 958 ch) | 87,16 % (18 177 ch) | −3,36 [−4,8; −1,9] |
-| 45 000 | 87,52 % (44 894 ch) | 92,17 % (42 614 ch) | −4,65 [−5,8; −3,5] |
+| 5 000 | 72,44 % (4 696 ch) | 71,44 % (4 800 ch) | +1,00 [−2,0; +3,9] |
+| 10 000 | 79,16 % (9 718 ch) | 79,35 % (8 900 ch) | −0,19 [−2,4; +1,9] |
+| 14 830 | 81,48 % (14 560 ch) | 84,08 % (13 286 ch) | −2,60 [−4,4; −0,7] |
+| 20 000 | 83,56 % (19 693 ch) | 87,16 % (18 177 ch) | −3,60 [−5,1; −2,1] |
+| 45 000 | 87,50 % (44 611 ch) | 92,17 % (42 614 ch) | −4,67 [−5,8; −3,5] |
 
-At a five-thousand-character budget the claim layer returns more of the gold
-answer facts than returning the passages, by 2,77 pp with an interval that
-excludes zero — the first positive, significant result of the pilot, on the test
-half, at a budget an agent actually uses. It is parity at ten thousand and it
-loses above fourteen thousand, where returning whole documents simply carries
-more text than any selective layer can.
+**A retraction.** The first version of this table reported +2,77 pp at five
+thousand characters, 95 % CI [+0,3; +5,3], and this document called it the first
+positive, significant result of the pilot. That number was produced by the
+packing cut: our side was allowed to skip a quote that did not fit and pack
+smaller ones after it, while the floor stops at the first item that does not fit.
+At the same volume the difference is +1,00 pp and the interval contains zero.
+There is no significant win over the floor at equal budget, and the earlier claim
+is withdrawn.
 
-That is the claim the pilot can defend: **in the small-context regime the
-compressed layer is not just cheaper and faster, it is better; outside it, volume
-wins.** Not superior overall, and not a state of the art.
+What survives is the shape: parity at five and ten thousand characters, a loss
+from fourteen thousand upwards, where returning whole passages carries more text
+than a selective layer can. The floor is the measuring instrument, not a
+competitor; beating it at small volume was never the goal, and the layer does not
+beat it.
+
+### E9 — rendering, at an identical budget (dev)
+
+Same frozen order, same cut; only the text of each chosen claim changes.
+
+| budget | quote | statement | difference, paired |
+|---|---|---|---|
+| 2 000 | 55,62 % (3 units) | **65,31 %** (20 units) | **+9,69 [+6,5; +12,9]** |
+| 5 000 | 70,83 % (9) | **74,73 %** (52) | **+3,91 [+1,6; +6,1]** |
+| 10 000 | 77,96 % (19) | **79,72 %** (100) | +1,76 [+0,0; +3,4] |
+| 14 830 | **80,31 %** (28) | 79,83 % (100) | −0,48 [−2,0; +1,0] |
+
+`statement+quote` and `all-quotes` are in the run record and in
+`e9-rendering-dev.json`; both are within noise of the quote at every budget below
+fourteen thousand, and both lose at two thousand because a claim then costs four
+hundred characters instead of eighty.
+
+The statement wins where the budget is small enough for the number of claims to
+matter: twenty claims instead of three at two thousand characters, fifty-two
+instead of nine at five thousand. At fourteen thousand the pool of one hundred
+claims is exhausted at 9 524 characters, so more budget cannot buy more claims
+and the quote catches up. The distillation keeps the tokens that carry the
+answer — that was the question, and the answer is yes.
+
+### E10 — one slot per aspect: negative
+
+The same pool, ordered round-robin over clusters of the claim vectors instead of
+greedily over the question's terms. On statements, paired against `cover`:
+
+| budget | cover | best aspect order | difference |
+|---|---|---|---|
+| 2 000 | 65,31 % | 63,14 % (`aspect8-cover`) | −2,17 [−3,6; −0,8] |
+| 5 000 | 74,73 % | 74,09 % (`aspect20-cover`) | −0,65 [−1,3; +0,0] |
+| 10 000 | 79,72 % | 79,64 % (all) | −0,08 [−0,3; +0,0] |
+
+At fourteen thousand, four orders land on exactly the same number because the
+whole pool fits and only the text matters. Every aspect order loses at the
+budget that matters, and the reason is visible in the diagnosis: the missing
+facts are not hidden inside one aspect that clustering could separate, they are
+claims the dense order ranks below the sixtieth place. Diversity spends slots on
+weaker claims instead of recovering them. The rung is closed.
+
 
 ## Amendment 3 — the cut was not the floor's cut
 
