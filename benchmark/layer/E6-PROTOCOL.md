@@ -140,3 +140,69 @@ first five in the selection's own order and not a sample, and the decision rule
 above is not touched by them. They are recorded here so that nobody can say the
 number surprised us later.
 
+## Results
+
+### E7 — negative, and the rule is applied
+
+96 dev questions, 60 candidates, `reasoning_effort = "none"`, one call each.
+
+| system, same sixty candidates | coverage |
+|---|---|
+| listwise rerank (deepseek-v4.1-flash) | **62,73 %** |
+| plain cut, first ten | 64,06 % |
+| `cover` | 71,15 % |
+| exact oracle, best ten | 82,08 % |
+
+Paired against `cover`: **−8,42 pp, 95 % CI [−10,4; −6,4]**. Against the plain
+cut: −1,33 pp [−3,1; +0,5]. Two of the 96 calls returned two tokens and no array;
+both rows are scored at the plain cut, not dropped, and removing them moves the
+rerank to 63,06 % against 71,62 % — the verdict does not depend on them. The ten
+indices the model returned overlap the first ten of the given order by 5,15 of 10,
+so it mostly agreed with the order it was handed.
+
+By the decision rule fixed above, **E7 < 76,0 %: a text-only recogniser at this
+configuration does not buy the recognition headroom, no new front is opened, and
+no claim about beating the floor is made.** E8 is therefore not run.
+
+What this does *not* say: that listwise reranking cannot work. One model, one
+prompt, one setting was measured, and at `effort = "none"` the recogniser behaved
+close to a re-print of the order. A stronger setting was not measured because the
+authorised budget was already spent, and it is not measured now, because a second
+configuration chosen after seeing the first result is the tuning the split exists
+to prevent.
+
+E7's measured cost: **0,2102 $** — 0,0189 $ of smoke and probes, 0,0769 $ of a
+run killed by a restart (63 calls paid, rows lost to a script that wrote only at
+the end; the harness now writes each row before the next call and resumes), and
+0,1144 $ for the complete run.
+
+### E6 — the budget curve on the test half
+
+One family: the frozen ranker's ordering, with the cut determined by the
+character budget instead of fixed at ten claims. The greedy path is
+prefix-consistent, so every budget is the same deterministic ordering stopped
+earlier or later. The family was designed on dev and read on test **once**; the
+whole curve is published and no budget was chosen afterwards. The test half had
+already been read once before, for the ten-claim operating point of the same
+ranker.
+
+| budget | this layer | floor BM25 | difference, paired |
+|---|---|---|---|
+| 5 000 | **74,21 %** (4 977 ch) | 71,44 % (4 800 ch) | **+2,77 [+0,3; +5,3]** |
+| 10 000 | 79,54 % (9 960 ch) | 79,35 % (8 900 ch) | +0,19 [−2,0; +2,3] |
+| 14 830 | 81,88 % (14 804 ch) | 84,08 % (13 286 ch) | −2,20 [−4,0; −0,4] |
+| 20 000 | 83,80 % (19 958 ch) | 87,16 % (18 177 ch) | −3,36 [−4,8; −1,9] |
+| 45 000 | 87,52 % (44 894 ch) | 92,17 % (42 614 ch) | −4,65 [−5,8; −3,5] |
+
+At a five-thousand-character budget the claim layer returns more of the gold
+answer facts than returning the passages, by 2,77 pp with an interval that
+excludes zero — the first positive, significant result of the pilot, on the test
+half, at a budget an agent actually uses. It is parity at ten thousand and it
+loses above fourteen thousand, where returning whole documents simply carries
+more text than any selective layer can.
+
+That is the claim the pilot can defend: **in the small-context regime the
+compressed layer is not just cheaper and faster, it is better; outside it, volume
+wins.** Not superior overall, and not a state of the art.
+
+
