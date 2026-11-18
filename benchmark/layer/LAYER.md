@@ -528,9 +528,11 @@ Three rows beat it, and all three are printed here:
 * **The sentence floor**, above five thousand characters: BM25 over raw sentences,
   no model, no dollars, and it wins by 1,2 points at ten thousand and 2,1 at
   fourteen thousand.
-* **RAPTOR**, everywhere above two thousand characters, and it builds for **39
-  times less money** — 0,1047 $ against 4,1115 $ — with 66 cluster summaries
-  against 9 295 claims. At five thousand characters the two are tied (−0,91
+* **RAPTOR**, everywhere above two thousand characters, and it builds for **30
+  times less money** on the retrieval path — 0,1047 $ against 3,1292 $, with 66
+  cluster summaries against the 9 104 verified claims the ranker reads. (The
+  full build is 4,1115 $; the 0,9823 $ difference is the conflict pass, which
+  retrieval never reads.) At five thousand characters the two are tied (−0,91
   [−2,6; +0,8]); the claim layer wins only at two thousand, by 5,8 points
   ([−8,3; −3,3]), which is where a tight budget makes granularity decide the
   number.
@@ -540,6 +542,21 @@ coverage above five thousand characters. It is coverage at a tight budget, plus
 the thing the metric cannot see: every unit this layer returns resolves to a
 document, a quotation and a claim identifier. `E6-PROTOCOL.md` §E16 carries the
 whole comparison, including the prediction the run falsified.
+
+The bill has been audited, so the answer is not a guess. Across all 192 questions
+(`E6-PROTOCOL.md` §E17), **79,95 % of the claims are shown at least once at
+fourteen thousand characters**, and at the two thousand characters this claim is
+about, 30,25 % of the index is ever reached, carrying 32,90 % of the bill. The
+waste is 18,29 % of the index never chosen and 1,76 % never even in a pool, and it
+is spread across every document — the median document has 93,1 % of its claims
+used at the wide budget — so there is no document to prune. The four dollars are
+not an index nobody reads. They are granularity RAPTOR does not have to buy:
+RAPTOR produces 5,8× more compressed text per dollar (15,0× compression against
+2,23×), and at a tight budget 15× compression leaves no resolution.
+
+Amortised over ten thousand questions the per-question cost is 0,00041 $ against
+RAPTOR's 0,00001 $ and GraphRAG's 0,00361 $. RAPTOR is cheaper per question at
+every workload; the claim layer's only measured advantage is the tight budget.
 
 ## By question kind
 
