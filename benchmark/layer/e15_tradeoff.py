@@ -70,6 +70,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--metric", default="recall_strict",
                         choices=("recall_strict", "recall_answered", "f1_strict",
                                  "precision_strict"))
+    parser.add_argument("--json", type=Path, default=None)
     args = parser.parse_args(argv)
 
     payload = json.loads((args.layer / f"runs/e14-pareto-{args.half}.json").read_text())
@@ -82,6 +83,26 @@ def main(argv: list[str] | None = None) -> int:
         "floor": curve(rows, "floor", args.metric),
         "graphrag": curve(rows, "graphrag", args.metric),
     }
+
+    payload_out = {
+        "half": args.half,
+        "metric": args.metric,
+        "curves": {name: points for name, points in systems.items()},
+        "at_tokens": {
+            str(target): {
+                name: at_tokens(points, target) for name, points in systems.items()
+            }
+            for target in TARGETS
+        },
+        "at_coverage": {
+            str(target): {
+                name: tokens_for(points, target) for name, points in systems.items()
+            }
+            for target in (60.0, 70.0, 75.0, 80.0)
+        },
+    }
+    if args.json:
+        args.json.write_text(json.dumps(payload_out, indent=1), encoding="utf-8")
 
     print(f"metric: {args.metric}  (percent of gold facts)")
     print("\nAt equal tokens returned:")

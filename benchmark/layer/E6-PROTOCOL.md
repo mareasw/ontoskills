@@ -509,3 +509,32 @@ Two sentences survive the numbers, and one does not.
 The honest one-line claim is therefore about **cost at a given accuracy**, not
 about accuracy at a given size of context, and it is stated with the row that
 beats us printed beside it.
+
+### The test read, once, on the configuration that was chosen on dev
+
+`statement` rendering, frozen `cover`, pool depth 400, at most 200 claims chosen,
+cut by `prefix_cut`. Selected on dev; this half was read once, after the choice.
+The configuration reproduces E13's dev column to the digit (65,29 / 74,88 / 81,12
+/ 84,19), so the read is of the pipeline that was measured, not of a variant.
+
+| budget | quote | statement | difference, paired |
+|---|---|---|---|
+| 2 000 | 56,95 % | **62,28 %** | **+5,33 [+2,8; +7,8]** |
+| 5 000 | 72,53 % | **74,75 %** | **+2,22 [+0,1; +4,3]** |
+| 10 000 | 78,99 % | **81,34 %** | **+2,36 [+0,4; +4,3]** |
+| 14 830 | 81,87 % | **84,42 %** | **+2,55 [+0,8; +4,3]** |
+
+The rendering effect replicates at every budget with intervals that exclude zero.
+It is smaller than dev promised at the tight end — dev said +10,09 at two thousand
+characters and the test says +5,33 — and that is the normal direction of a
+selection on the half that chose. The shape is the same: the gain shrinks as the
+budget grows, and it never changes sign.
+
+`statement+quote` and `all-quotes` are in `e9-rendering-test.json`: both lose to
+the bare quote at every budget except the statement+quote at fourteen thousand,
+where they tie. Once the budget holds whole quotes, prefixing the quote with its
+statement only adds overhead.
+
+At five thousand characters the published configuration covers **74,75 %** of the
+gold answer facts on the test half in 4 952 characters, against the floor's
+71,44 % in 4 800.
