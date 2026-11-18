@@ -513,10 +513,16 @@ characters and +2,22 at five thousand, both with intervals that exclude zero.
 With those two corrections, over all 192 questions and all systems on the same
 questions, the defensible claim is a cost claim:
 
-> at equal accuracy — 77,3 % of the gold answer facts — this layer consumes about
-> 1 700 context tokens and **zero** API tokens per question, against 12 227 tokens
-> for GraphRAG, of which 11 807 are paid; and it costs 4,11 $ to build the corpus
-> against 11,09 $, in 2 h 12 against 21 h 19.
+> at equal accuracy — 77,3 % of the gold answer facts, on the 162 questions
+> GraphRAG answers — this layer reaches 77,7 % at a budget of 7 250 characters,
+> a median of 1 800 context tokens and **zero** API tokens per question, against
+> 12 227 tokens for GraphRAG, of which 11 807 are paid; and it costs 4,11 $ to
+> build the corpus against 11,09 $, in 2 h 12 against 21 h 19.
+
+That 1 800 is not a chosen point on the curve: 77,27 % is GraphRAG's own coverage
+on the questions it answers, and 7 250 characters is the first budget tested (in
+steps of 250, at the pilot's 4,0 characters per token) at which this layer passes
+it on the same 162 questions.
 
 That claim is **against GraphRAG**, and it is the only system it holds against.
 Three rows beat it, and all three are printed here:
