@@ -586,7 +586,7 @@ nothing.
 Neither of those is the claim the pilot publishes. The published claim is the
 cost one, because it is the only one where the margin is not a matter of degree:
 
-**at 74,81 % strict coverage this layer spends zero API tokens per query and
-1 250 context tokens; GraphRAG spends 11 807 API tokens per query and never
-reaches that coverage at all — its ceiling is 65,20 % and its refusal rate is
-15,62 %.**
+At **74,81 %** strict coverage this layer spends **zero** API tokens per query and
+1 250 context tokens. GraphRAG spends **11 807** API tokens per query and never
+reaches that coverage at all: its ceiling is 65,20 %, and it declines 15,62 % of
+the questions.
