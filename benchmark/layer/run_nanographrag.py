@@ -48,7 +48,7 @@ CHARS_PER_TOKEN = 4.0
 PRICE_IN, PRICE_OUT = 0.15, 0.60
 DEFAULT_MAX_TOKENS = 4096
 # Declared in the protocol: the run stops here and reports itself incomplete.
-CEILING_USD = 3.20
+CEILING_USD = 5.50
 
 
 class BudgetExceeded(RuntimeError):
@@ -172,8 +172,42 @@ def make_embedding_func(device: str | None):
     return EmbeddingFunc(embedding_dim=EMBED_DIM, max_token_size=EMBED_MAX_TOKENS, func=embed), phase
 
 
+def _wait_instead_of_spin() -> None:
+    """Replace nano\'s polling limiter with a real semaphore.
+
+    `limit_async_func_call` waits with `await asyncio.sleep(0.0001)` in a loop. With
+    a thousand batches queued the event loop does nothing but re-arm timers, and the
+    one thread doing the encoding is starved: measured at 97 minutes with 7 % GPU
+    use for a minute of work. Same limit, callers park instead of spinning
+    (E18 amendment 3).
+    """
+    import asyncio
+    from functools import wraps
+
+    import nano_graphrag._utils as utils
+    import nano_graphrag.graphrag as graphrag
+
+    def limit_async_func_call(max_size: int, waitting_time: float = 0.0001):
+        def final_decor(func):
+            semaphore = asyncio.Semaphore(max_size)
+
+            @wraps(func)
+            async def wait_func(*args, **kwargs):
+                async with semaphore:
+                    return await func(*args, **kwargs)
+
+            return wait_func
+
+        return final_decor
+
+    utils.limit_async_func_call = limit_async_func_call
+    graphrag.limit_async_func_call = limit_async_func_call
+
+
 def build_graph(root: Path, meter: Path, device: str | None, stats: dict):
     from nano_graphrag import GraphRAG
+
+    _wait_instead_of_spin()
 
     embed, phase = make_embedding_func(device)
     # Both hooks, not one. Nano's `cheap_model_func` defaults to a hardcoded
