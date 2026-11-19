@@ -14,8 +14,10 @@ from benchmark.layer.run_nanographrag import (
     PRICE_IN,
     PRICE_OUT,
     GRAPH_FILES,
+    UpstreamUnavailable,
     cache_path,
     clear_stale_graph,
+    next_wait,
     retry_hint,
     spent_usd,
 )
@@ -106,3 +108,25 @@ def test_a_finished_graph_is_left_alone(tmp_path):
 
 def test_an_empty_working_dir_is_left_alone(tmp_path):
     assert clear_stale_graph(tmp_path, "20261119-1030") == []
+
+
+QUOTA = (
+    "Error code: 503 - {'error': {'code': 'budget_exhausted', "
+    "'message': 'quota exhausted (window weekly, resets 2026-11-23)', "
+    "'retry_after_ms': 86400000}}"
+)
+
+
+def test_a_daily_hint_raises_instead_of_parking_the_run():
+    import pytest
+
+    with pytest.raises(UpstreamUnavailable):
+        next_wait(8.0, QUOTA)
+
+
+def test_an_ordinary_503_backs_off_without_honouring_no_hint():
+    assert 8.0 <= next_wait(8.0, "Error code: 503 - upstream unavailable") <= 10.0
+
+
+def test_a_thirty_second_hint_is_honoured():
+    assert 32.0 <= next_wait(8.0, "503 retry_after_ms: 30000") <= 34.0
