@@ -1099,3 +1099,9 @@ longer hint raises `UpstreamUnavailable` and the build records `"outcome":
 No quality number exists yet for E18 and none is recorded here. The run resumes
 with the same command when the quota resets; the cache means the reports already
 paid for are not paid again.
+
+Resume is one command, `benchmark/layer/e18_resume.sh`, which starts the meter
+proxy on 8096 if it is not already listening, runs build, `local`, `naive`, both
+scores and the paired comparison, and prints the spend at the end. The graph the
+dead run saved in its `finally` is moved aside by the adapter (amendment 6), so the
+resume needs no manual cleanup.
