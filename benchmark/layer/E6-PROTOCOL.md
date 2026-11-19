@@ -1028,3 +1028,28 @@ of the run's history rather than its result:
   1,4664 $ of cached work;
 * a first attempt died at the entity-summary step (amendment 2) and left another
   1,4432 $, mostly the same extraction calls replayed.
+
+### Amendment 5 to E18 — the gateway's own retry hint, and six in flight
+
+The fifth attempt died 1 367 communities in, on a `503` that carried
+`retry_after_ms: 30000`. The adapter's backoff was 8 s doubling, capped at 32 s and
+four attempts, so it kept knocking inside the window the gateway had already named.
+1 803 of the 2 687 calls in that run were served; 166 came back `503`, one `502`,
+and each of those recorded 0 input and 0 output tokens — the failures cost nothing
+but wall clock.
+
+Two throughput changes, neither visible to any system under test:
+
+* the retry reads `retry_after_ms` out of the error and waits at least that long,
+  with jitter, for up to eight attempts;
+* the model concurrency drops from 12 to 6 (`best_model_max_async` and
+  `cheap_model_max_async`), because at 12 the community-report burst trips the
+  upstream's 429 guard — `3x429/60s` in the message.
+
+Same model, same prompts, same temperature, same yield; fewer collisions. Spend at
+the failure: 2,9162 $, all of it cached, so the rerun pays only for the reports that
+never completed.
+
+The clustering is seeded (`graph_cluster_seed`, `hierarchical_leiden`), so the
+partition is the same one the cached reports were written against — measured, not
+assumed: the previous restart asked for 340 community reports and paid for 165.

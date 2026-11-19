@@ -10,7 +10,13 @@ from __future__ import annotations
 
 import json
 
-from benchmark.layer.run_nanographrag import PRICE_IN, PRICE_OUT, cache_path, spent_usd
+from benchmark.layer.run_nanographrag import (
+    PRICE_IN,
+    PRICE_OUT,
+    cache_path,
+    retry_hint,
+    spent_usd,
+)
 
 
 def write(tmp_path, rows, raw=""):
@@ -59,3 +65,16 @@ def test_the_cache_is_sharded_by_the_first_two_characters(tmp_path):
     path = cache_path(tmp_path, "abcdef")
     assert path.parent.name == "ab"
     assert path.name == "abcdef.json"
+
+
+def test_the_gateway_retry_hint_is_obeyed_with_margin():
+    message = (
+        "Error code: 503 - {'error': {'code': 'rate_limited', "
+        "'message': 'upstream rate limited (3x429/60s), retry later', "
+        "'retry_after_ms': 30000}}"
+    )
+    assert retry_hint(message) == 32.0
+
+
+def test_a_message_without_a_hint_asks_for_nothing():
+    assert retry_hint("Error code: 503 - upstream unavailable") == 0.0
