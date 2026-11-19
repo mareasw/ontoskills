@@ -495,6 +495,75 @@ is an outcome, and counting it as a zero would be a different measurement, so
 it is reported in its own column: the false-refusal rate is a share of the
 answerable questions, and abstention a share of the unanswerable ones.
 
+### 7.0 The table above is not the comparison you want, and the replacement is
+
+Two things in it are misleading, and both were found after publication.
+
+**The volumes are not equal.** This layer returns 4 948 characters, the floor
+returns 45 885. At equal volume the floor's advantage is much smaller and the
+"volume wins" sentence in §7 is the correct reading only of the 45 885-character
+column. `E6-PROTOCOL.md` carries the corrected curve, cut the way the floor cuts:
+parity at five and ten thousand characters, a loss from fourteen thousand upward.
+
+**The unit is not optimised.** Every row above renders each chosen claim as its
+first quotation. Rendering it as the claim's own one-sentence statement, at the
+same character budget, is worth +5,33 points on the test half at two thousand
+characters and +2,22 at five thousand, both with intervals that exclude zero.
+
+With those two corrections, over all 192 questions and all systems on the same
+questions, the defensible claim is a cost claim:
+
+> at equal accuracy — 77,3 % of the gold answer facts, on the 162 questions
+> GraphRAG answers — this layer reaches 77,7 % at a budget of 7 250 characters,
+> a median of 1 800 context tokens and **zero** API tokens per question, against
+> 12 227 tokens for GraphRAG, of which 11 807 are paid; and it costs 4,11 $ to
+> build the corpus against 11,09 $, in 2 h 12 against 21 h 19.
+
+That 1 800 is not a chosen point on the curve: 77,27 % is GraphRAG's own coverage
+on the questions it answers, and 7 250 characters is the first budget tested (in
+steps of 250, at the pilot's 4,0 characters per token) at which this layer passes
+it on the same 162 questions.
+
+That claim is **against GraphRAG**, and it is the only system it holds against.
+Three rows beat it, and all three are printed here:
+
+* **GraphRAG, per token returned.** On the 162 questions it answers, its generated
+  answer reaches the same coverage while occupying a fifth of the context, and it
+  is denser on precision. A generated answer is a denser artifact; an evidence
+  layer that never refuses and costs nothing per query is a different one.
+* **The sentence floor**, above five thousand characters: BM25 over raw sentences,
+  no model, no dollars, and it wins by 1,2 points at ten thousand and 2,1 at
+  fourteen thousand.
+* **RAPTOR**, everywhere above two thousand characters, and it builds for **30
+  times less money** on the retrieval path — 0,1047 $ against 3,1292 $, with 66
+  cluster summaries against the 9 104 verified claims the ranker reads. (The
+  full build is 4,1115 $; the 0,9823 $ difference is the conflict pass, which
+  retrieval never reads.) At five thousand characters the two are tied (−0,91
+  [−2,6; +0,8]); the claim layer wins only at two thousand, by 5,8 points
+  ([−8,3; −3,3]), which is where a tight budget makes granularity decide the
+  number.
+
+So the honest one-line answer to "why pay 4,11 $ instead of 0,10 $" is **not**
+coverage above five thousand characters. It is coverage at a tight budget, plus
+the thing the metric cannot see: every unit this layer returns resolves to a
+document, a quotation and a claim identifier. `E6-PROTOCOL.md` §E16 carries the
+whole comparison, including the prediction the run falsified.
+
+The bill has been audited, so the answer is not a guess. Across all 192 questions
+(`E6-PROTOCOL.md` §E17), **79,95 % of the claims are shown at least once at
+fourteen thousand characters**, and at the two thousand characters this claim is
+about, 30,25 % of the index is ever reached, carrying 32,90 % of the bill. The
+waste is 18,29 % of the index never chosen and 1,76 % never even in a pool, and it
+is spread across every document — the median document has 93,1 % of its claims
+used at the wide budget — so there is no document to prune. The four dollars are
+not an index nobody reads. They are granularity RAPTOR does not have to buy:
+RAPTOR produces 5,8× more compressed text per dollar (15,0× compression against
+2,23×), and at a tight budget 15× compression leaves no resolution.
+
+Amortised over ten thousand questions the per-question cost is 0,00041 $ against
+RAPTOR's 0,00001 $ and GraphRAG's 0,00361 $. RAPTOR is cheaper per question at
+every workload; the claim layer's only measured advantage is the tight budget.
+
 ## By question kind
 
 **ontoskills**, by question kind (evidence, k=10):
