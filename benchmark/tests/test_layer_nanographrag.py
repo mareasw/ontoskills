@@ -13,7 +13,9 @@ import json
 from benchmark.layer.run_nanographrag import (
     PRICE_IN,
     PRICE_OUT,
+    GRAPH_FILES,
     cache_path,
+    clear_stale_graph,
     retry_hint,
     spent_usd,
 )
@@ -78,3 +80,29 @@ def test_the_gateway_retry_hint_is_obeyed_with_margin():
 
 def test_a_message_without_a_hint_asks_for_nothing():
     assert retry_hint("Error code: 503 - upstream unavailable") == 0.0
+
+
+def test_an_interrupted_graph_is_moved_aside_not_merged(tmp_path):
+    """Nano saves in a `finally`: a dead run leaves nodes and no reports on disk."""
+    for name in GRAPH_FILES:
+        (tmp_path / name).write_text("{}", encoding="utf-8")
+    (tmp_path / "llm-cache").mkdir()
+
+    moved = clear_stale_graph(tmp_path, "20261119-1030")
+
+    assert sorted(moved) == sorted(GRAPH_FILES)
+    assert all((tmp_path / "stale-20261119-1030" / name).exists() for name in GRAPH_FILES)
+    assert (tmp_path / "llm-cache").exists()
+    assert not (tmp_path / "graph_chunk_entity_relation.graphml").exists()
+
+
+def test_a_finished_graph_is_left_alone(tmp_path):
+    (tmp_path / "graph_chunk_entity_relation.graphml").write_text("{}", encoding="utf-8")
+    (tmp_path / "build.json").write_text('{"outcome": "ok"}', encoding="utf-8")
+
+    assert clear_stale_graph(tmp_path, "20261119-1030") == []
+    assert (tmp_path / "graph_chunk_entity_relation.graphml").exists()
+
+
+def test_an_empty_working_dir_is_left_alone(tmp_path):
+    assert clear_stale_graph(tmp_path, "20261119-1030") == []
