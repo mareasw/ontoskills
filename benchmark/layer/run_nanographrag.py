@@ -251,6 +251,43 @@ def build_graph(root: Path, meter: Path, device: str | None, stats: dict):
     ), phase
 
 
+GRAPH_FILES = (
+    "graph_chunk_entity_relation.graphml",
+    "kv_store_community_reports.json",
+    "kv_store_full_docs.json",
+    "kv_store_text_chunks.json",
+    "kv_store_llm_response_cache.json",
+    "vdb_chunks.json",
+    "vdb_entities.json",
+)
+
+
+def clear_stale_graph(root: Path, stamp: str) -> list[str]:
+    """Move an interrupted graph aside instead of merging into it.
+
+    Nano saves the graph in a `finally`, so a run that dies during community
+    reports leaves entities on disk and no reports. The next `ainsert` then skips
+    the documents it finds in memory-less stores and merges a fresh extraction
+    into the old nodes, which duplicates every entity description. The cache keeps
+    what was paid for; the half-built graph is moved, never deleted.
+    """
+    if not (root / "graph_chunk_entity_relation.graphml").exists():
+        return []
+    record = root / "build.json"
+    if record.exists() and json.loads(record.read_text(encoding="utf-8")).get("outcome") == "ok":
+        return []
+    grave = root / f"stale-{stamp}"
+    grave.mkdir(parents=True, exist_ok=True)
+    moved = []
+    for name in GRAPH_FILES:
+        path = root / name
+        if path.exists():
+            path.replace(grave / name)
+            moved.append(name)
+    (root / "build.json").unlink(missing_ok=True)
+    return moved
+
+
 def documents(layer: Path) -> list[str]:
     return [path.read_text(encoding="utf-8") for path in sorted((layer / "corpus").glob("*.txt"))]
 
@@ -258,6 +295,10 @@ def documents(layer: Path) -> list[str]:
 def phase_build(layer: Path, root: Path, meter: Path, device: str | None) -> int:
     stats = {"calls": 0, "retries": 0, "cache_hits": 0, "prompt_tokens": 0, "completion_tokens": 0}
     root.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    moved = clear_stale_graph(root, stamp)
+    if moved:
+        print(f"interrupted graph moved to stale-{stamp}: {', '.join(moved)}", flush=True)
     graph, _phase = build_graph(root, meter, device, stats)
     texts = documents(layer)
     print(f"documents {len(texts)}  spend so far {spent_usd(meter):.4f} $", flush=True)

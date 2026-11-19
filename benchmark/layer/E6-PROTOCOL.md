@@ -1053,3 +1053,18 @@ never completed.
 The clustering is seeded (`graph_cluster_seed`, `hierarchical_leiden`), so the
 partition is the same one the cached reports were written against — measured, not
 assumed: the previous restart asked for 340 community reports and paid for 165.
+
+### Amendment 6 to E18 — a dead run leaves a graph that the next one would merge into
+
+The fifth attempt's `finally` clause saved the graph: 8 160 entities, the entity
+vectors, and an empty community-report store. Relaunching naively would have
+re-read those nodes, found `full_docs` empty (it is saved empty for this build
+shape) and inserted the same 279 documents again, so every existing entity would
+have carried its description twice. The prompts would then differ from the cached
+ones and the whole report layer would be paid for a second time, against a polluted
+graph.
+
+The adapter now moves an unfinished graph into `stale-<timestamp>/` before a build
+and leaves `llm-cache/` where it is. The rule is: a graph is reused only when
+`build.json` from a completed run sits next to it. Nothing is deleted; the cache
+that was paid for is untouched.
