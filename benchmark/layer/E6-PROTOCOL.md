@@ -981,3 +981,50 @@ so the rerun pays for the entity summaries and the community reports and not for
 the extraction again. Both hooks now point at the pilot's model, which is what
 E18 declared ("the pilot's own model") in the first place. The 1,4432 $ already
 spent stays in the report.
+
+### Amendment 3 to E18 — nano's limiter busy-waits, and it stalled the build
+
+The third attempt reached the entity-embedding step and stopped moving: 1 029
+`asyncio` tasks waiting on `limit_async_func_call`, which in `0.0.8.2` polls
+`await asyncio.sleep(0.0001)` in a loop instead of waiting on a semaphore (their
+comment: "Not using async.Semaphore to aovid use nest-asyncio"). Each poll re-arms
+a timer, so the event loop spends the whole run cycling timers and the single
+encoding thread gets the interpreter only in scraps. Measured: 97 minutes of wall
+clock, 7 % GPU utilisation, 8 160 embeddings still unfinished — work that takes
+about a minute when encoded back to back.
+
+The adapter swaps in an `asyncio.Semaphore` with the same limit. Nothing about the
+run changes but the waiting: the limit is identical, the same inputs are encoded
+by the same model in the same batches, and the calls are independent. This is the
+same class of change as amendment 1's concurrency, and it touches throughput only.
+
+Cost at the stall: 1,4664 $ (1 116 paid calls). Extraction, entity summaries and
+part of the community reports are in the disk cache, so the rerun pays for the
+rest of the reports and nothing twice.
+
+### Amendment 4 to E18 — the ceiling, corrected against the community count
+
+Amendment 1 estimated the build from the price of an extraction call and left out
+that nano summarises every community it finds. Leiden on this corpus, at its
+default `max_cluster_size` of 10, produced **1 930 communities** across five levels
+(6 · 334 · 1 170 · 381 · 39), and each one is a model call.
+
+Measured on the 206 reports completed before the run was paused: **0,00117 $ per
+report**. The rest of the build is 2,48 $, so the build lands near **4,22 $**, and
+the planned question set (`local` on 192 questions at two calls each, `naive` on
+192) adds about 0,85 $. Total **≈ 5,07 $**.
+
+The ceiling is raised to **5,50 $**. Nothing about the configuration changes: the
+community size stays 10, every level is summarised, gleaning stays, the modes stay.
+The count is nano's own output on this corpus and cutting it would weaken the
+competitor on a number we did not predict before seeing it.
+
+Spend at the pause: 1,74 $, all of it cached on disk.
+
+Two corrections are recorded alongside, because they cost wall clock and are part
+of the run's history rather than its result:
+
+* the third attempt died at the entity-embedding step (amendment 3) and left
+  1,4664 $ of cached work;
+* a first attempt died at the entity-summary step (amendment 2) and left another
+  1,4432 $, mostly the same extraction calls replayed.
