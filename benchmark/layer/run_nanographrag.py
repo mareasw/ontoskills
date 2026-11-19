@@ -35,6 +35,8 @@ import asyncio
 import hashlib
 import json
 import os
+import random
+import re
 import sys
 import time
 from pathlib import Path
@@ -70,6 +72,21 @@ def spent_usd(log: Path) -> float:
         prompt += int(row.get("prompt_tokens") or 0)
         completion += int(row.get("completion_tokens") or 0)
     return prompt / 1e6 * PRICE_IN + completion / 1e6 * PRICE_OUT
+
+
+def retry_hint(message: str) -> float:
+    """The wait the gateway asked for, in seconds, when it names one.
+
+    A burst of community reports gets `503 retry_after_ms: 30000`; obeying it is
+    both faster and cheaper than a fixed backoff that keeps knocking.
+    """
+    match = re.search(r"retry_after_ms['\"]?\s*:\s*(\d+)", message)
+    if match:
+        return int(match.group(1)) / 1000.0 + 2.0
+    match = re.search(r"retry after\s*(\d+)", message, re.IGNORECASE)
+    if match:
+        return float(match.group(1)) + 2.0
+    return 0.0
 
 
 def cache_path(root: Path, key: str) -> Path:
@@ -124,17 +141,21 @@ def make_model_func(root: Path, meter: Path, stats: dict):
             payload["response_format"] = response_format
 
         delay = 8.0
-        for attempt in range(4):
+        for attempt in range(8):
             try:
                 response = await client.chat.completions.create(**payload)
                 break
             except Exception as error:  # the gateway 503s under load
-                if attempt == 3:
+                if attempt == 7:
                     raise
                 stats["retries"] += 1
-                print(f"  retry {attempt + 1} after {type(error).__name__}", flush=True)
-                await asyncio.sleep(delay)
-                delay *= 2
+                wait = max(delay, retry_hint(str(error))) + random.uniform(0, 2)
+                print(
+                    f"  retry {attempt + 1} in {wait:.0f}s after {type(error).__name__}",
+                    flush=True,
+                )
+                await asyncio.sleep(wait)
+                delay = min(delay * 2, 120.0)
 
         text = (response.choices[0].message.content or "").strip()
         usage = getattr(response, "usage", None)
@@ -220,9 +241,10 @@ def build_graph(root: Path, meter: Path, device: str | None, stats: dict):
         cheap_model_func=model_func,
         embedding_func=embed,
         enable_naive_rag=True,
-        # Twelve in flight, not four: E18 amendment 1. Throughput only — the calls
-        # are independent and the model runs at temperature 0.
-        best_model_max_async=12,
+        # Six in flight: E18 amendments 1 and 5. Throughput only — the calls are
+        # independent and the model runs at temperature 0.
+        best_model_max_async=6,
+        cheap_model_max_async=6,
         embedding_func_max_async=1,
         embedding_batch_num=8,
         always_create_working_dir=True,
