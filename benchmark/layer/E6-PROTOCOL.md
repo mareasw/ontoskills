@@ -1068,3 +1068,34 @@ The adapter now moves an unfinished graph into `stale-<timestamp>/` before a bui
 and leaves `llm-cache/` where it is. The rule is: a graph is reused only when
 `build.json` from a completed run sits next to it. Nothing is deleted; the cache
 that was paid for is untouched.
+
+### Amendment 7 to E18 — the gateway's weekly quota, and the state left behind
+
+At 10:58 on 19 November the gateway stopped serving this account:
+
+```json
+{"error": {"code": "budget_exhausted",
+           "message": "quota exhausted (window weekly, resets 2026-11-23T00:00:00.000Z)",
+           "retry_after_ms": 86400000}}
+```
+
+The sixth attempt had replayed 1 367 cached community reports for free and was
+starting the 1 368th when the wall appeared. The adapter read `86400000` — a day —
+and parked, which is worse than failing, so the wait is now capped at 300 s: a
+longer hint raises `UpstreamUnavailable` and the build records `"outcome":
+"upstream"` instead of sleeping.
+
+**State at the wall**, which is where the next run resumes:
+
+| | |
+|---|---|
+| calls served | 2 507 (plus 190 `503`, 13 `422`, one `502` — all with 0 tokens) |
+| spend | **2,9162 $** of the 5,50 $ ceiling |
+| cached and reusable | extraction (1 050), entity summaries, **1 367 of 1 930** community reports |
+| still to pay for | 563 community reports ≈ 0,66 $, then the questions ≈ 0,85 $ |
+| projected total | **≈ 4,4 $** |
+| working directory | `pilot-work/layer/nano/` — `llm-cache/` plus one moved-aside graph |
+
+No quality number exists yet for E18 and none is recorded here. The run resumes
+with the same command when the quota resets; the cache means the reports already
+paid for are not paid again.

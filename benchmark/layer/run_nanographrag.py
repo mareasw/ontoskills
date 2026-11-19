@@ -51,6 +51,12 @@ PRICE_IN, PRICE_OUT = 0.15, 0.60
 DEFAULT_MAX_TOKENS = 4096
 # Declared in the protocol: the run stops here and reports itself incomplete.
 CEILING_USD = 5.50
+# A hint longer than this is not a pause, it is a wall: the weekly quota, say.
+MAX_WAIT_SECONDS = 300.0
+
+
+class UpstreamUnavailable(RuntimeError):
+    """The gateway asked for a wait no run should sit through."""
 
 
 class BudgetExceeded(RuntimeError):
@@ -87,6 +93,18 @@ def retry_hint(message: str) -> float:
     if match:
         return float(match.group(1)) + 2.0
     return 0.0
+
+
+def next_wait(delay: float, message: str) -> float:
+    """Seconds to wait before the next attempt.
+
+    Raises when the gateway names a wait in hours: that is an exhausted quota, and
+    sleeping on it would leave a run parked for a day instead of reporting it.
+    """
+    hinted = retry_hint(message)
+    if hinted > MAX_WAIT_SECONDS:
+        raise UpstreamUnavailable(message)
+    return max(delay, hinted) + random.uniform(0, 2)
 
 
 def cache_path(root: Path, key: str) -> Path:
@@ -149,7 +167,7 @@ def make_model_func(root: Path, meter: Path, stats: dict):
                 if attempt == 7:
                     raise
                 stats["retries"] += 1
-                wait = max(delay, retry_hint(str(error))) + random.uniform(0, 2)
+                wait = next_wait(delay, str(error))
                 print(
                     f"  retry {attempt + 1} in {wait:.0f}s after {type(error).__name__}",
                     flush=True,
@@ -309,6 +327,10 @@ def phase_build(layer: Path, root: Path, meter: Path, device: str | None) -> int
         print(f"STOPPED: {error}", flush=True)
         write_record(root, stats, started, "ceiling")
         return 2
+    except UpstreamUnavailable as error:
+        print(f"STOPPED: the gateway is closed to us. {error}", flush=True)
+        write_record(root, stats, started, "upstream")
+        return 2
     write_record(root, stats, started, "ok")
     print(f"build done in {time.time() - started:.0f}s  {spent_usd(meter):.4f} $", flush=True)
     return 0
@@ -364,6 +386,9 @@ def phase_ask(layer: Path, root: Path, meter: Path, device: str | None, mode: st
                 answer = graph.query(item["text"], param=QueryParam(mode=mode))
             except BudgetExceeded as error:
                 print(f"STOPPED: {error}", flush=True)
+                return 2
+            except UpstreamUnavailable as error:
+                print(f"STOPPED: the gateway is closed to us. {error}", flush=True)
                 return 2
             finally:
                 phase["value"] = "passage"
