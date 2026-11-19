@@ -1090,7 +1090,7 @@ longer hint raises `UpstreamUnavailable` and the build records `"outcome":
 | | |
 |---|---|
 | calls served | 2 507 (plus 190 `503`, 13 `422`, one `502` — all with 0 tokens) |
-| spend | **2,9162 $** of the 5,50 $ ceiling |
+| spend | **2,9162 $** of the 5,50 $ ceiling, of which **0,0118 $** is the two-document smoke test of the adapter |
 | cached and reusable | extraction (1 050), entity summaries, **1 367 of 1 930** community reports |
 | still to pay for | 563 community reports ≈ 0,66 $, then the questions ≈ 0,85 $ |
 | projected total | **≈ 4,4 $** |
