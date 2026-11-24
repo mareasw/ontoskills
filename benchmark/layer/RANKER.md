@@ -387,6 +387,50 @@ stays in the table, labelled, with the test number that made the decision.
   a generator would make the row incomparable with GraphRAG's `local`.
 - **No fitting on the 200 questions.** E1–E5 see dev; the test half is read once.
 
+### After the freeze: a modern reranker, and the depth ceiling
+
+Two things were measured later, both local and free, and neither changes the
+decision — but both belong in this record because a reader will ask.
+
+**A real cross-encoder loses.** `BAAI/bge-reranker-v2-m3`, revision `953dc6f6`,
+**fp32**, `max_length = 256`, reranking the frozen pool of a hundred, one pair per
+candidate, on the dev half:
+
+| budget | quote: `cover` → CE | statement: `cover` → CE |
+|---|---|---|
+| 2 000 | 55,62 → 47,90 (−7,71 [−11,1; −4,2]) | 65,31 → 63,68 (−1,62 [−3,2; −0,0]) |
+| 5 000 | 70,83 → 59,47 (−11,36 [−13,8; −8,8]) | 74,73 → 74,43 (−0,30 [−1,3; +0,7]) |
+| 10 000 | 77,96 → 69,10 (−8,86 [−10,5; −7,2]) | 79,72 → 79,80 (+0,08 [−0,0; +0,2]) |
+| 14 830 | 80,31 → 74,59 (−5,71 [−7,1; −4,4]) | 79,83 → 79,83 (0,00) |
+
+The last two rows of the statement column are the pool fitting whole: when the cut
+keeps everything, order cannot matter and the two columns are the same number by
+construction. The rows where a reranker could act are the first two, and it loses
+both. That is now **two** independent rerankers failing on this corpus — the
+generic `ms-marco-MiniLM-L-6` in E5 and a 0,6 B multilingual one here. The finding
+is narrower than "rerankers are bad": the greedy chooser maximises the quantity
+the metric measures, coverage of the tokens the question and the gold facts share,
+while a relevance scorer optimises something else and demotes claims that carry
+answer tokens the question never names. Under a token-coverage metric a relevance
+trainer is a different objective, not a better one.
+
+**The hundred-claim pool was a ceiling, not a property.** `cover` runs out of
+claims at 9 524 characters — a hundred statements of about eighty. Past that the
+budget cannot buy a hundred-and-first claim, and the earlier losses at ten and
+fourteen thousand characters were partly measured against an exhausted pool:
+
+| budget | depth 100 | depth 200 | depth 400 | depth 800 | 400 vs 100, paired |
+|---|---|---|---|---|---|
+| 2 000 | 65,31 % | 64,77 % | 65,29 % | 64,21 % | ~0 |
+| 5 000 | 74,73 % | 74,02 % | **74,88 %** | 74,31 % | +0,15 [−1,1; +1,4] |
+| 10 000 | 79,72 % | 80,90 % | **81,12 %** | 80,38 % | +1,40 [+0,3; +2,6] |
+| 14 830 | 79,83 % | 83,61 % | **84,19 %** | 83,62 % | +4,36 [+3,1; +5,7] |
+
+Retrieval depth is published as **400**: it costs local CPU and no money, it is
+indistinguishable from a hundred at the operating point, and it removes a pool
+ceiling that would otherwise be reported as a property of the layer. Eight hundred
+buys nothing over four hundred.
+
 ## 6. The split, fixed before the first experiment
 
 `benchmark/layer/splits.py`, salt `ontoskills-ranker-v1`: 100 dev, 100 test, cut
